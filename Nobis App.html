@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Personal de Finca</title>
+    <!-- Tailwind CSS CDN para un estilo moderno y responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS para el mapa -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <!-- Leaflet Draw CSS para las herramientas de dibujo -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <!-- Estilo personalizado para el mapa -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        #map {
+            height: 60vh;
+            width: 100%;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+        }
+        .leaflet-control-coordinates {
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 8px 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            font-family: monospace;
+            font-size: 0.875rem;
+            color: #333;
+            border: 2px solid rgba(0, 0, 0, 0.2);
+            margin-left: 10px;
+            margin-bottom: 10px;
+            max-width: 250px;
+            transition: all 0.3s ease;
+        }
+        .leaflet-control-coordinates.hover {
+            background-color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .coordinates-label {
+            font-weight: bold;
+            color: #4B5563;
+            margin-right: 5px;
+        }
+        .coordinates-value {
+            font-weight: bold;
+            color: #1F2937;
+        }
+        .admin-controls {
+            display: none;
+        }
+        /* Mejoras para móviles */
+        @media (max-width: 768px) {
+            #map {
+                height: 50vh;
+            }
+            body {
+                padding: 12px;
+            }
+            .max-w-7xl {
+                padding: 0;
+            }
+            .bg-white {
+                border-radius: 1rem;
+            }
+            .text-3xl {
+                font-size: 1.75rem;
+            }
+            .text-2xl {
+                font-size: 1.5rem;
+            }
+        }
+        /* Asegurar que el modal sea visible en móviles */
+        #adminModal {
+            z-index: 10000;
+        }
+        /* Mejorar visualización de botones en móviles */
+        button, input, select {
+            font-size: 16px; /* Previene el zoom en iOS */
+        }
+        /* Prevenir desbordamiento en móviles */
+        .overflow-x-hidden {
+            overflow-x: hidden;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 sm:p-8 overflow-x-hidden">
+
+    <!-- Modal de acceso de administrador, visible al inicio -->
+    <div id="adminModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex flex-col items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+            <h1 class="text-3xl font-bold text-gray-800 mb-4">Acceso de Administrador</h1>
+            <p class="text-gray-600 mb-6">Por favor, introduce tu código de administrador para acceder.</p>
+            <input type="password" id="adminCodeInput" placeholder="Introduce el código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-4">
+            <button id="adminLoginBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition duration-300 ease-in-out font-bold">Acceder</button>
+        </div>
+    </div>
+
+    <!-- Contenido principal de la aplicación (inicialmente oculto) -->
+    <div class="max-w-7xl mx-auto flex flex-col space-y-8 hidden" id="appContent">
+        <!-- Resto del contenido de la aplicación... -->
+        
+        <!-- Sección principal del mapa -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Mapa de la Finca y Geocercas</h2>
+            <p id="authStatus" class="text-xs text-center text-gray-400 mb-2">Conectando...</p>
+            <div id="loading" class="text-center my-4" style="display: none;">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                <p class="text-gray-600 mt-2">Cargando datos...</p>
+            </div>
+            <div id="map"></div>
+            <div class="mt-4 flex flex-col items-center justify-center text-center">
+                <p id="statusMessage" class="text-base sm:text-lg font-medium text-gray-700">Haz clic en el mapa para colocar al personal. Usa las herramientas de la izquierda del mapa para dibujar geocercas.</p>
+            </div>
+        </div>
+
+        <!-- Resto del contenido de la aplicación... -->
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, updateDoc as firestoreUpdateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Firestore logs for debugging
+        setLogLevel('Debug');
+
+        // Leaflet JS
+        // Not a module, so must be loaded outside of the module script
+    </script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <!-- Leaflet Draw JS -->
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+    <script type="module">
+        // ... (código JavaScript anterior) ...
+
+        // Leaflet setup - NO inicializar el mapa aquí todavía
+        const initialCoords = [4.7110, -74.0721]; // Bogotá, Colombia
+        let map = null; // No inicializar todavía
+        
+        // App state
+        let personnelMarker = null;
+        let reportingInterval = null;
+        let geofenceLayers = {}; // Store leaflet layers by their firestore ID
+        let drawnItems = null;
+        
+        // Función para inicializar el mapa solo cuando sea visible
+        function initMap() {
+            if (map !== null) return; // Si ya está inicializado, salir
+            
+            map = L.map('map').setView(initialCoords, 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+            
+            // Inicializar controles de coordenadas
+            const coordinatesControl = L.control({position: 'bottomleft'});
+            coordinatesControl.onAdd = function(map) {
+                this._div = L.DomUtil.create('div', 'leaflet-control-coordinates');
+                this._div.innerHTML = '<div><span class="coordinates-label">Lat:</span> <span class="coordinates-value">-</span></div>' +
+                                     '<div><span class="coordinates-label">Lng:</span> <span class="coordinates-value">-</span></div>';
+                this._div.addEventListener('mouseover', () => this._div.classList.add('hover'));
+                this._div.addEventListener('mouseout', () => this._div.classList.remove('hover'));
+                return this._div;
+            };
+            coordinatesControl.addTo(map);
+            
+            map.on('mousemove', function(e) {
+                const lat = e.latlng.lat.toFixed(6);
+                const lng = e.latlng.lng.toFixed(6);
+                const coordsControl = document.querySelector('.leaflet-control-coordinates');
+                if (coordsControl) {
+                    coordsControl.innerHTML = `<div><span class="coordinates-label">Lat:</span> <span class="coordinates-value">${lat}</span></div>` +
+                                             `<div><span class="coordinates-label">Lng:</span> <span class="coordinates-value">${lng}</span></div>`;
+                }
+            });
+            
+            map.on('mouseout', function() {
+                const coordsControl = document.querySelector('.leaflet-control-coordinates');
+                if (coordsControl) {
+                    coordsControl.innerHTML = '<div><span class="coordinates-label">Lat:</span> <span class="coordinates-value">-</span></div>' +
+                                             '<div><span class="coordinates-label">Lng:</span> <span class="coordinates-value">-</span></div>';
+                }
+            });
+            
+            // Inicializar controles de dibujo
+            const drawControl = new L.Control.Draw({
+                edit: {
+                    featureGroup: drawnItems
+                },
+                draw: {
+                    polygon: { allowIntersection: false, showArea: true },
+                    polyline: false, rectangle: false, circle: false, marker: false, circlemarker: false,
+                }
+            });
+            
+            if (isAdmin) {
+                map.addControl(drawControl);
+            }
+
+            // Configurar eventos del mapa
+            map.on(L.Draw.Event.CREATED, async function (event) {
+                if (!isAuthReady || !isAdmin) return;
+                const layer = event.layer;
+                const geojson = layer.toGeoJSON();
+                const fenceName = `Geocerca #${Object.keys(geofenceLayers).length + 1}`;
+                
+                try {
+                    const docRef = await addDoc(getPublicCollection('geofences'), {
+                        name: fenceName,
+                        geojson: JSON.stringify(geojson),
+                    });
+                    layer.bindPopup(fenceName);
+                } catch (e) {
+                    handleFirestoreError(e, 'crear geocerca');
+                }
+            });
+
+            map.on('draw:edited draw:deleted', async function (e) {
+                if (!isAuthReady || !isAdmin) return;
+                e.layers.eachLayer(async (layer) => {
+                    const layers = await getDocs(getPublicCollection('geofences'));
+                    const doc = layers.docs.find(d => {
+                        try {
+                            const geojson = JSON.parse(d.data().geojson);
+                            return JSON.stringify(geojson.geometry.coordinates) === JSON.stringify(layer.toGeoJSON().geometry.coordinates);
+                        } catch (e) { return false; }
+                    });
+                    if (doc) {
+                        try {
+                            if (e.type === 'draw:edited') {
+                               await firestoreUpdateDoc(doc.ref, { geojson: JSON.stringify(layer.toGeoJSON()) });
+                            } else if (e.type === 'draw:deleted') {
+                               await deleteDoc(doc.ref);
+                            }
+                        } catch (e) {
+                            handleFirestoreError(e, 'editar/eliminar geocerca');
+                        }
+                    }
+                });
+            });
+            
+            map.on('click', function(e) {
+                if (!isAuthReady) return;
+                if (personnelMarker === null) {
+                    personnelMarker = L.marker(e.latlng, {
+                        draggable: true,
+                        icon: new L.Icon({
+                            iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="red" width="36px" height="36px"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>',
+                            iconSize: [36, 36],
+                            iconAnchor: [18, 36],
+                        })
+                    }).addTo(map);
+                    personnelMarker.on('dragend', updatePersonnelStatus);
+                    statusMessageEl.textContent = 'Marcador del personal colocado. Ahora puedes arrastrarlo y dibujar una geocerca.';
+                } else {
+                    personnelMarker.setLatLng(e.latlng);
+                    updatePersonnelStatus();
+                }
+            });
+            
+            // Forzar un redibujado del mapa
+            setTimeout(() => {
+                if (map) {
+                    map.invalidateSize();
+                }
+            }, 300);
+        }
+
+        // Lógica de inicio de sesión de administrador
+        adminLoginBtn.addEventListener('click', () => {
+            const code = adminCodeInput.value;
+            if (code === ADMIN_CODE) {
+                isAdmin = true;
+                adminModal.classList.add('hidden'); // Ocultar modal de login
+                appContent.classList.remove('hidden'); // Mostrar contenido de la aplicación
+                adminControls.forEach(el => el.style.display = 'block'); // Mostrar controles de admin
+                
+                // Inicializar el mapa ahora que es visible
+                setTimeout(() => {
+                    initMap();
+                    
+                    // Forzar un redibujado después de un breve retraso
+                    setTimeout(() => {
+                        if (map) {
+                            map.invalidateSize();
+                            map.setView(initialCoords, 13);
+                        }
+                    }, 500);
+                }, 100);
+                
+                showCustomMessage("¡Acceso de administrador concedido!");
+            } else {
+                showCustomMessage("Código de acceso incorrecto. Por favor, inténtalo de nuevo.");
+            }
+        });
+
+        // ... (resto del código JavaScript) ...
+
+    </script>
+</body>
+</html>
