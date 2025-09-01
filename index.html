@@ -4,13 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestión de Personal de Finca</title>
-    <!-- Tailwind CSS CDN para un estilo moderno y responsivo -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Leaflet CSS para el mapa -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <!-- Leaflet Draw CSS para las herramientas de dibujo -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
-    <!-- Estilo personalizado para el mapa -->
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -56,7 +52,6 @@
         .admin-controls {
             display: none;
         }
-        /* Mejoras para móviles */
         @media (max-width: 768px) {
             #map {
                 height: 50vh;
@@ -77,17 +72,20 @@
                 font-size: 1.5rem;
             }
         }
-        /* Asegurar que el modal sea visible en móviles */
         #adminModal {
             z-index: 10000;
         }
-        /* Mejorar visualización de botones en móviles */
         button, input, select {
-            font-size: 16px; /* Previene el zoom en iOS */
+            font-size: 16px;
         }
-        /* Prevenir desbordamiento en móviles */
         .overflow-x-hidden {
             overflow-x: hidden;
+        }
+        .error-message {
+            color: red;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
         }
     </style>
 </head>
@@ -98,87 +96,150 @@
         <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
             <h1 class="text-3xl font-bold text-gray-800 mb-4">Acceso de Administrador</h1>
             <p class="text-gray-600 mb-6">Por favor, introduce tu código de administrador para acceder.</p>
-            <input type="password" id="adminCodeInput" placeholder="Introduce el código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-4">
+            <input type="password" id="adminCodeInput" placeholder="Introduce el código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
+            <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
             <button id="adminLoginBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition duration-300 ease-in-out font-bold">Acceder</button>
         </div>
     </div>
 
     <!-- Contenido principal de la aplicación (inicialmente oculto) -->
     <div class="max-w-7xl mx-auto flex flex-col space-y-8 hidden" id="appContent">
-        <!-- Resto del contenido de la aplicación... -->
+        <header class="text-center my-4">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
+            <p class="text-md sm:text-lg text-gray-600 mt-2">Aplicación de seguimiento para personal de finca.</p>
+        </header>
         
         <!-- Sección principal del mapa -->
         <div class="bg-white p-6 rounded-2xl shadow-lg">
             <h2 class="text-2xl font-semibold text-gray-700 mb-4">Mapa de la Finca y Geocercas</h2>
-            <p id="authStatus" class="text-xs text-center text-gray-400 mb-2">Conectando...</p>
-            <div id="loading" class="text-center my-4" style="display: none;">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                <p class="text-gray-600 mt-2">Cargando datos...</p>
-            </div>
             <div id="map"></div>
             <div class="mt-4 flex flex-col items-center justify-center text-center">
                 <p id="statusMessage" class="text-base sm:text-lg font-medium text-gray-700">Haz clic en el mapa para colocar al personal. Usa las herramientas de la izquierda del mapa para dibujar geocercas.</p>
             </div>
         </div>
 
-        <!-- Resto del contenido de la aplicación... -->
+        <!-- Módulo de Reporte de Actividad del Personal -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Reporte de Actividad del Personal</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="reportPersonnel" class="block text-sm font-medium text-gray-700">Seleccionar Personal</label>
+                    <select id="reportPersonnel" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                        <option value="" disabled selected>Selecciona una persona</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="reportActivity" class="block text-sm font-medium text-gray-700">Seleccionar Actividad</label>
+                    <select id="reportActivity" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                        <option value="" disabled selected>Selecciona una actividad</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="reportGeofence" class="block text-sm font-medium text-gray-700">Seleccionar Geocerca</label>
+                    <select id="reportGeofence" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                        <option value="" disabled selected>Selecciona una geocerca</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="daysWorked" class="block text-sm font-medium text-gray-700">Días Trabajados</label>
+                    <input type="number" id="daysWorked" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                </div>
+                <div>
+                    <label for="hoursWorked" class="block text-sm font-medium text-gray-700">Horas Trabajadas</label>
+                    <input type="number" id="hoursWorked" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                </div>
+                <button id="submitReportBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition duration-300 ease-in-out font-bold">Subir Reporte</button>
+            </div>
+        </div>
+
+        <!-- Módulo de Reportes Valorados -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Reportes Valorados</h2>
+            <ul id="reportList" class="space-y-4">
+                <li class="text-gray-500 italic">No hay reportes enviados aún.</li>
+            </ul>
+        </div>
+
+        <!-- Botón para mostrar el modal de administrador -->
+        <div class="text-center">
+            <button id="showAdminModalBtn" class="bg-gray-400 text-white py-3 px-6 rounded-full hover:bg-gray-500 transition duration-300 ease-in-out font-bold shadow-lg">Acceso de Administrador</button>
+        </div>
+        
+        <!-- Sección de control y personal (visible para admin) -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg admin-controls hidden">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Añadir Personal</h2>
+            <div id="adminControlsContainer">
+                <div class="space-y-4">
+                    <div>
+                        <label for="personnelName" class="block text-sm font-medium text-gray-700">Nombre</label>
+                        <input type="text" id="personnelName" placeholder="Escribe el nombre del trabajador" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                    </div>
+                    <button id="addPersonnelBtn" class="w-full bg-green-600 text-white py-3 rounded-md hover:bg-green-700 transition duration-300 ease-in-out font-bold">Añadir Personal</button>
+                </div>
+
+                <hr class="my-6 border-gray-200">
+            </div>
+
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Personal en la Finca</h2>
+            <ul id="personnelList" class="space-y-2 flex-grow overflow-y-auto">
+                <li class="text-gray-500 italic">No hay personal añadido aún.</li>
+            </ul>
+        </div>
+
+        <!-- Módulo de Gestión de Actividades (Admin) -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg admin-controls hidden">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Gestión de Actividades (Admin)</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="activityName" class="block text-sm font-medium text-gray-700">Nombre de la Actividad</label>
+                    <input type="text" id="activityName" placeholder="Escribe la actividad" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                </div>
+                <button id="addActivityBtn" class="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out font-bold">Añadir Actividad</button>
+            </div>
+            <ul id="activityList" class="mt-4 space-y-2 text-gray-600 text-sm">
+                <li class="text-gray-500 italic">No hay actividades añadidas.</li>
+            </ul>
+        </div>
     </div>
 
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, updateDoc as firestoreUpdateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // Firestore logs for debugging
-        setLogLevel('Debug');
-
-        // Leaflet JS
-        // Not a module, so must be loaded outside of the module script
-    </script>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <!-- Leaflet Draw JS -->
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
-    <script type="module">
-        // ... (código JavaScript anterior) ...
-
-        // Leaflet setup - NO inicializar el mapa aquí todavía
-        const initialCoords = [4.7110, -74.0721]; // Bogotá, Colombia
-        let map = null; // No inicializar todavía
-        
-        // App state
+    <script>
+        // Configuración inicial
+        const ADMIN_CODE = "admin123"; // Código de administrador
+        let map = null;
         let personnelMarker = null;
-        let reportingInterval = null;
-        let geofenceLayers = {}; // Store leaflet layers by their firestore ID
-        let drawnItems = null;
-        
-        // Función para inicializar el mapa solo cuando sea visible
+
+        // Referencias a elementos DOM
+        const adminModal = document.getElementById('adminModal');
+        const adminCodeInput = document.getElementById('adminCodeInput');
+        const adminLoginBtn = document.getElementById('adminLoginBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const appContent = document.getElementById('appContent');
+        const showAdminModalBtn = document.getElementById('showAdminModalBtn');
+        const adminControls = document.querySelectorAll('.admin-controls');
+
+        // Función para inicializar el mapa
         function initMap() {
-            if (map !== null) return; // Si ya está inicializado, salir
-            
+            const initialCoords = [4.7110, -74.0721]; // Bogotá, Colombia
             map = L.map('map').setView(initialCoords, 13);
             
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
 
-            drawnItems = new L.FeatureGroup();
-            map.addLayer(drawnItems);
-            
-            // Inicializar controles de coordenadas
+            // Añadir control de coordenadas
             const coordinatesControl = L.control({position: 'bottomleft'});
             coordinatesControl.onAdd = function(map) {
                 this._div = L.DomUtil.create('div', 'leaflet-control-coordinates');
                 this._div.innerHTML = '<div><span class="coordinates-label">Lat:</span> <span class="coordinates-value">-</span></div>' +
                                      '<div><span class="coordinates-label">Lng:</span> <span class="coordinates-value">-</span></div>';
-                this._div.addEventListener('mouseover', () => this._div.classList.add('hover'));
-                this._div.addEventListener('mouseout', () => this._div.classList.remove('hover'));
                 return this._div;
             };
             coordinatesControl.addTo(map);
             
+            // Actualizar coordenadas al mover el ratón
             map.on('mousemove', function(e) {
                 const lat = e.latlng.lat.toFixed(6);
                 const lng = e.latlng.lng.toFixed(6);
@@ -188,129 +249,42 @@
                                              `<div><span class="coordinates-label">Lng:</span> <span class="coordinates-value">${lng}</span></div>`;
                 }
             });
-            
-            map.on('mouseout', function() {
-                const coordsControl = document.querySelector('.leaflet-control-coordinates');
-                if (coordsControl) {
-                    coordsControl.innerHTML = '<div><span class="coordinates-label">Lat:</span> <span class="coordinates-value">-</span></div>' +
-                                             '<div><span class="coordinates-label">Lng:</span> <span class="coordinates-value">-</span></div>';
-                }
-            });
-            
-            // Inicializar controles de dibujo
-            const drawControl = new L.Control.Draw({
-                edit: {
-                    featureGroup: drawnItems
-                },
-                draw: {
-                    polygon: { allowIntersection: false, showArea: true },
-                    polyline: false, rectangle: false, circle: false, marker: false, circlemarker: false,
-                }
-            });
-            
-            if (isAdmin) {
-                map.addControl(drawControl);
-            }
-
-            // Configurar eventos del mapa
-            map.on(L.Draw.Event.CREATED, async function (event) {
-                if (!isAuthReady || !isAdmin) return;
-                const layer = event.layer;
-                const geojson = layer.toGeoJSON();
-                const fenceName = `Geocerca #${Object.keys(geofenceLayers).length + 1}`;
-                
-                try {
-                    const docRef = await addDoc(getPublicCollection('geofences'), {
-                        name: fenceName,
-                        geojson: JSON.stringify(geojson),
-                    });
-                    layer.bindPopup(fenceName);
-                } catch (e) {
-                    handleFirestoreError(e, 'crear geocerca');
-                }
-            });
-
-            map.on('draw:edited draw:deleted', async function (e) {
-                if (!isAuthReady || !isAdmin) return;
-                e.layers.eachLayer(async (layer) => {
-                    const layers = await getDocs(getPublicCollection('geofences'));
-                    const doc = layers.docs.find(d => {
-                        try {
-                            const geojson = JSON.parse(d.data().geojson);
-                            return JSON.stringify(geojson.geometry.coordinates) === JSON.stringify(layer.toGeoJSON().geometry.coordinates);
-                        } catch (e) { return false; }
-                    });
-                    if (doc) {
-                        try {
-                            if (e.type === 'draw:edited') {
-                               await firestoreUpdateDoc(doc.ref, { geojson: JSON.stringify(layer.toGeoJSON()) });
-                            } else if (e.type === 'draw:deleted') {
-                               await deleteDoc(doc.ref);
-                            }
-                        } catch (e) {
-                            handleFirestoreError(e, 'editar/eliminar geocerca');
-                        }
-                    }
-                });
-            });
-            
-            map.on('click', function(e) {
-                if (!isAuthReady) return;
-                if (personnelMarker === null) {
-                    personnelMarker = L.marker(e.latlng, {
-                        draggable: true,
-                        icon: new L.Icon({
-                            iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="red" width="36px" height="36px"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>',
-                            iconSize: [36, 36],
-                            iconAnchor: [18, 36],
-                        })
-                    }).addTo(map);
-                    personnelMarker.on('dragend', updatePersonnelStatus);
-                    statusMessageEl.textContent = 'Marcador del personal colocado. Ahora puedes arrastrarlo y dibujar una geocerca.';
-                } else {
-                    personnelMarker.setLatLng(e.latlng);
-                    updatePersonnelStatus();
-                }
-            });
-            
-            // Forzar un redibujado del mapa
-            setTimeout(() => {
-                if (map) {
-                    map.invalidateSize();
-                }
-            }, 300);
         }
 
         // Lógica de inicio de sesión de administrador
         adminLoginBtn.addEventListener('click', () => {
-            const code = adminCodeInput.value;
+            const code = adminCodeInput.value.trim();
+            
             if (code === ADMIN_CODE) {
-                isAdmin = true;
-                adminModal.classList.add('hidden'); // Ocultar modal de login
-                appContent.classList.remove('hidden'); // Mostrar contenido de la aplicación
-                adminControls.forEach(el => el.style.display = 'block'); // Mostrar controles de admin
+                // Código correcto
+                adminModal.classList.add('hidden');
+                appContent.classList.remove('hidden');
+                adminControls.forEach(el => el.style.display = 'block');
+                errorMessage.style.display = 'none';
                 
-                // Inicializar el mapa ahora que es visible
+                // Inicializar el mapa después de un breve retraso
                 setTimeout(() => {
                     initMap();
-                    
-                    // Forzar un redibujado después de un breve retraso
-                    setTimeout(() => {
-                        if (map) {
-                            map.invalidateSize();
-                            map.setView(initialCoords, 13);
-                        }
-                    }, 500);
-                }, 100);
-                
-                showCustomMessage("¡Acceso de administrador concedido!");
+                }, 50);
             } else {
-                showCustomMessage("Código de acceso incorrecto. Por favor, inténtalo de nuevo.");
+                // Código incorrecto
+                errorMessage.style.display = 'block';
             }
         });
 
-        // ... (resto del código JavaScript) ...
+        // Permitir enviar el formulario con la tecla Enter
+        adminCodeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                adminLoginBtn.click();
+            }
+        });
 
+        // Mostrar modal de administrador al hacer clic en el botón
+        if (showAdminModalBtn) {
+            showAdminModalBtn.addEventListener('click', () => {
+                adminModal.classList.remove('hidden');
+            });
+        }
     </script>
 </body>
 </html>
