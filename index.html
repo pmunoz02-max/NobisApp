@@ -99,6 +99,16 @@
         .leaflet-draw-toolbar a:hover {
             background-color: #f4f4f4;
         }
+        /* Asegurar que los controles de dibujo sean visibles */
+        .leaflet-draw {
+            display: block !important;
+        }
+        .leaflet-top {
+            z-index: 1000;
+        }
+        .leaflet-touch .leaflet-draw-actions {
+            display: block !important;
+        }
     </style>
 </head>
 <body class="bg-gray-100 p-4 sm:p-8 overflow-x-hidden">
@@ -234,13 +244,21 @@
         const showAdminModalBtn = document.getElementById('showAdminModalBtn');
         const adminControls = document.querySelectorAll('.admin-controls');
 
-        // Función para inicializar el mapa
+        // Función para inicializar el mapa y las herramientas de dibujo
         function initMap() {
             const initialCoords = [4.7110, -74.0721]; // Bogotá, Colombia
-            map = L.map('map').setView(initialCoords, 13);
             
+            // Inicializar el mapa
+            map = L.map('map', {
+                zoomControl: true,
+                center: initialCoords,
+                zoom: 13
+            });
+            
+            // Añadir capa de OpenStreetMap
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
             }).addTo(map);
 
             // Inicializar la capa para los elementos dibujados
@@ -249,7 +267,7 @@
 
             // Configurar las herramientas de dibujo
             drawControl = new L.Control.Draw({
-                position: 'topright',
+                position: 'topleft',
                 draw: {
                     polygon: {
                         allowIntersection: false,
@@ -258,8 +276,15 @@
                         shapeOptions: {
                             color: '#3388ff',
                             fillColor: '#3388ff',
-                            fillOpacity: 0.2
-                        }
+                            fillOpacity: 0.2,
+                            weight: 2
+                        },
+                        guidelineDistance: 20,
+                        showLength: true,
+                        icon: new L.DivIcon({
+                            iconSize: new L.Point(12, 12),
+                            className: 'leaflet-div-icon leaflet-editing-icon'
+                        })
                     },
                     polyline: false,
                     circle: false,
@@ -280,6 +305,9 @@
             map.on(L.Draw.Event.CREATED, function (event) {
                 const layer = event.layer;
                 drawnItems.addLayer(layer);
+                
+                // Mostrar mensaje de confirmación
+                alert('Geocerca creada exitosamente. Puede editar o eliminar la geocerca usando las herramientas de edición.');
                 
                 // Aquí puedes guardar la geocerca en tu base de datos si es necesario
                 console.log('Geocerca creada:', layer.toGeoJSON());
@@ -309,7 +337,12 @@
             // Ajustar el tamaño del mapa después de que se muestre
             setTimeout(() => {
                 map.invalidateSize();
-            }, 100);
+                // Forzar la visualización de los controles de dibujo
+                if (drawControl) {
+                    map.removeControl(drawControl);
+                    map.addControl(drawControl);
+                }
+            }, 300);
         }
 
         // Lógica de inicio de sesión de administrador
@@ -326,7 +359,7 @@
                 // Inicializar el mapa después de un breve retraso
                 setTimeout(() => {
                     initMap();
-                }, 50);
+                }, 100);
             } else {
                 // Código incorrecto
                 errorMessage.style.display = 'block';
@@ -346,6 +379,11 @@
                 adminModal.classList.remove('hidden');
             });
         }
+
+        // Inicializar el modal de administrador al cargar la página
+        document.addEventListener('DOMContentLoaded', () => {
+            adminModal.classList.remove('hidden');
+        });
     </script>
 </body>
 </html>
