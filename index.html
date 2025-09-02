@@ -67,7 +67,7 @@
         </div>
       </div>
       <div id="map"></div>
-      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Haz clic en el mapa para ubicar la finca o usa el formulario de abajo.</p>
+      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Haz clic en el mapa para crear una nueva finca (se te pedirá el nombre).</p>
     </div>
 
     <!-- Geocercas con nombre -->
@@ -99,33 +99,15 @@
     const db = firebase.firestore();
     firebase.auth().signInAnonymously().catch(console.error);
 
-    let map, drawnItems, fincaMarker; // (no se usa para mostrar todas, se deja por compatibilidad mínima)
-    let activeFarmId = null;
-    let farmsLayer; // capa con todos los marcadores de fincas + etiquetas
+    let map, drawnItems;
+    let activeFarmId = null; // (se usa para geocercas; no interferimos ahora)
+    const fincaMarkers = {}; // Múltiples marcadores de finca por id
 
     function parseCoord(val){
       if (typeof val !== 'string' && typeof val !== 'number') return null;
       const s = String(val).trim().replace(',', '.');
       const n = parseFloat(s);
       return Number.isFinite(n) ? n : null;
-    }
-
-    async function setFincaLocation(lat, lng){
-      if(!activeFarmId){
-        const name = prompt("Nombre de la finca para estas coordenadas:");
-        if(!name) return alert("Debes ingresar un nombre de finca");
-        const docRef = await db.collection('farms').add({
-          name,
-          fincaLocation:{lat, lng},
-          geofences:{ type:'FeatureCollection', features: [] }
-        });
-        activeFarmId = docRef.id;
-        await loadFarms();
-        await renderAllFarmsMarkers();
-      } else {
-        await db.collection('farms').doc(activeFarmId).set({ fincaLocation: { lat, lng } }, { merge:true });
-        await renderAllFarmsMarkers();
-      }
     }
 
     function initMap(center={lat:-0.1807, lng:-78.4678}, zoom=13) {
@@ -135,15 +117,19 @@
       drawnItems = new L.FeatureGroup();
       map.addLayer(drawnItems);
 
-      // capa para TODOS los marcadores de fincas
-      farmsLayer = L.layerGroup().addTo(map);
-
-      // al hacer click, crear/actualizar finca y refrescar marcadores
-      map.on('click', e => {
-        setFincaLocation(e.latlng.lat, e.latlng.lng);
+      // Al hacer click SIEMPRE creamos una NUEVA finca (pide nombre y guarda), y refrescamos los pines
+      map.on('click', async (e) => {
+        const name = prompt("Nombre de la nueva finca:");
+        if(!name) return;
+        await db.collection('farms').add({
+          name,
+          fincaLocation: { lat: e.latlng.lat, lng: e.latlng.lng },
+          geofences: { type:'FeatureCollection', features: [] }
+        });
+        await loadFarms();
       });
 
-      // Evento de dibujo de geocerca con nombre (se mantiene)
+      // Evento de dibujo de geocerca con nombre (sin cambios en esta tarea)
       map.on(L.Draw.Event.CREATED, e => {
         const layer = e.layer;
         const name = prompt("Nombre de la geocerca:", "Geocerca " + (drawnItems.getLayers().length+1)) || ("Geocerca " + (drawnItems.getLayers().length+1));
@@ -154,6 +140,8 @@
         geo.eachLayer(l=> drawnItems.addLayer(l));
         saveGeofences();
       });
+
+      loadFarms();
     }
 
     async function saveGeofences(){
@@ -181,8 +169,41 @@
       sel.innerHTML='';
       const snap = await db.collection('farms').get();
       snap.forEach(doc=>{
+        const data = doc.data();
+        // llenar selector
         const opt = document.createElement('option');
-        opt.value=doc.id; opt.textContent=(doc.data().name || 'Finca');
+        opt.value=doc.id; opt.textContent=data.name || 'Finca';
         sel.appendChild(opt);
+        // limpiar marcador previo si existía
+        if(fincaMarkers[doc.id]){ map.removeLayer(fincaMarkers[doc.id]); delete fincaMarkers[doc.id]; }
+        // agregar marcador + etiqueta permanente
+        if(data.fincaLocation && Number.isFinite(data.fincaLocation.lat) && Number.isFinite(data.fincaLocation.lng)){
+          const marker = L.marker([data.fincaLocation.lat, data.fincaLocation.lng]).addTo(map);
+          marker.bindTooltip(data.name || 'Finca', { permanent:true, direction:'right', offset:[10,0], className:'farm-label' });
+          fincaMarkers[doc.id] = marker;
+        }
       });
-      if(activeFarmI
+      if(activeFarmId){ sel.value=activeFarmId; }
+    }
+
+    // LOGIN ADMIN
+    const ADMIN_CODE = "admin123";
+    function normalizeAdminInput(str){
+      return (str||"").normalize("NFKC").replace(/["'“”\s]/g,"").toLowerCase();
+    }
+    function doAdminLogin(){
+      const raw = document.getElementById('adminCodeInput').value;
+      if(normalizeAdminInput(raw) === normalizeAdminInput(ADMIN_CODE)){
+        document.getElementById('adminModal').classList.add("hidden");
+        document.getElementById('appContent').classList.remove("hidden");
+        setTimeout(initMap,100);
+      } else {
+        document.getElementById('errorMessage').style.display="block";
+      }
+    }
+    document.getElementById('adminLoginBtn').addEventListener("click", doAdminLogin);
+    document.getElementById('adminCodeInput').addEventListener("keypress", e=>{ if(e.key==="Enter") doAdminLogin(); });
+    document.addEventListener("DOMContentLoaded", ()=> document.getElementById('adminModal').classList.remove("hidden"));
+  </script>
+</body>
+</html>
