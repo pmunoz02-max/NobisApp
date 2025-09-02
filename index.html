@@ -48,22 +48,19 @@
     <div class="bg-white p-6 rounded-2xl shadow-lg">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
-        <!-- Botón rojo para eliminar finca -->
+        <!-- Botón rojo ELIMINAR FINCA (añadido) -->
         <button id="deleteFarmBtn"
           class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
           title="Eliminar la finca seleccionada">
-          <!-- X icon -->
+          <!-- Icono X -->
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M6 18L18 6M6 6l12 12" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
           Eliminar finca
         </button>
       </div>
       <div id="map"></div>
-      <p id="statusMessage" class="mt-3 text-sm text-gray-600">
-        Haz clic en el mapa para crear una nueva finca. Para borrar, selecciona una finca en el desplegable y usa <strong>Eliminar finca</strong>.
-      </p>
+      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Haz clic en el mapa para crear una nueva finca. Se guardará en Firestore y también en el almacenamiento local para que persista al reabrir.</p>
     </div>
   </div>
 
@@ -84,8 +81,9 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    // 1) Persistencia offline (si es posible)
+    // 1) Intenta activar persistencia offline (IndexedDB)
     db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+      // Si falla (p.ej. Safari privado o varias pestañas), seguimos sin ella
       console.warn('Firestore persistence no disponible:', err && err.code);
     });
 
@@ -115,20 +113,16 @@
         fincaMarkers[f.id] = marker;
       });
       // llenar selector
-      fillFarmSelect(farms);
-      // actualizar estado botón
-      updateDeleteButtonState();
-    }
-
-    function fillFarmSelect(farms){
       const sel = document.getElementById('farmSelect');
-      if (!sel) return;
-      sel.innerHTML = '';
-      farms.forEach(f=>{
-        const opt = document.createElement('option');
-        opt.value = f.id; opt.textContent = f.name || 'Finca';
-        sel.appendChild(opt);
-      });
+      if (sel){
+        sel.innerHTML = '';
+        farms.forEach(f=>{
+          const opt = document.createElement('option');
+          opt.value = f.id; opt.textContent = f.name || 'Finca';
+          sel.appendChild(opt);
+        });
+      }
+      updateDeleteButtonState(); // (añadido) actualizar estado del botón
     }
 
     function initMap(center={lat:-0.1807, lng:-78.4678}, zoom=6){
@@ -178,8 +172,17 @@
         });
         // Escribir espejo local (persistencia al reabrir)
         saveCache(farms);
-        fillFarmSelect(farms);
-        updateDeleteButtonState();
+        // rellenar selector
+        const sel = document.getElementById('farmSelect');
+        if (sel){
+          sel.innerHTML = '';
+          farms.forEach(f=>{
+            const opt = document.createElement('option');
+            opt.value = f.id; opt.textContent = f.name || 'Finca';
+            sel.appendChild(opt);
+          });
+        }
+        updateDeleteButtonState(); // (añadido) actualizar estado del botón
       }, err => {
         console.error('onSnapshot error:', err);
         // Si falla el snapshot (sin conexión, reglas, etc.), mantenemos lo del cache
@@ -187,7 +190,7 @@
       });
     }
 
-    // === ELIMINAR FINCA ===
+    // === (añadido) ELIMINAR FINCA ===
     async function deleteSelectedFarm(){
       const sel = document.getElementById('farmSelect');
       const id = sel && sel.value;
@@ -215,19 +218,18 @@
         // el snapshot actualizará el cache y la UI
       }catch(err){
         console.error('No se pudo borrar en Firestore, eliminando solo localmente:', err);
-        // fallback: borrar solo del cache local
         const updated = farmsCache.filter(f=>f.id!==id);
         saveCache(updated);
         renderFromCache();
       }
     }
 
+    // (añadido) Habilitar/deshabilitar botón eliminar
     function updateDeleteButtonState(){
       const sel = document.getElementById('farmSelect');
       const btn = document.getElementById('deleteFarmBtn');
       if(!btn) return;
-      const hasSelection = Boolean(sel && sel.value);
-      btn.disabled = !hasSelection;
+      btn.disabled = !(sel && sel.value);
     }
 
     // LOGIN ADMIN
@@ -245,17 +247,19 @@
         document.getElementById('errorMessage').style.display="block";
       }
     }
-
-    // Listeners
     document.getElementById('adminLoginBtn').addEventListener("click",doAdminLogin);
     document.getElementById('adminCodeInput').addEventListener("keypress",e=>{if(e.key==="Enter")doAdminLogin();});
     document.addEventListener("DOMContentLoaded",()=>{
       document.getElementById('adminModal').classList.remove("hidden");
+      // (añadido) listeners para el botón y el select
       const sel = document.getElementById('farmSelect');
-      sel.addEventListener('change', updateDeleteButtonState);
-      document.getElementById('deleteFarmBtn').addEventListener('click', deleteSelectedFarm);
+      if (sel) sel.addEventListener('change', updateDeleteButtonState);
+      const btn = document.getElementById('deleteFarmBtn');
+      if (btn) btn.addEventListener('click', deleteSelectedFarm);
       updateDeleteButtonState();
     });
   </script>
 </body>
+</html>
+
 </html>
