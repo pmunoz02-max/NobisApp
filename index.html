@@ -10,7 +10,7 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            background-color: #f3f4f6;
             margin: 0;
             padding: 0;
             overflow-x: hidden;
@@ -19,9 +19,8 @@
             height: 60vh;
             width: 100%;
             border-radius: 1rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             z-index: 1;
-            border: 2px solid #e5e7eb;
         }
         .leaflet-control-coordinates {
             background-color: rgba(255, 255, 255, 0.95);
@@ -72,6 +71,17 @@
             .text-2xl {
                 font-size: 1.5rem;
             }
+            /* Ajustes para controles en móviles */
+            .leaflet-top {
+                top: 10px;
+            }
+            .leaflet-left {
+                left: 10px;
+            }
+            .leaflet-touch .leaflet-control-layers, 
+            .leaflet-touch .leaflet-bar {
+                border: 2px solid rgba(0,0,0,0.2);
+            }
         }
         #adminModal {
             z-index: 10000;
@@ -83,12 +93,12 @@
             overflow-x: hidden;
         }
         .error-message {
-            color: #ef4444;
+            color: red;
             font-size: 14px;
             margin-top: 5px;
             display: none;
         }
-        /* Estilos específicos para las herramientas de dibujo */
+        /* Estilos para las herramientas de dibujo */
         .leaflet-draw-toolbar {
             margin-top: 12px;
         }
@@ -110,52 +120,23 @@
         .leaflet-touch .leaflet-draw-actions {
             display: block !important;
         }
-        /* Estilo personalizado para el botón de polígono */
-        .leaflet-draw-draw-polygon {
-            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlnb24gcG9pbnRzPSIyMyA3IDEzLjUgMTAgOCA0IDIgMTAgMTEuNSAxNiAxNiAyMiAyMyA3Ij48L3BvbHlnb24+PC9zdmc+');
-            background-size: 16px 16px;
-            background-repeat: no-repeat;
-            background-position: center;
-        }
-        #statusMessage {
-            background-color: #f8fafc;
-            padding: 12px 16px;
-            border-radius: 8px;
-            border-left: 4px solid #3b82f6;
-            margin-top: 16px;
-            font-weight: 500;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-        .geofence-counter {
-            background-color: #3b82f6;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 9999px;
-            font-size: 0.875rem;
+        /* Botón personalizado para mover finca */
+        .move-finca-btn {
+            background-color: #fff;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-radius: 4px;
+            padding: 5px 10px;
             font-weight: bold;
-            margin-left: 8px;
+            cursor: pointer;
+            margin-bottom: 10px;
         }
-        .section-title {
-            display: flex;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-        .finca-coordinates {
-            background-color: #1e293b;
+        .move-finca-btn.active {
+            background-color: #4CAF50;
             color: white;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-family: monospace;
-            margin-top: 8px;
-            display: inline-block;
         }
-        .success-message {
-            background-color: #10b981;
-            color: white;
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin-top: 10px;
-            display: none;
+        /* Ajustar z-index para controles en móviles */
+        .leaflet-control-container {
+            z-index: 1000;
         }
     </style>
 </head>
@@ -168,7 +149,6 @@
             <p class="text-gray-600 mb-6">Por favor, introduce tu código de administrador para acceder.</p>
             <input type="password" id="adminCodeInput" placeholder="Introduce el código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
             <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
-            <div id="successMessage" class="success-message">¡Acceso concedido! Cargando aplicación...</div>
             <button id="adminLoginBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition duration-300 ease-in-out font-bold">Acceder</button>
         </div>
     </div>
@@ -178,24 +158,17 @@
         <header class="text-center my-4">
             <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
             <p class="text-md sm:text-lg text-gray-600 mt-2">Aplicación de seguimiento para personal de finca.</p>
-            <div class="finca-coordinates">
-                <div>Lat: -1.733139</div>
-                <div>Lng: -77.912777</div>
-            </div>
         </header>
         
         <!-- Sección principal del mapa -->
         <div class="bg-white p-6 rounded-2xl shadow-lg">
-            <div class="section-title">
+            <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-semibold text-gray-700">Mapa de la Finca y Geocercas</h2>
-                <span id="geofenceCounter" class="geofence-counter">0</span>
+                <button id="moveFincaBtn" class="move-finca-btn">Mover Ubicación Finca</button>
             </div>
             <div id="map"></div>
             <div class="mt-4 flex flex-col items-center justify-center text-center">
-                <p id="statusMessage" class="text-base sm:text-lg font-medium text-gray-700">Haz clic en el mapa para colocar al personal. Usa las herramientas que están a la derecha del mapa para dibujar geocercas.</p>
-                <button id="clearGeofencesBtn" class="mt-4 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md transition duration-300 ease-in-out">
-                    Eliminar todas las geocercas
-                </button>
+                <p id="statusMessage" class="text-base sm:text-lg font-medium text-gray-700">Haz clic en el mapa para colocar al personal. Usa las herramientas de la izquierda del mapa para dibujar geocercas.</p>
             </div>
         </div>
 
@@ -289,158 +262,37 @@
     <script>
         // Configuración inicial
         const ADMIN_CODE = "admin123"; // Código de administrador
-        const FINCA_COORDS = [-1.733139, -77.912777]; // Coordenadas de la finca
-        
         let map = null;
         let personnelMarker = null;
         let drawnItems = null;
         let drawControl = null;
+        let isMovingFinca = false;
+        let fincaMarker = null;
 
         // Referencias a elementos DOM
-        let adminModal, adminCodeInput, adminLoginBtn, errorMessage, successMessage;
-        let appContent, showAdminModalBtn, adminControls, geofenceCounter, clearGeofencesBtn;
-
-        // Inicializar la aplicación después de que el DOM esté completamente cargado
-        document.addEventListener('DOMContentLoaded', function() {
-            // Obtener referencias a los elementos del DOM
-            adminModal = document.getElementById('adminModal');
-            adminCodeInput = document.getElementById('adminCodeInput');
-            adminLoginBtn = document.getElementById('adminLoginBtn');
-            errorMessage = document.getElementById('errorMessage');
-            successMessage = document.getElementById('successMessage');
-            appContent = document.getElementById('appContent');
-            showAdminModalBtn = document.getElementById('showAdminModalBtn');
-            adminControls = document.querySelectorAll('.admin-controls');
-            geofenceCounter = document.getElementById('geofenceCounter');
-            clearGeofencesBtn = document.getElementById('clearGeofencesBtn');
-
-            // Mostrar el modal de administrador al cargar la página
-            adminModal.classList.remove('hidden');
-
-            // Configurar event listeners
-            adminLoginBtn.addEventListener('click', handleAdminLogin);
-            
-            adminCodeInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    handleAdminLogin();
-                }
-            });
-
-            if (showAdminModalBtn) {
-                showAdminModalBtn.addEventListener('click', () => {
-                    adminModal.classList.remove('hidden');
-                });
-            }
-
-            if (clearGeofencesBtn) {
-                clearGeofencesBtn.addEventListener('click', handleClearGeofences);
-            }
-        });
-
-        // Función para manejar el login de administrador
-        function handleAdminLogin() {
-            const code = adminCodeInput.value.trim();
-            
-            if (code === ADMIN_CODE) {
-                // Código correcto - mostrar mensaje de éxito
-                errorMessage.style.display = 'none';
-                successMessage.style.display = 'block';
-                
-                // Ocultar modal y mostrar aplicación después de un breve retraso
-                setTimeout(() => {
-                    adminModal.classList.add('hidden');
-                    appContent.classList.remove('hidden');
-                    
-                    // Mostrar controles de administrador
-                    adminControls.forEach(el => el.style.display = 'block');
-                    
-                    // Inicializar el mapa
-                    initMap();
-                }, 1000);
-            } else {
-                // Código incorrecto
-                errorMessage.style.display = 'block';
-                successMessage.style.display = 'none';
-            }
-        }
-
-        // Función para guardar geocercas en localStorage
-        function saveGeofences() {
-            if (drawnItems) {
-                const geofences = drawnItems.toGeoJSON();
-                localStorage.setItem('geofences', JSON.stringify(geofences));
-                
-                // Actualizar contador
-                const count = Object.keys(geofences.features).length;
-                geofenceCounter.textContent = count;
-                
-                // Actualizar mensaje de estado
-                const statusMessage = document.getElementById('statusMessage');
-                if (count > 0) {
-                    statusMessage.innerHTML = `Tienes <strong>${count}</strong> geocerca(s) guardada(s). Las geocercas persisten incluso después de cerrar la página.`;
-                } else {
-                    statusMessage.textContent = "Haz clic en el mapa para colocar al personal. Usa las herramientas que están a la derecha del mapa para dibujar geocercas.";
-                }
-            }
-        }
-
-        // Función para cargar geocercas desde localStorage
-        function loadGeofences() {
-            const savedGeofences = localStorage.getItem('geofences');
-            if (savedGeofences) {
-                try {
-                    const geofences = JSON.parse(savedGeofences);
-                    
-                    // Crear una capa GeoJSON y añadirla al grupo drawnItems
-                    const geoJsonLayer = L.geoJSON(geofences, {
-                        style: {
-                            color: '#3388ff',
-                            weight: 2,
-                            fillColor: '#3388ff',
-                            fillOpacity: 0.2
-                        }
-                    });
-                    
-                    // Añadir cada característica al grupo drawnItems
-                    geoJsonLayer.eachLayer(function(layer) {
-                        drawnItems.addLayer(layer);
-                    });
-                    
-                    // Actualizar contador
-                    const count = geoJsonLayer.getLayers().length;
-                    geofenceCounter.textContent = count;
-                    
-                    // Ajustar vista del mapa para mostrar todas las geocercas
-                    if (count > 0) {
-                        map.fitBounds(drawnItems.getBounds());
-                        
-                        // Actualizar mensaje de estado
-                        const statusMessage = document.getElementById('statusMessage');
-                        statusMessage.innerHTML = `Se han cargado <strong>${count}</strong> geocerca(s) guardadas.`;
-                    }
-                } catch (e) {
-                    console.error('Error al cargar geocercas:', e);
-                }
-            }
-        }
-
-        // Función para manejar la eliminación de todas las geocercas
-        function handleClearGeofences() {
-            if (confirm('¿Estás seguro de que quieres eliminar todas las geocercas? Esta acción no se puede deshacer.')) {
-                drawnItems.clearLayers();
-                localStorage.removeItem('geofences');
-                saveGeofences();
-                alert('Todas las geocercas han sido eliminadas.');
-            }
-        }
+        const adminModal = document.getElementById('adminModal');
+        const adminCodeInput = document.getElementById('adminCodeInput');
+        const adminLoginBtn = document.getElementById('adminLoginBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const appContent = document.getElementById('appContent');
+        const showAdminModalBtn = document.getElementById('showAdminModalBtn');
+        const adminControls = document.querySelectorAll('.admin-controls');
+        const moveFincaBtn = document.getElementById('moveFincaBtn');
 
         // Función para inicializar el mapa y las herramientas de dibujo
         function initMap() {
-            // Inicializar el mapa centrado en las coordenadas de la finca
+            const initialCoords = [4.7110, -74.0721]; // Bogotá, Colombia
+            
+            // Inicializar el mapa
             map = L.map('map', {
                 zoomControl: true,
-                center: FINCA_COORDS,
-                zoom: 16
+                center: initialCoords,
+                zoom: 13,
+                // Mejorar la experiencia táctil en móviles
+                tap: false,
+                touchZoom: true,
+                scrollWheelZoom: true,
+                doubleClickZoom: true
             });
             
             // Añadir capa de OpenStreetMap
@@ -449,11 +301,14 @@
                 maxZoom: 19
             }).addTo(map);
 
-            // Añadir marcador en la ubicación de la finca
-            L.marker(FINCA_COORDS)
-                .addTo(map)
-                .bindPopup('Ubicación de la Finca')
-                .openPopup();
+            // Crear marcador para la finca
+            fincaMarker = L.marker(initialCoords, {
+                draggable: false,
+                title: 'Ubicación de la finca',
+                alt: 'Ubicación de la finca'
+            }).addTo(map);
+            
+            fincaMarker.bindPopup('Ubicación actual de la finca').openPopup();
 
             // Inicializar la capa para los elementos dibujados
             drawnItems = new L.FeatureGroup();
@@ -461,7 +316,7 @@
 
             // Configurar las herramientas de dibujo
             drawControl = new L.Control.Draw({
-                position: 'topright',
+                position: 'topleft',
                 draw: {
                     polygon: {
                         allowIntersection: false,
@@ -495,19 +350,12 @@
             map.on(L.Draw.Event.CREATED, function (event) {
                 const layer = event.layer;
                 drawnItems.addLayer(layer);
-                saveGeofences();
                 
                 // Mostrar mensaje de confirmación
-                alert('Geocerca creada exitosamente. Se ha guardado para futuras sesiones.');
-            });
-
-            // Manejar eventos de edición y eliminación
-            map.on(L.Draw.Event.EDITED, function (e) {
-                saveGeofences();
-            });
-
-            map.on(L.Draw.Event.DELETED, function (e) {
-                saveGeofences();
+                alert('Geocerca creada exitosamente. Puede editar o eliminar la geocerca usando las herramientas de edición.');
+                
+                // Aquí puedes guardar la geocerca en tu base de datos si es necesario
+                console.log('Geocerca creada:', layer.toGeoJSON());
             });
 
             // Añadir control de coordenadas
@@ -531,22 +379,92 @@
                 }
             });
 
-            // Cargar geocercas guardadas después de un breve retraso
-            setTimeout(() => {
-                loadGeofences();
-            }, 500);
-
             // Ajustar el tamaño del mapa después de que se muestre
             setTimeout(() => {
                 map.invalidateSize();
                 
                 // Forzar la visualización de los controles de dibujo
                 if (drawControl) {
+                    // Eliminar y volver a agregar el control para forzar su visualización
                     map.removeControl(drawControl);
                     map.addControl(drawControl);
                 }
             }, 300);
         }
+
+        // Función para activar/desactivar el modo de mover la finca
+        function toggleMoveFinca() {
+            isMovingFinca = !isMovingFinca;
+            
+            if (isMovingFinca) {
+                // Activar modo mover
+                moveFincaBtn.classList.add('active');
+                moveFincaBtn.textContent = 'Guardar Ubicación';
+                fincaMarker.dragging.enable();
+                map.dragging.disable();
+                map.once('click', function(e) {
+                    if (isMovingFinca) {
+                        fincaMarker.setLatLng(e.latlng);
+                        fincaMarker.openPopup();
+                    }
+                });
+            } else {
+                // Desactivar modo mover
+                moveFincaBtn.classList.remove('active');
+                moveFincaBtn.textContent = 'Mover Ubicación Finca';
+                fincaMarker.dragging.disable();
+                map.dragging.enable();
+                
+                // Mostrar mensaje con las nuevas coordenadas
+                const latLng = fincaMarker.getLatLng();
+                alert(`Ubicación de la finca actualizada.\nNuevas coordenadas: ${latLng.lat.toFixed(6)}, ${latLng.lng.toFixed(6)}`);
+            }
+        }
+
+        // Lógica de inicio de sesión de administrador
+        adminLoginBtn.addEventListener('click', () => {
+            const code = adminCodeInput.value.trim();
+            
+            if (code === ADMIN_CODE) {
+                // Código correcto
+                adminModal.classList.add('hidden');
+                appContent.classList.remove('hidden');
+                adminControls.forEach(el => el.style.display = 'block');
+                errorMessage.style.display = 'none';
+                
+                // Inicializar el mapa después de un breve retraso
+                setTimeout(() => {
+                    initMap();
+                }, 100);
+            } else {
+                // Código incorrecto
+                errorMessage.style.display = 'block';
+            }
+        });
+
+        // Permitir enviar el formulario con la tecla Enter
+        adminCodeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                adminLoginBtn.click();
+            }
+        });
+
+        // Mostrar modal de administrador al hacer clic en el botón
+        if (showAdminModalBtn) {
+            showAdminModalBtn.addEventListener('click', () => {
+                adminModal.classList.remove('hidden');
+            });
+        }
+
+        // Evento para el botón de mover finca
+        if (moveFincaBtn) {
+            moveFincaBtn.addEventListener('click', toggleMoveFinca);
+        }
+
+        // Inicializar el modal de administrador al cargar la página
+        document.addEventListener('DOMContentLoaded', () => {
+            adminModal.classList.remove('hidden');
+        });
     </script>
 </body>
 </html>
