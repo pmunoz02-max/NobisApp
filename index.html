@@ -46,21 +46,38 @@
 
     <!-- Mapa -->
     <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <div class="flex justify-between items-center mb-4">
+      <div class="flex flex-wrap gap-3 justify-between items-center mb-4">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
-        <!-- Botón rojo ELIMINAR FINCA (añadido) -->
-        <button id="deleteFarmBtn"
-          class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Eliminar la finca seleccionada">
-          <!-- Icono X -->
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-          Eliminar finca
-        </button>
+
+        <div class="ml-auto flex gap-2">
+          <!-- NUEVO: Botón CREAR -->
+          <button id="createFarmBtn"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">
+            <!-- plus icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Crear finca
+          </button>
+
+          <!-- Botón rojo ELIMINAR -->
+          <button id="deleteFarmBtn"
+            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Eliminar la finca seleccionada">
+            <!-- X icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Eliminar finca
+          </button>
+        </div>
       </div>
+
       <div id="map"></div>
-      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Haz clic en el mapa para crear una nueva finca. Se guardará en Firestore y también en el almacenamiento local para que persista al reabrir.</p>
+      <p id="statusMessage" class="mt-3 text-sm text-gray-600">
+        Puedes <strong>mover el mapa</strong> y luego pulsar <strong>Crear finca</strong> (usa el centro del mapa),
+        o haz clic en el mapa para crearla donde hagas clic. Para borrar, elige una finca en el listado y usa <strong>Eliminar finca</strong>.
+      </p>
     </div>
   </div>
 
@@ -81,16 +98,13 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    // 1) Intenta activar persistencia offline (IndexedDB)
     db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-      // Si falla (p.ej. Safari privado o varias pestañas), seguimos sin ella
       console.warn('Firestore persistence no disponible:', err && err.code);
     });
-
     firebase.auth().signInAnonymously().catch(console.error);
 
     let map;
-    const fincaMarkers = {}; // guardar marcadores por id
+    const fincaMarkers = {};
 
     // ==== Persistencia local: espejo de Firestore ====
     const LS_KEY = 'fincas_cache_v1';
@@ -102,16 +116,16 @@
     }
     function renderFromCache(){
       const farms = loadCache();
-      // limpiar marcadores previos
       Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
       for(const k in fincaMarkers) delete fincaMarkers[k];
-      // pintar
+
       farms.forEach(f=>{
         if(!f || !f.id || !f.fincaLocation) return;
         const marker = L.marker([f.fincaLocation.lat, f.fincaLocation.lng]).addTo(map);
         marker.bindTooltip(f.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
         fincaMarkers[f.id] = marker;
       });
+
       // llenar selector
       const sel = document.getElementById('farmSelect');
       if (sel){
@@ -122,17 +136,17 @@
           sel.appendChild(opt);
         });
       }
-      updateDeleteButtonState(); // (añadido) actualizar estado del botón
+      updateDeleteButtonState();
     }
 
     function initMap(center={lat:-0.1807, lng:-78.4678}, zoom=6){
       map = L.map('map',{center:[center.lat,center.lng],zoom});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
-      // 1) Pintar primero desde cache local para que persista al reabrir
+      // Pintar primero desde cache
       renderFromCache();
 
-      // 2) Crear finca con click -> se guardará en Firestore (y el snapshot actualizará cache y mapa)
+      // Crear finca con clic en el mapa (comportamiento original)
       map.on('click', async e=>{
         const name = prompt("Nombre de la nueva finca:");
         if(!name) return;
@@ -156,7 +170,6 @@
     function subscribeFarms(){
       db.collection('farms').onSnapshot(snap=>{
         const farms = [];
-        // limpiar marcadores previos en el mapa
         Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
         for(const key in fincaMarkers){ delete fincaMarkers[key]; }
 
@@ -170,9 +183,9 @@
             fincaMarkers[doc.id]=marker;
           }
         });
-        // Escribir espejo local (persistencia al reabrir)
+
         saveCache(farms);
-        // rellenar selector
+        // Llenar selector
         const sel = document.getElementById('farmSelect');
         if (sel){
           sel.innerHTML = '';
@@ -182,29 +195,44 @@
             sel.appendChild(opt);
           });
         }
-        updateDeleteButtonState(); // (añadido) actualizar estado del botón
+        updateDeleteButtonState();
       }, err => {
         console.error('onSnapshot error:', err);
-        // Si falla el snapshot (sin conexión, reglas, etc.), mantenemos lo del cache
         renderFromCache();
       });
     }
 
-    // === (añadido) ELIMINAR FINCA ===
+    // === CREAR FINCA (botón) ===
+    async function createFarmAtCenter(){
+      if(!map){ alert('Mapa no listo aún.'); return; }
+      const name = prompt("Nombre de la nueva finca:");
+      if(!name) return;
+      const c = map.getCenter();
+      try{
+        await db.collection('farms').add({
+          name,
+          fincaLocation:{lat:c.lat, lng:c.lng}
+        });
+      }catch(err){
+        alert('No se pudo guardar en Firestore. Se guardará solo localmente.');
+        const farms = loadCache();
+        farms.push({ id: 'local-'+Date.now(), name, fincaLocation:{lat:c.lat, lng:c.lng} });
+        saveCache(farms);
+        renderFromCache();
+      }
+    }
+
+    // === ELIMINAR FINCA (botón) ===
     async function deleteSelectedFarm(){
       const sel = document.getElementById('farmSelect');
       const id = sel && sel.value;
-      if(!id){
-        alert('No hay finca seleccionada.');
-        return;
-      }
+      if(!id){ alert('No hay finca seleccionada.'); return; }
+
       const farmsCache = loadCache();
       const farm = farmsCache.find(f=>f.id===id);
       const name = (farm && farm.name) || 'Finca';
-
       if(!confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) return;
 
-      // Si es una finca local (no sincronizada)
       if(id.startsWith('local-')){
         const updated = farmsCache.filter(f=>f.id!==id);
         saveCache(updated);
@@ -212,7 +240,6 @@
         return;
       }
 
-      // Intentar borrar en Firestore
       try{
         await db.collection('farms').doc(id).delete();
         // el snapshot actualizará el cache y la UI
@@ -224,7 +251,6 @@
       }
     }
 
-    // (añadido) Habilitar/deshabilitar botón eliminar
     function updateDeleteButtonState(){
       const sel = document.getElementById('farmSelect');
       const btn = document.getElementById('deleteFarmBtn');
@@ -247,19 +273,24 @@
         document.getElementById('errorMessage').style.display="block";
       }
     }
+
+    // Listeners
     document.getElementById('adminLoginBtn').addEventListener("click",doAdminLogin);
     document.getElementById('adminCodeInput').addEventListener("keypress",e=>{if(e.key==="Enter")doAdminLogin();});
     document.addEventListener("DOMContentLoaded",()=>{
       document.getElementById('adminModal').classList.remove("hidden");
-      // (añadido) listeners para el botón y el select
+
       const sel = document.getElementById('farmSelect');
       if (sel) sel.addEventListener('change', updateDeleteButtonState);
-      const btn = document.getElementById('deleteFarmBtn');
-      if (btn) btn.addEventListener('click', deleteSelectedFarm);
+
+      const btnDel = document.getElementById('deleteFarmBtn');
+      if (btnDel) btnDel.addEventListener('click', deleteSelectedFarm);
+
+      const btnCreate = document.getElementById('createFarmBtn');
+      if (btnCreate) btnCreate.addEventListener('click', createFarmAtCenter);
+
       updateDeleteButtonState();
     });
   </script>
 </body>
-</html>
-
 </html>
