@@ -46,7 +46,7 @@
         <div>
           <label class="block text-sm font-medium text-gray-700">Finca activa</label>
           <select id="farmSelect" class="mt-1 w-full border rounded-md p-2"></select>
-          <p class="text-xs text-gray-500 mt-1">Cada finca guarda su propia <span class="pill">ubicación</span>, <span class="pill">geocercas</span>, <span class="pill">personal</span>, <span class="pill">actividades</span> y <span class="pill">reportes</span>.</p>
+          <p class="text-xs text-gray-500 mt-1">Cada finca guarda su propia <span class="pill">ubicación</span>, <span class="pill">geocercas</span> y <span class="pill">nombre</span>.</p>
         </div>
         <div class="lg:col-span-2">
           <label class="block text-sm font-medium text-gray-700">Crear nueva finca</label>
@@ -68,91 +68,18 @@
         </div>
       </div>
       <div id="map"></div>
-      <p class="mt-3 text-sm text-gray-600">Haz clic en el mapa para ubicar la finca. Dibuja geocercas o ingrésalas por coordenadas con nombre.</p>
+      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Haz clic en el mapa para ubicar/guardar la finca. Si no hay finca activa, se te pedirá un <strong>nombre de finca</strong> y se creará automáticamente.</p>
     </div>
 
-    <!-- Coordenadas y polígono manual -->
+    <!-- Geocercas con nombre -->
     <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Ubicación y geocercas por coordenadas</h2>
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div>
-          <h3 class="font-semibold mb-2">Ubicación de la finca</h3>
-          <div class="grid grid-cols-3 gap-2">
-            <input id="initLat" inputmode="decimal" class="border rounded-md p-2" placeholder="Lat ej: -1.7307" />
-            <input id="initLng" inputmode="decimal" class="border rounded-md p-2" placeholder="Lng ej: -77.9122" />
-            <input id="initZoom" type="number" min="3" max="19" class="border rounded-md p-2" placeholder="15" value="15" />
-          </div>
-          <div class="flex gap-2 mt-2">
-            <button id="centerInitBtn" class="flex-1 bg-gray-200 rounded-md py-2">Centrar</button>
-            <button id="setInitLocationBtn" class="flex-1 bg-indigo-600 text-white rounded-md py-2">Guardar finca</button>
-          </div>
-          <button id="useGPSBtn" class="mt-2 w-full bg-gray-200 rounded-md py-2">Usar mi GPS</button>
-        </div>
-        <div class="lg:col-span-2">
-          <h3 class="font-semibold mb-2">Añadir geocerca escribiendo coordenadas</h3>
-          <p class="text-xs text-gray-500 mb-2">Formato (una por línea): <code>lat,lng</code>. Ejemplo:<br/>-1.7307,-77.9122<br/>-1.7312,-77.9131<br/>-1.7310,-77.9140</p>
-          <input id="geofenceNameInput" class="w-full border rounded-md p-2 mb-2" placeholder="Nombre de la geocerca (ej: Lote 3)" />
-          <textarea id="coordsTextarea" rows="6" class="w-full border rounded-md p-3" placeholder="Pega aquí los puntos..."></textarea>
-          <div class="grid grid-cols-2 gap-2 mt-2">
-            <button id="addPolygonBtn" class="bg-green-600 text-white rounded-md py-2">Añadir polígono</button>
-            <button id="clearPolygonsBtn" class="bg-red-50 text-red-700 rounded-md py-2 border">Borrar geocercas</button>
-          </div>
-        </div>
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Añadir geocerca por coordenadas</h2>
+      <input id="geofenceName" class="w-full border rounded-md p-2 mb-2" placeholder="Nombre de la geocerca (ej: Lote 3)"/>
+      <textarea id="coordsTextarea" rows="6" class="w-full border rounded-md p-2" placeholder="Una coordenada por línea: lat,lng"></textarea>
+      <div class="flex gap-2 mt-2">
+        <button id="addPolygonBtn" class="px-4 py-2 bg-green-600 text-white rounded-md">Añadir Polígono</button>
+        <button id="clearPolygonsBtn" class="px-4 py-2 bg-red-50 text-red-700 rounded-md border">Borrar geocercas</button>
       </div>
-    </div>
-
-    <!-- Gestión de personal y actividades -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Gestión de Personal y Actividades</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div>
-          <h3 class="font-semibold">Añadir personal</h3>
-          <div class="flex gap-2 mt-2">
-            <input id="personnelName" class="flex-1 border rounded-md p-2" placeholder="Nombre"/>
-            <button id="addPersonnelBtn" class="px-4 py-2 bg-green-600 text-white rounded-md">Añadir</button>
-          </div>
-          <ul id="personnelList" class="mt-3 text-sm text-gray-700 space-y-1">
-            <li class="text-gray-500 italic">No hay personal añadido.</li>
-          </ul>
-        </div>
-        <div>
-          <h3 class="font-semibold">Añadir actividad</h3>
-          <div class="flex gap-2 mt-2">
-            <input id="activityName" class="flex-1 border rounded-md p-2" placeholder="Actividad"/>
-            <button id="addActivityBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md">Añadir</button>
-          </div>
-          <ul id="activityList" class="mt-3 text-sm text-gray-700 space-y-1">
-            <li class="text-gray-500 italic">No hay actividades.</li>
-          </ul>
-        </div>
-        <div>
-          <h3 class="font-semibold">Asignar a geocerca</h3>
-          <div class="space-y-2 mt-2">
-            <select id="assignPersonnel" class="w-full border rounded-md p-2"></select>
-            <select id="assignGeofence" class="w-full border rounded-md p-2"></select>
-            <button id="assignBtn" class="w-full bg-gray-800 text-white rounded-md py-2">Asignar</button>
-          </div>
-          <ul id="assignmentsList" class="mt-3 text-sm text-gray-700 space-y-1">
-            <li class="text-gray-500 italic">Sin asignaciones.</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <!-- Reportes -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Reportes</h2>
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <select id="reportPersonnel" class="border rounded-md p-2"></select>
-        <select id="reportActivity" class="border rounded-md p-2"></select>
-        <select id="reportGeofence" class="border rounded-md p-2"></select>
-        <div class="grid grid-cols-2 gap-2">
-          <input id="daysWorked" type="number" min="0" class="border rounded-md p-2" placeholder="Días" />
-          <input id="hoursWorked" type="number" min="0" class="border rounded-md p-2" placeholder="Horas" />
-        </div>
-      </div>
-      <button id="submitReportBtn" class="mt-3 w-full bg-indigo-600 text-white rounded-md py-2">Subir reporte</button>
-      <ul id="reportList" class="mt-4 space-y-3 text-sm"></ul>
     </div>
   </div>
 
@@ -163,7 +90,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
   <script>
-    // ===== Firebase ===== (usa tu propio proyecto en producción)
+    // ===== Firebase =====
     const firebaseConfig = {
       apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
       authDomain: "demo-finca-app.firebaseapp.com",
@@ -184,9 +111,6 @@
     let activeFarmId = null; // docId de la finca activa
     let unsubFarm = null;    // unsubscribe a onSnapshot de la finca
     let isMoving = false;
-
-    // caches locales de la finca activa
-    let cache = { personnel: [], activities: [], assignments: [] };
 
     // ===== Utilidades =====
     function parseCoord(val){
@@ -227,43 +151,57 @@
       });
       map.addControl(drawControl);
 
-      // crear marcador de finca desde inicio
+      // crear marcador de finca
       fincaMarker = L.marker([center.lat, center.lng], { draggable:false }).addTo(map).bindPopup('Ubicación de la finca');
 
-      // coordenadas en vivo
+      // Coordenadas en vivo
       const coord = L.control({ position: 'bottomleft' });
       coord.onAdd = function(){ const d = L.DomUtil.create('div','leaflet-control-coordinates'); d.innerHTML = '<div><strong>Lat:</strong> -</div><div><strong>Lng:</strong> -</div>'; return d; };
       coord.addTo(map);
       map.on('mousemove', e=>{ const el=document.querySelector('.leaflet-control-coordinates'); if(el) el.innerHTML = `<div><strong>Lat:</strong> ${e.latlng.lat.toFixed(6)}</div><div><strong>Lng:</strong> ${e.latlng.lng.toFixed(6)}</div>`; });
 
-      // click para ubicar finca
-      map.on('click', e => {
-        if (!activeFarmId) return alert('Primero selecciona o crea una finca.');
-        fincaMarker.setLatLng(e.latlng);
-        db.collection('farms').doc(activeFarmId).set({ fincaLocation: { lat: e.latlng.lat, lng: e.latlng.lng } }, { merge:true });
+      // Click para guardar ubicación de finca.
+      // Si NO hay finca activa, se pide NOMBRE y se crea con estas coordenadas.
+      map.on('click', async (e) => {
+        const { lat, lng } = e.latlng;
+        if (!activeFarmId) {
+          const name = prompt('No hay finca activa. Escribe el NOMBRE de la finca para guardar estas coordenadas:');
+          if(!name) return;
+          const id = slugify(name) + '-' + Date.now().toString(36);
+          await db.collection('farms').doc(id).set({
+            name,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            fincaLocation: { lat, lng },
+            geofences: { type:'FeatureCollection', features: [] }
+          });
+          activeFarmId = id; byId('farmSelect').value = id; attachFarm(id); await loadFarmsList();
+          alert('Finca creada y ubicación guardada.');
+        } else {
+          await db.collection('farms').doc(activeFarmId).set({ fincaLocation: { lat, lng } }, { merge:true });
+          alert('Ubicación de la finca actualizada.');
+        }
+        fincaMarker.setLatLng([lat,lng]);
       });
 
-      // eventos de dibujo + NOMBRE
+      // Dibujo de geocerca: pedir NOMBRE y guardar en properties.name
       map.on(L.Draw.Event.CREATED, e => {
         const layer = e.layer;
         const defaultName = `Geocerca ${drawnItems.getLayers().length + 1}`;
         const name = prompt('Nombre para esta geocerca:', defaultName) || defaultName;
-        // guardar el nombre en properties
         const gj = layer.toGeoJSON();
         gj.properties = gj.properties || {}; gj.properties.name = name;
-        // re-crear como L.geoJSON con propiedades
         const geo = L.geoJSON(gj, { style: { color:'#3388ff', fillColor:'#3388ff', fillOpacity:.2, weight:2 } });
         geo.eachLayer(l => drawnItems.addLayer(l));
         saveGeofences();
         refreshGeofenceSelects();
       });
-      map.on(L.Draw.Event.EDITED, () => { saveGeofences(); refreshGeofenceSelects(); });
+      map.on(L.Draw.Event.EDITED, () => { saveGeofences(); });
       map.on(L.Draw.Event.DELETED, () => { saveGeofences(); refreshGeofenceSelects(); });
 
       setTimeout(()=>{ map.invalidateSize(); map.removeControl(drawControl); map.addControl(drawControl); }, 300);
     }
 
-    // ===== Fincas (CRUD básico) =====
+    // ===== Fincas =====
     async function loadFarmsList(){
       const sel = byId('farmSelect');
       sel.innerHTML = '';
@@ -283,15 +221,7 @@
       const name = (byId('newFarmName').value||'').trim();
       if(!name) return alert('Escribe un nombre para la finca');
       const id = slugify(name) + '-' + Date.now().toString(36);
-      await db.collection('farms').doc(id).set({
-        name,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        fincaLocation: DEFAULT_CENTER,
-        geofences: { type:'FeatureCollection', features: [] },
-        personnel: [],
-        activities: [],
-        assignments: []
-      });
+      await db.collection('farms').doc(id).set({ name, createdAt: firebase.firestore.FieldValue.serverTimestamp(), fincaLocation: DEFAULT_CENTER, geofences: { type:'FeatureCollection', features: [] } });
       byId('newFarmName').value='';
       await loadFarmsList();
       activeFarmId = id; byId('farmSelect').value = id; attachFarm(id);
@@ -299,16 +229,10 @@
 
     byId('deleteFarmBtn').addEventListener('click', async ()=>{
       if(!activeFarmId) return alert('No hay finca activa');
-      if(!confirm('¿Eliminar esta finca y sus datos (reportes incluidos)?')) return;
-      const repSnap = await db.collection('farms').doc(activeFarmId).collection('reports').get();
-      const batch = db.batch(); repSnap.forEach(d=> batch.delete(d.ref)); await batch.commit();
+      if(!confirm('¿Eliminar esta finca y sus datos?')) return;
       await db.collection('farms').doc(activeFarmId).delete();
       activeFarmId = null; if (unsubFarm) unsubFarm();
       drawnItems.clearLayers(); fincaMarker.setLatLng([DEFAULT_CENTER.lat, DEFAULT_CENTER.lng]);
-      byId('personnelList').innerHTML = '<li class="text-gray-500 italic">No hay personal añadido.</li>';
-      byId('activityList').innerHTML = '<li class="text-gray-500 italic">No hay actividades.</li>';
-      byId('assignmentsList').innerHTML = '<li class="text-gray-500 italic">Sin asignaciones.</li>';
-      byId('reportList').innerHTML = '';
       await loadFarmsList();
     });
 
@@ -316,49 +240,39 @@
       if (unsubFarm) unsubFarm();
       unsubFarm = db.collection('farms').doc(farmId).onSnapshot(doc=>{
         const data = doc.data()||{};
-        // ubicación
         const loc = data.fincaLocation || DEFAULT_CENTER;
         fincaMarker.setLatLng([loc.lat, loc.lng]);
         map.setView([loc.lat, loc.lng], Math.max(map.getZoom(), 15));
-        // geocercas
         renderGeofences(data.geofences);
-        // listas
-        cache.personnel = data.personnel || [];
-        cache.activities = data.activities || [];
-        cache.assignments = data.assignments || [];
-        renderPersonnel();
-        renderActivities();
-        renderAssignments();
-        refreshAllSelects();
-        loadReports();
       });
     }
 
     function renderGeofences(fc){
       drawnItems.clearLayers();
       if (!fc || !fc.features) { refreshGeofenceSelects(); return; }
-      L.geoJSON(fc, { style: { color: '#3388ff', fillColor:'#3388ff', fillOpacity:.2, weight:2 } })
-        .eachLayer(l=> drawnItems.addLayer(l));
+      L.geoJSON(fc, { style: { color: '#3388ff', fillColor:'#3388ff', fillOpacity:.2, weight:2 } }).eachLayer(l=> drawnItems.addLayer(l));
       refreshGeofenceSelects();
     }
 
     async function saveGeofences(){
       if(!activeFarmId) return;
       const fc = drawnItems.toGeoJSON();
-      await db.collection('farms').doc(activeFarmId).set(
-        { geofences: fc, updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
-        { merge:true }
-      );
+      // asegura que cada feature tenga nombre
+      fc.features.forEach((f,i)=>{ f.properties = f.properties||{}; if(!f.properties.name) f.properties.name = `Geocerca ${i+1}`; });
+      await db.collection('farms').doc(activeFarmId).set({ geofences: fc, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge:true });
     }
 
-    // ===== Polígono manual (con nombre) =====
+    function refreshGeofenceSelects(){
+      // Hook para futuro: aquí llenar combos dependientes si agregas módulos de personal/actividades
+    }
+
+    // ===== Geocerca por coordenadas (con nombre) =====
     function parseCoordsTextarea(text){
       if(!text) return [];
-      const t = text.trim();
-      const list = t.split(/\n+/);
+      const list = text.trim().split(/\n+/);
       const coords = [];
-      for (const item of list){
-        const [a,b] = String(item).trim().split(/[\s,]+/);
+      for (const row of list){
+        const [a,b] = String(row).trim().split(/[\s,]+/);
         const lat = parseCoord(a), lng = parseCoord(b);
         if (lat!==null && lng!==null) coords.push([lat,lng]);
       }
@@ -367,233 +281,37 @@
 
     byId('addPolygonBtn').addEventListener('click', ()=>{
       if(!activeFarmId) return alert('Selecciona o crea una finca');
-      const name = (byId('geofenceNameInput').value||'').trim()
-                   || `Geocerca ${drawnItems.getLayers().length + 1}`;
+      const name = (byId('geofenceName').value||'').trim() || `Geocerca ${drawnItems.getLayers().length + 1}`;
       const coords = parseCoordsTextarea(byId('coordsTextarea').value);
       if (coords.length < 3) return alert('Necesitas al menos 3 puntos lat,lng');
-      const feature = {
-        type:'Feature',
-        properties:{ name },
-        geometry:{ type:'Polygon', coordinates:[ coords.map(([lat,lng])=>[lng,lat]) ] }
-      };
-      L.geoJSON(feature, { style:{ color:'#3388ff', weight:2, fillColor:'#3388ff', fillOpacity:.2 } })
-        .eachLayer(l=> drawnItems.addLayer(l));
+      const feature = { type:'Feature', properties:{ name }, geometry:{ type:'Polygon', coordinates:[ coords.map(([lat,lng])=>[lng,lat]) ] } };
+      L.geoJSON(feature, { style:{ color:'#3388ff', weight:2, fillColor:'#3388ff', fillOpacity:.2 } }).eachLayer(l=> drawnItems.addLayer(l));
       saveGeofences();
-      refreshGeofenceSelects();
-      const poly = L.polygon(coords);
-      map.fitBounds(poly.getBounds(), { padding:[20,20] });
-      byId('coordsTextarea').value=''; byId('geofenceNameInput').value='';
+      const poly = L.polygon(coords); map.fitBounds(poly.getBounds(), { padding:[20,20] });
+      byId('coordsTextarea').value=''; byId('geofenceName').value='';
     });
 
     byId('clearPolygonsBtn').addEventListener('click', ()=>{
       if(!activeFarmId) return alert('Selecciona o crea una finca');
       if(!confirm('¿Borrar todas las geocercas de esta finca?')) return;
-      drawnItems.clearLayers(); saveGeofences(); refreshGeofenceSelects();
-    });
-
-    // ===== Ubicación finca por formulario/GPS =====
-    byId('centerInitBtn').addEventListener('click', ()=>{
-      const lat = parseCoord(byId('initLat').value);
-      const lng = parseCoord(byId('initLng').value);
-      const z = parseInt(byId('initZoom').value)||15;
-      if(lat===null||lng===null) return alert('Ingresa lat/lng válidos');
-      map.setView([lat,lng], z); fincaMarker.setLatLng([lat,lng]);
-    });
-
-    byId('setInitLocationBtn').addEventListener('click', ()=>{
-      if(!activeFarmId) return alert('Selecciona o crea una finca');
-      const lat = parseCoord(byId('initLat').value);
-      const lng = parseCoord(byId('initLng').value);
-      const z = parseInt(byId('initZoom').value)||15;
-      if(lat===null||lng===null) return alert('Ingresa lat/lng válidos');
-      db.collection('farms').doc(activeFarmId).set({ fincaLocation:{lat,lng} }, { merge:true });
-      map.setView([lat,lng], z); fincaMarker.setLatLng([lat,lng]);
-      alert(`Ubicación de finca guardada: ${lat}, ${lng}`);
-    });
-
-    byId('useGPSBtn').addEventListener('click', ()=>{
-      if(!navigator.geolocation) return alert('Geolocalización no soportada');
-      navigator.geolocation.getCurrentPosition(pos=>{
-        const lat = pos.coords.latitude, lng = pos.coords.longitude;
-        byId('initLat').value = lat.toFixed(6);
-        byId('initLng').value = lng.toFixed(6);
-        map.setView([lat,lng], 16); fincaMarker.setLatLng([lat,lng]);
-      }, err=> alert('No se pudo obtener la ubicación: '+err.message), { enableHighAccuracy:true, timeout:8000 });
+      drawnItems.clearLayers(); saveGeofences();
     });
 
     // ===== Mover finca por arrastre =====
     byId('moveFincaBtn').addEventListener('click', ()=>{
       if(!activeFarmId) return alert('Selecciona o crea una finca');
       if (isMoving) return; isMoving = true;
-      byId('moveFincaBtn').classList.add('active');
-      byId('moveFincaBtn').textContent = 'Guardar ubicación';
+      byId('moveFincaBtn').classList.add('active'); byId('moveFincaBtn').textContent = 'Guardar ubicación';
       fincaMarker.dragging.enable();
-      fincaMarker.once('dragend', e=>{
+      fincaMarker.once('dragend', async (e)=>{
         const ll = e.target.getLatLng();
-        db.collection('farms').doc(activeFarmId).set({ fincaLocation:{ lat: ll.lat, lng: ll.lng } }, { merge:true });
+        await db.collection('farms').doc(activeFarmId).set({ fincaLocation:{ lat: ll.lat, lng: ll.lng } }, { merge:true });
         fincaMarker.dragging.disable(); isMoving = false;
-        byId('moveFincaBtn').classList.remove('active');
-        byId('moveFincaBtn').textContent = 'Mover Ubicación Finca';
+        byId('moveFincaBtn').classList.remove('active'); byId('moveFincaBtn').textContent = 'Mover Ubicación Finca';
         alert(`Ubicación guardada: ${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}`);
       });
     });
 
-    // ===== Selects dependientes de geocercas =====
-    function refreshGeofenceSelects(){
-      const selects = [ byId('assignGeofence'), byId('reportGeofence') ];
-      selects.forEach(sel => { if(sel) sel.innerHTML = ''; });
-      let index=-1, has=false;
-      drawnItems.eachLayer(l=>{
-        index++;
-        const f = l.toGeoJSON();
-        const name = (f.properties && f.properties.name) ? f.properties.name : `Geocerca ${index+1}`;
-        selects.forEach(sel=>{
-          if(!sel) return;
-          const opt=document.createElement('option');
-          opt.value=String(index);
-          opt.textContent=name;
-          sel.appendChild(opt);
-        });
-        has=true;
-      });
-      if(!has){
-        selects.forEach(sel=>{
-          if(!sel) return;
-          const opt=document.createElement('option');
-          opt.value='';
-          opt.textContent='(sin geocercas)';
-          sel.appendChild(opt);
-        });
-      }
-    }
-
-    function refreshAllSelects(){
-      const pSelects = [ byId('assignPersonnel'), byId('reportPersonnel') ];
-      pSelects.forEach(sel=> { if(sel) sel.innerHTML=''; });
-      if(!cache.personnel.length){
-        pSelects.forEach(sel=> { if(sel) sel.innerHTML='<option value="" disabled selected>(sin personal)</option>'; });
-      }
-      cache.personnel.forEach(p=>{
-        const opt = document.createElement('option');
-        opt.value = p.id; opt.textContent = p.name;
-        pSelects.forEach(sel=> { if(sel) sel.appendChild(opt.cloneNode(true)); });
-      });
-      const aSel = byId('reportActivity');
-      if(aSel){
-        aSel.innerHTML='';
-        if(!cache.activities.length){
-          aSel.innerHTML='<option value="" disabled selected>(sin actividades)</option>';
-        }
-        cache.activities.forEach(a=>{
-          const opt=document.createElement('option');
-          opt.value=a; opt.textContent=a;
-          aSel.appendChild(opt);
-        });
-      }
-    }
-
-    // ===== Personal =====
-    function renderPersonnel(){
-      const ul = byId('personnelList'); if(!ul) return; ul.innerHTML='';
-      if(!cache.personnel.length){ ul.innerHTML='<li class="text-gray-500 italic">No hay personal añadido.</li>'; return; }
-      cache.personnel.forEach(p=>{
-        const li=document.createElement('li'); li.textContent = `• ${p.name}`; ul.appendChild(li);
-      });
-    }
-    document.getElementById('addPersonnelBtn')?.addEventListener('click', async ()=>{
-      if(!activeFarmId) return alert('Selecciona o crea una finca');
-      const name = (byId('personnelName').value||'').trim(); if(!name) return;
-      const id = 'p-' + Date.now().toString(36);
-      cache.personnel.push({ id, name });
-      await db.collection('farms').doc(activeFarmId).set({ personnel: cache.personnel }, { merge:true });
-      byId('personnelName').value='';
-    });
-
-    // ===== Actividades =====
-    function renderActivities(){
-      const ul = byId('activityList'); if(!ul) return; ul.innerHTML='';
-      if(!cache.activities.length){ ul.innerHTML='<li class="text-gray-500 italic">No hay actividades.</li>'; return; }
-      cache.activities.forEach(a=>{
-        const li=document.createElement('li'); li.textContent = `• ${a}`; ul.appendChild(li);
-      });
-    }
-    document.getElementById('addActivityBtn')?.addEventListener('click', async ()=>{
-      if(!activeFarmId) return alert('Selecciona o crea una finca');
-      const a = (byId('activityName').value||'').trim(); if(!a) return;
-      if(!cache.activities.includes(a)) cache.activities.push(a);
-      await db.collection('farms').doc(activeFarmId).set({ activities: cache.activities }, { merge:true });
-      byId('activityName').value='';
-    });
-
-    // ===== Asignaciones =====
-    function renderAssignments(){
-      const ul = byId('assignmentsList'); if(!ul) return; ul.innerHTML='';
-      if(!cache.assignments.length){ ul.innerHTML='<li class="text-gray-500 italic">Sin asignaciones.</li>'; return; }
-      cache.assignments.forEach(as=>{
-        const li=document.createElement('li'); li.textContent = `${as.personnelName} → ${as.geofenceName}`; ul.appendChild(li);
-      });
-    }
-    document.getElementById('assignBtn')?.addEventListener('click', async ()=>{
-      if(!activeFarmId) return alert('Selecciona o crea una finca');
-      const pid = byId('assignPersonnel').value;
-      const gidx = parseInt(byId('assignGeofence').value);
-      if(!pid || isNaN(gidx)) return alert('Selecciona personal y geocerca');
-      const p = cache.personnel.find(x=>x.id===pid); if(!p) return;
-      // nombre desde drawnItems índice
-      let idx=-1, geofenceName=`Geocerca ${gidx+1}`;
-      let target=null; drawnItems.eachLayer(l=>{ idx++; if(idx===gidx) target=l; });
-      if(target){
-        const f=target.toGeoJSON();
-        if(f.properties&&f.properties.name) geofenceName=f.properties.name;
-      }
-      cache.assignments.push({ personnelId: pid, personnelName: p.name, geofenceIndex: gidx, geofenceName });
-      await db.collection('farms').doc(activeFarmId).set({ assignments: cache.assignments }, { merge:true });
-    });
-
-    // ===== Reportes =====
-    async function loadReports(){
-      if(!activeFarmId) return;
-      const ul = byId('reportList'); if(!ul) return; ul.innerHTML='';
-      const snap = await db.collection('farms').doc(activeFarmId).collection('reports')
-        .orderBy('createdAt','desc').limit(50).get();
-      if (snap.empty){
-        ul.innerHTML='<li class="text-gray-500 italic">No hay reportes enviados aún.</li>'; return;
-      }
-      snap.forEach(doc=>{
-        const r = doc.data();
-        const li = document.createElement('li');
-        li.className = 'p-3 border rounded-lg bg-gray-50';
-        li.innerHTML = `<strong>${r.personnelName}</strong> — ${r.activity} — ${r.geofenceName}<br/>Días: ${r.daysWorked||0} · Horas: ${r.hoursWorked||0} · <span class="text-xs text-gray-500">${(r.createdAt&&r.createdAt.toDate)? r.createdAt.toDate().toLocaleString():''}</span>`;
-        ul.appendChild(li);
-      });
-    }
-
-    document.getElementById('submitReportBtn')?.addEventListener('click', async ()=>{
-      if(!activeFarmId) return alert('Selecciona o crea una finca');
-      const pid = byId('reportPersonnel').value;
-      const activity = byId('reportActivity').value;
-      const gidx = parseInt(byId('reportGeofence').value);
-      const days = parseFloat(byId('daysWorked').value)||0;
-      const hours = parseFloat(byId('hoursWorked').value)||0;
-      if(!pid || !activity || isNaN(gidx)) return alert('Completa personal, actividad y geocerca');
-      const p = cache.personnel.find(x=>x.id===pid); if(!p) return alert('Personal inválido');
-      let geofenceName=`Geocerca ${gidx+1}`;
-      let idx=-1, target=null; drawnItems.eachLayer(l=>{ idx++; if(idx===gidx) target=l; });
-      if(target){
-        const f=target.toGeoJSON();
-        if(f.properties&&f.properties.name) geofenceName=f.properties.name;
-      }
-      const payload = {
-        personnelId: pid, personnelName: p.name, activity,
-        geofenceIndex: gidx, geofenceName,
-        daysWorked: days, hoursWorked: hours,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      await db.collection('farms').doc(activeFarmId).collection('reports').add(payload);
-      byId('daysWorked').value=''; byId('hoursWorked').value='';
-      await loadReports();
-      alert('Reporte enviado');
-    });
   </script>
 </body>
 </html>
