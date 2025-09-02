@@ -6,18 +6,13 @@
   <title>Gestión de Personal de Finca (Leaflet + Firebase)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; margin: 0; padding: 0; overflow-x: hidden; }
     #map { height: 55vh; width: 100%; border-radius: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,.1); z-index: 1; }
-    .leaflet-control-coordinates { background-color: rgba(255,255,255,.95); padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.2); font-family: monospace; font-size: .875rem; color: #333; border: 2px solid rgba(0,0,0,.2); margin-left: 10px; margin-bottom: 10px; max-width: 250px; transition: all .3s ease; }
     @media (max-width: 768px) { #map { height: 45vh; } body { padding: 12px; } }
     #adminModal { z-index: 10000; }
     button, input, select, textarea { font-size: 16px; }
     .error-message { color: red; font-size: 14px; margin-top: 5px; display: none; }
-    .move-finca-btn { background-color: #fff; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; padding: 5px 10px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
-    .move-finca-btn.active { background-color: #4CAF50; color: white; }
-    /* etiqueta permanente al lado del pin con el nombre de la finca */
     .farm-label { background: #ffffff; border: 1px solid rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.15); font-size: 12px; }
   </style>
 </head>
@@ -38,55 +33,33 @@
   <div id="appContent" class="max-w-7xl mx-auto flex flex-col space-y-6 hidden">
     <header class="text-center my-4">
       <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
-      <p class="text-md sm:text-lg text-gray-600 mt-2">Sincronizado con Firebase (Firestore)</p>
+      <p class="text-md sm:text-lg text-gray-600 mt-2">Sincronizado con Firebase (Firestore) + respaldo local</p>
     </header>
 
-    <!-- Selección y creación de fincas -->
+    <!-- Selección de finca -->
     <div class="bg-white p-4 rounded-2xl shadow-lg">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-end">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Finca activa</label>
-          <select id="farmSelect" class="mt-1 w-full border rounded-md p-2"></select>
-        </div>
-        <div class="lg:col-span-2">
-          <label class="block text-sm font-medium text-gray-700">Crear nueva finca</label>
-          <div class="flex gap-2 mt-1">
-            <input id="newFarmName" class="flex-1 border rounded-md p-2" placeholder="Nombre de la finca"/>
-            <button id="createFarmBtn" class="px-4 py-2 bg-green-600 text-white rounded-md">Crear</button>
-          </div>
-        </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Finca activa</label>
+        <select id="farmSelect" class="mt-1 w-full border rounded-md p-2"></select>
       </div>
     </div>
 
     <!-- Mapa -->
     <div class="bg-white p-6 rounded-2xl shadow-lg">
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-2xl font-semibold text-gray-700">Mapa de la Finca y Geocercas</h2>
-        <div class="flex items-center gap-3">
-          <button id="moveFincaBtn" class="move-finca-btn">Mover Ubicación Finca</button>
-        </div>
+        <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
       </div>
       <div id="map"></div>
-      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Haz clic en el mapa para crear una nueva finca (se te pedirá el nombre). Verás un pin con su etiqueta.</p>
-    </div>
-
-    <!-- Geocercas con nombre -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Añadir geocerca por coordenadas</h2>
-      <input id="geofenceName" class="w-full border rounded-md p-2 mb-2" placeholder="Nombre de la geocerca"/>
-      <textarea id="coordsTextarea" rows="4" class="w-full border rounded-md p-2" placeholder="lat,lng por línea"></textarea>
-      <button id="addPolygonBtn" class="mt-2 px-4 py-2 bg-green-600 text-white rounded-md">Añadir Polígono</button>
+      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Haz clic en el mapa para crear una nueva finca. Se guardará en Firestore y también en el almacenamiento local para que persista al reabrir.</p>
     </div>
   </div>
 
   <!-- Leaflet & Firebase -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
   <script>
-    // === Firebase ===
     const firebaseConfig = {
       apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
       authDomain: "demo-finca-app.firebaseapp.com",
@@ -95,138 +68,124 @@
       messagingSenderId: "123456789012",
       appId: "1:123456789012:web:abcdef1234567890"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    // 1) Intenta activar persistencia offline (IndexedDB)
+    db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+      // Si falla (p.ej. Safari privado o varias pestañas), seguimos sin ella
+      console.warn('Firestore persistence no disponible:', err && err.code);
+    });
+
     firebase.auth().signInAnonymously().catch(console.error);
 
-    // === Estado ===
-    const ADMIN_CODE = "admin123";
-    const DEFAULT_CENTER = { lat: -0.1807, lng: -78.4678 };
-    let map, drawnItems;
-    const markersById = {};   // idDoc -> L.Marker
-    let unsubscribeFarms = null;
+    let map;
+    const fincaMarkers = {}; // guardar marcadores por id
 
-    // === Utilidades ===
-    function parseCoord(val){
-      if (typeof val !== 'string' && typeof val !== 'number') return null;
-      const s = String(val).trim().replace(',', '.');
-      const n = parseFloat(s);
-      return Number.isFinite(n) ? n : null;
+    // ==== Persistencia local: espejo de Firestore ====
+    const LS_KEY = 'fincas_cache_v1';
+    function saveCache(farms){
+      try { localStorage.setItem(LS_KEY, JSON.stringify(farms)); } catch(e) { console.warn('No se pudo guardar cache', e); }
     }
-    function normalizeAdminInput(str){
-      return (str||"").normalize("NFKC").replace(/["'“”\s]/g,"").toLowerCase();
+    function loadCache(){
+      try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(e) { return []; }
+    }
+    function renderFromCache(){
+      const farms = loadCache();
+      // limpiar marcadores previos
+      Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
+      for(const k in fincaMarkers) delete fincaMarkers[k];
+      // pintar
+      farms.forEach(f=>{
+        if(!f || !f.id || !f.fincaLocation) return;
+        const marker = L.marker([f.fincaLocation.lat, f.fincaLocation.lng]).addTo(map);
+        marker.bindTooltip(f.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
+        fincaMarkers[f.id] = marker;
+      });
+      // llenar selector
+      const sel = document.getElementById('farmSelect');
+      if (sel){
+        sel.innerHTML = '';
+        farms.forEach(f=>{
+          const opt = document.createElement('option');
+          opt.value = f.id; opt.textContent = f.name || 'Finca';
+          sel.appendChild(opt);
+        });
+      }
     }
 
-    // === App ===
-    function initMap(center=DEFAULT_CENTER, zoom=13) {
-      map = L.map('map', { center: [center.lat, center.lng], zoom, tap:false });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    function initMap(center={lat:-0.1807, lng:-78.4678}, zoom=6){
+      map = L.map('map',{center:[center.lat,center.lng],zoom});
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
-      drawnItems = new L.FeatureGroup();
-      map.addLayer(drawnItems);
+      // 1) Pintar primero desde cache local para que persista al reabrir
+      renderFromCache();
 
-      // Crear finca con click
-      map.on('click', async (e) => {
+      // 2) Crear finca con click -> se guardará en Firestore (y el snapshot actualizará cache y mapa)
+      map.on('click', async e=>{
         const name = prompt("Nombre de la nueva finca:");
         if(!name) return;
-        const docRef = await db.collection('farms').add({
-          name,
-          fincaLocation: { lat: e.latlng.lat, lng: e.latlng.lng },
-          geofences: { type:'FeatureCollection', features: [] }
-        });
-        // centrar en el nuevo pin (cuando onSnapshot lo pinte)
-        const ll = e.latlng;
-        setTimeout(()=> map.flyTo([ll.lat, ll.lng], Math.max(map.getZoom(), 15)), 200);
+        try{
+          await db.collection('farms').add({
+            name,
+            fincaLocation:{lat:e.latlng.lat, lng:e.latlng.lng}
+          });
+        }catch(err){
+          alert('No se pudo guardar en Firestore. Se guardará solo localmente.');
+          const farms = loadCache();
+          farms.push({ id: 'local-'+Date.now(), name, fincaLocation:{lat:e.latlng.lat, lng:e.latlng.lng} });
+          saveCache(farms);
+          renderFromCache();
+        }
       });
 
-      // Listener en tiempo real de TODAS las fincas (pines + selector)
       subscribeFarms();
     }
 
     function subscribeFarms(){
-      if (unsubscribeFarms) unsubscribeFarms();
-      const sel = document.getElementById('farmSelect');
-      unsubscribeFarms = db.collection('farms').onSnapshot((snap) => {
-        // 1) actualizar selector
-        sel.innerHTML = '';
-        const seen = new Set();
-        snap.forEach(doc => {
-          const data = doc.data()||{};
-          const opt = document.createElement('option');
-          opt.value = doc.id;
-          opt.textContent = data.name || 'Finca';
-          sel.appendChild(opt);
-          seen.add(doc.id);
+      db.collection('farms').onSnapshot(snap=>{
+        const farms = [];
+        // limpiar marcadores previos en el mapa
+        Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
+        for(const key in fincaMarkers){ delete fincaMarkers[key]; }
 
-          // 2) dibujar/actualizar marcador con etiqueta permanente
-          if (data.fincaLocation && Number.isFinite(data.fincaLocation.lat) && Number.isFinite(data.fincaLocation.lng)) {
-            const latlng = [data.fincaLocation.lat, data.fincaLocation.lng];
-            if (!markersById[doc.id]) {
-              const m = L.marker(latlng).addTo(map);
-              m.bindTooltip(data.name || 'Finca', { permanent:true, direction:'right', offset:[10,0], className:'farm-label' });
-              markersById[doc.id] = m;
-            } else {
-              markersById[doc.id].setLatLng(latlng);
-              const tt = markersById[doc.id].getTooltip();
-              if (tt) tt.setContent(data.name || 'Finca');
-            }
+        snap.forEach(doc=>{
+          const data = doc.data();
+          const farm = { id: doc.id, name: data.name, fincaLocation: data.fincaLocation };
+          farms.push(farm);
+          if(data.fincaLocation){
+            const marker = L.marker([data.fincaLocation.lat, data.fincaLocation.lng]).addTo(map);
+            marker.bindTooltip(data.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
+            fincaMarkers[doc.id]=marker;
           }
         });
-
-        // 3) eliminar marcadores de docs que ya no existan
-        Object.keys(markersById).forEach(id => {
-          if (!seen.has(id)) {
-            map.removeLayer(markersById[id]);
-            delete markersById[id];
-          }
-        });
-      }, (err) => console.error('onSnapshot farms error:', err));
+        // Escribir espejo local (persistencia al reabrir)
+        saveCache(farms);
+      }, err => {
+        console.error('onSnapshot error:', err);
+        // Si falla el snapshot (sin conexión, reglas, etc.), mantenemos lo del cache
+        renderFromCache();
+      });
     }
 
-    // Guardar geocercas (por si las usas luego; no afecta pines)
-    async function saveGeofencesForFarm(farmId){
-      const fc = drawnItems.toGeoJSON();
-      fc.features.forEach((f,i)=>{ f.properties = f.properties||{}; if(!f.properties.name) f.properties.name = `Geocerca ${i+1}`; });
-      await db.collection('farms').doc(farmId).set({ geofences: fc }, { merge:true });
+    // LOGIN ADMIN
+    const ADMIN_CODE = "admin123";
+    function normalizeAdminInput(str){
+      return (str||"").normalize("NFKC").replace(/["'“”\s]/g,"").toLowerCase();
     }
-
-    // Crear polígono desde textarea (no toca pines)
-    document.addEventListener('DOMContentLoaded', ()=>{
-      const btn = document.getElementById('addPolygonBtn');
-      if (btn) {
-        btn.addEventListener('click', ()=>{
-          const name = document.getElementById('geofenceName').value.trim() || 'Geocerca';
-          const raw = document.getElementById('coordsTextarea').value.trim();
-          const coords = raw.split(/\n+/).map(l=>l.split(',').map(x=>parseCoord(x)));
-          if (coords.length < 3) return alert('Necesitas al menos 3 puntos');
-          const poly = L.polygon(coords, { color:'#3388ff' });
-          poly.feature = { type:'Feature', properties:{ name }, geometry:{ type:'Polygon', coordinates:[coords.map(c=>[c[1],c[0]])] } };
-          drawnItems.addLayer(poly);
-          map.fitBounds(poly.getBounds(), { padding: [20,20] });
-          document.getElementById('geofenceName').value='';
-          document.getElementById('coordsTextarea').value='';
-        });
-      }
-    });
-
-    // === Login admin ===
     function doAdminLogin(){
-      const raw = document.getElementById('adminCodeInput').value;
-      if(normalizeAdminInput(raw) === normalizeAdminInput(ADMIN_CODE)){
+      const raw=document.getElementById('adminCodeInput').value;
+      if(normalizeAdminInput(raw)===normalizeAdminInput(ADMIN_CODE)){
         document.getElementById('adminModal').classList.add("hidden");
         document.getElementById('appContent').classList.remove("hidden");
-        setTimeout(() => {
-          initMap();
-          // Very important para que Leaflet calcule bien tamaños y posiciones:
-          setTimeout(()=> map.invalidateSize(), 100);
-        },100);
-      } else {
+        setTimeout(() => { initMap(); setTimeout(()=>map.invalidateSize(),100); }, 100);
+      }else{
         document.getElementById('errorMessage').style.display="block";
       }
     }
-    document.getElementById('adminLoginBtn').addEventListener("click", doAdminLogin);
-    document.getElementById('adminCodeInput').addEventListener("keypress", e=>{ if(e.key==="Enter") doAdminLogin(); });
-    document.addEventListener("DOMContentLoaded", ()=> document.getElementById('adminModal').classList.remove("hidden"));
+    document.getElementById('adminLoginBtn').addEventListener("click",doAdminLogin);
+    document.getElementById('adminCodeInput').addEventListener("keypress",e=>{if(e.key==="Enter")doAdminLogin();});
+    document.addEventListener("DOMContentLoaded",()=>document.getElementById('adminModal').classList.remove("hidden"));
   </script>
 </body>
 </html>
