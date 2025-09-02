@@ -50,33 +50,49 @@
       <div class="flex flex-wrap gap-2 items-center mb-2">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
         <div class="ml-auto flex flex-wrap gap-2">
-          <!-- (existente) Crear en centro -->
+          <!-- Crear en centro -->
           <button id="createFarmBtn"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Crear finca en el centro del mapa">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             Crear finca
           </button>
-
-          <!-- (existente) Crear por Lat/Lng -->
+          <!-- Crear por Lat/Lng -->
           <button id="createByCoordsBtn"
             class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Crear finca ingresando Lat/Lng">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h4l3-3 4 8 3-5H22M3 19h18"/></svg>
             Crear finca (Lat/Lng)
           </button>
-
-          <!-- (existente) Eliminar -->
+          <!-- Eliminar finca -->
           <button id="deleteFarmBtn"
             class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             title="Eliminar la finca seleccionada">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             Eliminar finca
           </button>
+
+          <!-- ===== NUEVAS HERRAMIENTAS DE GEOCERCA ===== -->
+          <button id="startFenceBtn"
+            class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Iniciar dibujo de geocerca">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+            Nueva geocerca
+          </button>
+          <button id="finishFenceBtn"
+            class="hidden inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Finalizar geocerca">
+            Finalizar geocerca
+          </button>
+          <button id="cancelFenceBtn"
+            class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg"
+            title="Cancelar dibujo">
+            Cancelar
+          </button>
         </div>
       </div>
 
-      <!-- ÚNICO NUEVO: panel para nombrar la finca creada por Lat/Lng -->
+      <!-- Panel nombre para Crear finca (Lat/Lng) - ya existente -->
       <div id="coordsNamePanel" class="hidden mb-3">
         <div class="rounded-xl border border-gray-200 p-3">
           <label for="coordsNameInput" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la nueva finca</label>
@@ -89,9 +105,23 @@
         </div>
       </div>
 
+      <!-- NUEVO: Panel nombre para geocerca -->
+      <div id="fenceNamePanel" class="hidden mb-3">
+        <div class="rounded-xl border border-gray-200 p-3">
+          <label for="fenceNameInput" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la geocerca</label>
+          <div class="flex gap-2">
+            <input id="fenceNameInput" type="text" class="border rounded-md p-2 w-full" placeholder="Ej.: Geocerca Lote 1" />
+            <button id="fenceNameSaveBtn" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
+            <button id="fenceNameCancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
+          </div>
+          <p id="fenceNameHint" class="text-xs text-gray-500 mt-2"></p>
+        </div>
+      </div>
+
       <div id="map"></div>
       <p id="statusMessage" class="mt-3 text-sm text-gray-600">
         Haz clic en el mapa para crear una nueva finca. También puedes usar <strong>Crear finca</strong> (centro del mapa) o <strong>Crear finca (Lat/Lng)</strong>.
+        Para geocercas: <strong>Nueva geocerca</strong> → clics en el mapa para vértices → <strong>Finalizar geocerca</strong> → asigna nombre y guarda.
       </p>
     </div>
   </div>
@@ -120,13 +150,26 @@
     const fincaMarkers = {};
     const LS_KEY = 'fincas_cache_v1';
 
-    // NUEVO: estado temporal para coords (solo para Crear finca (Lat/Lng))
-    let pendingLat = null, pendingLng = null;
+    // ===== NUEVO: estado y caché para geocercas =====
+    const geofenceLayers = {}; // id -> L.Polygon
+    const LS_GF = 'geofences_cache_v1';
 
+    // Dibujo interactivo
+    let isDrawingFence = false;
+    let drawingCoords = [];        // [{lat,lng}, ...]
+    let drawingPolyline = null;    // L.Polyline temporal
+    let drawingMarkers = [];       // pequeños marcadores de vértices
+    let pendingFenceCoords = null; // coords a guardar cuando se nombra
+
+    // ====== Persistencia local (farms) ======
     function saveCache(farms){ try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} }
     function loadCache(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } }
 
-    function renderFromCache(){
+    // ====== Persistencia local (geocercas) ======
+    function saveFenceCache(fences){ try{ localStorage.setItem(LS_GF, JSON.stringify(fences)); }catch{} }
+    function loadFenceCache(){ try{ return JSON.parse(localStorage.getItem(LS_GF)||'[]'); }catch{ return []; } }
+
+    function renderFarmsFromCache(){
       const farms = loadCache();
       Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
       for(const k in fincaMarkers) delete fincaMarkers[k];
@@ -138,6 +181,7 @@
         fincaMarkers[f.id] = marker;
       });
 
+      // selector de fincas
       const sel = document.getElementById('farmSelect');
       if (sel){
         sel.innerHTML = '';
@@ -150,6 +194,21 @@
       updateDeleteButtonState();
     }
 
+    function renderGeofencesFromCache(){
+      // limpiar geocercas previas
+      Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
+      for(const k in geofenceLayers) delete geofenceLayers[k];
+
+      const fences = loadFenceCache();
+      fences.forEach(g=>{
+        if(!g || !g.id || !Array.isArray(g.path) || g.path.length<3) return;
+        const latlngs = g.path.map(pt=> [pt.lat, pt.lng]);
+        const poly = L.polygon(latlngs, {weight:2, fillOpacity:0.15}).addTo(map);
+        poly.bindTooltip(g.name || 'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
+        geofenceLayers[g.id] = poly;
+      });
+    }
+
     function initMap(center={lat:-0.1807, lng:-78.4678}, zoom=6){
       map = L.map('map',{center:[center.lat,center.lng],zoom});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
@@ -157,10 +216,16 @@
       // Control coordenadas del mouse
       addMousePositionControl();
 
-      renderFromCache();
+      // Pintar desde caché
+      renderFarmsFromCache();
+      renderGeofencesFromCache();
 
-      // Crear finca con clic (sin cambios)
+      // Clic en mapa: crear finca (original) o capturar vértices si estamos dibujando geocerca
       map.on('click', async e=>{
+        if(isDrawingFence){
+          addFenceVertex(e.latlng);
+          return;
+        }
         const name = prompt("Nombre de la nueva finca:");
         if(!name) return;
         try{
@@ -168,11 +233,12 @@
         }catch{
           const farms = loadCache();
           farms.push({ id: 'local-'+Date.now(), name, fincaLocation:{lat:e.latlng.lat, lng:e.latlng.lng} });
-          saveCache(farms); renderFromCache();
+          saveCache(farms); renderFarmsFromCache();
         }
       });
 
       subscribeFarms();
+      subscribeGeofences();
     }
 
     function subscribeFarms(){
@@ -193,6 +259,7 @@
         });
 
         saveCache(farms);
+        // selector
         const sel = document.getElementById('farmSelect');
         if (sel){
           sel.innerHTML = '';
@@ -201,42 +268,59 @@
           });
         }
         updateDeleteButtonState();
-      }, ()=>{ renderFromCache(); });
+      }, ()=>{ renderFarmsFromCache(); });
     }
 
-    // Helpers coords
+    // ====== NUEVO: suscripción geocercas ======
+    function subscribeGeofences(){
+      db.collection('geofences').onSnapshot(snap=>{
+        const fences = [];
+        // limpiar capas previas
+        Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
+        for(const k in geofenceLayers) delete geofenceLayers[k];
+
+        snap.forEach(doc=>{
+          const d = doc.data();
+          const g = { id: doc.id, name: d.name, path: d.path || [] };
+          fences.push(g);
+          if(Array.isArray(g.path) && g.path.length>=3){
+            const latlngs = g.path.map(pt=> [pt.lat, pt.lng]);
+            const poly = L.polygon(latlngs, {weight:2, fillOpacity:0.15}).addTo(map);
+            poly.bindTooltip(g.name || 'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
+            geofenceLayers[doc.id]=poly;
+          }
+        });
+
+        saveFenceCache(fences);
+      }, ()=>{ renderGeofencesFromCache(); });
+    }
+
+    // ===== Helpers números/coords existentes =====
     function normDec(s){ return String(s||'').trim().replace(',', '.'); }
-    function parseCoord(s){ const v = parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; }
+    function parseCoord(s){ const v=parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; }
     function validLat(v){ return v>=-90 && v<=90; }
     function validLng(v){ return v>=-180 && v<=180; }
 
-    // Crear en centro (sin cambios)
+    // ===== Crear en centro (fincas, existente) =====
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
       const name = prompt("Nombre de la nueva finca:"); if(!name) return;
       const c = map.getCenter();
-      try{
-        await db.collection('farms').add({ name, fincaLocation:{lat:c.lat, lng:c.lng} });
-      }catch{
-        const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:c.lat, lng:c.lng} }); saveCache(farms); renderFromCache();
-      }
+      try{ await db.collection('farms').add({ name, fincaLocation:{lat:c.lat, lng:c.lng} }); }
+      catch{ const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:c.lat, lng:c.lng} }); saveCache(farms); renderFarmsFromCache(); }
     }
 
-    // **ÚNICO CAMBIO DE FLUJO**: Crear por Lat/Lng -> pedir coords, luego mostrar panel para NOMBRE
+    // ===== Crear por Lat/Lng (fincas, ya implementado con panel) =====
+    let pendingLat = null, pendingLng = null; // ya utilizado para fincas por coords
     async function createFarmByCoords(){
-      const latStr = prompt("Latitud (decimal, -90 a 90). Puedes usar coma o punto:");
-      if(latStr === null) return;
-      const lngStr = prompt("Longitud (decimal, -180 a 180). Puedes usar coma o punto:");
-      if(lngStr === null) return;
-
+      const latStr = prompt("Latitud (decimal, -90 a 90). Puedes usar coma o punto:"); if(latStr===null) return;
+      const lngStr = prompt("Longitud (decimal, -180 a 180). Puedes usar coma o punto:"); if(lngStr===null) return;
       const lat = parseCoord(latStr), lng = parseCoord(lngStr);
       if(!Number.isFinite(lat) || !validLat(lat)){ alert('Latitud inválida o fuera de rango (-90 a 90).'); return; }
       if(!Number.isFinite(lng) || !validLng(lng)){ alert('Longitud inválida o fuera de rango (-180 a 180).'); return; }
-
-      // Guardar en estado temporal y mostrar panel de nombre
       pendingLat = lat; pendingLng = lng;
-      const hint = document.getElementById('coordsNameHint');
-      hint.textContent = `Coordenadas: Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
+
+      document.getElementById('coordsNameHint').textContent = `Coordenadas: Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
       const input = document.getElementById('coordsNameInput');
       input.value = `Finca ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
       document.getElementById('coordsNamePanel').classList.remove('hidden');
@@ -244,26 +328,101 @@
 
       if(map){ map.setView([lat, lng], Math.max(map.getZoom(), 12)); }
     }
-
     async function saveCoordsName(){
       if(pendingLat==null || pendingLng==null) { cancelCoordsName(); return; }
       const input = document.getElementById('coordsNameInput');
       const name = (input.value||'').trim() || `Finca ${pendingLat.toFixed(5)}, ${pendingLng.toFixed(5)}`;
-
-      try{
-        await db.collection('farms').add({ name, fincaLocation:{lat: pendingLat, lng: pendingLng} });
-      }catch{
-        const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:pendingLat, lng:pendingLng} }); saveCache(farms); renderFromCache();
-      }
+      try{ await db.collection('farms').add({ name, fincaLocation:{lat: pendingLat, lng: pendingLng} }); }
+      catch{ const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:pendingLat, lng:pendingLng} }); saveCache(farms); renderFarmsFromCache(); }
       pendingLat=null; pendingLng=null; input.value=''; document.getElementById('coordsNamePanel').classList.add('hidden');
     }
-    function cancelCoordsName(){
-      pendingLat=null; pendingLng=null;
-      document.getElementById('coordsNameInput').value='';
-      document.getElementById('coordsNamePanel').classList.add('hidden');
+    function cancelCoordsName(){ pendingLat=null; pendingLng=null; document.getElementById('coordsNameInput').value=''; document.getElementById('coordsNamePanel').classList.add('hidden'); }
+
+    // ===== NUEVO: Herramientas de geocerca =====
+    function addFenceVertex(latlng){
+      drawingCoords.push({lat: latlng.lat, lng: latlng.lng});
+      // marcador pequeño
+      const m = L.circleMarker(latlng, {radius:4, weight:2}).addTo(map);
+      drawingMarkers.push(m);
+      // actualizar línea/polígono temporal
+      updateFencePreview();
+    }
+    function updateFencePreview(){
+      const latlngs = drawingCoords.map(p=> [p.lat, p.lng]);
+      if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; }
+      if(latlngs.length>=3){
+        drawingPolyline = L.polygon(latlngs, {dashArray:'4,4', weight:2, fillOpacity:0.1}).addTo(map);
+      }else if(latlngs.length>=2){
+        drawingPolyline = L.polyline(latlngs, {dashArray:'4,4', weight:2}).addTo(map);
+      }
+    }
+    function startFenceDraw(){
+      if(isDrawingFence) return;
+      isDrawingFence = true;
+      drawingCoords = [];
+      drawingMarkers.forEach(m=> map.removeLayer(m)); drawingMarkers=[];
+      if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; }
+
+      document.getElementById('startFenceBtn').classList.add('hidden');
+      document.getElementById('finishFenceBtn').classList.remove('hidden');
+      document.getElementById('cancelFenceBtn').classList.remove('hidden');
+    }
+    function finishFenceDraw(){
+      if(!isDrawingFence) return;
+      if(drawingCoords.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
+      // pasar coords a pendiente y abrir panel de nombre
+      pendingFenceCoords = drawingCoords.slice();
+      const hint = document.getElementById('fenceNameHint');
+      hint.textContent = `Vértices: ${pendingFenceCoords.length} puntos`;
+      const input = document.getElementById('fenceNameInput');
+      input.value = `Geocerca ${new Date().toLocaleDateString()}`;
+      document.getElementById('fenceNamePanel').classList.remove('hidden');
+      input.focus(); input.select();
+    }
+    function cancelFenceDraw(){
+      isDrawingFence = false;
+      drawingCoords = [];
+      drawingMarkers.forEach(m=> map.removeLayer(m)); drawingMarkers=[];
+      if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; }
+      document.getElementById('startFenceBtn').classList.remove('hidden');
+      document.getElementById('finishFenceBtn').classList.add('hidden');
+      document.getElementById('cancelFenceBtn').classList.add('hidden');
+      // cerrar panel si estaba abierto
+      document.getElementById('fenceNamePanel').classList.add('hidden');
+      pendingFenceCoords = null;
+    }
+    async function saveFenceName(){
+      const input = document.getElementById('fenceNameInput');
+      const name = (input.value||'').trim() || 'Geocerca';
+      if(!pendingFenceCoords || pendingFenceCoords.length<3){ alert('No hay geocerca lista para guardar.'); return; }
+
+      // guardar en Firestore o local
+      try{
+        await db.collection('geofences').add({
+          name,
+          path: pendingFenceCoords
+        });
+      }catch(err){
+        console.error('No se pudo guardar en Firestore. Guardando localmente:', err);
+        const fences = loadFenceCache();
+        fences.push({ id: 'localgf-'+Date.now(), name, path: pendingFenceCoords });
+        saveFenceCache(fences);
+        renderGeofencesFromCache();
+      }
+
+      // limpiar estado de dibujo
+      input.value='';
+      pendingFenceCoords=null;
+      document.getElementById('fenceNamePanel').classList.add('hidden');
+      cancelFenceDraw(); // también oculta botones y limpia preview
+    }
+    function cancelFenceName(){
+      document.getElementById('fenceNameInput').value='';
+      document.getElementById('fenceNamePanel').classList.add('hidden');
+      // mantenemos el modo dibujo para que el usuario pueda ajustar o cancelar
     }
 
-    // Eliminar (sin cambios)
+    // ===== UI varias ya existentes =====
     async function deleteSelectedFarm(){
       const sel=document.getElementById('farmSelect'); const id=sel&&sel.value;
       if(!id){ alert('No hay finca seleccionada.'); return; }
@@ -272,10 +431,10 @@
       if(!confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) return;
 
       if(id.startsWith('local-')){
-        const updated=farmsCache.filter(f=>f.id!==id); saveCache(updated); renderFromCache(); return;
+        const updated=farmsCache.filter(f=>f.id!==id); saveCache(updated); renderFarmsFromCache(); return;
       }
       try{ await db.collection('farms').doc(id).delete(); }
-      catch{ const updated=farmsCache.filter(f=>f.id!==id); saveCache(updated); renderFromCache(); }
+      catch{ const updated=farmsCache.filter(f=>f.id!==id); saveCache(updated); renderFarmsFromCache(); }
     }
 
     function updateDeleteButtonState(){
@@ -283,7 +442,7 @@
       if(!btn) return; btn.disabled = !(sel && sel.value);
     }
 
-    // Control Leaflet para coordenadas del mouse (ya solicitado antes)
+    // Control Leaflet para coordenadas del mouse
     function addMousePositionControl(){
       const MousePos=L.Control.extend({
         options:{position:'bottomleft'},
@@ -327,7 +486,15 @@
       const btnCoords=document.getElementById('createByCoordsBtn');
       if (btnCoords) btnCoords.addEventListener('click', createFarmByCoords);
 
-      // Guardar/cancelar nombre para Lat/Lng
+      // Geocercas: listeners
+      document.getElementById('startFenceBtn').addEventListener('click', startFenceDraw);
+      document.getElementById('finishFenceBtn').addEventListener('click', finishFenceDraw);
+      document.getElementById('cancelFenceBtn').addEventListener('click', cancelFenceDraw);
+      document.getElementById('fenceNameSaveBtn').addEventListener('click', saveFenceName);
+      document.getElementById('fenceNameCancelBtn').addEventListener('click', cancelFenceName);
+      document.getElementById('fenceNameInput').addEventListener('keypress', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveFenceName(); } });
+
+      // guardar/cancelar nombre de finca por coords (ya existente)
       document.getElementById('coordsNameSaveBtn').addEventListener('click', saveCoordsName);
       document.getElementById('coordsNameCancelBtn').addEventListener('click', cancelCoordsName);
       document.getElementById('coordsNameInput').addEventListener('keypress', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveCoordsName(); } });
@@ -337,3 +504,4 @@
   </script>
 </body>
 </html>
+
