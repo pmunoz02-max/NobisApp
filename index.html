@@ -12,7 +12,7 @@
     @media (max-width: 768px) { #map { height: 45vh; } body { padding: 12px; } }
     #adminModal { z-index: 10000; }
     button, input, select, textarea { font-size: 16px; }
-    .error-message { color: red; font-size: 14px; margin-top: 5px; display: none; }
+    .error-message { color: #dc2626; font-size: 14px; margin-top: 6px; display: none; }
     .farm-label { background: #ffffff; border: 1px solid rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.15); font-size: 12px; }
   </style>
 </head>
@@ -50,7 +50,7 @@
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
         <!-- Contenedor de botones, pegado a la derecha -->
         <div class="ml-auto flex gap-2">
-          <!-- Botón CREAR FINCA -->
+          <!-- Botón CREAR FINCA (centro del mapa) -->
           <button id="createFarmBtn"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Crear una finca en el centro del mapa">
@@ -72,10 +72,30 @@
         </div>
       </div>
 
+      <!-- NUEVO: Formulario para crear por coordenadas -->
+      <div class="rounded-xl border border-gray-200 p-4 mb-4">
+        <h3 class="text-lg font-semibold text-gray-700 mb-3">Crear finca por coordenadas</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input id="coordName" type="text" placeholder="Nombre de la finca"
+                 class="border rounded-md p-2 w-full" />
+          <input id="coordLat" type="text" inputmode="decimal" placeholder="Latitud (ej. -1.2345)"
+                 class="border rounded-md p-2 w-full" />
+          <input id="coordLng" type="text" inputmode="decimal" placeholder="Longitud (ej. -78.5678)"
+                 class="border rounded-md p-2 w-full" />
+          <button id="createByCoordsBtn"
+                  class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
+            Crear por coordenadas
+          </button>
+        </div>
+        <div id="coordError" class="error-message"></div>
+        <p class="text-xs text-gray-500 mt-2">Consejo: puedes usar coma o punto como separador decimal; el sistema lo normaliza.</p>
+      </div>
+
       <div id="map"></div>
       <p id="statusMessage" class="mt-3 text-sm text-gray-600">
         Haz clic en el mapa para crear una nueva finca.
-        También puedes mover el mapa y pulsar <strong>Crear finca</strong> (usa el centro del mapa).
+        También puedes mover el mapa y pulsar <strong>Crear finca</strong> (usa el centro del mapa),
+        o ingresar <strong>Nombre, Lat y Lng</strong> y usar <strong>Crear por coordenadas</strong>.
         Para borrar, selecciona una finca en el listado y usa <strong>Eliminar finca</strong>.
       </p>
     </div>
@@ -98,11 +118,10 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    // 1) Intenta activar persistencia offline (IndexedDB)
+    // Persistencia offline (si es posible)
     db.enablePersistence({ synchronizeTabs: true }).catch(err => {
       console.warn('Firestore persistence no disponible:', err && err.code);
     });
-
     firebase.auth().signInAnonymously().catch(console.error);
 
     let map;
@@ -118,16 +137,16 @@
     }
     function renderFromCache(){
       const farms = loadCache();
-      // limpiar marcadores previos
       Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
       for(const k in fincaMarkers) delete fincaMarkers[k];
-      // pintar
+
       farms.forEach(f=>{
         if(!f || !f.id || !f.fincaLocation) return;
         const marker = L.marker([f.fincaLocation.lat, f.fincaLocation.lng]).addTo(map);
         marker.bindTooltip(f.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
         fincaMarkers[f.id] = marker;
       });
+
       // llenar selector
       const sel = document.getElementById('farmSelect');
       if (sel){
@@ -145,10 +164,10 @@
       map = L.map('map',{center:[center.lat,center.lng],zoom});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
-      // 1) Pintar primero desde cache local para que persista al reabrir
+      // Pintar primero desde cache
       renderFromCache();
 
-      // 2) Crear finca con click -> se guardará en Firestore (y el snapshot actualizará cache y mapa)
+      // Crear finca con clic en el mapa (comportamiento original)
       map.on('click', async e=>{
         const name = prompt("Nombre de la nueva finca:");
         if(!name) return;
@@ -172,7 +191,6 @@
     function subscribeFarms(){
       db.collection('farms').onSnapshot(snap=>{
         const farms = [];
-        // limpiar marcadores previos en el mapa
         Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
         for(const key in fincaMarkers){ delete fincaMarkers[key]; }
 
@@ -186,9 +204,8 @@
             fincaMarkers[doc.id]=marker;
           }
         });
-        // Escribir espejo local (persistencia al reabrir)
-        saveCache(farms);
 
+        saveCache(farms);
         // Llenar selector
         const sel = document.getElementById('farmSelect');
         if (sel){
@@ -202,12 +219,23 @@
         updateDeleteButtonState();
       }, err => {
         console.error('onSnapshot error:', err);
-        // Si falla el snapshot (sin conexión, reglas, etc.), mantenemos lo del cache
         renderFromCache();
       });
     }
 
-    // === CREAR FINCA (botón) ===
+    // === Helpers de validación/parseo ===
+    function normDec(s){
+      // Normaliza coma/punto y quita espacios
+      return String(s || '').trim().replace(',', '.');
+    }
+    function parseCoord(s){
+      const v = parseFloat(normDec(s));
+      return Number.isFinite(v) ? v : NaN;
+    }
+    function validLat(v){ return v >= -90 && v <= 90; }
+    function validLng(v){ return v >= -180 && v <= 180; }
+
+    // === CREAR FINCA (centro del mapa) ===
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
       const name = prompt("Nombre de la nueva finca:");
@@ -219,13 +247,62 @@
           name,
           fincaLocation:{ lat: c.lat, lng: c.lng }
         });
-        // onSnapshot actualizará cache y UI
       }catch(err){
         console.error('No se pudo guardar en Firestore. Guardando solo local:', err);
         const farms = loadCache();
         farms.push({ id: 'local-'+Date.now(), name, fincaLocation:{ lat: c.lat, lng: c.lng } });
         saveCache(farms);
         renderFromCache();
+      }
+    }
+
+    // === NUEVO: CREAR FINCA POR COORDENADAS ===
+    async function createFarmByCoords(){
+      const nameEl = document.getElementById('coordName');
+      const latEl  = document.getElementById('coordLat');
+      const lngEl  = document.getElementById('coordLng');
+      const errEl  = document.getElementById('coordError');
+
+      const name = (nameEl.value || '').trim();
+      const lat  = parseCoord(latEl.value);
+      const lng  = parseCoord(lngEl.value);
+
+      // Validaciones
+      const errs = [];
+      if(!name) errs.push('• Ingresa un nombre.');
+      if(!Number.isFinite(lat)) errs.push('• Latitud inválida.');
+      if(!Number.isFinite(lng)) errs.push('• Longitud inválida.');
+      if(Number.isFinite(lat) && !validLat(lat)) errs.push('• Latitud fuera de rango (-90 a 90).');
+      if(Number.isFinite(lng) && !validLng(lng)) errs.push('• Longitud fuera de rango (-180 a 180).');
+
+      if(errs.length){
+        errEl.textContent = errs.join(' ');
+        errEl.style.display = 'block';
+        return;
+      }
+
+      errEl.style.display = 'none';
+
+      try{
+        await db.collection('farms').add({
+          name,
+          fincaLocation:{ lat, lng }
+        });
+        // Limpia inputs si todo va bien
+        nameEl.value = ''; latEl.value = ''; lngEl.value = '';
+      }catch(err){
+        console.error('No se pudo guardar en Firestore. Guardando solo local:', err);
+        const farms = loadCache();
+        farms.push({ id: 'local-'+Date.now(), name, fincaLocation:{ lat, lng } });
+        saveCache(farms);
+        renderFromCache();
+        // Limpia inputs
+        nameEl.value = ''; latEl.value = ''; lngEl.value = '';
+      }
+
+      // Centrar mapa en la nueva finca para visual feedback
+      if(map){
+        map.setView([lat, lng], Math.max(map.getZoom(), 12));
       }
     }
 
@@ -243,7 +320,6 @@
 
       if(!confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) return;
 
-      // Si es una finca local (no sincronizada)
       if(id.startsWith('local-')){
         const updated = farmsCache.filter(f=>f.id!==id);
         saveCache(updated);
@@ -251,13 +327,11 @@
         return;
       }
 
-      // Intentar borrar en Firestore
       try{
         await db.collection('farms').doc(id).delete();
         // el snapshot actualizará el cache y la UI
       }catch(err){
         console.error('No se pudo borrar en Firestore, eliminando solo localmente:', err);
-        // fallback: borrar solo del cache local
         const updated = farmsCache.filter(f=>f.id!==id);
         saveCache(updated);
         renderFromCache();
@@ -286,12 +360,13 @@
         document.getElementById('errorMessage').style.display="block";
       }
     }
+
+    // Listeners
     document.getElementById('adminLoginBtn').addEventListener("click",doAdminLogin);
     document.getElementById('adminCodeInput').addEventListener("keypress",e=>{if(e.key==="Enter")doAdminLogin();});
     document.addEventListener("DOMContentLoaded",()=>{
       document.getElementById('adminModal').classList.remove("hidden");
 
-      // Listeners de UI
       const sel = document.getElementById('farmSelect');
       if (sel) sel.addEventListener('change', updateDeleteButtonState);
 
@@ -300,6 +375,22 @@
 
       const btnDelete = document.getElementById('deleteFarmBtn');
       if (btnDelete) btnDelete.addEventListener('click', deleteSelectedFarm);
+
+      const btnCoords = document.getElementById('createByCoordsBtn');
+      if (btnCoords) btnCoords.addEventListener('click', createFarmByCoords);
+
+      // Permitir Enter en inputs de coordenadas para crear
+      ['coordName','coordLat','coordLng'].forEach(id=>{
+        const el = document.getElementById(id);
+        if(el){
+          el.addEventListener('keypress', (e)=>{
+            if(e.key === 'Enter'){
+              e.preventDefault();
+              createFarmByCoords();
+            }
+          });
+        }
+      });
 
       updateDeleteButtonState();
     });
