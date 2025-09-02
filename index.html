@@ -149,6 +149,14 @@
             margin-top: 8px;
             display: inline-block;
         }
+        .success-message {
+            background-color: #10b981;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
     </style>
 </head>
 <body class="bg-gray-100 p-4 sm:p-8 overflow-x-hidden">
@@ -160,6 +168,7 @@
             <p class="text-gray-600 mb-6">Por favor, introduce tu código de administrador para acceder.</p>
             <input type="password" id="adminCodeInput" placeholder="Introduce el código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
             <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
+            <div id="successMessage" class="success-message">¡Acceso concedido! Cargando aplicación...</div>
             <button id="adminLoginBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition duration-300 ease-in-out font-bold">Acceder</button>
         </div>
     </div>
@@ -266,3 +275,266 @@
                     <label for="activityName" class="block text-sm font-medium text-gray-700">Nombre de la Actividad</label>
                     <input type="text" id="activityName" placeholder="Escribe la actividad" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
                 </div>
+                <button id="addActivityBtn" class="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out font-bold">Añadir Actividad</button>
+            </div>
+            <ul id="activityList" class="mt-4 space-y-2 text-gray-600 text-sm">
+                <li class="text-gray-500 italic">No hay actividades añadidas.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+    <script>
+        // Configuración inicial
+        const ADMIN_CODE = "admin123"; // Código de administrador
+        const FINCA_COORDS = [-1.733139, -77.912777]; // Coordenadas de la finca
+        
+        let map = null;
+        let personnelMarker = null;
+        let drawnItems = null;
+        let drawControl = null;
+
+        // Referencias a elementos DOM
+        let adminModal, adminCodeInput, adminLoginBtn, errorMessage, successMessage;
+        let appContent, showAdminModalBtn, adminControls, geofenceCounter, clearGeofencesBtn;
+
+        // Inicializar la aplicación después de que el DOM esté completamente cargado
+        document.addEventListener('DOMContentLoaded', function() {
+            // Obtener referencias a los elementos del DOM
+            adminModal = document.getElementById('adminModal');
+            adminCodeInput = document.getElementById('adminCodeInput');
+            adminLoginBtn = document.getElementById('adminLoginBtn');
+            errorMessage = document.getElementById('errorMessage');
+            successMessage = document.getElementById('successMessage');
+            appContent = document.getElementById('appContent');
+            showAdminModalBtn = document.getElementById('showAdminModalBtn');
+            adminControls = document.querySelectorAll('.admin-controls');
+            geofenceCounter = document.getElementById('geofenceCounter');
+            clearGeofencesBtn = document.getElementById('clearGeofencesBtn');
+
+            // Mostrar el modal de administrador al cargar la página
+            adminModal.classList.remove('hidden');
+
+            // Configurar event listeners
+            adminLoginBtn.addEventListener('click', handleAdminLogin);
+            
+            adminCodeInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleAdminLogin();
+                }
+            });
+
+            if (showAdminModalBtn) {
+                showAdminModalBtn.addEventListener('click', () => {
+                    adminModal.classList.remove('hidden');
+                });
+            }
+
+            if (clearGeofencesBtn) {
+                clearGeofencesBtn.addEventListener('click', handleClearGeofences);
+            }
+        });
+
+        // Función para manejar el login de administrador
+        function handleAdminLogin() {
+            const code = adminCodeInput.value.trim();
+            
+            if (code === ADMIN_CODE) {
+                // Código correcto - mostrar mensaje de éxito
+                errorMessage.style.display = 'none';
+                successMessage.style.display = 'block';
+                
+                // Ocultar modal y mostrar aplicación después de un breve retraso
+                setTimeout(() => {
+                    adminModal.classList.add('hidden');
+                    appContent.classList.remove('hidden');
+                    
+                    // Mostrar controles de administrador
+                    adminControls.forEach(el => el.style.display = 'block');
+                    
+                    // Inicializar el mapa
+                    initMap();
+                }, 1000);
+            } else {
+                // Código incorrecto
+                errorMessage.style.display = 'block';
+                successMessage.style.display = 'none';
+            }
+        }
+
+        // Función para guardar geocercas en localStorage
+        function saveGeofences() {
+            if (drawnItems) {
+                const geofences = drawnItems.toGeoJSON();
+                localStorage.setItem('geofences', JSON.stringify(geofences));
+                
+                // Actualizar contador
+                const count = Object.keys(geofences.features).length;
+                geofenceCounter.textContent = count;
+                
+                // Actualizar mensaje de estado
+                const statusMessage = document.getElementById('statusMessage');
+                if (count > 0) {
+                    statusMessage.innerHTML = `Tienes <strong>${count}</strong> geocerca(s) guardada(s). Las geocercas persisten incluso después de cerrar la página.`;
+                } else {
+                    statusMessage.textContent = "Haz clic en el mapa para colocar al personal. Usa las herramientas que están a la derecha del mapa para dibujar geocercas.";
+                }
+            }
+        }
+
+        // Función para cargar geocercas desde localStorage
+        function loadGeofences() {
+            const savedGeofences = localStorage.getItem('geofences');
+            if (savedGeofences) {
+                try {
+                    const geofences = JSON.parse(savedGeofences);
+                    L.geoJSON(geofences, {
+                        onEachFeature: function (feature, layer) {
+                            drawnItems.addLayer(layer);
+                        }
+                    });
+                    
+                    // Actualizar contador
+                    const count = Object.keys(geofences.features).length;
+                    geofenceCounter.textContent = count;
+                    
+                    // Ajustar vista del mapa para mostrar todas las geocercas
+                    if (count > 0) {
+                        map.fitBounds(drawnItems.getBounds());
+                        
+                        // Actualizar mensaje de estado
+                        const statusMessage = document.getElementById('statusMessage');
+                        statusMessage.innerHTML = `Se han cargado <strong>${count}</strong> geocerca(s) guardadas.`;
+                    }
+                } catch (e) {
+                    console.error('Error al cargar geocercas:', e);
+                }
+            }
+        }
+
+        // Función para manejar la eliminación de todas las geocercas
+        function handleClearGeofences() {
+            if (confirm('¿Estás seguro de que quieres eliminar todas las geocercas? Esta acción no se puede deshacer.')) {
+                drawnItems.clearLayers();
+                localStorage.removeItem('geofences');
+                saveGeofences();
+                alert('Todas las geocercas han sido eliminadas.');
+            }
+        }
+
+        // Función para inicializar el mapa y las herramientas de dibujo
+        function initMap() {
+            // Inicializar el mapa centrado en las coordenadas de la finca
+            map = L.map('map', {
+                zoomControl: true,
+                center: FINCA_COORDS,
+                zoom: 16
+            });
+            
+            // Añadir capa de OpenStreetMap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Añadir marcador en la ubicación de la finca
+            L.marker(FINCA_COORDS)
+                .addTo(map)
+                .bindPopup('Ubicación de la Finca')
+                .openPopup();
+
+            // Inicializar la capa para los elementos dibujados
+            drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+
+            // Configurar las herramientas de dibujo
+            drawControl = new L.Control.Draw({
+                position: 'topright',
+                draw: {
+                    polygon: {
+                        allowIntersection: false,
+                        showArea: true,
+                        metric: true,
+                        shapeOptions: {
+                            color: '#3388ff',
+                            fillColor: '#3388ff',
+                            fillOpacity: 0.2,
+                            weight: 2
+                        },
+                        guidelineDistance: 20,
+                        showLength: true
+                    },
+                    polyline: false,
+                    circle: false,
+                    rectangle: false,
+                    marker: false,
+                    circlemarker: false
+                },
+                edit: {
+                    featureGroup: drawnItems,
+                    remove: true
+                }
+            });
+
+            // Añadir control de dibujo al mapa
+            map.addControl(drawControl);
+
+            // Manejar eventos de dibujo
+            map.on(L.Draw.Event.CREATED, function (event) {
+                const layer = event.layer;
+                drawnItems.addLayer(layer);
+                saveGeofences();
+                
+                // Mostrar mensaje de confirmación
+                alert('Geocerca creada exitosamente. Se ha guardado para futuras sesiones.');
+            });
+
+            // Manejar eventos de edición y eliminación
+            map.on(L.Draw.Event.EDITED, function (e) {
+                saveGeofences();
+            });
+
+            map.on(L.Draw.Event.DELETED, function (e) {
+                saveGeofences();
+            });
+
+            // Añadir control de coordenadas
+            const coordinatesControl = L.control({position: 'bottomleft'});
+            coordinatesControl.onAdd = function(map) {
+                this._div = L.DomUtil.create('div', 'leaflet-control-coordinates');
+                this._div.innerHTML = '<div><span class="coordinates-label">Lat:</span> <span class="coordinates-value">-</span></div>' +
+                                     '<div><span class="coordinates-label">Lng:</span> <span class="coordinates-value">-</span></div>';
+                return this._div;
+            };
+            coordinatesControl.addTo(map);
+            
+            // Actualizar coordenadas al mover el ratón
+            map.on('mousemove', function(e) {
+                const lat = e.latlng.lat.toFixed(6);
+                const lng = e.latlng.lng.toFixed(6);
+                const coordsControl = document.querySelector('.leaflet-control-coordinates');
+                if (coordsControl) {
+                    coordsControl.innerHTML = `<div><span class="coordinates-label">Lat:</span> <span class="coordinates-value">${lat}</span></div>` +
+                                             `<div><span class="coordinates-label">Lng:</span> <span class="coordinates-value">${lng}</span></div>`;
+                }
+            });
+
+            // Cargar geocercas guardadas
+            loadGeofences();
+
+            // Ajustar el tamaño del mapa después de que se muestre
+            setTimeout(() => {
+                map.invalidateSize();
+                
+                // Forzar la visualización de los controles de dibujo
+                if (drawControl) {
+                    map.removeControl(drawControl);
+                    map.addControl(drawControl);
+                }
+            }, 300);
+        }
+    </script>
+</body>
+</html>
