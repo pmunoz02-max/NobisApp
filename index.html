@@ -14,6 +14,12 @@
     button, input, select, textarea { font-size: 16px; }
     .error-message { color: #dc2626; font-size: 14px; margin-top: 6px; display: none; }
     .farm-label { background: #ffffff; border: 1px solid rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.15); font-size: 12px; }
+    /* Control de coordenadas del mouse */
+    .mousepos-control {
+      background: #ffffff; border: 1px solid rgba(0,0,0,0.15);
+      border-radius: .5rem; padding: .25rem .5rem; font-size: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.1);
+    }
   </style>
 </head>
 <body class="bg-gray-100 p-4 sm:p-8 overflow-x-hidden">
@@ -49,7 +55,7 @@
       <div class="flex flex-wrap gap-3 items-center mb-4">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
         <!-- Contenedor de botones, pegado a la derecha -->
-        <div class="ml-auto flex gap-2">
+        <div class="ml-auto flex flex-wrap gap-2">
           <!-- Botón CREAR FINCA (centro del mapa) -->
           <button id="createFarmBtn"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg"
@@ -72,30 +78,28 @@
         </div>
       </div>
 
-      <!-- NUEVO: Formulario para crear por coordenadas -->
+      <!-- NUEVO: Crear por coordenadas (Lat/Lng) -->
       <div class="rounded-xl border border-gray-200 p-4 mb-4">
         <h3 class="text-lg font-semibold text-gray-700 mb-3">Crear finca por coordenadas</h3>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <input id="coordName" type="text" placeholder="Nombre de la finca"
-                 class="border rounded-md p-2 w-full" />
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input id="coordLat" type="text" inputmode="decimal" placeholder="Latitud (ej. -1.2345)"
                  class="border rounded-md p-2 w-full" />
           <input id="coordLng" type="text" inputmode="decimal" placeholder="Longitud (ej. -78.5678)"
                  class="border rounded-md p-2 w-full" />
           <button id="createByCoordsBtn"
                   class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
-            Crear por coordenadas
+            Crear finca (Lat/Lng)
           </button>
         </div>
         <div id="coordError" class="error-message"></div>
-        <p class="text-xs text-gray-500 mt-2">Consejo: puedes usar coma o punto como separador decimal; el sistema lo normaliza.</p>
+        <p class="text-xs text-gray-500 mt-2">Puedes usar coma o punto como separador decimal; se normaliza automáticamente.</p>
       </div>
 
       <div id="map"></div>
       <p id="statusMessage" class="mt-3 text-sm text-gray-600">
         Haz clic en el mapa para crear una nueva finca.
         También puedes mover el mapa y pulsar <strong>Crear finca</strong> (usa el centro del mapa),
-        o ingresar <strong>Nombre, Lat y Lng</strong> y usar <strong>Crear por coordenadas</strong>.
+        o ingresar <strong>Lat</strong> y <strong>Lng</strong> y usar <strong>Crear finca (Lat/Lng)</strong>.
         Para borrar, selecciona una finca en el listado y usa <strong>Eliminar finca</strong>.
       </p>
     </div>
@@ -164,6 +168,9 @@
       map = L.map('map',{center:[center.lat,center.lng],zoom});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
+      // Control de posición del mouse (Lat/Lng en vivo)
+      addMousePositionControl();
+
       // Pintar primero desde cache
       renderFromCache();
 
@@ -224,10 +231,7 @@
     }
 
     // === Helpers de validación/parseo ===
-    function normDec(s){
-      // Normaliza coma/punto y quita espacios
-      return String(s || '').trim().replace(',', '.');
-    }
+    function normDec(s){ return String(s || '').trim().replace(',', '.'); }
     function parseCoord(s){
       const v = parseFloat(normDec(s));
       return Number.isFinite(v) ? v : NaN;
@@ -256,20 +260,16 @@
       }
     }
 
-    // === NUEVO: CREAR FINCA POR COORDENADAS ===
+    // === NUEVO: CREAR FINCA POR COORDENADAS (Lat/Lng) ===
     async function createFarmByCoords(){
-      const nameEl = document.getElementById('coordName');
       const latEl  = document.getElementById('coordLat');
       const lngEl  = document.getElementById('coordLng');
       const errEl  = document.getElementById('coordError');
 
-      const name = (nameEl.value || '').trim();
       const lat  = parseCoord(latEl.value);
       const lng  = parseCoord(lngEl.value);
 
-      // Validaciones
       const errs = [];
-      if(!name) errs.push('• Ingresa un nombre.');
       if(!Number.isFinite(lat)) errs.push('• Latitud inválida.');
       if(!Number.isFinite(lng)) errs.push('• Longitud inválida.');
       if(Number.isFinite(lat) && !validLat(lat)) errs.push('• Latitud fuera de rango (-90 a 90).');
@@ -280,27 +280,25 @@
         errEl.style.display = 'block';
         return;
       }
-
       errEl.style.display = 'none';
+
+      const name = `Finca ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 
       try{
         await db.collection('farms').add({
           name,
           fincaLocation:{ lat, lng }
         });
-        // Limpia inputs si todo va bien
-        nameEl.value = ''; latEl.value = ''; lngEl.value = '';
+        latEl.value = ''; lngEl.value = '';
       }catch(err){
         console.error('No se pudo guardar en Firestore. Guardando solo local:', err);
         const farms = loadCache();
         farms.push({ id: 'local-'+Date.now(), name, fincaLocation:{ lat, lng } });
         saveCache(farms);
         renderFromCache();
-        // Limpia inputs
-        nameEl.value = ''; latEl.value = ''; lngEl.value = '';
+        latEl.value = ''; lngEl.value = '';
       }
 
-      // Centrar mapa en la nueva finca para visual feedback
       if(map){
         map.setView([lat, lng], Math.max(map.getZoom(), 12));
       }
@@ -329,7 +327,6 @@
 
       try{
         await db.collection('farms').doc(id).delete();
-        // el snapshot actualizará el cache y la UI
       }catch(err){
         console.error('No se pudo borrar en Firestore, eliminando solo localmente:', err);
         const updated = farmsCache.filter(f=>f.id!==id);
@@ -343,6 +340,30 @@
       const btn = document.getElementById('deleteFarmBtn');
       if(!btn) return;
       btn.disabled = !(sel && sel.value);
+    }
+
+    // === NUEVO: Control Leaflet para mostrar coordenadas del mouse ===
+    function addMousePositionControl(){
+      const MousePos = L.Control.extend({
+        options: { position: 'bottomleft' },
+        onAdd: function(){
+          const div = L.DomUtil.create('div', 'mousepos-control');
+          div.innerHTML = 'Lat: — Lng: —';
+          this._div = div;
+          return div;
+        },
+        update: function(lat, lng){
+          if(this._div){
+            this._div.innerHTML = (lat!=null && lng!=null)
+              ? `Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`
+              : 'Lat: — Lng: —';
+          }
+        }
+      });
+      const ctrl = new MousePos();
+      ctrl.addTo(map);
+      map.on('mousemove', e => ctrl.update(e.latlng.lat, e.latlng.lng));
+      map.on('mouseout',  () => ctrl.update(null, null));
     }
 
     // LOGIN ADMIN
@@ -379,8 +400,8 @@
       const btnCoords = document.getElementById('createByCoordsBtn');
       if (btnCoords) btnCoords.addEventListener('click', createFarmByCoords);
 
-      // Permitir Enter en inputs de coordenadas para crear
-      ['coordName','coordLat','coordLng'].forEach(id=>{
+      // Enter en inputs de coord para crear
+      ['coordLat','coordLng'].forEach(id=>{
         const el = document.getElementById(id);
         if(el){
           el.addEventListener('keypress', (e)=>{
