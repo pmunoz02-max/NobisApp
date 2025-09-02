@@ -1,470 +1,390 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Personal de Finca</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
-        }
-        #map {
-            height: 60vh;
-            width: 100%;
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            z-index: 1;
-        }
-        .leaflet-control-coordinates {
-            background-color: rgba(255, 255, 255, 0.95);
-            padding: 8px 12px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-            font-family: monospace;
-            font-size: 0.875rem;
-            color: #333;
-            border: 2px solid rgba(0, 0, 0, 0.2);
-            margin-left: 10px;
-            margin-bottom: 10px;
-            max-width: 250px;
-            transition: all 0.3s ease;
-        }
-        .leaflet-control-coordinates.hover {
-            background-color: white;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-        .coordinates-label {
-            font-weight: bold;
-            color: #4B5563;
-            margin-right: 5px;
-        }
-        .coordinates-value {
-            font-weight: bold;
-            color: #1F2937;
-        }
-        .admin-controls {
-            display: none;
-        }
-        @media (max-width: 768px) {
-            #map {
-                height: 50vh;
-            }
-            body {
-                padding: 12px;
-            }
-            .max-w-7xl {
-                padding: 0;
-            }
-            .bg-white {
-                border-radius: 1rem;
-            }
-            .text-3xl {
-                font-size: 1.75rem;
-            }
-            .text-2xl {
-                font-size: 1.5rem;
-            }
-            /* Ajustes para controles en móviles */
-            .leaflet-top {
-                top: 10px;
-            }
-            .leaflet-left {
-                left: 10px;
-            }
-            .leaflet-touch .leaflet-control-layers, 
-            .leaflet-touch .leaflet-bar {
-                border: 2px solid rgba(0,0,0,0.2);
-            }
-        }
-        #adminModal {
-            z-index: 10000;
-        }
-        button, input, select {
-            font-size: 16px;
-        }
-        .overflow-x-hidden {
-            overflow-x: hidden;
-        }
-        .error-message {
-            color: red;
-            font-size: 14px;
-            margin-top: 5px;
-            display: none;
-        }
-        /* Estilos para las herramientas de dibujo */
-        .leaflet-draw-toolbar {
-            margin-top: 12px;
-        }
-        .leaflet-draw-toolbar a {
-            background-color: #fff;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .leaflet-draw-toolbar a:hover {
-            background-color: #f4f4f4;
-        }
-        /* Asegurar que los controles de dibujo sean visibles */
-        .leaflet-draw {
-            display: block !important;
-        }
-        .leaflet-top {
-            z-index: 1000;
-        }
-        .leaflet-touch .leaflet-draw-actions {
-            display: block !important;
-        }
-        /* Botón personalizado para mover finca */
-        .move-finca-btn {
-            background-color: #fff;
-            border: 2px solid rgba(0,0,0,0.2);
-            border-radius: 4px;
-            padding: 5px 10px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-bottom: 10px;
-        }
-        .move-finca-btn.active {
-            background-color: #4CAF50;
-            color: white;
-        }
-        /* Ajustar z-index para controles en móviles */
-        .leaflet-control-container {
-            z-index: 1000;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Personal de Finca (Leaflet + Firebase)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; margin: 0; padding: 0; overflow-x: hidden; }
+    #map { height: 55vh; width: 100%; border-radius: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,.1); z-index: 1; }
+    .leaflet-control-coordinates { background-color: rgba(255,255,255,.95); padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.2); font-family: monospace; font-size: .875rem; color: #333; border: 2px solid rgba(0,0,0,.2); margin-left: 10px; margin-bottom: 10px; max-width: 250px; transition: all .3s ease; }
+    .admin-controls { display: none; }
+    @media (max-width: 768px) { #map { height: 45vh; } body { padding: 12px; } }
+    #adminModal { z-index: 10000; }
+    button, input, select { font-size: 16px; }
+    .error-message { color: red; font-size: 14px; margin-top: 5px; display: none; }
+    .move-finca-btn { background-color: #fff; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; padding: 5px 10px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+    .move-finca-btn.active { background-color: #4CAF50; color: white; }
+  </style>
 </head>
 <body class="bg-gray-100 p-4 sm:p-8 overflow-x-hidden">
 
-    <!-- Modal de acceso de administrador, visible al inicio -->
-    <div id="adminModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex flex-col items-center justify-center z-50 p-4">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
-            <h1 class="text-3xl font-bold text-gray-800 mb-4">Acceso de Administrador</h1>
-            <p class="text-gray-600 mb-6">Por favor, introduce tu código de administrador para acceder.</p>
-            <input type="password" id="adminCodeInput" placeholder="Introduce el código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
-            <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
-            <button id="adminLoginBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition duration-300 ease-in-out font-bold">Acceder</button>
+  <!-- Modal admin -->
+  <div id="adminModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+      <h1 class="text-3xl font-bold text-gray-800 mb-4">Acceso de Administrador</h1>
+      <p class="text-gray-600 mb-6">Introduce tu código de administrador.</p>
+      <input type="password" id="adminCodeInput" placeholder="Código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
+      <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
+      <button id="adminLoginBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">Acceder</button>
+    </div>
+  </div>
+
+  <div id="appContent" class="max-w-7xl mx-auto flex flex-col space-y-6 hidden">
+    <header class="text-center my-4">
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
+      <p class="text-md sm:text-lg text-gray-600 mt-2">Sincronizado con Firebase (Firestore)</p>
+    </header>
+
+    <div class="bg-white p-6 rounded-2xl shadow-lg">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-semibold text-gray-700">Mapa de la Finca y Geocercas</h2>
+        <div class="flex items-center gap-3">
+          <button id="moveFincaBtn" class="move-finca-btn">Mover Ubicación Finca</button>
+          <button id="exportReportsCSV" class="px-4 py-2 bg-gray-200 rounded-md">Exportar reportes CSV</button>
+          <button id="exportReportsPDF" class="px-4 py-2 bg-gray-200 rounded-md">Exportar reportes PDF</button>
         </div>
+      </div>
+      <div id="map"></div>
+      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Usa las herramientas a la izquierda para dibujar geocercas. Todo se sincroniza en la nube.</p>
     </div>
 
-    <!-- Contenido principal de la aplicación (inicialmente oculto) -->
-    <div class="max-w-7xl mx-auto flex flex-col space-y-8 hidden" id="appContent">
-        <header class="text-center my-4">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
-            <p class="text-md sm:text-lg text-gray-600 mt-2">Aplicación de seguimiento para personal de finca.</p>
-        </header>
-        
-        <!-- Sección principal del mapa -->
-        <div class="bg-white p-6 rounded-2xl shadow-lg">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-semibold text-gray-700">Mapa de la Finca y Geocercas</h2>
-                <button id="moveFincaBtn" class="move-finca-btn">Mover Ubicación Finca</button>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Panel izquierdo: Reportes -->
+      <div class="bg-white p-6 rounded-2xl shadow-lg">
+        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Enviar Reporte</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Seleccionar Personal</label>
+            <select id="reportPersonnel" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Seleccionar Actividad</label>
+            <select id="reportActivity" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Seleccionar Geocerca</label>
+            <select id="reportGeofence" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></select>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Días</label>
+              <input id="daysWorked" type="number" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
             </div>
-            <div id="map"></div>
-            <div class="mt-4 flex flex-col items-center justify-center text-center">
-                <p id="statusMessage" class="text-base sm:text-lg font-medium text-gray-700">Haz clic en el mapa para colocar al personal. Usa las herramientas de la izquierda del mapa para dibujar geocercas.</p>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Horas</label>
+              <input id="hoursWorked" type="number" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
             </div>
+          </div>
+          <button id="submitReportBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">Subir Reporte</button>
         </div>
+      </div>
 
-        <!-- Módulo de Reporte de Actividad del Personal -->
-        <div class="bg-white p-6 rounded-2xl shadow-lg">
-            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Reporte de Actividad del Personal</h2>
-            <div class="space-y-4">
-                <div>
-                    <label for="reportPersonnel" class="block text-sm font-medium text-gray-700">Seleccionar Personal</label>
-                    <select id="reportPersonnel" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
-                        <option value="" disabled selected>Selecciona una persona</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="reportActivity" class="block text-sm font-medium text-gray-700">Seleccionar Actividad</label>
-                    <select id="reportActivity" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
-                        <option value="" disabled selected>Selecciona una actividad</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="reportGeofence" class="block text-sm font-medium text-gray-700">Seleccionar Geocerca</label>
-                    <select id="reportGeofence" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
-                        <option value="" disabled selected>Selecciona una geocerca</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="daysWorked" class="block text-sm font-medium text-gray-700">Días Trabajados</label>
-                    <input type="number" id="daysWorked" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
-                </div>
-                <div>
-                    <label for="hoursWorked" class="block text-sm font-medium text-gray-700">Horas Trabajadas</label>
-                    <input type="number" id="hoursWorked" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
-                </div>
-                <button id="submitReportBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition duration-300 ease-in-out font-bold">Subir Reporte</button>
-            </div>
+      <!-- Panel derecho: Admin controls -->
+      <div class="bg-white p-6 rounded-2xl shadow-lg admin-controls hidden">
+        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Administración</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Nombre del trabajador</label>
+            <input id="personnelName" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+            <button id="addPersonnelBtn" class="mt-2 w-full bg-green-600 text-white py-2 rounded-md">Añadir Personal</button>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Nombre de la actividad</label>
+            <input id="activityName" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+            <button id="addActivityBtn" class="mt-2 w-full bg-blue-600 text-white py-2 rounded-md">Añadir Actividad</button>
+          </div>
+          <hr>
+          <h3 class="font-semibold">Personal</h3>
+          <ul id="personnelList" class="mt-2 text-sm text-gray-600 max-h-40 overflow-auto"></ul>
+          <h3 class="font-semibold mt-4">Actividades</h3>
+          <ul id="activityList" class="mt-2 text-sm text-gray-600 max-h-40 overflow-auto"></ul>
         </div>
-
-        <!-- Módulo de Reportes Valorados -->
-        <div class="bg-white p-6 rounded-2xl shadow-lg">
-            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Reportes Valorados</h2>
-            <ul id="reportList" class="space-y-4">
-                <li class="text-gray-500 italic">No hay reportes enviados aún.</li>
-            </ul>
-        </div>
-
-        <!-- Botón para mostrar el modal de administrador -->
-        <div class="text-center">
-            <button id="showAdminModalBtn" class="bg-gray-400 text-white py-3 px-6 rounded-full hover:bg-gray-500 transition duration-300 ease-in-out font-bold shadow-lg">Acceso de Administrador</button>
-        </div>
-        
-        <!-- Sección de control y personal (visible para admin) -->
-        <div class="bg-white p-6 rounded-2xl shadow-lg admin-controls hidden">
-            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Añadir Personal</h2>
-            <div id="adminControlsContainer">
-                <div class="space-y-4">
-                    <div>
-                        <label for="personnelName" class="block text-sm font-medium text-gray-700">Nombre</label>
-                        <input type="text" id="personnelName" placeholder="Escribe el nombre del trabajador" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
-                    </div>
-                    <button id="addPersonnelBtn" class="w-full bg-green-600 text-white py-3 rounded-md hover:bg-green-700 transition duration-300 ease-in-out font-bold">Añadir Personal</button>
-                </div>
-
-                <hr class="my-6 border-gray-200">
-            </div>
-
-            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Personal en la Finca</h2>
-            <ul id="personnelList" class="space-y-2 flex-grow overflow-y-auto">
-                <li class="text-gray-500 italic">No hay personal añadido aún.</li>
-            </ul>
-        </div>
-
-        <!-- Módulo de Gestión de Actividades (Admin) -->
-        <div class="bg-white p-6 rounded-2xl shadow-lg admin-controls hidden">
-            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Gestión de Actividades (Admin)</h2>
-            <div class="space-y-4">
-                <div>
-                    <label for="activityName" class="block text-sm font-medium text-gray-700">Nombre de la Actividad</label>
-                    <input type="text" id="activityName" placeholder="Escribe la actividad" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
-                </div>
-                <button id="addActivityBtn" class="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out font-bold">Añadir Actividad</button>
-            </div>
-            <ul id="activityList" class="mt-4 space-y-2 text-gray-600 text-sm">
-                <li class="text-gray-500 italic">No hay actividades añadidas.</li>
-            </ul>
-        </div>
+      </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <div class="bg-white p-6 rounded-2xl shadow-lg">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Reportes Enviados</h2>
+      <ul id="reportList" class="space-y-2 text-sm text-gray-700 max-h-56 overflow-auto"></ul>
+    </div>
 
-    <script>
-        // Configuración inicial
-        const ADMIN_CODE = "admin123"; // Código de administrador
-        let map = null;
-        let personnelMarker = null;
-        let drawnItems = null;
-        let drawControl = null;
-        let isMovingFinca = false;
-        let fincaMarker = null;
+    <div class="text-center">
+      <button id="showAdminModalBtn" class="bg-gray-400 text-white py-3 px-6 rounded-full hover:bg-gray-500 transition font-bold">Acceso de Administrador</button>
+    </div>
+  </div>
 
-        // Referencias a elementos DOM
-        const adminModal = document.getElementById('adminModal');
-        const adminCodeInput = document.getElementById('adminCodeInput');
-        const adminLoginBtn = document.getElementById('adminLoginBtn');
-        const errorMessage = document.getElementById('errorMessage');
-        const appContent = document.getElementById('appContent');
-        const showAdminModalBtn = document.getElementById('showAdminModalBtn');
-        const adminControls = document.querySelectorAll('.admin-controls');
-        const moveFincaBtn = document.getElementById('moveFincaBtn');
+  <!-- Leaflet & Draw -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <!-- Firebase compat -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+  <!-- jsPDF para exportar PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-        // Función para inicializar el mapa y las herramientas de dibujo
-        function initMap() {
-            const initialCoords = [4.7110, -74.0721]; // Bogotá, Colombia
-            
-            // Inicializar el mapa
-            map = L.map('map', {
-                zoomControl: true,
-                center: initialCoords,
-                zoom: 13,
-                // Mejorar la experiencia táctil en móviles
-                tap: false,
-                touchZoom: true,
-                scrollWheelZoom: true,
-                doubleClickZoom: true
-            });
-            
-            // Añadir capa de OpenStreetMap
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                maxZoom: 19
-            }).addTo(map);
+  <script>
+    // =========================
+    // CONFIGURACIÓN FIREBASE - reemplaza con tus credenciales
+    // =========================
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_AUTH_DOMAIN",
+      projectId: "TU_PROJECT_ID",
+      storageBucket: "TU_STORAGE_BUCKET",
+      messagingSenderId: "TU_MESSAGING_SENDER_ID",
+      appId: "TU_APP_ID"
+    };
+    const FARM_ID = 'mi-finca-1';
 
-            // Crear marcador para la finca
-            fincaMarker = L.marker(initialCoords, {
-                draggable: false,
-                title: 'Ubicación de la finca',
-                alt: 'Ubicación de la finca'
-            }).addTo(map);
-            
-            fincaMarker.bindPopup('Ubicación actual de la finca').openPopup();
+    // Inicializar
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    firebase.auth().signInAnonymously().catch(console.error);
 
-            // Inicializar la capa para los elementos dibujados
-            drawnItems = new L.FeatureGroup();
-            map.addLayer(drawnItems);
+    // Refs
+    const farmDoc = db.collection('farms').doc(FARM_ID);
+    const personnelCol = farmDoc.collection('personnel');
+    const activitiesCol = farmDoc.collection('activities');
+    const reportsCol = farmDoc.collection('reports');
 
-            // Configurar las herramientas de dibujo
-            drawControl = new L.Control.Draw({
-                position: 'topleft',
-                draw: {
-                    polygon: {
-                        allowIntersection: false,
-                        showArea: true,
-                        metric: true,
-                        shapeOptions: {
-                            color: '#3388ff',
-                            fillColor: '#3388ff',
-                            fillOpacity: 0.2,
-                            weight: 2
-                        },
-                        guidelineDistance: 20,
-                        showLength: true
-                    },
-                    polyline: false,
-                    circle: false,
-                    rectangle: false,
-                    marker: false,
-                    circlemarker: false
-                },
-                edit: {
-                    featureGroup: drawnItems,
-                    remove: true
-                }
-            });
+    // UI refs
+    const adminModal = document.getElementById('adminModal');
+    const adminCodeInput = document.getElementById('adminCodeInput');
+    const adminLoginBtn = document.getElementById('adminLoginBtn');
+    const errorMessage = document.getElementById('errorMessage');
+    const appContent = document.getElementById('appContent');
+    const showAdminModalBtn = document.getElementById('showAdminModalBtn');
+    const adminControls = document.querySelectorAll('.admin-controls');
+    const moveFincaBtn = document.getElementById('moveFincaBtn');
+    const reportPersonnel = document.getElementById('reportPersonnel');
+    const reportActivity = document.getElementById('reportActivity');
+    const reportGeofence = document.getElementById('reportGeofence');
+    const personnelName = document.getElementById('personnelName');
+    const activityName = document.getElementById('activityName');
+    const personnelList = document.getElementById('personnelList');
+    const activityList = document.getElementById('activityList');
+    const reportList = document.getElementById('reportList');
+    const addPersonnelBtn = document.getElementById('addPersonnelBtn');
+    const addActivityBtn = document.getElementById('addActivityBtn');
+    const submitReportBtn = document.getElementById('submitReportBtn');
+    const exportCSVBtn = document.getElementById('exportReportsCSV');
+    const exportPDFBtn = document.getElementById('exportReportsPDF');
 
-            // Añadir control de dibujo al mapa
-            map.addControl(drawControl);
+    // Map vars
+    let map, drawnItems, drawControl, fincaMarker;
+    let isMovingFinca = false;
+    let isUpdatingRemote = false;
 
-            // Manejar eventos de dibujo
-            map.on(L.Draw.Event.CREATED, function (event) {
-                const layer = event.layer;
-                drawnItems.addLayer(layer);
-                
-                // Mostrar mensaje de confirmación
-                alert('Geocerca creada exitosamente. Puede editar o eliminar la geocerca usando las herramientas de edición.');
-                
-                // Aquí puedes guardar la geocerca en tu base de datos si es necesario
-                console.log('Geocerca creada:', layer.toGeoJSON());
-            });
+    // Renders a GeoJSON FeatureCollection into drawnItems
+    function renderGeoJSON(featureCollection) {
+      drawnItems.clearLayers();
+      if (!featureCollection || !featureCollection.features) return;
+      L.geoJSON(featureCollection, {
+        style: { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2 }
+      }).eachLayer(layer => drawnItems.addLayer(layer));
+      refreshGeofenceSelects();
+    }
 
-            // Añadir control de coordenadas
-            const coordinatesControl = L.control({position: 'bottomleft'});
-            coordinatesControl.onAdd = function(map) {
-                this._div = L.DomUtil.create('div', 'leaflet-control-coordinates');
-                this._div.innerHTML = '<div><span class="coordinates-label">Lat:</span> <span class="coordinates-value">-</span></div>' +
-                                     '<div><span class="coordinates-label">Lng:</span> <span class="coordinates-value">-</span></div>';
-                return this._div;
-            };
-            coordinatesControl.addTo(map);
-            
-            // Actualizar coordenadas al mover el ratón
-            map.on('mousemove', function(e) {
-                const lat = e.latlng.lat.toFixed(6);
-                const lng = e.latlng.lng.toFixed(6);
-                const coordsControl = document.querySelector('.leaflet-control-coordinates');
-                if (coordsControl) {
-                    coordsControl.innerHTML = `<div><span class="coordinates-label">Lat:</span> <span class="coordinates-value">${lat}</span></div>` +
-                                             `<div><span class="coordinates-label">Lng:</span> <span class="coordinates-value">${lng}</span></div>`;
-                }
-            });
+    // Update geofence selects
+    function refreshGeofenceSelects() {
+      // reportGeofence
+      reportGeofence.innerHTML = '<option value="" disabled selected>Selecciona una geocerca</option>';
+      let i = 1;
+      drawnItems.eachLayer(layer => {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = `Geocerca ${i}`;
+        reportGeofence.appendChild(opt);
+        i++;
+      });
+    }
 
-            // Ajustar el tamaño del mapa después de que se muestre
-            setTimeout(() => {
-                map.invalidateSize();
-                
-                // Forzar la visualización de los controles de dibujo
-                if (drawControl) {
-                    // Eliminar y volver a agregar el control para forzar su visualización
-                    map.removeControl(drawControl);
-                    map.addControl(drawControl);
-                }
-            }, 300);
+    // Initialize map
+    function initMap() {
+      map = L.map('map', { center: [4.7110, -74.0721], zoom: 13, tap: false });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+      drawnItems = new L.FeatureGroup();
+      map.addLayer(drawnItems);
+
+      drawControl = new L.Control.Draw({ position: 'topleft', draw: { polygon: { allowIntersection: false, showArea: true, metric: true, shapeOptions: { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2 } }, polyline:false, circle:false, rectangle:false, marker:false, circlemarker:false }, edit: { featureGroup: drawnItems, remove:true } });
+      map.addControl(drawControl);
+
+      map.on(L.Draw.Event.CREATED, e => { drawnItems.addLayer(e.layer); saveGeofencesToCloud(); });
+      map.on(L.Draw.Event.EDITED, () => saveGeofencesToCloud());
+      map.on(L.Draw.Event.DELETED, () => saveGeofencesToCloud());
+
+      // coordinates control
+      const coordinatesControl = L.control({ position: 'bottomleft' });
+      coordinatesControl.onAdd = function() { const d = L.DomUtil.create('div', 'leaflet-control-coordinates'); d.innerHTML = '<div><strong>Lat:</strong> -</div><div><strong>Lng:</strong> -</div>'; return d; };
+      coordinatesControl.addTo(map);
+      map.on('mousemove', e => { const el = document.querySelector('.leaflet-control-coordinates'); if (el) el.innerHTML = `<div><strong>Lat:</strong> ${e.latlng.lat.toFixed(6)}</div><div><strong>Lng:</strong> ${e.latlng.lng.toFixed(6)}</div>`; });
+
+      // subscribe to data
+      subscribeToFarm();
+
+      setTimeout(() => { map.invalidateSize(); map.removeControl(drawControl); map.addControl(drawControl); }, 300);
+    }
+
+    // Save geofences
+    async function saveGeofencesToCloud() {
+      if (isUpdatingRemote) return;
+      const fc = drawnItems.toGeoJSON();
+      await farmDoc.set({ geofences: fc, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    }
+
+    // Save finca location
+    async function saveFincaLocationToCloud(latlng) {
+      if (isUpdatingRemote) return;
+      await farmDoc.set({ fincaLocation: { lat: latlng.lat, lng: latlng.lng }, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    }
+
+    // Subscribe to farm document + subcollections
+    function subscribeToFarm() {
+      // farm doc for geofences and finca
+      farmDoc.onSnapshot(doc => {
+        const data = doc.data() || {};
+        isUpdatingRemote = true;
+        if (data.geofences) renderGeoJSON(data.geofences);
+        if (data.fincaLocation) {
+          const loc = data.fincaLocation;
+          if (!fincaMarker) {
+            fincaMarker = L.marker([loc.lat, loc.lng], { draggable: false }).addTo(map).bindPopup('Ubicación de la finca');
+          } else {
+            fincaMarker.setLatLng([loc.lat, loc.lng]);
+          }
         }
+        isUpdatingRemote = false;
+      });
 
-        // Función para activar/desactivar el modo de mover la finca
-        function toggleMoveFinca() {
-            isMovingFinca = !isMovingFinca;
-            
-            if (isMovingFinca) {
-                // Activar modo mover
-                moveFincaBtn.classList.add('active');
-                moveFincaBtn.textContent = 'Guardar Ubicación';
-                fincaMarker.dragging.enable();
-                map.dragging.disable();
-                map.once('click', function(e) {
-                    if (isMovingFinca) {
-                        fincaMarker.setLatLng(e.latlng);
-                        fincaMarker.openPopup();
-                    }
-                });
-            } else {
-                // Desactivar modo mover
-                moveFincaBtn.classList.remove('active');
-                moveFincaBtn.textContent = 'Mover Ubicación Finca';
-                fincaMarker.dragging.disable();
-                map.dragging.enable();
-                
-                // Mostrar mensaje con las nuevas coordenadas
-                const latLng = fincaMarker.getLatLng();
-                alert(`Ubicación de la finca actualizada.\nNuevas coordenadas: ${latLng.lat.toFixed(6)}, ${latLng.lng.toFixed(6)}`);
-            }
-        }
-
-        // Lógica de inicio de sesión de administrador
-        adminLoginBtn.addEventListener('click', () => {
-            const code = adminCodeInput.value.trim();
-            
-            if (code === ADMIN_CODE) {
-                // Código correcto
-                adminModal.classList.add('hidden');
-                appContent.classList.remove('hidden');
-                adminControls.forEach(el => el.style.display = 'block');
-                errorMessage.style.display = 'none';
-                
-                // Inicializar el mapa después de un breve retraso
-                setTimeout(() => {
-                    initMap();
-                }, 100);
-            } else {
-                // Código incorrecto
-                errorMessage.style.display = 'block';
-            }
+      // personnel
+      personnelCol.onSnapshot(snap => {
+        personnelList.innerHTML = '';
+        reportPersonnel.innerHTML = '';
+        const defaultOpt = document.createElement('option'); defaultOpt.value=''; defaultOpt.disabled=true; defaultOpt.selected=true; defaultOpt.textContent='Selecciona una persona'; reportPersonnel.appendChild(defaultOpt);
+        snap.forEach(doc => {
+          const p = doc.data();
+          const li = document.createElement('li'); li.textContent = p.name; personnelList.appendChild(li);
+          const opt = document.createElement('option'); opt.value = doc.id; opt.textContent = p.name; reportPersonnel.appendChild(opt);
         });
+      });
 
-        // Permitir enviar el formulario con la tecla Enter
-        adminCodeInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                adminLoginBtn.click();
-            }
+      // activities
+      activitiesCol.onSnapshot(snap => {
+        activityList.innerHTML = '';
+        reportActivity.innerHTML = '';
+        const defaultOpt = document.createElement('option'); defaultOpt.value=''; defaultOpt.disabled=true; defaultOpt.selected=true; defaultOpt.textContent='Selecciona una actividad'; reportActivity.appendChild(defaultOpt);
+        snap.forEach(doc => {
+          const a = doc.data();
+          const li = document.createElement('li'); li.textContent = a.name; activityList.appendChild(li);
+          const opt = document.createElement('option'); opt.value = doc.id; opt.textContent = a.name; reportActivity.appendChild(opt);
         });
+      });
 
-        // Mostrar modal de administrador al hacer clic en el botón
-        if (showAdminModalBtn) {
-            showAdminModalBtn.addEventListener('click', () => {
-                adminModal.classList.remove('hidden');
-            });
-        }
-
-        // Evento para el botón de mover finca
-        if (moveFincaBtn) {
-            moveFincaBtn.addEventListener('click', toggleMoveFinca);
-        }
-
-        // Inicializar el modal de administrador al cargar la página
-        document.addEventListener('DOMContentLoaded', () => {
-            adminModal.classList.remove('hidden');
+      // reports
+      reportsCol.orderBy('createdAt','desc').onSnapshot(snap => {
+        reportList.innerHTML = '';
+        snap.forEach(doc => {
+          const r = doc.data();
+          const li = document.createElement('li');
+          const date = r.createdAt ? r.createdAt.toDate().toLocaleString() : '';
+          li.textContent = `${date} - ${r.personName || '---'} - ${r.activityName || '---'} - Días: ${r.days} Horas: ${r.hours}`;
+          reportList.appendChild(li);
         });
-    </script>
+      });
+    }
+
+    // Admin actions
+    addPersonnelBtn.addEventListener('click', async () => {
+      const name = personnelName.value.trim(); if (!name) return alert('Escribe un nombre');
+      await personnelCol.add({ name }); personnelName.value='';
+    });
+    addActivityBtn.addEventListener('click', async () => {
+      const name = activityName.value.trim(); if (!name) return alert('Escribe una actividad');
+      await activitiesCol.add({ name }); activityName.value='';
+    });
+
+    // Submit report
+    submitReportBtn.addEventListener('click', async () => {
+      const personId = reportPersonnel.value; const activityId = reportActivity.value; const geofenceIdx = reportGeofence.value;
+      const days = Number(document.getElementById('daysWorked').value||0); const hours = Number(document.getElementById('hoursWorked').value||0);
+      if (!personId || !activityId) return alert('Selecciona personal y actividad');
+
+      // get names
+      const personDoc = await personnelCol.doc(personId).get(); const personNameVal = personDoc.exists ? personDoc.data().name : '';
+      const activityDoc = await activitiesCol.doc(activityId).get(); const activityNameVal = activityDoc.exists ? activityDoc.data().name : '';
+
+      // optionally attach geofence geometry
+      let geofenceFeature = null;
+      if (geofenceIdx) {
+        const idx = Number(geofenceIdx)-1; let i=0;
+        drawnItems.eachLayer(layer => {
+          if (i===idx) geofenceFeature = layer.toGeoJSON();
+          i++;
+        });
+      }
+
+      await reportsCol.add({ personId, personName: personNameVal, activityId, activityName: activityNameVal, days, hours, geofence: geofenceFeature, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      alert('Reporte enviado');
+    });
+
+    // Move finca
+    function toggleMoveFinca() {
+      if (!fincaMarker) return alert('Esperando ubicación de finca...');
+      isMovingFinca = !isMovingFinca;
+      if (isMovingFinca) {
+        moveFincaBtn.classList.add('active'); moveFincaBtn.textContent='Guardar Ubicación'; fincaMarker.dragging.enable();
+        fincaMarker.once('dragend', async e => { const latlng = e.target.getLatLng(); await saveFincaLocationToCloud(latlng); alert('Ubicación guardada'); });
+      } else {
+        moveFincaBtn.classList.remove('active'); moveFincaBtn.textContent='Mover Ubicación Finca'; fincaMarker.dragging.disable();
+      }
+    }
+    if (moveFincaBtn) moveFincaBtn.addEventListener('click', toggleMoveFinca);
+
+    // Save finca location helper
+    async function saveFincaLocationToCloud(latlng) { if (isUpdatingRemote) return; await farmDoc.set({ fincaLocation: { lat: latlng.lat, lng: latlng.lng }, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); }
+
+    // Export reports CSV
+    exportCSVBtn.addEventListener('click', async () => {
+      const snap = await reportsCol.orderBy('createdAt','desc').get();
+      const rows = [['Fecha','Personal','Actividad','Días','Horas','Geocerca (si)']];
+      snap.forEach(doc => {
+        const r = doc.data(); const date = r.createdAt ? r.createdAt.toDate().toLocaleString() : ''; const hasGeo = r.geofence ? 'Sí' : '';
+        rows.push([date, r.personName||'', r.activityName||'', r.days||0, r.hours||0, hasGeo]);
+      });
+      const csvContent = rows.map(e => e.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('
+');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `reportes_${FARM_ID}.csv`; a.click(); URL.revokeObjectURL(url);
+    });
+
+    // Export reports PDF (simple table) using jsPDF
+    exportPDFBtn.addEventListener('click', async () => {
+      const { jsPDF } = window.jspdf; const doc = new jsPDF();
+      const snap = await reportsCol.orderBy('createdAt','desc').limit(100).get();
+      let y = 14; doc.setFontSize(12); doc.text('Reportes - ' + FARM_ID, 14, 10);
+      snap.forEach(docSnap => {
+        const r = docSnap.data(); const date = r.createdAt ? r.createdAt.toDate().toLocaleString() : '';
+        const line = `${date} - ${r.personName||''} - ${r.activityName||''} - D:${r.days||0} H:${r.hours||0}`;
+        doc.text(line, 14, y); y += 8; if (y > 280) { doc.addPage(); y = 14; }
+      });
+      doc.save(`reportes_${FARM_ID}.pdf`);
+    });
+
+    // Admin login
+    const ADMIN_CODE = 'admin123';
+    adminLoginBtn.addEventListener('click', () => { const code = adminCodeInput.value.trim(); if (code === ADMIN_CODE) { adminModal.classList.add('hidden'); appContent.classList.remove('hidden'); adminControls.forEach(el=>el.style.display='block'); setTimeout(initMap,100); } else { errorMessage.style.display='block'; } });
+    adminCodeInput.addEventListener('keypress', e=> { if (e.key==='Enter') adminLoginBtn.click(); });
+    if (showAdminModalBtn) showAdminModalBtn.addEventListener('click', ()=> adminModal.classList.remove('hidden'));
+    document.addEventListener('DOMContentLoaded', ()=> adminModal.classList.remove('hidden'));
+  </script>
+
+  <p class="text-center text-xs text-gray-500 mt-4">Nota: reemplaza las credenciales de Firebase por las tuyas y ajusta las reglas de Firestore para producción.</p>
 </body>
+</html>
+
 </html>
