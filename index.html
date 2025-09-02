@@ -12,11 +12,12 @@
     @media (max-width: 768px) { #map { height: 45vh; } body { padding: 12px; } }
     #adminModal { z-index: 10000; }
     button, input, select, textarea { font-size: 16px; }
-    .error-message { color: #dc2626; font-size: 14px; margin-top: 6px; display: none; }
+    .error-message { color: red; font-size: 14px; margin-top: 5px; display: none; }
     .farm-label { background: #ffffff; border: 1px solid rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.15); font-size: 12px; }
-    /* Control de coordenadas del mouse */
+
+    /* Control que muestra Lat/Lng del mouse */
     .mousepos-control {
-      background: #ffffff; border: 1px solid rgba(0,0,0,0.15);
+      background: #fff; border: 1px solid rgba(0,0,0,0.15);
       border-radius: .5rem; padding: .25rem .5rem; font-size: 12px;
       box-shadow: 0 1px 2px rgba(0,0,0,.1);
     }
@@ -52,21 +53,31 @@
 
     <!-- Mapa -->
     <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <div class="flex flex-wrap gap-3 items-center mb-4">
+      <div class="flex flex-wrap gap-2 items-center mb-4">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
-        <!-- Contenedor de botones, pegado a la derecha -->
+        <!-- Botones a la derecha -->
         <div class="ml-auto flex flex-wrap gap-2">
-          <!-- Botón CREAR FINCA (centro del mapa) -->
+          <!-- (Ya existente en tu app) Botón crear en centro, si lo tienes -->
           <button id="createFarmBtn"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg"
-            title="Crear una finca en el centro del mapa">
+            title="Crear finca en el centro del mapa">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
             Crear finca
           </button>
 
-          <!-- Botón ELIMINAR FINCA -->
+          <!-- NUEVO: Botón crear por coordenadas -->
+          <button id="createByCoordsBtn"
+            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Crear finca ingresando Lat/Lng">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h4l3-3 4 8 3-5 4 0M3 19h18"/>
+            </svg>
+            Crear finca (Lat/Lng)
+          </button>
+
+          <!-- Ya existente: Botón eliminar -->
           <button id="deleteFarmBtn"
             class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             title="Eliminar la finca seleccionada">
@@ -78,29 +89,9 @@
         </div>
       </div>
 
-      <!-- NUEVO: Crear por coordenadas (Lat/Lng) -->
-      <div class="rounded-xl border border-gray-200 p-4 mb-4">
-        <h3 class="text-lg font-semibold text-gray-700 mb-3">Crear finca por coordenadas</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input id="coordLat" type="text" inputmode="decimal" placeholder="Latitud (ej. -1.2345)"
-                 class="border rounded-md p-2 w-full" />
-          <input id="coordLng" type="text" inputmode="decimal" placeholder="Longitud (ej. -78.5678)"
-                 class="border rounded-md p-2 w-full" />
-          <button id="createByCoordsBtn"
-                  class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
-            Crear finca (Lat/Lng)
-          </button>
-        </div>
-        <div id="coordError" class="error-message"></div>
-        <p class="text-xs text-gray-500 mt-2">Puedes usar coma o punto como separador decimal; se normaliza automáticamente.</p>
-      </div>
-
       <div id="map"></div>
       <p id="statusMessage" class="mt-3 text-sm text-gray-600">
-        Haz clic en el mapa para crear una nueva finca.
-        También puedes mover el mapa y pulsar <strong>Crear finca</strong> (usa el centro del mapa),
-        o ingresar <strong>Lat</strong> y <strong>Lng</strong> y usar <strong>Crear finca (Lat/Lng)</strong>.
-        Para borrar, selecciona una finca en el listado y usa <strong>Eliminar finca</strong>.
+        Haz clic en el mapa para crear una nueva finca. También puedes usar <strong>Crear finca</strong> (centro del mapa) o <strong>Crear finca (Lat/Lng)</strong>.
       </p>
     </div>
   </div>
@@ -168,13 +159,13 @@
       map = L.map('map',{center:[center.lat,center.lng],zoom});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
-      // Control de posición del mouse (Lat/Lng en vivo)
+      // NUEVO: Control que muestra Lat/Lng del mouse
       addMousePositionControl();
 
-      // Pintar primero desde cache
+      // Pintar primero desde cache local
       renderFromCache();
 
-      // Crear finca con clic en el mapa (comportamiento original)
+      // Crear finca con clic en el mapa (tu comportamiento original)
       map.on('click', async e=>{
         const name = prompt("Nombre de la nueva finca:");
         if(!name) return;
@@ -204,7 +195,7 @@
         snap.forEach(doc=>{
           const data = doc.data();
           const farm = { id: doc.id, name: data.name, fincaLocation: data.fincaLocation };
-          farms.push(farm);
+        farms.push(farm);
           if(data.fincaLocation){
             const marker = L.marker([data.fincaLocation.lat, data.fincaLocation.lng]).addTo(map);
             marker.bindTooltip(data.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
@@ -230,7 +221,7 @@
       });
     }
 
-    // === Helpers de validación/parseo ===
+    // === Helpers mínimos para coordenadas ===
     function normDec(s){ return String(s || '').trim().replace(',', '.'); }
     function parseCoord(s){
       const v = parseFloat(normDec(s));
@@ -239,7 +230,7 @@
     function validLat(v){ return v >= -90 && v <= 90; }
     function validLng(v){ return v >= -180 && v <= 180; }
 
-    // === CREAR FINCA (centro del mapa) ===
+    // (ya tenías este botón en algunas versiones) Crear en el centro del mapa
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
       const name = prompt("Nombre de la nueva finca:");
@@ -260,43 +251,39 @@
       }
     }
 
-    // === NUEVO: CREAR FINCA POR COORDENADAS (Lat/Lng) ===
+    // NUEVO: Crear finca mediante prompts de Lat/Lng
     async function createFarmByCoords(){
-      const latEl  = document.getElementById('coordLat');
-      const lngEl  = document.getElementById('coordLng');
-      const errEl  = document.getElementById('coordError');
+      const latStr = prompt("Latitud (decimal, -90 a 90). Puedes usar coma o punto:");
+      if(latStr === null) return;
+      const lngStr = prompt("Longitud (decimal, -180 a 180). Puedes usar coma o punto:");
+      if(lngStr === null) return;
 
-      const lat  = parseCoord(latEl.value);
-      const lng  = parseCoord(lngEl.value);
+      const lat = parseCoord(latStr);
+      const lng = parseCoord(lngStr);
 
-      const errs = [];
-      if(!Number.isFinite(lat)) errs.push('• Latitud inválida.');
-      if(!Number.isFinite(lng)) errs.push('• Longitud inválida.');
-      if(Number.isFinite(lat) && !validLat(lat)) errs.push('• Latitud fuera de rango (-90 a 90).');
-      if(Number.isFinite(lng) && !validLng(lng)) errs.push('• Longitud fuera de rango (-180 a 180).');
-
-      if(errs.length){
-        errEl.textContent = errs.join(' ');
-        errEl.style.display = 'block';
+      if(!Number.isFinite(lat) || !validLat(lat)){
+        alert('Latitud inválida o fuera de rango (-90 a 90).');
         return;
       }
-      errEl.style.display = 'none';
+      if(!Number.isFinite(lng) || !validLng(lng)){
+        alert('Longitud inválida o fuera de rango (-180 a 180).');
+        return;
+      }
 
-      const name = `Finca ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      const nameInput = prompt("Nombre de la finca (opcional):");
+      const name = (nameInput && nameInput.trim()) ? nameInput.trim() : `Finca ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 
       try{
         await db.collection('farms').add({
           name,
           fincaLocation:{ lat, lng }
         });
-        latEl.value = ''; lngEl.value = '';
       }catch(err){
         console.error('No se pudo guardar en Firestore. Guardando solo local:', err);
         const farms = loadCache();
         farms.push({ id: 'local-'+Date.now(), name, fincaLocation:{ lat, lng } });
         saveCache(farms);
         renderFromCache();
-        latEl.value = ''; lngEl.value = '';
       }
 
       if(map){
@@ -304,7 +291,7 @@
       }
     }
 
-    // === ELIMINAR FINCA (botón) ===
+    // Eliminar finca (ya lo tenías)
     async function deleteSelectedFarm(){
       const sel = document.getElementById('farmSelect');
       const id = sel && sel.value;
@@ -342,7 +329,7 @@
       btn.disabled = !(sel && sel.value);
     }
 
-    // === NUEVO: Control Leaflet para mostrar coordenadas del mouse ===
+    // NUEVO: Control Leaflet que muestra Lat/Lng del mouse
     function addMousePositionControl(){
       const MousePos = L.Control.extend({
         options: { position: 'bottomleft' },
@@ -397,21 +384,9 @@
       const btnDelete = document.getElementById('deleteFarmBtn');
       if (btnDelete) btnDelete.addEventListener('click', deleteSelectedFarm);
 
+      // NUEVO: botón crear por coordenadas
       const btnCoords = document.getElementById('createByCoordsBtn');
       if (btnCoords) btnCoords.addEventListener('click', createFarmByCoords);
-
-      // Enter en inputs de coord para crear
-      ['coordLat','coordLng'].forEach(id=>{
-        const el = document.getElementById(id);
-        if(el){
-          el.addEventListener('keypress', (e)=>{
-            if(e.key === 'Enter'){
-              e.preventDefault();
-              createFarmByCoords();
-            }
-          });
-        }
-      });
 
       updateDeleteButtonState();
     });
