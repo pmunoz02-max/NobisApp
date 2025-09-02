@@ -12,15 +12,9 @@
     @media (max-width: 768px) { #map { height: 45vh; } body { padding: 12px; } }
     #adminModal { z-index: 10000; }
     button, input, select, textarea { font-size: 16px; }
-    .error-message { color: red; font-size: 14px; margin-top: 5px; display: none; }
+    .error-message { color: #dc2626; font-size: 14px; margin-top: 6px; display: none; }
     .farm-label { background: #ffffff; border: 1px solid rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.15); font-size: 12px; }
-
-    /* Control que muestra Lat/Lng del mouse */
-    .mousepos-control {
-      background: #fff; border: 1px solid rgba(0,0,0,0.15);
-      border-radius: .5rem; padding: .25rem .5rem; font-size: 12px;
-      box-shadow: 0 1px 2px rgba(0,0,0,.1);
-    }
+    .mousepos-control { background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:.5rem;padding:.25rem .5rem;font-size:12px;box-shadow:0 1px 2px rgba(0,0,0,.1); }
   </style>
 </head>
 <body class="bg-gray-100 p-4 sm:p-8 overflow-x-hidden">
@@ -55,57 +49,41 @@
     <div class="bg-white p-6 rounded-2xl shadow-lg">
       <div class="flex flex-wrap gap-2 items-center mb-2">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
-        <!-- Botones a la derecha -->
         <div class="ml-auto flex flex-wrap gap-2">
-          <!-- Crear en centro del mapa -->
+          <!-- (existente) Crear en centro -->
           <button id="createFarmBtn"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Crear finca en el centro del mapa">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             Crear finca
           </button>
 
-          <!-- Crear por Lat/Lng -->
+          <!-- (existente) Crear por Lat/Lng -->
           <button id="createByCoordsBtn"
             class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Crear finca ingresando Lat/Lng">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h4l3-3 4 8 3-5H22M3 19h18"/>
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h4l3-3 4 8 3-5H22M3 19h18"/></svg>
             Crear finca (Lat/Lng)
           </button>
 
-          <!-- Eliminar -->
+          <!-- (existente) Eliminar -->
           <button id="deleteFarmBtn"
             class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             title="Eliminar la finca seleccionada">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             Eliminar finca
           </button>
         </div>
       </div>
 
-      <!-- NUEVO: Panel nombre para la finca creada por Lat/Lng -->
+      <!-- ÚNICO NUEVO: panel para nombrar la finca creada por Lat/Lng -->
       <div id="coordsNamePanel" class="hidden mb-3">
         <div class="rounded-xl border border-gray-200 p-3">
-          <label for="coordsNameInput" class="block text-sm font-medium text-gray-700 mb-1">
-            Nombre para la nueva finca
-          </label>
+          <label for="coordsNameInput" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la nueva finca</label>
           <div class="flex gap-2">
-            <input id="coordsNameInput" type="text" class="border rounded-md p-2 w-full"
-                   placeholder="Ej.: Finca Palora Norte" />
-            <button id="coordsNameSaveBtn"
-              class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
-              Guardar
-            </button>
-            <button id="coordsNameCancelBtn"
-              class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">
-              Cancelar
-            </button>
+            <input id="coordsNameInput" type="text" class="border rounded-md p-2 w-full" placeholder="Ej.: Finca Palora Norte" />
+            <button id="coordsNameSaveBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
+            <button id="coordsNameCancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
           </div>
           <p id="coordsNameHint" class="text-xs text-gray-500 mt-2"></p>
         </div>
@@ -135,27 +113,19 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    // Persistencia offline (si es posible)
-    db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-      console.warn('Firestore persistence no disponible:', err && err.code);
-    });
+    db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
     firebase.auth().signInAnonymously().catch(console.error);
 
     let map;
-    const fincaMarkers = {}; // guardar marcadores por id
-
-    // === NUEVO: variables temporales para coords cuando se usa el botón Lat/Lng ===
-    let pendingLat = null;
-    let pendingLng = null;
-
-    // ==== Persistencia local: espejo de Firestore ====
+    const fincaMarkers = {};
     const LS_KEY = 'fincas_cache_v1';
-    function saveCache(farms){
-      try { localStorage.setItem(LS_KEY, JSON.stringify(farms)); } catch(e) { console.warn('No se pudo guardar cache', e); }
-    }
-    function loadCache(){
-      try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(e) { return []; }
-    }
+
+    // NUEVO: estado temporal para coords (solo para Crear finca (Lat/Lng))
+    let pendingLat = null, pendingLng = null;
+
+    function saveCache(farms){ try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} }
+    function loadCache(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } }
+
     function renderFromCache(){
       const farms = loadCache();
       Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
@@ -168,7 +138,6 @@
         fincaMarkers[f.id] = marker;
       });
 
-      // llenar selector
       const sel = document.getElementById('farmSelect');
       if (sel){
         sel.innerHTML = '';
@@ -185,27 +154,21 @@
       map = L.map('map',{center:[center.lat,center.lng],zoom});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
-      // Control Lat/Lng del mouse
+      // Control coordenadas del mouse
       addMousePositionControl();
 
-      // Pintar primero desde cache
       renderFromCache();
 
-      // Crear finca con clic en el mapa (comportamiento original)
+      // Crear finca con clic (sin cambios)
       map.on('click', async e=>{
         const name = prompt("Nombre de la nueva finca:");
         if(!name) return;
         try{
-          await db.collection('farms').add({
-            name,
-            fincaLocation:{lat:e.latlng.lat, lng:e.latlng.lng}
-          });
-        }catch(err){
-          alert('No se pudo guardar en Firestore. Se guardará solo localmente.');
+          await db.collection('farms').add({ name, fincaLocation:{lat:e.latlng.lat, lng:e.latlng.lng} });
+        }catch{
           const farms = loadCache();
           farms.push({ id: 'local-'+Date.now(), name, fincaLocation:{lat:e.latlng.lat, lng:e.latlng.lng} });
-          saveCache(farms);
-          renderFromCache();
+          saveCache(farms); renderFromCache();
         }
       });
 
@@ -216,215 +179,131 @@
       db.collection('farms').onSnapshot(snap=>{
         const farms = [];
         Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
-        for(const key in fincaMarkers){ delete fincaMarkers[key]; }
+        for(const k in fincaMarkers) delete fincaMarkers[k];
 
         snap.forEach(doc=>{
-          const data = doc.data();
-          const farm = { id: doc.id, name: data.name, fincaLocation: data.fincaLocation };
+          const d = doc.data();
+          const farm = { id: doc.id, name: d.name, fincaLocation: d.fincaLocation };
           farms.push(farm);
-          if(data.fincaLocation){
-            const marker = L.marker([data.fincaLocation.lat, data.fincaLocation.lng]).addTo(map);
-            marker.bindTooltip(data.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
+          if(d.fincaLocation){
+            const marker = L.marker([d.fincaLocation.lat, d.fincaLocation.lng]).addTo(map);
+            marker.bindTooltip(d.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
             fincaMarkers[doc.id]=marker;
           }
         });
 
         saveCache(farms);
-        // Llenar selector
         const sel = document.getElementById('farmSelect');
         if (sel){
           sel.innerHTML = '';
           farms.forEach(f=>{
-            const opt = document.createElement('option');
-            opt.value = f.id; opt.textContent = f.name || 'Finca';
-            sel.appendChild(opt);
+            const opt = document.createElement('option'); opt.value = f.id; opt.textContent = f.name || 'Finca'; sel.appendChild(opt);
           });
         }
         updateDeleteButtonState();
-      }, err => {
-        console.error('onSnapshot error:', err);
-        renderFromCache();
-      });
+      }, ()=>{ renderFromCache(); });
     }
 
-    // === Helpers mínimos ===
-    function normDec(s){ return String(s || '').trim().replace(',', '.'); }
-    function parseCoord(s){
-      const v = parseFloat(normDec(s));
-      return Number.isFinite(v) ? v : NaN;
-    }
-    function validLat(v){ return v >= -90 && v <= 90; }
-    function validLng(v){ return v >= -180 && v <= 180; }
+    // Helpers coords
+    function normDec(s){ return String(s||'').trim().replace(',', '.'); }
+    function parseCoord(s){ const v = parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; }
+    function validLat(v){ return v>=-90 && v<=90; }
+    function validLng(v){ return v>=-180 && v<=180; }
 
-    // Crear en el centro del mapa (sin cambios)
+    // Crear en centro (sin cambios)
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
-      const name = prompt("Nombre de la nueva finca:");
-      if(!name) return;
-
+      const name = prompt("Nombre de la nueva finca:"); if(!name) return;
       const c = map.getCenter();
       try{
-        await db.collection('farms').add({
-          name,
-          fincaLocation:{ lat: c.lat, lng: c.lng }
-        });
-      }catch(err){
-        console.error('No se pudo guardar en Firestore. Guardando solo local:', err);
-        const farms = loadCache();
-        farms.push({ id: 'local-'+Date.now(), name, fincaLocation:{ lat: c.lat, lng: c.lng } });
-        saveCache(farms);
-        renderFromCache();
+        await db.collection('farms').add({ name, fincaLocation:{lat:c.lat, lng:c.lng} });
+      }catch{
+        const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:c.lat, lng:c.lng} }); saveCache(farms); renderFromCache();
       }
     }
 
-    // ===== NUEVO: Crear finca por coordenadas con panel de nombre =====
+    // **ÚNICO CAMBIO DE FLUJO**: Crear por Lat/Lng -> pedir coords, luego mostrar panel para NOMBRE
     async function createFarmByCoords(){
-      // 1) Pedir Lat/Lng (como antes)
       const latStr = prompt("Latitud (decimal, -90 a 90). Puedes usar coma o punto:");
       if(latStr === null) return;
       const lngStr = prompt("Longitud (decimal, -180 a 180). Puedes usar coma o punto:");
       if(lngStr === null) return;
 
-      const lat = parseCoord(latStr);
-      const lng = parseCoord(lngStr);
+      const lat = parseCoord(latStr), lng = parseCoord(lngStr);
+      if(!Number.isFinite(lat) || !validLat(lat)){ alert('Latitud inválida o fuera de rango (-90 a 90).'); return; }
+      if(!Number.isFinite(lng) || !validLng(lng)){ alert('Longitud inválida o fuera de rango (-180 a 180).'); return; }
 
-      if(!Number.isFinite(lat) || !validLat(lat)){
-        alert('Latitud inválida o fuera de rango (-90 a 90).');
-        return;
-      }
-      if(!Number.isFinite(lng) || !validLng(lng)){
-        alert('Longitud inválida o fuera de rango (-180 a 180).');
-        return;
-      }
-
-      // 2) Guardar coords en variables temporales y mostrar panel de nombre
-      pendingLat = lat;
-      pendingLng = lng;
-
+      // Guardar en estado temporal y mostrar panel de nombre
+      pendingLat = lat; pendingLng = lng;
       const hint = document.getElementById('coordsNameHint');
       hint.textContent = `Coordenadas: Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
-
       const input = document.getElementById('coordsNameInput');
       input.value = `Finca ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
       document.getElementById('coordsNamePanel').classList.remove('hidden');
-      input.focus();
-      input.select();
+      input.focus(); input.select();
 
-      // centrar el mapa como feedback
-      if(map){
-        map.setView([lat, lng], Math.max(map.getZoom(), 12));
-      }
+      if(map){ map.setView([lat, lng], Math.max(map.getZoom(), 12)); }
     }
 
     async function saveCoordsName(){
-      const panel = document.getElementById('coordsNamePanel');
+      if(pendingLat==null || pendingLng==null) { cancelCoordsName(); return; }
       const input = document.getElementById('coordsNameInput');
-      const name = (input.value || '').trim() || `Finca ${pendingLat.toFixed(5)}, ${pendingLng.toFixed(5)}`;
-
-      if(pendingLat==null || pendingLng==null){
-        // nada pendiente, ocultar panel por seguridad
-        panel.classList.add('hidden');
-        return;
-      }
+      const name = (input.value||'').trim() || `Finca ${pendingLat.toFixed(5)}, ${pendingLng.toFixed(5)}`;
 
       try{
-        await db.collection('farms').add({
-          name,
-          fincaLocation:{ lat: pendingLat, lng: pendingLng }
-        });
-      }catch(err){
-        console.error('No se pudo guardar en Firestore. Guardando solo local:', err);
-        const farms = loadCache();
-        farms.push({ id: 'local-'+Date.now(), name, fincaLocation:{ lat: pendingLat, lng: pendingLng } });
-        saveCache(farms);
-        renderFromCache();
+        await db.collection('farms').add({ name, fincaLocation:{lat: pendingLat, lng: pendingLng} });
+      }catch{
+        const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:pendingLat, lng:pendingLng} }); saveCache(farms); renderFromCache();
       }
-
-      // limpiar estado y ocultar panel
-      pendingLat = null; pendingLng = null;
-      input.value = '';
-      panel.classList.add('hidden');
+      pendingLat=null; pendingLng=null; input.value=''; document.getElementById('coordsNamePanel').classList.add('hidden');
     }
-
     function cancelCoordsName(){
-      pendingLat = null; pendingLng = null;
-      document.getElementById('coordsNameInput').value = '';
+      pendingLat=null; pendingLng=null;
+      document.getElementById('coordsNameInput').value='';
       document.getElementById('coordsNamePanel').classList.add('hidden');
     }
 
-    // Eliminar finca (sin cambios)
+    // Eliminar (sin cambios)
     async function deleteSelectedFarm(){
-      const sel = document.getElementById('farmSelect');
-      const id = sel && sel.value;
-      if(!id){
-        alert('No hay finca seleccionada.');
-        return;
-      }
+      const sel=document.getElementById('farmSelect'); const id=sel&&sel.value;
+      if(!id){ alert('No hay finca seleccionada.'); return; }
       const farmsCache = loadCache();
-      const farm = farmsCache.find(f=>f.id===id);
-      const name = (farm && farm.name) || 'Finca';
-
+      const farm = farmsCache.find(f=>f.id===id); const name=(farm&&farm.name)||'Finca';
       if(!confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) return;
 
       if(id.startsWith('local-')){
-        const updated = farmsCache.filter(f=>f.id!==id);
-        saveCache(updated);
-        renderFromCache();
-        return;
+        const updated=farmsCache.filter(f=>f.id!==id); saveCache(updated); renderFromCache(); return;
       }
-
-      try{
-        await db.collection('farms').doc(id).delete();
-      }catch(err){
-        console.error('No se pudo borrar en Firestore, eliminando solo localmente:', err);
-        const updated = farmsCache.filter(f=>f.id!==id);
-        saveCache(updated);
-        renderFromCache();
-      }
+      try{ await db.collection('farms').doc(id).delete(); }
+      catch{ const updated=farmsCache.filter(f=>f.id!==id); saveCache(updated); renderFromCache(); }
     }
 
     function updateDeleteButtonState(){
-      const sel = document.getElementById('farmSelect');
-      const btn = document.getElementById('deleteFarmBtn');
-      if(!btn) return;
-      btn.disabled = !(sel && sel.value);
+      const sel=document.getElementById('farmSelect'); const btn=document.getElementById('deleteFarmBtn');
+      if(!btn) return; btn.disabled = !(sel && sel.value);
     }
 
-    // Control Leaflet que muestra Lat/Lng del mouse
+    // Control Leaflet para coordenadas del mouse (ya solicitado antes)
     function addMousePositionControl(){
-      const MousePos = L.Control.extend({
-        options: { position: 'bottomleft' },
-        onAdd: function(){
-          const div = L.DomUtil.create('div', 'mousepos-control');
-          div.innerHTML = 'Lat: — Lng: —';
-          this._div = div;
-          return div;
-        },
-        update: function(lat, lng){
-          if(this._div){
-            this._div.innerHTML = (lat!=null && lng!=null)
-              ? `Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`
-              : 'Lat: — Lng: —';
-          }
-        }
+      const MousePos=L.Control.extend({
+        options:{position:'bottomleft'},
+        onAdd:function(){ const d=L.DomUtil.create('div','mousepos-control'); d.innerHTML='Lat: — Lng: —'; this._div=d; return d; },
+        update:function(lat,lng){ if(this._div){ this._div.innerHTML = (lat!=null&&lng!=null)?`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`:'Lat: — Lng: —'; } }
       });
-      const ctrl = new MousePos();
-      ctrl.addTo(map);
-      map.on('mousemove', e => ctrl.update(e.latlng.lat, e.latlng.lng));
-      map.on('mouseout',  () => ctrl.update(null, null));
+      const ctrl = new MousePos(); ctrl.addTo(map);
+      map.on('mousemove', e=>ctrl.update(e.latlng.lat, e.latlng.lng));
+      map.on('mouseout', ()=>ctrl.update(null,null));
     }
 
     // LOGIN ADMIN
     const ADMIN_CODE = "admin123";
-    function normalizeAdminInput(str){
-      return (str||"").normalize("NFKC").replace(/["'“”\s]/g,"").toLowerCase();
-    }
+    function normalizeAdminInput(str){ return (str||"").normalize("NFKC").replace(/["'“”\s]/g,"").toLowerCase(); }
     function doAdminLogin(){
       const raw=document.getElementById('adminCodeInput').value;
       if(normalizeAdminInput(raw)===normalizeAdminInput(ADMIN_CODE)){
         document.getElementById('adminModal').classList.add("hidden");
         document.getElementById('appContent').classList.remove("hidden");
-        setTimeout(() => { initMap(); setTimeout(()=>map.invalidateSize(),100); }, 100);
+        setTimeout(()=>{ initMap(); setTimeout(()=>map.invalidateSize(),100); },100);
       }else{
         document.getElementById('errorMessage').style.display="block";
       }
@@ -436,27 +315,22 @@
     document.addEventListener("DOMContentLoaded",()=>{
       document.getElementById('adminModal').classList.remove("hidden");
 
-      const sel = document.getElementById('farmSelect');
+      const sel=document.getElementById('farmSelect');
       if (sel) sel.addEventListener('change', updateDeleteButtonState);
 
-      const btnCreate = document.getElementById('createFarmBtn');
+      const btnCreate=document.getElementById('createFarmBtn');
       if (btnCreate) btnCreate.addEventListener('click', createFarmAtCenter);
 
-      const btnDelete = document.getElementById('deleteFarmBtn');
+      const btnDelete=document.getElementById('deleteFarmBtn');
       if (btnDelete) btnDelete.addEventListener('click', deleteSelectedFarm);
 
-      // Botón crear por coordenadas (muestra panel de nombre tras validar Lat/Lng)
-      const btnCoords = document.getElementById('createByCoordsBtn');
+      const btnCoords=document.getElementById('createByCoordsBtn');
       if (btnCoords) btnCoords.addEventListener('click', createFarmByCoords);
 
-      // Panel nombre: guardar / cancelar
+      // Guardar/cancelar nombre para Lat/Lng
       document.getElementById('coordsNameSaveBtn').addEventListener('click', saveCoordsName);
       document.getElementById('coordsNameCancelBtn').addEventListener('click', cancelCoordsName);
-
-      // Enter para guardar nombre
-      document.getElementById('coordsNameInput').addEventListener('keypress', (e)=>{
-        if(e.key === 'Enter'){ e.preventDefault(); saveCoordsName(); }
-      });
+      document.getElementById('coordsNameInput').addEventListener('keypress', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveCoordsName(); } });
 
       updateDeleteButtonState();
     });
