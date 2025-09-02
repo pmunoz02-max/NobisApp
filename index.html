@@ -390,14 +390,24 @@
             if (savedGeofences) {
                 try {
                     const geofences = JSON.parse(savedGeofences);
-                    L.geoJSON(geofences, {
-                        onEachFeature: function (feature, layer) {
-                            drawnItems.addLayer(layer);
+                    
+                    // Crear una capa GeoJSON y añadirla al grupo drawnItems
+                    const geoJsonLayer = L.geoJSON(geofences, {
+                        style: {
+                            color: '#3388ff',
+                            weight: 2,
+                            fillColor: '#3388ff',
+                            fillOpacity: 0.2
                         }
                     });
                     
+                    // Añadir cada característica al grupo drawnItems
+                    geoJsonLayer.eachLayer(function(layer) {
+                        drawnItems.addLayer(layer);
+                    });
+                    
                     // Actualizar contador
-                    const count = Object.keys(geofences.features).length;
+                    const count = geoJsonLayer.getLayers().length;
                     geofenceCounter.textContent = count;
                     
                     // Ajustar vista del mapa para mostrar todas las geocercas
@@ -521,8 +531,10 @@
                 }
             });
 
-            // Cargar geocercas guardadas
-            loadGeofences();
+            // Cargar geocercas guardadas después de un breve retraso
+            setTimeout(() => {
+                loadGeofences();
+            }, 500);
 
             // Ajustar el tamaño del mapa después de que se muestre
             setTimeout(() => {
