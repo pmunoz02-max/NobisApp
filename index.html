@@ -33,6 +33,7 @@
     </div>
   </div>
 
+  <!-- Contenido de la app -->
   <div id="appContent" class="max-w-7xl mx-auto flex flex-col space-y-6 hidden">
     <header class="text-center my-4">
       <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
@@ -40,217 +41,324 @@
     </header>
 
     <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <div class="flex justify-between items-center mb-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de la Finca y Geocercas</h2>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2">
           <button id="moveFincaBtn" class="move-finca-btn">Mover Ubicación Finca</button>
-          <button id="exportReportsCSV" class="px-4 py-2 bg-gray-200 rounded-md">Exportar reportes CSV</button>
-          <button id="exportReportsPDF" class="px-4 py-2 bg-gray-200 rounded-md">Exportar reportes PDF</button>
+          <button id="exportReportsCSV" class="px-4 py-2 bg-gray-200 rounded-md">Exportar CSV</button>
+          <button id="exportReportsPDF" class="px-4 py-2 bg-gray-200 rounded-md">Exportar PDF</button>
         </div>
       </div>
       <div id="map"></div>
-      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Usa las herramientas a la izquierda para dibujar geocercas. Todo se sincroniza en la nube.</p>
-    </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <!-- Panel izquierdo: Reportes -->
-      <div class="bg-white p-6 rounded-2xl shadow-lg">
-        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Enviar Reporte</h2>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Seleccionar Personal</label>
-            <select id="reportPersonnel" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></select>
+      <!-- Panel de inicio preferido / ubicación manual -->
+      <div class="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="p-4 border rounded-xl">
+          <h3 class="font-semibold mb-2">Abrir aplicación en…</h3>
+          <select id="startupMode" class="w-full border rounded-md p-2">
+            <option value="finca">Ubicación de la finca</option>
+            <option value="coords">Coordenadas personalizadas</option>
+            <option value="geofence">Geocerca seleccionada</option>
+          </select>
+          <button id="saveStartupMode" class="mt-2 w-full bg-indigo-600 text-white rounded-md py-2">Guardar preferencia</button>
+          <p class="text-xs text-gray-500 mt-1">Se guarda en este navegador.</p>
+        </div>
+
+        <div class="p-4 border rounded-xl">
+          <h3 class="font-semibold mb-2">Coordenadas personalizadas</h3>
+          <div class="grid grid-cols-3 gap-2">
+            <input id="setLat" type="number" step="any" placeholder="Lat" class="border rounded-md p-2" />
+            <input id="setLng" type="number" step="any" placeholder="Lng" class="border rounded-md p-2" />
+            <input id="setZoom" type="number" min="3" max="19" value="15" class="border rounded-md p-2" />
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Seleccionar Actividad</label>
-            <select id="reportActivity" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></select>
+          <div class="flex gap-2 mt-2">
+            <button id="centerOnCoords" class="flex-1 bg-gray-200 rounded-md py-2">Centrar ahora</button>
+            <button id="saveAsFinca" class="flex-1 bg-green-600 text-white rounded-md py-2">Guardar como finca</button>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Seleccionar Geocerca</label>
-            <select id="reportGeofence" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></select>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Días</label>
-              <input id="daysWorked" type="number" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Horas</label>
-              <input id="hoursWorked" type="number" min="0" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-            </div>
-          </div>
-          <button id="submitReportBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">Subir Reporte</button>
+          <button id="useGeolocation" class="mt-2 w-full bg-gray-200 rounded-md py-2">Usar mi ubicación (GPS)</button>
+        </div>
+
+        <div class="p-4 border rounded-xl">
+          <h3 class="font-semibold mb-2">Ir a geocerca</h3>
+          <select id="goGeofence" class="w-full border rounded-md p-2">
+            <option value="" selected disabled>No hay geocercas</option>
+          </select>
+          <button id="centerOnGeofence" class="mt-2 w-full bg-gray-200 rounded-md py-2">Centrar</button>
         </div>
       </div>
-
-      <!-- Panel derecho: Admin controls -->
-      <div class="bg-white p-6 rounded-2xl shadow-lg admin-controls hidden">
-        <h2 class="text-2xl font-semibold text-gray-700 mb-4">Administración</h2>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Nombre del trabajador</label>
-            <input id="personnelName" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-            <button id="addPersonnelBtn" class="mt-2 w-full bg-green-600 text-white py-2 rounded-md">Añadir Personal</button>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Nombre de la actividad</label>
-            <input id="activityName" type="text" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-            <button id="addActivityBtn" class="mt-2 w-full bg-blue-600 text-white py-2 rounded-md">Añadir Actividad</button>
-          </div>
-          <hr>
-          <h3 class="font-semibold">Personal</h3>
-          <ul id="personnelList" class="mt-2 text-sm text-gray-600 max-h-40 overflow-auto"></ul>
-          <h3 class="font-semibold mt-4">Actividades</h3>
-          <ul id="activityList" class="mt-2 text-sm text-gray-600 max-h-40 overflow-auto"></ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Reportes Enviados</h2>
-      <ul id="reportList" class="space-y-2 text-sm text-gray-700 max-h-56 overflow-auto"></ul>
-    </div>
-
-    <div class="text-center">
-      <button id="showAdminModalBtn" class="bg-gray-400 text-white py-3 px-6 rounded-full hover:bg-gray-500 transition font-bold">Acceso de Administrador</button>
+      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Dibuja geocercas con las herramientas; todo se sincroniza en la nube.</p>
     </div>
   </div>
 
-  <!-- Leaflet & Draw -->
+  <!-- Leaflet & Firebase -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-  <!-- Firebase compat -->
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
-  <!-- jsPDF para exportar PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script>
-    // =========================
-    // CONFIGURACIÓN FIREBASE - reemplaza con tus credenciales
-    // =========================
+    // ====== CONFIG FIREBASE DEMO (cámbialo para producción) ======
     const firebaseConfig = {
-      apiKey: "TU_API_KEY",
-      authDomain: "TU_AUTH_DOMAIN",
-      projectId: "TU_PROJECT_ID",
-      storageBucket: "TU_STORAGE_BUCKET",
-      messagingSenderId: "TU_MESSAGING_SENDER_ID",
-      appId: "TU_APP_ID"
+      apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
+      authDomain: "demo-finca-app.firebaseapp.com",
+      projectId: "demo-finca-app",
+      storageBucket: "demo-finca-app.appspot.com",
+      messagingSenderId: "123456789012",
+      appId: "1:123456789012:web:abcdef1234567890"
     };
-    const FARM_ID = 'mi-finca-1';
+    const FARM_ID = "mi-finca-demo";
+    const DEFAULT_LOCATION = { lat: -0.1807, lng: -78.4678 }; // Quito
 
-    // Inicializar
-    try {
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.firestore();
-      firebase.auth().signInAnonymously().catch(console.error);
-    } catch (e) {
-      console.error('Firebase error', e);
-    }
-
-    // Refs
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    const farmDoc = db.collection('farms').doc(FARM_ID);
-    const personnelCol = farmDoc.collection('personnel');
-    const activitiesCol = farmDoc.collection('activities');
-    const reportsCol = farmDoc.collection('reports');
+    firebase.auth().signInAnonymously().catch(console.error);
 
-    // UI refs
+    // ====== UI REFS ======
     const adminModal = document.getElementById('adminModal');
+    const appContent = document.getElementById('appContent');
     const adminCodeInput = document.getElementById('adminCodeInput');
     const adminLoginBtn = document.getElementById('adminLoginBtn');
     const errorMessage = document.getElementById('errorMessage');
-    const appContent = document.getElementById('appContent');
-    const showAdminModalBtn = document.getElementById('showAdminModalBtn');
-    const adminControls = document.querySelectorAll('.admin-controls');
     const moveFincaBtn = document.getElementById('moveFincaBtn');
-    const reportPersonnel = document.getElementById('reportPersonnel');
-    const reportActivity = document.getElementById('reportActivity');
-    const reportGeofence = document.getElementById('reportGeofence');
-    const personnelName = document.getElementById('personnelName');
-    const activityName = document.getElementById('activityName');
-    const personnelList = document.getElementById('personnelList');
-    const activityList = document.getElementById('activityList');
-    const reportList = document.getElementById('reportList');
-    const addPersonnelBtn = document.getElementById('addPersonnelBtn');
-    const addActivityBtn = document.getElementById('addActivityBtn');
-    const submitReportBtn = document.getElementById('submitReportBtn');
-    const exportCSVBtn = document.getElementById('exportReportsCSV');
-    const exportPDFBtn = document.getElementById('exportReportsPDF');
 
-    // Map vars
+    const startupModeSel = document.getElementById('startupMode');
+    const saveStartupModeBtn = document.getElementById('saveStartupMode');
+    const setLat = document.getElementById('setLat');
+    const setLng = document.getElementById('setLng');
+    const setZoom = document.getElementById('setZoom');
+    const centerOnCoordsBtn = document.getElementById('centerOnCoords');
+    const saveAsFincaBtn = document.getElementById('saveAsFinca');
+    const useGeolocationBtn = document.getElementById('useGeolocation');
+
+    const goGeofenceSel = document.getElementById('goGeofence');
+    const centerOnGeofenceBtn = document.getElementById('centerOnGeofence');
+
+    // ====== FIRESTORE REFS ======
+    const farmDoc = db.collection('farms').doc(FARM_ID);
+    const reportsCol = farmDoc.collection('reports');
+
+    // ====== MAP VARS ======
     let map, drawnItems, drawControl, fincaMarker;
-    let isMovingFinca = false;
-    let isUpdatingRemote = false;
+    let isApplyingRemote = false;
+    let startupApplied = false;
 
-    // Renders a GeoJSON FeatureCollection into drawnItems
-    function renderGeoJSON(featureCollection) {
-      drawnItems.clearLayers();
-      if (!featureCollection || !featureCollection.features) return;
-      L.geoJSON(featureCollection, {
-        style: { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2 }
-      }).eachLayer(layer => drawnItems.addLayer(layer));
-      refreshGeofenceSelects();
-    }
-
-    // Update geofence selects
-    function refreshGeofenceSelects() {
-      reportGeofence.innerHTML = '<option value="" disabled selected>Selecciona una geocerca</option>';
-      let i = 1;
-      drawnItems.eachLayer(layer => {
-        const opt = document.createElement('option');
-        opt.value = String(i);
-        opt.textContent = `Geocerca ${i}`;
-        reportGeofence.appendChild(opt);
-        i++;
-      });
-    }
-
-    // Initialize map
-    function initMap() {
-      map = L.map('map', { center: [4.7110, -74.0721], zoom: 13, tap: false });
+    // ====== MAP ======
+    function initMap(centerLatLng, zoom){
+      const start = centerLatLng || DEFAULT_LOCATION;
+      const z = zoom || 13;
+      map = L.map('map', { center: [start.lat, start.lng], zoom: z, tap: false });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
       drawnItems = new L.FeatureGroup();
       map.addLayer(drawnItems);
 
-      drawControl = new L.Control.Draw({ position: 'topleft', draw: { polygon: { allowIntersection: false, showArea: true, metric: true, shapeOptions: { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2 } }, polyline:false, circle:false, rectangle:false, marker:false, circlemarker:false }, edit: { featureGroup: drawnItems, remove:true } });
+      drawControl = new L.Control.Draw({
+        position: 'topleft',
+        draw: {
+          polygon: { allowIntersection: false, showArea: true, metric: true, shapeOptions: { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2 } },
+          polyline:false, circle:false, rectangle:false, marker:false, circlemarker:false
+        },
+        edit: { featureGroup: drawnItems, remove:true }
+      });
       map.addControl(drawControl);
 
-      map.on(L.Draw.Event.CREATED, e => { drawnItems.addLayer(e.layer); saveGeofencesToCloud(); });
-      map.on(L.Draw.Event.EDITED, () => saveGeofencesToCloud());
-      map.on(L.Draw.Event.DELETED, () => saveGeofencesToCloud());
+      map.on(L.Draw.Event.CREATED, e => { drawnItems.addLayer(e.layer); saveGeofencesToCloud(); refreshGeofenceSelects(); });
+      map.on(L.Draw.Event.EDITED, () => { saveGeofencesToCloud(); refreshGeofenceSelects(); });
+      map.on(L.Draw.Event.DELETED, () => { saveGeofencesToCloud(); refreshGeofenceSelects(); });
 
-      const coordinatesControl = L.control({ position: 'bottomleft' });
-      coordinatesControl.onAdd = function() { const d = L.DomUtil.create('div', 'leaflet-control-coordinates'); d.innerHTML = '<div><strong>Lat:</strong> -</div><div><strong>Lng:</strong> -</div>'; return d; };
-      coordinatesControl.addTo(map);
-      map.on('mousemove', e => { const el = document.querySelector('.leaflet-control-coordinates'); if (el) el.innerHTML = `<div><strong>Lat:</strong> ${e.latlng.lat.toFixed(6)}</div><div><strong>Lng:</strong> ${e.latlng.lng.toFixed(6)}</div>`; });
+      const coordCtrl = L.control({ position: 'bottomleft' });
+      coordCtrl.onAdd = function(){ const d = L.DomUtil.create('div','leaflet-control-coordinates'); d.innerHTML='<div><strong>Lat:</strong> -</div><div><strong>Lng:</strong> -</div>'; return d; };
+      coordCtrl.addTo(map);
+      map.on('mousemove', e=>{ const el=document.querySelector('.leaflet-control-coordinates'); if(el) el.innerHTML = `<div><strong>Lat:</strong> ${e.latlng.lat.toFixed(6)}</div><div><strong>Lng:</strong> ${e.latlng.lng.toFixed(6)}</div>`; });
 
-      subscribeToFarm();
-      setTimeout(() => { map.invalidateSize(); map.removeControl(drawControl); map.addControl(drawControl); }, 300);
+      subscribeFarm();
+      setTimeout(()=>{ map.invalidateSize(); map.removeControl(drawControl); map.addControl(drawControl); }, 300);
     }
 
-    async function saveGeofencesToCloud() {
-      if (isUpdatingRemote) return;
+    // ====== SYNC ======
+    function subscribeFarm(){
+      farmDoc.onSnapshot(doc => {
+        const data = doc.data() || {};
+        isApplyingRemote = true;
+
+        // finca
+        const loc = data.fincaLocation || DEFAULT_LOCATION;
+        if (!fincaMarker) {
+          fincaMarker = L.marker([loc.lat, loc.lng], { draggable: false }).addTo(map).bindPopup('Ubicación de la finca');
+        } else {
+          fincaMarker.setLatLng([loc.lat, loc.lng]);
+        }
+
+        // geofences
+        if (data.geofences && data.geofences.features) {
+          renderGeofences(data.geofences);
+        }
+
+        maybeApplyStartupPreference(data);
+        isApplyingRemote = false;
+      });
+    }
+
+    function renderGeofences(fc){
+      drawnItems.clearLayers();
+      L.geoJSON(fc, { style: { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2 } })
+        .eachLayer(layer => drawnItems.addLayer(layer));
+      refreshGeofenceSelects();
+    }
+
+    async function saveGeofencesToCloud(){
+      if (isApplyingRemote) return;
       const fc = drawnItems.toGeoJSON();
       await farmDoc.set({ geofences: fc, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
     }
 
-    async function saveFincaLocationToCloud(latlng) {
-      if (isUpdatingRemote) return;
+    async function saveFincaLocationToCloud(latlng){
+      if (isApplyingRemote) return;
       await farmDoc.set({ fincaLocation: { lat: latlng.lat, lng: latlng.lng }, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
     }
 
-    function subscribeToFarm() {
-      farmDoc.onSnapshot(doc => {
-        const data = doc.data() || {};
-        isUpdatingRemote = true;
-        if (data.geofences) renderGeoJSON(data.geofences);
-        if (data.fincaLocation) {
-          const loc = data.fincaLocation;
-          if (!fincaMarker) {
-            fincaMarker = L.marker([loc.lat, loc.lng], { draggable: false }).addTo(map).bindPopup('Ubicación de la finca');
-          } else {
-            fincaMarker.setLatLng([loc.lat, loc.lng]);
-         
+    // ====== STARTUP PREFERENCES ======
+    function getStartupPref(){
+      return JSON.parse(localStorage.getItem('startupPref') || '{"mode":"finca"}');
+    }
+    function setStartupPref(pref){
+      localStorage.setItem('startupPref', JSON.stringify(pref));
+    }
+
+    function maybeApplyStartupPreference(data){
+      if (startupApplied) return; // solo una vez en arranque
+      startupApplied = true;
+
+      // URL override (?lat=&lng=&zoom=)
+      const url = new URL(location.href);
+      const qlat = parseFloat(url.searchParams.get('lat'));
+      const qlng = parseFloat(url.searchParams.get('lng'));
+      const qzoom = parseInt(url.searchParams.get('zoom')) || 15;
+      if (!isNaN(qlat) && !isNaN(qlng)) {
+        map.setView([qlat, qlng], qzoom);
+        return;
+      }
+
+      const pref = getStartupPref();
+      if (pref.mode === 'coords' && pref.coords) {
+        map.setView([pref.coords.lat, pref.coords.lng], pref.coords.zoom || 15);
+      } else if (pref.mode === 'geofence' && typeof pref.index === 'number') {
+        centerToGeofenceByIndex(pref.index);
+      } else {
+        const loc = (data && data.fincaLocation) ? data.fincaLocation : DEFAULT_LOCATION;
+        map.setView([loc.lat, loc.lng], 15);
+      }
+    }
+
+    // ====== UI HELPERS ======
+    function refreshGeofenceSelects(){
+      goGeofenceSel.innerHTML = '';
+      let i = 0, has = false;
+      drawnItems.eachLayer(layer => {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = `Geocerca ${i+1}`;
+        goGeofenceSel.appendChild(opt);
+        has = true; i++;
+      });
+      if (!has) {
+        const opt = document.createElement('option'); opt.value=''; opt.textContent='No hay geocercas'; goGeofenceSel.appendChild(opt);
+      }
+    }
+
+    function centerToGeofenceByIndex(idx){
+      let i=0, target=null;
+      drawnItems.eachLayer(layer => { if (i===idx) target = layer; i++; });
+      if (target) {
+        map.fitBounds(target.getBounds(), { padding: [20,20] });
+      }
+    }
+
+    function parseCoord(val){ const n=parseFloat(val); return isNaN(n)?null:n; }
+
+    // ====== BUTTONS / EVENTS ======
+    document.getElementById('centerOnGeofence').addEventListener('click', () => {
+      const idx = parseInt(goGeofenceSel.value); if (isNaN(idx)) return;
+      centerToGeofenceByIndex(idx);
+    });
+
+    document.getElementById('centerOnCoords').addEventListener('click', () => {
+      const lat = parseCoord(setLat.value); const lng = parseCoord(setLng.value); const z = parseInt(setZoom.value)||15;
+      if (lat==null || lng==null) return alert('Ingresa lat/lng válidos');
+      map.setView([lat,lng], z);
+    });
+
+    document.getElementById('saveAsFinca').addEventListener('click', async () => {
+      const lat = parseCoord(setLat.value); const lng = parseCoord(setLng.value);
+      if (lat==null || lng==null) return alert('Ingresa lat/lng válidos');
+      await saveFincaLocationToCloud({lat, lng});
+      map.setView([lat,lng], Math.max(map.getZoom(), 15));
+      alert('Ubicación de finca guardada');
+    });
+
+    document.getElementById('useGeolocation').addEventListener('click', () => {
+      if (!navigator.geolocation) return alert('Geolocalización no soportada');
+      navigator.geolocation.getCurrentPosition(pos => {
+        const lat = pos.coords.latitude; const lng = pos.coords.longitude;
+        setLat.value = lat.toFixed(6); setLng.value = lng.toFixed(6);
+        map.setView([lat,lng], 16);
+      }, err => alert('No se pudo obtener la ubicación: ' + err.message), { enableHighAccuracy: true, timeout: 8000 });
+    });
+
+    document.getElementById('saveStartupMode').addEventListener('click', () => {
+      const mode = startupModeSel.value;
+      if (mode === 'coords') {
+        const lat = parseCoord(setLat.value); const lng = parseCoord(setLng.value); const zoom = parseInt(setZoom.value)||15;
+        if (lat==null || lng==null) return alert('Para "Coordenadas personalizadas" debes llenar Lat y Lng');
+        setStartupPref({ mode:'coords', coords:{lat,lng,zoom} });
+        alert('Preferencia guardada: abrir en coordenadas personalizadas');
+      } else if (mode === 'geofence') {
+        const idx = parseInt(goGeofenceSel.value);
+        if (isNaN(idx)) return alert('Selecciona una geocerca en el desplegable');
+        setStartupPref({ mode:'geofence', index: idx });
+        alert('Preferencia guardada: abrir en geocerca seleccionada');
+      } else {
+        setStartupPref({ mode:'finca' });
+        alert('Preferencia guardada: abrir en ubicación de la finca');
+      }
+    });
+
+    document.getElementById('moveFincaBtn').addEventListener('click', () => {
+      if (!fincaMarker) return alert('Aún no hay marcador de finca');
+      if (!fincaMarker.dragging.enabled()) {
+        fincaMarker.dragging.enable();
+        fincaMarker.once('dragend', async e => {
+          const latlng = e.target.getLatLng();
+          await saveFincaLocationToCloud(latlng);
+          fincaMarker.dragging.disable();
+          map.setView([latlng.lat, latlng.lng], Math.max(map.getZoom(), 15));
+          alert(`Ubicación guardada: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`);
+        });
+      } else {
+        fincaMarker.dragging.disable();
+      }
+    });
+
+    // ====== LOGIN ADMIN ======
+    const ADMIN_CODE = "admin123";
+    function normalizeAdminInput(str){
+      return (str||"").normalize("NFKC").replace(/["'“”\s]/g,"").toLowerCase();
+    }
+    function doAdminLogin(){
+      const raw = document.getElementById('adminCodeInput').value;
+      if(normalizeAdminInput(raw) === normalizeAdminInput(ADMIN_CODE)){
+        document.getElementById('adminModal').classList.add("hidden");
+        document.getElementById('appContent').classList.remove("hidden");
+        setTimeout(() => initMap(), 100);
+      } else {
+        document.getElementById('errorMessage').style.display="block";
+      }
+    }
+    document.getElementById('adminLoginBtn').addEventListener("click", doAdminLogin);
+    document.getElementById('adminCodeInput').addEventListener("keypress", e=>{ if(e.key==="Enter") doAdminLogin(); });
+    document.addEventListener("DOMContentLoaded", ()=> document.getElementById('adminModal').classList.remove("hidden"));
+  </script>
+</body>
+</html>
