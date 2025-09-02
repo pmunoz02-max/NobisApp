@@ -67,7 +67,7 @@
         </div>
       </div>
       <div id="map"></div>
-      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Haz clic en el mapa para crear una nueva finca (se te pedirá el nombre).</p>
+      <p id="statusMessage" class="mt-3 text-sm text-gray-600">Haz clic en el mapa para crear una nueva finca (se te pedirá el nombre). Verás un pin con su etiqueta.</p>
     </div>
 
     <!-- Geocercas con nombre -->
@@ -86,6 +86,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
   <script>
+    // === Firebase ===
     const firebaseConfig = {
       apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
       authDomain: "demo-finca-app.firebaseapp.com",
@@ -94,109 +95,131 @@
       messagingSenderId: "123456789012",
       appId: "1:123456789012:web:abcdef1234567890"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     firebase.auth().signInAnonymously().catch(console.error);
 
+    // === Estado ===
+    const ADMIN_CODE = "admin123";
+    const DEFAULT_CENTER = { lat: -0.1807, lng: -78.4678 };
     let map, drawnItems;
-    let activeFarmId = null; // (se usa para geocercas; no interferimos ahora)
-    const fincaMarkers = {}; // Múltiples marcadores de finca por id
+    const markersById = {};   // idDoc -> L.Marker
+    let unsubscribeFarms = null;
 
+    // === Utilidades ===
     function parseCoord(val){
       if (typeof val !== 'string' && typeof val !== 'number') return null;
       const s = String(val).trim().replace(',', '.');
       const n = parseFloat(s);
       return Number.isFinite(n) ? n : null;
     }
+    function normalizeAdminInput(str){
+      return (str||"").normalize("NFKC").replace(/["'“”\s]/g,"").toLowerCase();
+    }
 
-    function initMap(center={lat:-0.1807, lng:-78.4678}, zoom=13) {
+    // === App ===
+    function initMap(center=DEFAULT_CENTER, zoom=13) {
       map = L.map('map', { center: [center.lat, center.lng], zoom, tap:false });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
       drawnItems = new L.FeatureGroup();
       map.addLayer(drawnItems);
 
-      // Al hacer click SIEMPRE creamos una NUEVA finca (pide nombre y guarda), y refrescamos los pines
+      // Crear finca con click
       map.on('click', async (e) => {
         const name = prompt("Nombre de la nueva finca:");
         if(!name) return;
-        await db.collection('farms').add({
+        const docRef = await db.collection('farms').add({
           name,
           fincaLocation: { lat: e.latlng.lat, lng: e.latlng.lng },
           geofences: { type:'FeatureCollection', features: [] }
         });
-        await loadFarms();
+        // centrar en el nuevo pin (cuando onSnapshot lo pinte)
+        const ll = e.latlng;
+        setTimeout(()=> map.flyTo([ll.lat, ll.lng], Math.max(map.getZoom(), 15)), 200);
       });
 
-      // Evento de dibujo de geocerca con nombre (sin cambios en esta tarea)
-      map.on(L.Draw.Event.CREATED, e => {
-        const layer = e.layer;
-        const name = prompt("Nombre de la geocerca:", "Geocerca " + (drawnItems.getLayers().length+1)) || ("Geocerca " + (drawnItems.getLayers().length+1));
-        const gj = layer.toGeoJSON();
-        if(!gj.properties) gj.properties={};
-        gj.properties.name = name;
-        const geo = L.geoJSON(gj, { style:{color:'#3388ff'} });
-        geo.eachLayer(l=> drawnItems.addLayer(l));
-        saveGeofences();
-      });
-
-      loadFarms();
+      // Listener en tiempo real de TODAS las fincas (pines + selector)
+      subscribeFarms();
     }
 
-    async function saveGeofences(){
-      if(!activeFarmId) return;
+    function subscribeFarms(){
+      if (unsubscribeFarms) unsubscribeFarms();
+      const sel = document.getElementById('farmSelect');
+      unsubscribeFarms = db.collection('farms').onSnapshot((snap) => {
+        // 1) actualizar selector
+        sel.innerHTML = '';
+        const seen = new Set();
+        snap.forEach(doc => {
+          const data = doc.data()||{};
+          const opt = document.createElement('option');
+          opt.value = doc.id;
+          opt.textContent = data.name || 'Finca';
+          sel.appendChild(opt);
+          seen.add(doc.id);
+
+          // 2) dibujar/actualizar marcador con etiqueta permanente
+          if (data.fincaLocation && Number.isFinite(data.fincaLocation.lat) && Number.isFinite(data.fincaLocation.lng)) {
+            const latlng = [data.fincaLocation.lat, data.fincaLocation.lng];
+            if (!markersById[doc.id]) {
+              const m = L.marker(latlng).addTo(map);
+              m.bindTooltip(data.name || 'Finca', { permanent:true, direction:'right', offset:[10,0], className:'farm-label' });
+              markersById[doc.id] = m;
+            } else {
+              markersById[doc.id].setLatLng(latlng);
+              const tt = markersById[doc.id].getTooltip();
+              if (tt) tt.setContent(data.name || 'Finca');
+            }
+          }
+        });
+
+        // 3) eliminar marcadores de docs que ya no existan
+        Object.keys(markersById).forEach(id => {
+          if (!seen.has(id)) {
+            map.removeLayer(markersById[id]);
+            delete markersById[id];
+          }
+        });
+      }, (err) => console.error('onSnapshot farms error:', err));
+    }
+
+    // Guardar geocercas (por si las usas luego; no afecta pines)
+    async function saveGeofencesForFarm(farmId){
       const fc = drawnItems.toGeoJSON();
-      fc.features.forEach((f,i)=>{ if(!f.properties) f.properties={}; if(!f.properties.name) f.properties.name = 'Geocerca '+(i+1); });
-      await db.collection('farms').doc(activeFarmId).set({ geofences: fc }, { merge:true });
+      fc.features.forEach((f,i)=>{ f.properties = f.properties||{}; if(!f.properties.name) f.properties.name = `Geocerca ${i+1}`; });
+      await db.collection('farms').doc(farmId).set({ geofences: fc }, { merge:true });
     }
 
-    document.getElementById('addPolygonBtn').addEventListener('click', ()=>{
-      const name = document.getElementById('geofenceName').value.trim() || 'Geocerca';
-      const coords = document.getElementById('coordsTextarea').value.trim().split(/\n+/).map(l=>l.split(',').map(x=>parseCoord(x)));
-      if(coords.length<3) return alert('Necesitas al menos 3 puntos');
-      const poly = L.polygon(coords, { color:'#3388ff' });
-      poly.feature = { type:'Feature', properties:{ name }, geometry:{ type:'Polygon', coordinates:[coords.map(c=>[c[1],c[0]])] } };
-      drawnItems.addLayer(poly);
-      saveGeofences();
-      map.fitBounds(poly.getBounds());
-      document.getElementById('geofenceName').value='';
-      document.getElementById('coordsTextarea').value='';
+    // Crear polígono desde textarea (no toca pines)
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const btn = document.getElementById('addPolygonBtn');
+      if (btn) {
+        btn.addEventListener('click', ()=>{
+          const name = document.getElementById('geofenceName').value.trim() || 'Geocerca';
+          const raw = document.getElementById('coordsTextarea').value.trim();
+          const coords = raw.split(/\n+/).map(l=>l.split(',').map(x=>parseCoord(x)));
+          if (coords.length < 3) return alert('Necesitas al menos 3 puntos');
+          const poly = L.polygon(coords, { color:'#3388ff' });
+          poly.feature = { type:'Feature', properties:{ name }, geometry:{ type:'Polygon', coordinates:[coords.map(c=>[c[1],c[0]])] } };
+          drawnItems.addLayer(poly);
+          map.fitBounds(poly.getBounds(), { padding: [20,20] });
+          document.getElementById('geofenceName').value='';
+          document.getElementById('coordsTextarea').value='';
+        });
+      }
     });
 
-    async function loadFarms(){
-      const sel = document.getElementById('farmSelect');
-      sel.innerHTML='';
-      const snap = await db.collection('farms').get();
-      snap.forEach(doc=>{
-        const data = doc.data();
-        // llenar selector
-        const opt = document.createElement('option');
-        opt.value=doc.id; opt.textContent=data.name || 'Finca';
-        sel.appendChild(opt);
-        // limpiar marcador previo si existía
-        if(fincaMarkers[doc.id]){ map.removeLayer(fincaMarkers[doc.id]); delete fincaMarkers[doc.id]; }
-        // agregar marcador + etiqueta permanente
-        if(data.fincaLocation && Number.isFinite(data.fincaLocation.lat) && Number.isFinite(data.fincaLocation.lng)){
-          const marker = L.marker([data.fincaLocation.lat, data.fincaLocation.lng]).addTo(map);
-          marker.bindTooltip(data.name || 'Finca', { permanent:true, direction:'right', offset:[10,0], className:'farm-label' });
-          fincaMarkers[doc.id] = marker;
-        }
-      });
-      if(activeFarmId){ sel.value=activeFarmId; }
-    }
-
-    // LOGIN ADMIN
-    const ADMIN_CODE = "admin123";
-    function normalizeAdminInput(str){
-      return (str||"").normalize("NFKC").replace(/["'“”\s]/g,"").toLowerCase();
-    }
+    // === Login admin ===
     function doAdminLogin(){
       const raw = document.getElementById('adminCodeInput').value;
       if(normalizeAdminInput(raw) === normalizeAdminInput(ADMIN_CODE)){
         document.getElementById('adminModal').classList.add("hidden");
         document.getElementById('appContent').classList.remove("hidden");
-        setTimeout(initMap,100);
+        setTimeout(() => {
+          initMap();
+          // Very important para que Leaflet calcule bien tamaños y posiciones:
+          setTimeout(()=> map.invalidateSize(), 100);
+        },100);
       } else {
         document.getElementById('errorMessage').style.display="block";
       }
