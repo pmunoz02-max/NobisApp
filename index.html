@@ -25,7 +25,7 @@
 </head>
 <body class="bg-gray-100 p-4 sm:p-8 overflow-x-hidden">
 
-  <!-- Modal admin (RESTABLECIDO) -->
+  <!-- Modal admin -->
   <div id="adminModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
     <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
       <h1 class="text-3xl font-bold text-gray-800 mb-4">Acceso de Administrador</h1>
@@ -41,7 +41,7 @@
     </div>
   </div>
 
-  <!-- === PARCHE LOGIN ROBUSTO (ÚNICA VERSIÓN ACTIVA) === -->
+  <!-- === LOGIN ROBUSTO (ÚNICA VERSIÓN ACTIVA) === -->
   <script>
   const ADMIN_CODE = "admin123";
 
@@ -56,7 +56,7 @@
   function allowBypass(){
     try {
       const qs = new URLSearchParams(location.search);
-      if (qs.get("skipAdmin") === "1") return true;               // ?skipAdmin=1
+      if (qs.get("skipAdmin") === "1") return true;        // ?skipAdmin=1
       if (localStorage.getItem("admin_debug") === "1") return true;
     } catch {}
     return false;
@@ -71,34 +71,22 @@
   function doAdminLogin(ev){
     if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
     try{
-      const inputEl = document.getElementById('adminCodeInput');
-      const raw = inputEl ? inputEl.value : "";
+      const raw = document.getElementById('adminCodeInput')?.value || "";
       const ok = allowBypass() || normalizeCode(raw) === normalizeCode(ADMIN_CODE);
-      if (ok){
-        showApp();
-      }else{
+      if (ok){ showApp(); }
+      else{
         const err = document.getElementById('errorMessage');
-        if (err){
-          err.textContent = 'Código incorrecto. Intenta con "admin123"';
-          err.style.display = "block";
-        }
+        if (err){ err.textContent = 'Código incorrecto. Intenta con "admin123"'; err.style.display = "block"; }
       }
     }catch(e){ console.error(e); }
   }
 
   document.addEventListener("DOMContentLoaded",function(){
-    const modal = document.getElementById('adminModal');
-    modal?.classList.remove("hidden");
-
-    const btn = document.getElementById('adminLoginBtn');
-    btn?.addEventListener("click", doAdminLogin);
-
+    document.getElementById('adminModal')?.classList.remove("hidden");
+    document.getElementById('adminLoginBtn')?.addEventListener("click", doAdminLogin);
     const adminInput = document.getElementById('adminCodeInput');
     adminInput?.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ doAdminLogin(e); }});
-    adminInput?.addEventListener("input", ()=>{ 
-      const err = document.getElementById('errorMessage');
-      if (err) err.style.display="none";
-    });
+    adminInput?.addEventListener("input", ()=>{ document.getElementById('errorMessage').style.display="none"; });
 
     // Auto-entrar si usas ?skipAdmin=1 o admin_debug
     if (allowBypass()) showApp();
@@ -341,9 +329,9 @@
 
     // ===== Edición (Leaflet.Draw) =====
     let isEditingFence = false;
-    let editBackupCoords = null; 
-    let editGroup = null;        
-    let editToolbar = null;      
+    let editBackupCoords = null; // [{lat,lng},...]
+    let editGroup = null;        // L.FeatureGroup
+    let editToolbar = null;      // L.EditToolbar.Edit
 
     // Caché
     const saveCache = farms => { try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} };
@@ -597,30 +585,28 @@
       if(!Number.isFinite(lng) || !validLng(lng)){ alert('Longitud inválida o fuera de rango (-180 a 180).'); return; }
       pendingLat = lat; pendingLng = lng;
 
-      const coordsNameHint = document.getElementById('coordsNameHint');
-      if (coordsNameHint) coordsNameHint.textContent = `Coordenadas: Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
+      document.getElementById('coordsNameHint').textContent = `Coordenadas: Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
       const input = document.getElementById('coordsNameInput');
-      if (input) input.value = `Finca ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      const panel = document.getElementById('coordsNamePanel');
-      if (panel) panel.classList.remove('hidden');
-      if (input){ input.focus(); input.select(); }
+      input.value = `Finca ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      document.getElementById('coordsNamePanel').classList.remove('hidden');
+      input.focus(); input.select();
 
       if(map){ map.setView([lat, lng], Math.max(map.getZoom(), 12)); }
     }
     async function saveCoordsName(){
       if(pendingLat==null || pendingLng==null) { cancelCoordsName(); return; }
       const input = document.getElementById('coordsNameInput');
-      const name = (input && input.value ? input.value : '').trim() || `Finca ${pendingLat.toFixed(5)}, ${pendingLng.toFixed(5)}`;
+      const name = (input.value || '').trim() || `Finca ${pendingLat.toFixed(5)}, ${pendingLng.toFixed(5)}`;
       try{ await db.collection('farms').add({ name, fincaLocation:{lat: pendingLat, lng: pendingLng} }); }
       catch{ const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:pendingLat, lng:pendingLng} }); saveCache(farms); renderFarmsFromCache(); }
-      pendingLat=null; pendingLng=null; if(input){ input.value=''; }
-      const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
+      pendingLat=null; pendingLng=null; input.value='';
+      document.getElementById('coordsNamePanel').classList.add('hidden');
       waitAuthThen(syncLocalPendingToFirestore);
     }
     function cancelCoordsName(){
       pendingLat=null; pendingLng=null;
-      const input = document.getElementById('coordsNameInput'); if(input){ input.value=''; }
-      const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
+      document.getElementById('coordsNameInput').value='';
+      document.getElementById('coordsNamePanel').classList.add('hidden');
     }
 
     // ===== Dibujo de geocerca con clics =====
@@ -654,14 +640,11 @@
       if(!isDrawingFence) return;
       if(drawingCoords.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
       pendingFenceCoords = drawingCoords.slice();
-      const hint = document.getElementById('fenceNameHint');
-      if(hint) hint.textContent = `Vértices: ${pendingFenceCoords.length} puntos`;
+      document.getElementById('fenceNameHint').textContent = `Vértices: ${pendingFenceCoords.length} puntos`;
       const input = document.getElementById('fenceNameInput');
-      if(input) {
-        input.value = `Geocerca ${new Date().toLocaleDateString()}`;
-        const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.remove('hidden'); }
-        input.focus(); input.select();
-      }
+      input.value = `Geocerca ${new Date().toLocaleDateString()}`;
+      document.getElementById('fenceNamePanel').classList.remove('hidden');
+      input.focus(); input.select();
     }
     function cancelFenceDraw(){
       isDrawingFence = false;
@@ -671,34 +654,33 @@
       document.getElementById('startFenceBtn').classList.remove('hidden');
       document.getElementById('finishFenceBtn').classList.add('hidden');
       document.getElementById('cancelFenceBtn').classList.add('hidden');
-      const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
+      document.getElementById('fenceNamePanel').classList.add('hidden');
       pendingFenceCoords = null;
     }
     async function saveFenceName(){
       const input = document.getElementById('fenceNameInput');
-      const name = (input && input.value ? input.value : '').trim() || 'Geocerca';
+      const name = (input.value || '').trim() || 'Geocerca';
       if(!pendingFenceCoords || pendingFenceCoords.length<3){ alert('No hay geocerca lista para guardar.'); return; }
 
       try{
         await db.collection('geofences').add({ name, path: pendingFenceCoords });
       }catch(err){
-        console.error('No se pudo guardar en Firestore. Guardando localmente:', err);
         const fences = loadFenceCache();
         fences.push({ id: 'localgf-'+Date.now(), name, path: pendingFenceCoords });
         saveFenceCache(fences);
         renderGeofencesFromCache();
       }
 
-      if(input){ input.value=''; }
+      input.value='';
       pendingFenceCoords=null;
-      const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
+      document.getElementById('fenceNamePanel').classList.add('hidden');
       cancelFenceDraw();
       removePreviewFence();
       waitAuthThen(syncLocalPendingToFirestore);
     }
     function cancelFenceName(){
-      const input=document.getElementById('fenceNameInput'); if(input){ input.value=''; }
-      const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
+      document.getElementById('fenceNameInput').value='';
+      document.getElementById('fenceNamePanel').classList.add('hidden');
       removePreviewFence();
     }
 
@@ -720,9 +702,9 @@
       items.forEach(it=>{
         const parts = it.split(/[,\s]+/).map(t=> t.trim()).filter(Boolean);
         if(parts.length < 2) return;
-        const lat = parseCoord(parts[0]);
-        const lng = parseCoord(parts[1]);
-        if(Number.isFinite(lat) && Number.isFinite(lng) && validLat(lat) && validLng(lng)){
+        const lat = parseFloat(String(parts[0]).replace(',', '.'));
+        const lng = parseFloat(String(parts[1]).replace(',', '.'));
+        if(Number.isFinite(lat) && Number.isFinite(lng) && lat>=-90 && lat<=90 && lng>=-180 && lng<=180){
           puntos.push({lat, lng});
         }
       });
@@ -751,14 +733,11 @@
         previewFenceLayer = L.polygon(pts.map(p=> [p.lat, p.lng]), { dashArray: '4,4', weight: 2, fillOpacity: 0.1 }).addTo(map);
         try { map.fitBounds(previewFenceLayer.getBounds(), { padding: [20,20] }); } catch(e){}
       }
-      const hint = document.getElementById('fenceNameHint');
-      if (hint) hint.textContent = `Vértices: ${pts.length} puntos`;
+      document.getElementById('fenceNameHint').textContent = `Vértices: ${pts.length} puntos`;
       const input = document.getElementById('fenceNameInput');
-      if (input) {
-        input.value = `Geocerca ${new Date().toLocaleDateString()}`;
-        const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.remove('hidden'); }
-        input.focus(); input.select();
-      }
+      input.value = `Geocerca ${new Date().toLocaleDateString()}`;
+      document.getElementById('fenceNamePanel').classList.remove('hidden');
+      input.focus(); input.select();
     }
 
     // ======================= EDICIÓN DE GEOCERCAS (Leaflet.Draw) =======================
@@ -1095,7 +1074,6 @@
       try{
         await db.collection('geofences').doc(selectedFenceId).delete();
       }catch(err){
-        console.warn('Fallo al eliminar en Firestore, limpiando localmente:', err);
         const updated = fencesCache.filter(g=> g.id !== selectedFenceId);
         saveFenceCache(updated);
         if(geofenceLayers[selectedFenceId]){
