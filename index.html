@@ -24,7 +24,6 @@
     <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
       <h1 class="text-3xl font-bold text-gray-800 mb-4">Acceso de Administrador</h1>
       <p class="text-gray-600 mb-6">Introduce tu código de administrador.</p>
-      <!-- SOLO CAMBIO: desactivar autocorrect/autocapitalize y afines en móviles -->
       <input type="password" id="adminCodeInput" placeholder="Código de acceso"
              class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2"
              autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text">
@@ -174,22 +173,22 @@
 
     const db = firebase.firestore();
 
-    /* Transporte compatible con móviles (ya presente) */
+    /* Transporte compatible con móviles */
     try {
       db.settings({
         experimentalForceLongPolling: true,
         experimentalAutoDetectLongPolling: false,
         useFetchStreams: false
       });
-    } catch (e) {
-      console.warn('Firestore settings no soportados en este entorno:', e);
-    }
+    } catch (e) { console.warn('Firestore settings no soportados en este entorno:', e); }
 
+    /* Persistencia solo desktop (evita problemas en Safari/iOS) */
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (!isMobile) {
       db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
     }
 
+    /* Auth anónima (si falla en móvil, igualmente mostraremos datos) */
     firebase.auth().signInAnonymously().catch(console.error);
 
     let map;
@@ -289,7 +288,12 @@
         }
       });
 
-      if (firebase.auth().currentUser) startSubscriptions();
+      /* ============================
+         MÓVIL FIX: no esperar auth
+         ============================ */
+      startSubscriptions();       // <-- arranca ya
+      initialFetchAll();          // <-- y carga de respaldo inmediata
+      setTimeout(initialFetchAll, 1200);
     }
 
     function startSubscriptions(){
@@ -297,8 +301,6 @@
       subsStarted = true;
       subscribeFarms();
       subscribeGeofences();
-      initialFetchAll();
-      setTimeout(initialFetchAll, 1200);
     }
 
     function subscribeFarms(){
@@ -387,7 +389,11 @@
     }
 
     firebase.auth().onAuthStateChanged(user=>{
-      if (user) startSubscriptions();
+      // Si luego se autentica, no duplicamos nada gracias a subsStarted
+      if (user && !subsStarted) {
+        startSubscriptions();
+        initialFetchAll();
+      }
     });
 
     function selectFence(id){
@@ -662,13 +668,13 @@
       map.on('mouseout', ()=>ctrl.update(null,null));
     }
 
-    /* ===== ACCESO (SOLO CAMBIO EN NORMALIZACIÓN) ===== */
+    /* ===== ACCESO ===== */
     const ADMIN_CODE = "admin123";
     function doAdminLogin(){
       try{
         const inputEl = document.getElementById('adminCodeInput');
         const raw = inputEl ? String(inputEl.value || '') : '';
-        const normalized = raw.trim().toLowerCase();  // tolerante a mayúsculas/espacios en móvil
+        const normalized = raw.trim().toLowerCase();
         if(normalized === ADMIN_CODE){
           const modal = document.getElementById('adminModal'); if(modal){ modal.classList.add("hidden"); }
           const app = document.getElementById('appContent'); if(app){ app.classList.remove("hidden"); }
