@@ -783,29 +783,57 @@
     }
 
     async function saveFenceEdit(){
-      if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]) return;
-      const poly = geofenceLayers[selectedFenceId];
+  // Validaciones básicas
+  if (!isEditingFence) { alert('No estás en modo edición.'); return; }
+  if (!selectedFenceId || !geofenceLayers[selectedFenceId]) { alert('No hay geocerca seleccionada.'); return; }
 
-      // Capturar nuevos puntos (primer anillo)
-      const rings = poly.getLatLngs();
-      const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
-      const newPath = ring0.map(ll => ({lat: ll.lat, lng: ll.lng}));
-      if (newPath.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
+  const poly = geofenceLayers[selectedFenceId];
 
-      const fencesCache = loadFenceCache();
-      const idxCache = fencesCache.findIndex(g => g.id === selectedFenceId);
+  // Obtener el primer anillo del polígono editado
+  const rings = poly.getLatLngs();
+  const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
+  const newPath = ring0.map(ll => ({ lat: ll.lat, lng: ll.lng }));
 
-      try{
-        if (selectedFenceId.startsWith('localgf-')) {
-          if (idxCache>=0){ fencesCache[idxCache].path = newPath; saveFenceCache(fencesCache); }
-        } else {
-          await db.collection('geofences').doc(selectedFenceId).update({ path: newPath });
-        }
-      }catch(err){
-        if (idxCache>=0){ fencesCache[idxCache].path = newPath; saveFenceCache(fencesCache); }
-        console.warn('No se pudo guardar edición en Firestore, se guardó localmente:', err);
-      }
+  if (newPath.length < 3){
+    alert('La geocerca necesita al menos 3 puntos.');
+    return;
+  }
 
+  // 1) Actualizar CACHÉ local de inmediato (experiencia instantánea)
+  const fencesCache = loadFenceCache() || [];
+  const idxCache = fencesCache.findIndex(g => g.id === selectedFenceId);
+  if (idxCache >= 0) {
+    fencesCache[idxCache].path = newPath;
+    try { saveFenceCache(fencesCache); } catch {}
+  }
+
+  // 2) Intentar guardar en Firestore (si el id no es local)
+  let firestoreOK = false;
+  try{
+    if (!selectedFenceId.startsWith('localgf-')) {
+      await db.collection('geofences').doc(selectedFenceId).update({ path: newPath });
+    }
+    firestoreOK = true;
+  }catch(err){
+    console.warn('No se pudo guardar en Firestore. Se mantiene el cambio en caché local:', err);
+  }
+
+  // 3) Salir del modo edición limpiamente (sin re-render global)
+  try { if (editToolbar) editToolbar.disable(); } catch {}
+  try { if (editGroup && editGroup.hasLayer(poly)) editGroup.removeLayer(poly); } catch {}
+  isEditingFence = false;
+  editBackupCoords = null;
+  updateEditButtonsState();
+
+  // Mantener resaltado el polígono seleccionado
+  try { poly.setStyle(GEOFENCE_SELECTED_STYLE); } catch {}
+
+  // (Opcional) Notifica el resultado
+  alert(firestoreOK ? 'Cambios guardados.' : 'Cambios guardados localmente (sin conexión o sin permisos).');
+
+  // No llamamos a renderGeofencesFromCache() aquí para no perder la edición visual.
+  // El onSnapshot actualizará más tarde desde Firestore cuando sea posible.
+}
       // Deshabilitar edición y limpiar grupo
       if (editToolbar) editToolbar.disable();
       if (editGroup && editGroup.hasLayer(poly)) editGroup.removeLayer(poly);
