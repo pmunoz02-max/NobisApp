@@ -24,7 +24,10 @@
     <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
       <h1 class="text-3xl font-bold text-gray-800 mb-4">Acceso de Administrador</h1>
       <p class="text-gray-600 mb-6">Introduce tu código de administrador.</p>
-      <input type="password" id="adminCodeInput" placeholder="Código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
+      <!-- SOLO CAMBIO: desactivar autocorrect/autocapitalize y afines en móviles -->
+      <input type="password" id="adminCodeInput" placeholder="Código de acceso"
+             class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2"
+             autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text">
       <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
       <button id="adminLoginBtn"
               onclick="doAdminLogin()"
@@ -171,7 +174,7 @@
 
     const db = firebase.firestore();
 
-    /* === Transporte compatible con móviles === */
+    /* Transporte compatible con móviles (ya presente) */
     try {
       db.settings({
         experimentalForceLongPolling: true,
@@ -182,13 +185,11 @@
       console.warn('Firestore settings no soportados en este entorno:', e);
     }
 
-    /* === Persistencia solo en desktop (evita fallos Safari/iOS) === */
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (!isMobile) {
       db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
     }
 
-    /* === Auth anónima === */
     firebase.auth().signInAnonymously().catch(console.error);
 
     let map;
@@ -207,7 +208,7 @@
     let previewFenceLayer = null;
     let selectedFenceId = null;
 
-    let subsStarted = false; // <-- NUEVO: para arrancar subs solo tras auth
+    let subsStarted = false;
     const GEOFENCE_STYLE = {weight:2, fillOpacity:0.15};
     const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
 
@@ -288,18 +289,16 @@
         }
       });
 
-      // Si ya hay usuario autenticado (desktop), inicia subs; si no, espera onAuthStateChanged
       if (firebase.auth().currentUser) startSubscriptions();
     }
 
-    /* ======= NUEVO: arrancar subs SOLO tras auth ======= */
     function startSubscriptions(){
       if (subsStarted) return;
       subsStarted = true;
       subscribeFarms();
       subscribeGeofences();
-      initialFetchAll();                  // carga inmediata
-      setTimeout(initialFetchAll, 1200);  // reintento suave
+      initialFetchAll();
+      setTimeout(initialFetchAll, 1200);
     }
 
     function subscribeFarms(){
@@ -387,11 +386,8 @@
       }catch(e){ console.warn('Fallback get geofences failed', e); }
     }
 
-    /* ======= Auth listo => arrancar subs ======= */
     firebase.auth().onAuthStateChanged(user=>{
-      if (user) {
-        startSubscriptions();
-      }
+      if (user) startSubscriptions();
     });
 
     function selectFence(id){
@@ -666,15 +662,14 @@
       map.on('mouseout', ()=>ctrl.update(null,null));
     }
 
-    /* =========================
-       Acceso y listeners UI
-       ========================= */
+    /* ===== ACCESO (SOLO CAMBIO EN NORMALIZACIÓN) ===== */
     const ADMIN_CODE = "admin123";
     function doAdminLogin(){
       try{
         const inputEl = document.getElementById('adminCodeInput');
-        const raw = inputEl ? inputEl.value : "";
-        if(raw && raw.trim() === ADMIN_CODE){
+        const raw = inputEl ? String(inputEl.value || '') : '';
+        const normalized = raw.trim().toLowerCase();  // tolerante a mayúsculas/espacios en móvil
+        if(normalized === ADMIN_CODE){
           const modal = document.getElementById('adminModal'); if(modal){ modal.classList.add("hidden"); }
           const app = document.getElementById('appContent'); if(app){ app.classList.remove("hidden"); }
           setTimeout(()=>{ initMap(); setTimeout(()=>{ if(map){ map.invalidateSize(); } }, 100); }, 100);
@@ -684,6 +679,7 @@
       }catch(e){ console.error(e); }
     }
 
+    /* Listeners UI */
     document.addEventListener("DOMContentLoaded",function(){
       const modal = document.getElementById('adminModal'); if(modal){ modal.classList.remove("hidden"); }
 
@@ -719,3 +715,4 @@
   </script>
 </body>
 </html>
+
