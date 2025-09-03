@@ -27,6 +27,12 @@
       <input type="password" id="adminCodeInput" placeholder="Código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
       <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
       <button id="adminLoginBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">Acceder</button>
+      <button id="adminLoginBtn"
+        onclick="doAdminLogin()"
+        class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">
+  Acceder
+</button>
+
     </div>
   </div>
 
@@ -544,17 +550,13 @@
 
     // LOGIN ADMIN
     const ADMIN_CODE = "admin123";
-    function normalizeAdminInput(str){ return (str||"").normalize("NFKC").replace(/["'“”\s]/g,"").toLowerCase(); }
-    function doAdminLogin(){
-      const raw=document.getElementById('adminCodeInput').value;
-      if(normalizeAdminInput(raw)===normalizeAdminInput(ADMIN_CODE)){
-        document.getElementById('adminModal').classList.add("hidden");
-        document.getElementById('appContent').classList.remove("hidden");
-        setTimeout(()=>{ initMap(); setTimeout(()=>map.invalidateSize(),100); },100);
-      }else{
-        document.getElementById('errorMessage').style.display="block";
-      }
-    }
+    function normalizeAdminInput(str){
+  // Soporta browsers sin String.prototype.normalize
+  const s = (str ?? "").toString().trim();
+  const safe = (typeof s.normalize === "function") ? s.normalize("NFKC") : s;
+  return safe.replace(/["'“”\s]/g, "").toLowerCase();
+}
+
 
     // Listeners
     document.getElementById('adminLoginBtn').addEventListener("click",doAdminLogin);
@@ -573,6 +575,9 @@
 
       const btnCoords=document.getElementById('createByCoordsBtn');
       if (btnCoords) btnCoords.addEventListener('click', createFarmByCoords);
+      document.getElementById('adminCodeInput')
+  ?.addEventListener("keydown", e => { if (e.key === "Enter") doAdminLogin(); });
+
 
       // Geocercas (dibujo)
       document.getElementById('startFenceBtn').addEventListener('click', startFenceDraw);
