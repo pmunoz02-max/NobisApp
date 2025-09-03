@@ -51,6 +51,30 @@
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
         <div class="ml-auto flex flex-wrap gap-2">
           <!-- Crear en centro -->
+
+          <!-- Herramientas de geocerca -->
+<button id="startFenceBtn"
+  class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
+  title="Iniciar dibujo de geocerca">
+  <!-- icono -->
+  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
+  </svg>
+  Nueva geocerca
+</button>
+
+<button id="finishFenceBtn"
+  class="hidden inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg"
+  title="Finalizar geocerca">
+  Finalizar geocerca
+</button>
+
+<button id="cancelFenceBtn"
+  class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg"
+  title="Cancelar dibujo">
+  Cancelar
+</button>
+
           <button id="createFarmBtn"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Crear finca en el centro del mapa">
