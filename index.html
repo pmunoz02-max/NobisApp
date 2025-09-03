@@ -525,6 +525,103 @@
 
       updateDeleteButtonState();
     });
+    <!-- NUEVO: Crear geocerca por coordenadas -->
+<button id="createFenceByCoordsBtn"
+  class="inline-flex items-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg"
+  title="Crear geocerca ingresando una lista de coordenadas">
+  <!-- icono -->
+  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
+  </svg>
+  Geocerca (Lat/Lngs)
+</button>
+// === NUEVO: previsualización temporal para geocerca por coordenadas ===
+let previewFenceLayer = null;
+
+// Reutiliza tus helpers normDec / parseCoord / validLat / validLng ya definidos
+function parseLatLngList(texto){
+  // Acepta: "lat,lng; lat,lng; ..." o líneas separadas
+  const items = String(texto || '')
+    .split(/[\n;]+/)              // separa por ; o salto de línea
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  const puntos = [];
+  for(const it of items){
+    // separa por coma o espacios
+    const parts = it.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
+    if(parts.length < 2) continue;
+    const lat = parseCoord(parts[0]);
+    const lng = parseCoord(parts[1]);
+    if(Number.isFinite(lat) && Number.isFinite(lng) && validLat(lat) && validLng(lng)){
+      puntos.push({lat, lng});
+    }
+  }
+  return puntos;
+}
+
+// === NUEVO: Crear geocerca ingresando lista de coordenadas ===
+function createFenceByCoords(){
+  // si estás en modo dibujo, evita conflictos
+  if (typeof isDrawingFence !== 'undefined' && isDrawingFence){
+    alert('Finaliza o cancela el dibujo de geocerca antes de crear por coordenadas.');
+    return;
+  }
+
+  const ejemplo = "-1.2345,-78.5678; -1.2350,-78.5684; -1.2362,-78.5690";
+  const raw = prompt(
+    "Ingresa puntos en formato lat,lng separados por ';' o por saltos de línea.\n" +
+    "Ejemplo:\n" + ejemplo
+  );
+  if(raw === null) return;
+
+  const pts = parseLatLngList(raw);
+  if(pts.length < 3){
+    alert('Se requieren al menos 3 puntos válidos (lat,lng).');
+    return;
+  }
+
+  // Usa el mismo flujo de nombrado que ya tienes para geocercas
+  if (typeof pendingFenceCoords === 'undefined'){
+    // en tu código ya existe; si no, lo creamos local sin interferir
+    window.pendingFenceCoords = null;
+  }
+  pendingFenceCoords = pts;
+
+  // Previsualización en el mapa (no interfiere con el modo dibujo)
+  if (typeof map !== 'undefined' && map){
+    if(previewFenceLayer){ map.removeLayer(previewFenceLayer); previewFenceLayer = null; }
+    previewFenceLayer = L.polygon(pts.map(p => [p.lat, p.lng]), { dashArray: '4,4', weight: 2, fillOpacity: 0.1 }).addTo(map);
+    try { map.fitBounds(previewFenceLayer.getBounds(), { padding: [20,20] }); } catch {}
+  }
+
+  // Abre tu panel de nombre existente para geocercas
+  const hint = document.getElementById('fenceNameHint');
+  if (hint) hint.textContent = `Vértices: ${pts.length} puntos`;
+
+  const input = document.getElementById('fenceNameInput');
+  if (input) {
+    input.value = `Geocerca ${new Date().toLocaleDateString()}`;
+    document.getElementById('fenceNamePanel')?.classList.remove('hidden');
+    input.focus(); input.select();
+  }
+}
+
+// === NUEVO: limpiar la previsualización al guardar/cancelar nombre ===
+function removePreviewFence(){
+  if(previewFenceLayer){
+    map.removeLayer(previewFenceLayer);
+    previewFenceLayer = null;
+  }
+}
+// Botón nuevo
+document.getElementById('createFenceByCoordsBtn')?.addEventListener('click', createFenceByCoords);
+
+// Quitar preview cuando se guarda/cancela el nombre (sin tocar tus handlers existentes)
+document.getElementById('fenceNameSaveBtn')?.addEventListener('click', removePreviewFence);
+document.getElementById('fenceNameCancelBtn')?.addEventListener('click', removePreviewFence);
+
   </script>
 </body>
 </html>
