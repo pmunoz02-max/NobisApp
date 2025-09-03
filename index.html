@@ -59,7 +59,7 @@
             class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Iniciar dibujo de geocerca">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6H4z"/>
             </svg>
             Nueva geocerca
           </button>
@@ -190,7 +190,7 @@
     // Preview geocerca por lista
     let previewFenceLayer = null;
 
-    // NUEVO: selección de geocerca
+    // Selección de geocerca
     let selectedFenceId = null;
 
     // Estilos de geocerca
@@ -239,13 +239,10 @@
         const poly = L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
         poly.bindTooltip(g.name || 'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
         geofenceLayers[g.id] = poly;
-        // NUEVO: seleccionar al hacer click
-        poly.on('click', ()=> selectFence(g.id));
-        // Si ya estaba seleccionada, re-aplicar estilo
+        poly.on('click', ()=> selectFence(g.id)); // seleccionar al click
         if(selectedFenceId === g.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
       });
 
-      // Si la seleccionada ya no existe, limpiar selección
       if(selectedFenceId && !geofenceLayers[selectedFenceId]){
         selectedFenceId = null;
       }
@@ -324,16 +321,13 @@
             const poly = L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
             poly.bindTooltip(g.name || 'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
             geofenceLayers[doc.id]=poly;
-            // NUEVO: seleccionar al hacer click
-            poly.on('click', ()=> selectFence(doc.id));
-            // Reaplicar estilo si estaba seleccionada
+            poly.on('click', ()=> selectFence(doc.id)); // seleccionar al click
             if(selectedFenceId === doc.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
           }
         });
 
         saveFenceCache(fences);
 
-        // Si la seleccionada ya no existe tras el snapshot, limpiarla
         if(selectedFenceId && !geofenceLayers[selectedFenceId]){
           selectedFenceId = null;
         }
@@ -341,9 +335,8 @@
       }, ()=>{ renderGeofencesFromCache(); });
     }
 
-    // Selección de geocerca (NUEVO)
+    // Selección de geocerca
     function selectFence(id){
-      // quitar estilo seleccionado previo
       if(selectedFenceId && geofenceLayers[selectedFenceId]){
         geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE);
       }
@@ -463,7 +456,7 @@
       pendingFenceCoords=null;
       document.getElementById('fenceNamePanel').classList.add('hidden');
       cancelFenceDraw();
-      removePreviewFence(); // limpiar preview si venía de coords
+      removePreviewFence();
     }
     function cancelFenceName(){
       document.getElementById('fenceNameInput').value='';
@@ -554,25 +547,22 @@
       if(!btn) return; btn.disabled = !(sel && sel.value);
     }
 
-    // NUEVO: eliminar geocerca seleccionada
+    // Eliminar geocerca
     async function deleteSelectedFence(){
       if(!selectedFenceId){
         alert('Primero selecciona una geocerca haciendo click sobre ella.');
         return;
       }
 
-      // Obtener nombre (para confirmar) desde caché
       const fencesCache = loadFenceCache();
       const gf = fencesCache.find(g => g.id === selectedFenceId);
       const name = (gf && gf.name) ? gf.name : 'Geocerca';
 
       if(!confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) return;
 
-      // Si es local
       if(selectedFenceId.startsWith('localgf-')){
         const updated = fencesCache.filter(g => g.id !== selectedFenceId);
         saveFenceCache(updated);
-        // eliminar capa del mapa
         if(geofenceLayers[selectedFenceId]){
           map.removeLayer(geofenceLayers[selectedFenceId]);
           delete geofenceLayers[selectedFenceId];
@@ -582,7 +572,6 @@
         return;
       }
 
-      // Intentar borrar en Firestore; si falla, limpiar local como fallback
       try{
         await db.collection('geofences').doc(selectedFenceId).delete();
       }catch(err){
@@ -617,7 +606,7 @@
       map.on('mouseout', ()=>ctrl.update(null,null));
     }
 
-    // LOGIN ADMIN (robusto)
+    // LOGIN ADMIN
     const ADMIN_CODE = "admin123";
     function normalizeAdminInput(str){
       const s = (str ?? "").toString().trim();
@@ -668,7 +657,7 @@
       document.getElementById('fenceNameSaveBtn')?.addEventListener('click', removePreviewFence);
       document.getElementById('fenceNameCancelBtn')?.addEventListener('click', removePreviewFence);
 
-      // NUEVO: borrar geocerca
+      // Eliminar geocerca
       document.getElementById('deleteFenceBtn')?.addEventListener('click', deleteSelectedFence);
 
       updateDeleteButtonState();
