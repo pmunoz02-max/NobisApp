@@ -177,7 +177,7 @@
     try {
       db.settings({
         experimentalForceLongPolling: true,
-        experimentalAutoDetectLongPolling: false,
+        experimentalAutoDetectLongPolling: true, /* auto-detección activada */
         useFetchStreams: false
       });
     } catch (e) { console.warn('Firestore settings no soportados en este entorno:', e); }
@@ -209,6 +209,9 @@
     let selectedFenceId = null;
 
     let subsStarted = false;
+    let unsubFarms = null;
+    let unsubGeofences = null;
+
     const GEOFENCE_STYLE = {weight:2, fillOpacity:0.15};
     const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
 
@@ -292,11 +295,9 @@
         }
       });
 
-      // Arrancar subs y carga inmediata
       startSubscriptions();
       initialFetchAll();
-      setTimeout(initialFetchAll, 1200); // segundo intento suave
-      // Fallback extra para móviles: REST si a los 3s seguimos sin datos
+      setTimeout(initialFetchAll, 1200);
       setTimeout(tryRESTFallbackIfEmpty, 3000);
     }
 
@@ -307,9 +308,18 @@
       subscribeGeofences();
     }
 
+    /* ======= NUEVO: reintentar tras auth ======= */
+    function restartSubscriptions(){
+      try { if (unsubFarms) { unsubFarms(); unsubFarms = null; } } catch {}
+      try { if (unsubGeofences) { unsubGeofences(); unsubGeofences = null; } } catch {}
+      subscribeFarms();
+      subscribeGeofences();
+      initialFetchAll();            // refresco inmediato
+    }
+
     /* ========= Suscripciones Firestore ========= */
     function subscribeFarms(){
-      db.collection('farms').onSnapshot(snap=>{
+      unsubFarms = db.collection('farms').onSnapshot(snap=>{
         const farms = [];
         Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
         for(const k in fincaMarkers) delete fincaMarkers[k];
@@ -334,11 +344,14 @@
           });
         }
         updateDeleteButtonState();
-      }, err => { console.warn('onSnapshot farms error', err); renderFarmsFromCache(); });
+      }, err => {
+        console.warn('onSnapshot farms error', err);
+        renderFarmsFromCache();
+      });
     }
 
     function subscribeGeofences(){
-      db.collection('geofences').onSnapshot(snap=>{
+      unsubGeofences = db.collection('geofences').onSnapshot(snap=>{
         const fences = [];
         Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
         for(const k in geofenceLayers) delete geofenceLayers[k];
@@ -362,7 +375,10 @@
           selectedFenceId = null;
         }
         updateDeleteFenceButtonState();
-      }, err => { console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
+      }, err => {
+        console.warn('onSnapshot geofences error', err);
+        renderGeofencesFromCache();
+      });
     }
 
     /* ========= Carga inicial (SDK) ========= */
@@ -398,7 +414,7 @@
       }catch(e){ console.warn('Fallback get geofences failed', e); }
     }
 
-    /* ========= Fallback REST para móviles (si SDK no trae nada) ========= */
+    /* ========= Fallback REST ========= */
     const REST_BASE = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
     async function restList(collection){
       const url = `${REST_BASE}/${collection}?key=${firebaseConfig.apiKey}`;
@@ -446,7 +462,6 @@
         const fences = [];
         docs.forEach(d=>{
           const name = readString(d.fields.name);
-          // path es ArrayValue de map {lat,lng}
           const arr = d.fields.path?.arrayValue?.values || [];
           const path = arr.map(v => readLatLng(v.mapValue?.fields)).filter(Boolean);
           fences.push({ id:d.id, name, path });
@@ -759,6 +774,13 @@
         }
       }catch(e){ console.error(e); }
     }
+
+    /* ========= Reintento tras auth: aquí forzamos el resubscribe ========= */
+    firebase.auth().onAuthStateChanged(user=>{
+      if (user) {
+        restartSubscriptions();  // <- NUEVO: reintenta suscripciones con permisos
+      }
+    });
 
     /* ========= Listeners UI ========= */
     document.addEventListener("DOMContentLoaded",function(){
