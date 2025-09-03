@@ -173,7 +173,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // Transporte más compatible con móviles/Safari
     try {
       db.settings({
         experimentalForceLongPolling: true,
@@ -182,16 +181,15 @@
       });
     } catch {}
 
-    // Persistencia: la dejamos solo en desktop (iOS suele fallar con persistence)
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (!isMobile) {
       db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
     }
 
-    // === Auth anónima ===
+    // === Auth anónima (esperamos usuario real) ===
     let authReady = false;
     firebase.auth().signInAnonymously().catch(console.error);
-    firebase.auth().onAuthStateChanged(()=>{ authReady = true; });
+    firebase.auth().onAuthStateChanged((user)=>{ authReady = !!user; });
 
     // ========= Estado =========
     let map;
@@ -284,15 +282,20 @@
         }
       });
 
-      // ⬇️ CAMBIO CLAVE: esperamos auth antes de tocar Firestore (lecturas y suscripciones)
-      waitAuthThen(()=>{
+      // Espera auth real antes de tocar Firestore
+      waitAuthThen(async ()=>{
         startSubscriptions();
-        initialFetchAll();
+        await initialFetchAll();
+
+        // 🔁 Móvil: fallback REST si seguimos sin datos
         if (isMobile) {
+          setTimeout(() => { maybeRestFallback(); }, 1800);
+          // además polling SDK (por si el realtime no engancha)
           sdkRefreshAll();
           startSDKPolling(12000);
         }
-        // si tienes elementos locales pendientes, súbelos (no cambia nada de tu flujo)
+
+        // por si hay locales pendientes
         syncLocalPendingToFirestore();
       });
     }
@@ -368,7 +371,7 @@
       }catch(e){ console.warn('get geofences failed', e); }
     }
 
-    // ========= Polling por SDK solo móvil =========
+    // ========= Polling por SDK (solo móvil) =========
     let sdkPollTimer = null;
     async function sdkFetchFarms(){
       try{
@@ -389,6 +392,71 @@
       if (sdkPollTimer) return;
       sdkPollTimer = setInterval(sdkRefreshAll, ms || 12000);
       document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) sdkRefreshAll(); });
+    }
+
+    // ========= REST FALLBACK (solo lectura, solo si todo vacío en móvil) =========
+    function fsVal(v){
+      if(!v) return null;
+      if('stringValue' in v) return v.stringValue;
+      if('integerValue' in v) return parseInt(v.integerValue,10);
+      if('doubleValue' in v) return parseFloat(v.doubleValue);
+      if('booleanValue' in v) return !!v.booleanValue;
+      if('mapValue' in v){
+        const out={}; const f=v.mapValue.fields||{};
+        for(const k in f){ out[k]=fsVal(f[k]); }
+        return out;
+      }
+      if('arrayValue' in v){
+        const arr=v.arrayValue.values||[]; return arr.map(fsVal);
+      }
+      return null;
+    }
+    async function restFetchCollection(col){
+      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${col}?key=${firebaseConfig.apiKey}`;
+      const res = await fetch(url, { method:'GET' });
+      if(!res.ok) throw new Error(`REST ${col} ${res.status}`);
+      const j = await res.json();
+      const docs = (j.documents||[]).map(d=>{
+        const id = (d.name||'').split('/').pop();
+        const f = d.fields||{};
+        return { id, ...Object.fromEntries(Object.keys(f).map(k=>[k, fsVal(f[k])])) };
+      });
+      return docs;
+    }
+    function isMapEmpty(){
+      const farms = loadCache();
+      const fences = loadFenceCache();
+      return (!farms || farms.length===0) && (!fences || fences.length===0);
+    }
+    async function maybeRestFallback(){
+      if (!isMobile) return;
+      if (!isMapEmpty()) return; // ya hay datos por SDK
+      try{
+        const [farms, fences] = await Promise.allSettled([
+          restFetchCollection('farms'),
+          restFetchCollection('geofences')
+        ]);
+        if (farms.status==='fulfilled' && Array.isArray(farms.value)){
+          // adaptamos formato fincaLocation {lat,lng}
+          const cleaned = farms.value.map(x=>{
+            let loc = x.fincaLocation;
+            if (loc && typeof loc.lat==='number' && typeof loc.lng==='number'){
+              return { id:x.id, name:x.name||'Finca', fincaLocation:{lat:loc.lat, lng:loc.lng} };
+            }
+            return null;
+          }).filter(Boolean);
+          if (cleaned.length){ saveCache(cleaned); renderFarmsFromCache(); }
+        }
+        if (fences.status==='fulfilled' && Array.isArray(fences.value)){
+          const cleaned = fences.value.map(x=>{
+            const path = Array.isArray(x.path) ? x.path.filter(p => p && typeof p.lat==='number' && typeof p.lng==='number') : [];
+            return path.length>=3 ? { id:x.id, name:x.name||'Geocerca', path } : null;
+          }).filter(Boolean);
+          if (cleaned.length){ saveFenceCache(cleaned); renderGeofencesFromCache(); }
+        }
+      }catch(e){
+        console.warn('REST fallback failed', e);
+      }
     }
 
     // ========= SYNC local -> Firestore (ya existente) =========
@@ -426,12 +494,7 @@
       }catch(e){ console.warn('sync geofences error', e); }
     }
 
-    // ========= Utilidades =========
-    function waitAuthThen(fn){
-      if (authReady) { fn(); return; }
-      const iv = setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } }, 150);
-    }
-
+    // ========= Interacción geocercas =========
     function selectFence(id){
       if(selectedFenceId && geofenceLayers[selectedFenceId]){
         geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE);
@@ -443,6 +506,7 @@
       updateDeleteFenceButtonState();
     }
 
+    // ========= Helpers numéricos =========
     const normDec = s => String(s||'').trim().replace(',', '.');
     const parseCoord = s => { const v=parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; };
     const validLat = v => v>=-90 && v<=90;
@@ -709,6 +773,12 @@
       const ctrl = new MousePos(); ctrl.addTo(map);
       map.on('mousemove', e=>ctrl.update(e.latlng.lat, e.latlng.lng));
       map.on('mouseout', ()=>ctrl.update(null,null));
+    }
+
+    // ========= Utilidades =========
+    function waitAuthThen(fn){
+      if (authReady) { fn(); return; }
+      const iv = setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } }, 150);
     }
 
     // ========= Acceso =========
