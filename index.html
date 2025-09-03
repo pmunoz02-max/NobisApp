@@ -1133,6 +1133,77 @@
       updateDeleteFenceButtonState();
       updateEditButtonsState();
     });
+    <script>
+// --- HOTFIX: insertar botones avanzados si no existen ---
+function ensureAdvancedButtons() {
+  const afterBtn = document.getElementById('deleteFenceBtn');
+  if (!afterBtn || !afterBtn.parentElement) return;
+  const bar = afterBtn.parentElement;
+
+  // Evitar doble inserción
+  if (document.getElementById('editFenceBtn') ||
+      document.getElementById('exportGeoJSONBtn') ||
+      document.getElementById('importGeoJSONInput')) {
+    updateEditButtonsState && updateEditButtonsState();
+    return;
+  }
+
+  // Utilidad para crear botón
+  const mkBtn = (id, text, classes, title) => {
+    const b = document.createElement('button');
+    b.id = id; b.type = 'button';
+    b.className = classes;
+    b.textContent = text;
+    if (title) b.title = title;
+    return b;
+  };
+
+  // 1) Botón Editar geocerca
+  const editBtn = mkBtn(
+    'editFenceBtn',
+    'Editar geocerca',
+    'inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed',
+    'Editar (mover vértices) de la geocerca seleccionada'
+  );
+  editBtn.disabled = true;
+
+  // 2) Guardar / Cancelar edición (inician ocultos)
+  const saveBtn = mkBtn(
+    'saveFenceEditBtn',
+    'Guardar cambios',
+    'hidden inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg',
+    'Guardar cambios a la geocerca'
+  );
+  const cancelBtn = mkBtn(
+    'cancelFenceEditBtn',
+    'Cancelar edición',
+    'hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg',
+    'Cancelar edición y restaurar'
+  );
+
+  // 3) Exportar GeoJSON
+  const exportBtn = mkBtn(
+    'exportGeoJSONBtn',
+    'Exportar GeoJSON',
+    'inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg',
+    'Exportar GeoJSON (seleccionada o todas)'
+  );
+
+  // 4) Importar GeoJSON (label + input file)
+  const importLabel = document.createElement('label');
+  importLabel.className = 'inline-flex items-center gap-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold px-4 py-2 rounded-lg cursor-pointer';
+  importLabel.title = 'Importar GeoJSON (Polygon o MultiPolygon)';
+  importLabel.textContent = 'Importar GeoJSON';
+
+  const importInput = document.createElement('input');
+  importInput.id = 'importGeoJSONInput';
+  importInput.type = 'file';
+  importInput.accept = '.geojson,application/geo+json,application/json';
+  importInput.className = 'hidden';
+  importLabel.appendChild(importInput);
+
+  // Inser
+
   </script>
 </body>
 </html>
