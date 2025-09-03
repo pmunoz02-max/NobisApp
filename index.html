@@ -26,13 +26,11 @@
       <p class="text-gray-600 mb-6">Introduce tu código de administrador.</p>
       <input type="password" id="adminCodeInput" placeholder="Código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
       <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
-      <button id="adminLoginBtn" class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">Acceder</button>
       <button id="adminLoginBtn"
-        onclick="doAdminLogin()"
-        class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">
-  Acceder
-</button>
-
+              onclick="doAdminLogin()"
+              class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">
+        Acceder
+      </button>
     </div>
   </div>
 
@@ -56,7 +54,7 @@
       <div class="flex flex-wrap gap-2 items-center mb-2">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
         <div class="ml-auto flex flex-wrap gap-2">
-          <!-- (ya estaban en tu código) herramientas geocerca - bloque 1 -->
+          <!-- Geocerca (dibujo) -->
           <button id="startFenceBtn"
             class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Iniciar dibujo de geocerca">
@@ -76,47 +74,7 @@
             Cancelar
           </button>
 
-          <!-- Crear finca (centro) -->
-          <button id="createFarmBtn"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg"
-            title="Crear finca en el centro del mapa">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            Crear finca
-          </button>
-          <!-- Crear por Lat/Lng -->
-          <button id="createByCoordsBtn"
-            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg"
-            title="Crear finca ingresando Lat/Lng">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h4l3-3 4 8 3-5H22M3 19h18"/></svg>
-            Crear finca (Lat/Lng)
-          </button>
-          <!-- Eliminar finca -->
-          <button id="deleteFarmBtn"
-            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Eliminar la finca seleccionada">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            Eliminar finca
-          </button>
-
-          <!-- (ya estaban en tu código) herramientas geocerca - bloque 2 -->
-          <button id="startFenceBtn"
-            class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
-            title="Iniciar dibujo de geocerca">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
-            Nueva geocerca
-          </button>
-          <button id="finishFenceBtn"
-            class="hidden inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg"
-            title="Finalizar geocerca">
-            Finalizar geocerca
-          </button>
-          <button id="cancelFenceBtn"
-            class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg"
-            title="Cancelar dibujo">
-            Cancelar
-          </button>
-
-          <!-- NUEVO: Geocerca ingresando lista de Lat/Lngs -->
+          <!-- Geocerca por coordenadas -->
           <button id="createFenceByCoordsBtn"
             class="inline-flex items-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg"
             title="Crear geocerca ingresando una lista de coordenadas">
@@ -125,6 +83,26 @@
                 d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
             </svg>
             Geocerca (Lat/Lngs)
+          </button>
+
+          <!-- Fincas -->
+          <button id="createFarmBtn"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Crear finca en el centro del mapa">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Crear finca
+          </button>
+          <button id="createByCoordsBtn"
+            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Crear finca ingresando Lat/Lng">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h4l3-3 4 8 3-5H22M3 19h18"/></svg>
+            Crear finca (Lat/Lng)
+          </button>
+          <button id="deleteFarmBtn"
+            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Eliminar la finca seleccionada">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            Eliminar finca
           </button>
         </div>
       </div>
@@ -187,7 +165,7 @@
     const fincaMarkers = {};
     const LS_KEY = 'fincas_cache_v1';
 
-    // ===== NUEVO: estado y caché para geocercas =====
+    // Geocercas
     const geofenceLayers = {}; // id -> L.Polygon
     const LS_GF = 'geofences_cache_v1';
 
@@ -198,11 +176,13 @@
     let drawingMarkers = [];       // pequeños marcadores de vértices
     let pendingFenceCoords = null; // coords a guardar cuando se nombra
 
-    // ====== Persistencia local (farms) ======
+    // Preview geocerca por lista
+    let previewFenceLayer = null;
+
+    // ===== Persistencia local =====
     function saveCache(farms){ try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} }
     function loadCache(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } }
 
-    // ====== Persistencia local (geocercas) ======
     function saveFenceCache(fences){ try{ localStorage.setItem(LS_GF, JSON.stringify(fences)); }catch{} }
     function loadFenceCache(){ try{ return JSON.parse(localStorage.getItem(LS_GF)||'[]'); }catch{ return []; } }
 
@@ -218,7 +198,6 @@
         fincaMarkers[f.id] = marker;
       });
 
-      // selector de fincas
       const sel = document.getElementById('farmSelect');
       if (sel){
         sel.innerHTML = '';
@@ -232,7 +211,6 @@
     }
 
     function renderGeofencesFromCache(){
-      // limpiar geocercas previas
       Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
       for(const k in geofenceLayers) delete geofenceLayers[k];
 
@@ -250,14 +228,10 @@
       map = L.map('map',{center:[center.lat,center.lng],zoom});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
-      // Control coordenadas del mouse
       addMousePositionControl();
-
-      // Pintar desde caché
       renderFarmsFromCache();
       renderGeofencesFromCache();
 
-      // Clic en mapa: crear finca (original) o capturar vértices si estamos dibujando geocerca
       map.on('click', async e=>{
         if(isDrawingFence){
           addFenceVertex(e.latlng);
@@ -296,7 +270,6 @@
         });
 
         saveCache(farms);
-        // selector
         const sel = document.getElementById('farmSelect');
         if (sel){
           sel.innerHTML = '';
@@ -308,11 +281,9 @@
       }, ()=>{ renderFarmsFromCache(); });
     }
 
-    // ====== suscripción geocercas ======
     function subscribeGeofences(){
       db.collection('geofences').onSnapshot(snap=>{
         const fences = [];
-        // limpiar capas previas
         Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
         for(const k in geofenceLayers) delete geofenceLayers[k];
 
@@ -332,13 +303,14 @@
       }, ()=>{ renderGeofencesFromCache(); });
     }
 
-    // ===== Helpers números/coords =====
+    // Helpers coords
     function normDec(s){ return String(s||'').trim().replace(',', '.'); }
     function parseCoord(s){ const v=parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; }
     function validLat(v){ return v>=-90 && v<=90; }
     function validLng(v){ return v>=-180 && v<=180; }
 
-    // ===== Crear en centro (fincas) =====
+    // Fincas
+    let pendingLat = null, pendingLng = null;
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
       const name = prompt("Nombre de la nueva finca:"); if(!name) return;
@@ -346,9 +318,6 @@
       try{ await db.collection('farms').add({ name, fincaLocation:{lat:c.lat, lng:c.lng} }); }
       catch{ const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:c.lat, lng:c.lng} }); saveCache(farms); renderFarmsFromCache(); }
     }
-
-    // ===== Crear por Lat/Lng (fincas) =====
-    let pendingLat = null, pendingLng = null;
     async function createFarmByCoords(){
       const latStr = prompt("Latitud (decimal, -90 a 90). Puedes usar coma o punto:"); if(latStr===null) return;
       const lngStr = prompt("Longitud (decimal, -180 a 180). Puedes usar coma o punto:"); if(lngStr===null) return;
@@ -375,7 +344,7 @@
     }
     function cancelCoordsName(){ pendingLat=null; pendingLng=null; document.getElementById('coordsNameInput').value=''; document.getElementById('coordsNamePanel').classList.add('hidden'); }
 
-    // ===== Herramientas de geocerca (dibujo) =====
+    // Geocercas (dibujo)
     function addFenceVertex(latlng){
       drawingCoords.push({lat: latlng.lat, lng: latlng.lng});
       const m = L.circleMarker(latlng, {radius:4, weight:2}).addTo(map);
@@ -443,20 +412,18 @@
       pendingFenceCoords=null;
       document.getElementById('fenceNamePanel').classList.add('hidden');
       cancelFenceDraw();
-      removePreviewFence(); // por si venía de coords
+      removePreviewFence(); // limpiar preview si venía de coords
     }
     function cancelFenceName(){
       document.getElementById('fenceNameInput').value='';
       document.getElementById('fenceNamePanel').classList.add('hidden');
-      // si venía de coords, limpiamos preview
       removePreviewFence();
     }
 
-    // ===== NUEVO: Geocerca por lista de coordenadas =====
-    let previewFenceLayer = null;
+    // Geocerca por lista de coordenadas
     function parseLatLngList(texto){
       const items = String(texto || '')
-        .split(/[\n;]+/)        // separa por ; o saltos de línea
+        .split(/[\n;]+/)
         .map(s => s.trim())
         .filter(Boolean);
 
@@ -516,7 +483,7 @@
       }
     }
 
-    // ===== UI varias =====
+    // Eliminar finca
     async function deleteSelectedFarm(){
       const sel=document.getElementById('farmSelect'); const id=sel&&sel.value;
       if(!id){ alert('No hay finca seleccionada.'); return; }
@@ -536,7 +503,7 @@
       if(!btn) return; btn.disabled = !(sel && sel.value);
     }
 
-    // Control Leaflet para coordenadas del mouse
+    // Control coordenadas del mouse
     function addMousePositionControl(){
       const MousePos=L.Control.extend({
         options:{position:'bottomleft'},
@@ -548,50 +515,57 @@
       map.on('mouseout', ()=>ctrl.update(null,null));
     }
 
-    // LOGIN ADMIN
+    // LOGIN ADMIN (robusto)
     const ADMIN_CODE = "admin123";
     function normalizeAdminInput(str){
-  // Soporta browsers sin String.prototype.normalize
-  const s = (str ?? "").toString().trim();
-  const safe = (typeof s.normalize === "function") ? s.normalize("NFKC") : s;
-  return safe.replace(/["'“”\s]/g, "").toLowerCase();
-}
-
+      const s = (str ?? "").toString().trim();
+      const safe = (typeof s.normalize === "function") ? s.normalize("NFKC") : s;
+      return safe.replace(/["'“”\s]/g, "").toLowerCase();
+    }
+    function doAdminLogin(){
+      try{
+        const raw = document.getElementById('adminCodeInput')?.value ?? "";
+        if(normalizeAdminInput(raw)===normalizeAdminInput(ADMIN_CODE)){
+          document.getElementById('adminModal')?.classList.add("hidden");
+          document.getElementById('appContent')?.classList.remove("hidden");
+          setTimeout(() => { initMap(); setTimeout(()=>map.invalidateSize(),100); }, 100);
+        }else{
+          const em = document.getElementById('errorMessage');
+          if(em) em.style.display="block";
+        }
+      }catch(e){
+        console.error(e);
+      }
+    }
 
     // Listeners
-    document.getElementById('adminLoginBtn').addEventListener("click",doAdminLogin);
-    document.getElementById('adminCodeInput').addEventListener("keypress",e=>{if(e.key==="Enter")doAdminLogin();});
     document.addEventListener("DOMContentLoaded",()=>{
-      document.getElementById('adminModal').classList.remove("hidden");
+      // mostrar modal (por si tenía "hidden" desde una versión anterior)
+      document.getElementById('adminModal')?.classList.remove("hidden");
+
+      document.getElementById('adminLoginBtn')?.addEventListener("click", doAdminLogin);
+      document.getElementById('adminCodeInput')?.addEventListener("keypress", e=>{ if(e.key==="Enter") doAdminLogin(); });
+      document.getElementById('adminCodeInput')?.addEventListener("keydown",  e=>{ if(e.key==="Enter") doAdminLogin(); });
 
       const sel=document.getElementById('farmSelect');
-      if (sel) sel.addEventListener('change', updateDeleteButtonState);
+      sel?.addEventListener('change', updateDeleteButtonState);
 
-      const btnCreate=document.getElementById('createFarmBtn');
-      if (btnCreate) btnCreate.addEventListener('click', createFarmAtCenter);
-
-      const btnDelete=document.getElementById('deleteFarmBtn');
-      if (btnDelete) btnDelete.addEventListener('click', deleteSelectedFarm);
-
-      const btnCoords=document.getElementById('createByCoordsBtn');
-      if (btnCoords) btnCoords.addEventListener('click', createFarmByCoords);
-      document.getElementById('adminCodeInput')
-  ?.addEventListener("keydown", e => { if (e.key === "Enter") doAdminLogin(); });
-
+      document.getElementById('createFarmBtn')?.addEventListener('click', createFarmAtCenter);
+      document.getElementById('deleteFarmBtn')?.addEventListener('click', deleteSelectedFarm);
+      document.getElementById('createByCoordsBtn')?.addEventListener('click', createFarmByCoords);
 
       // Geocercas (dibujo)
-      document.getElementById('startFenceBtn').addEventListener('click', startFenceDraw);
-      document.getElementById('finishFenceBtn').addEventListener('click', finishFenceDraw);
-      document.getElementById('cancelFenceBtn').addEventListener('click', cancelFenceDraw);
-      document.getElementById('fenceNameSaveBtn').addEventListener('click', saveFenceName);
-      document.getElementById('fenceNameCancelBtn').addEventListener('click', cancelFenceName);
-      document.getElementById('fenceNameInput').addEventListener('keypress', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveFenceName(); } });
+      document.getElementById('startFenceBtn')?.addEventListener('click', startFenceDraw);
+      document.getElementById('finishFenceBtn')?.addEventListener('click', finishFenceDraw);
+      document.getElementById('cancelFenceBtn')?.addEventListener('click', cancelFenceDraw);
+      document.getElementById('fenceNameSaveBtn')?.addEventListener('click', saveFenceName);
+      document.getElementById('fenceNameCancelBtn')?.addEventListener('click', cancelFenceName);
+      document.getElementById('fenceNameInput')?.addEventListener('keypress', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveFenceName(); } });
 
-      // NUEVO: Geocerca por coordenadas
-      document.getElementById('createFenceByCoordsBtn').addEventListener('click', createFenceByCoords);
-      // limpiar previsualización si se guarda/cancela el nombre
-      document.getElementById('fenceNameSaveBtn').addEventListener('click', removePreviewFence);
-      document.getElementById('fenceNameCancelBtn').addEventListener('click', removePreviewFence);
+      // Geocerca por coordenadas
+      document.getElementById('createFenceByCoordsBtn')?.addEventListener('click', createFenceByCoords);
+      document.getElementById('fenceNameSaveBtn')?.addEventListener('click', removePreviewFence);
+      document.getElementById('fenceNameCancelBtn')?.addEventListener('click', removePreviewFence);
 
       updateDeleteButtonState();
     });
