@@ -189,7 +189,7 @@
       db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
     }
 
-    /* Auth anónima */
+    /* Auth anónima + bandera de listo */
     let authReady = false;
     firebase.auth().signInAnonymously().catch(console.error);
     firebase.auth().onAuthStateChanged(()=>{ authReady = true; });
@@ -285,16 +285,19 @@
         }
       });
 
-      // Estrategia de carga
-      if (isMobile && isFileOrigin) {
-        // Solo REST en móvil file:// — pero autenticado.
-        waitAuthThen(()=>{ restRefreshAll(); startRestPolling(12000); });
-      } else {
-        startSubscriptions();
-        initialFetchAll();
-        setTimeout(initialFetchAll, 1200);
-        // Si a los 3s sigue vacío, usa REST autenticado (también para móviles con https)
-        setTimeout(tryRESTFallbackIfEmpty, 3000);
+      // ==== ESTRATEGIA DE CARGA ====
+      startSubscriptions();           // mantiene escritorio y https tal como estaba
+
+      initialFetchAll();
+      setTimeout(initialFetchAll, 1200);
+      setTimeout(tryRESTFallbackIfEmpty, 3000);
+
+      // 🚀 NUEVO: en **cualquier móvil** (file:// o https) activamos REST autenticado SIEMPRE
+      if (isMobile) {
+        waitAuthThen(()=>{
+          restRefreshAll();          // carga inmediata
+          startRestPolling(12000);   // refresco periódico
+        });
       }
     }
 
@@ -382,7 +385,6 @@
     }
 
     async function restList(collection){
-      // Usa Authorization si hay token; mantiene apiKey por compatibilidad.
       const headers = { 'Content-Type': 'application/json', ...(await authHeaders()) };
       const url = `${REST_BASE}/${collection}?key=${firebaseConfig.apiKey}`;
       const res = await fetch(url, { headers });
@@ -394,7 +396,6 @@
         return { id, fields: f };
       });
     }
-
     const readString = field => field?.stringValue ?? '';
     function readNumber(field){
       if (field?.doubleValue != null) return Number(field.doubleValue);
@@ -415,7 +416,7 @@
         const docs = await restList('farms');
         const farms = docs.map(d=>{
           return { id:d.id, name: readString(d.fields.name), fincaLocation: readLatLng(d.fields.fincaLocation) };
-        });
+        }).filter(x => x.fincaLocation);
         if (farms.length){
           saveCache(farms);
           renderFarmsFromCache();
@@ -429,7 +430,7 @@
           const arr = d.fields.path?.arrayValue?.values || [];
           const path = arr.map(v => readLatLng(v.mapValue?.fields)).filter(Boolean);
           return { id:d.id, name: readString(d.fields.name), path };
-        });
+        }).filter(x => x.path && x.path.length >= 3);
         if (fences.length){
           saveFenceCache(fences);
           renderGeofencesFromCache();
@@ -445,7 +446,7 @@
       }
     }
 
-    // Polling REST (solo cuando se decida usar REST)
+    // Polling REST
     let restPollTimer = null;
     function restRefreshAll(){ fetchFarmsViaREST(); fetchGeofencesViaREST(); }
     function startRestPolling(ms){
