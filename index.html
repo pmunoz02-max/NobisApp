@@ -169,15 +169,19 @@
 
     firebase.initializeApp(firebaseConfig);
 
-    // === SOLO PARA MÓVIL: preferir long-polling si WebSocket falla ===
     const db = firebase.firestore();
-    db.settings({
-      experimentalAutoDetectLongPolling: true, // auto-cambia a long-polling si WS no funciona
-      experimentalForceLongPolling: true,      // fuerza long-polling en entornos file:// / WebView
-      useFetchStreams: false                   // compat Safari móviles
-    });
+    // ⬇️ Evitar que un ajuste no soportado rompa el script (arreglo desktop)
+    try {
+      db.settings({
+        // En móviles/ambientes con proxies, cambia a long-polling automáticamente
+        experimentalAutoDetectLongPolling: true
+        // (No forzamos long-polling para no afectar desktop)
+      });
+    } catch (e) {
+      console.warn('Firestore settings no soportados en este entorno:', e);
+    }
 
-    // Persistencia local (si falla, seguimos)
+    // Persistencia local (si falla, seguimos normal)
     db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
 
     // Auth anónima
@@ -287,7 +291,7 @@
       subscribeFarms();
       subscribeGeofences();
 
-      // Fallback adicional por si el snapshot tarda
+      // Fallback por si el snapshot tarda
       setTimeout(()=>{ initialFetchAll(); }, 800);
     }
 
@@ -382,12 +386,9 @@
       }catch(e){ console.warn('Fallback get geofences failed', e); }
     }
 
-    // === CLAVE EN MÓVILES: correr fallback tras autenticación lista ===
+    // Correr fallback tras autenticación lista (móvil/desktops lentos)
     firebase.auth().onAuthStateChanged((user)=>{
-      if(user){
-        // Una vez logueado anónimo en móvil, forzamos una carga inicial
-        initialFetchAll();
-      }
+      if(user){ initialFetchAll(); }
     });
 
     // Selección de geocerca
