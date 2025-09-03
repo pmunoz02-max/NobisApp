@@ -40,45 +40,45 @@
     </div>
   </div>
 
-  <!-- === LOGIN ROBUSTO (única versión activa) === -->
+  <!-- LOGIN ROBUSTO -->
   <script>
-  const ADMIN_CODE = "admin123";
-  function normalizeCode(s){
-    return String(s||"").normalize("NFKC").replace(/[\u200B-\u200D\uFEFF]/g,"").trim().toLowerCase();
-  }
-  function allowBypass(){
-    try{
-      const qs=new URLSearchParams(location.search);
-      if(qs.get("skipAdmin")==="1") return true;
-      if(localStorage.getItem("admin_debug")==="1") return true;
-    }catch{}
-    return false;
-  }
-  function showApp(){
-    document.getElementById('adminModal')?.classList.add("hidden");
-    document.getElementById('appContent')?.classList.remove("hidden");
-    setTimeout(()=>{ initMap(); setTimeout(()=>{ if(window.map){ map.invalidateSize(); } }, 80); }, 50);
-  }
-  function doAdminLogin(ev){
-    if(ev&&ev.preventDefault) ev.preventDefault();
-    try{
-      const raw=document.getElementById('adminCodeInput')?.value||"";
-      const ok=allowBypass()||normalizeCode(raw)===normalizeCode(ADMIN_CODE);
-      if(ok) showApp();
-      else{ const err=document.getElementById('errorMessage'); if(err){ err.textContent='Código incorrecto. Intenta con "admin123"'; err.style.display="block"; } }
-    }catch(e){ console.error(e); }
-  }
-  document.addEventListener("DOMContentLoaded",()=>{
-    document.getElementById('adminModal')?.classList.remove("hidden");
-    document.getElementById('adminLoginBtn')?.addEventListener("click", doAdminLogin);
-    const adminInput=document.getElementById('adminCodeInput');
-    adminInput?.addEventListener("keydown",e=>{ if(e.key==="Enter") doAdminLogin(e); });
-    adminInput?.addEventListener("input", ()=>{ const err=document.getElementById('errorMessage'); if(err) err.style.display="none"; });
-    if(allowBypass()) showApp();
-  });
+    const ADMIN_CODE = "admin123";
+    function normalizeCode(s){
+      return String(s||"").normalize("NFKC").replace(/[\u200B-\u200D\uFEFF]/g,"").trim().toLowerCase();
+    }
+    function allowBypass(){
+      try{
+        const qs=new URLSearchParams(location.search);
+        if(qs.get("skipAdmin")==="1") return true;
+        if(localStorage.getItem("admin_debug")==="1") return true;
+      }catch{}
+      return false;
+    }
+    function showApp(){
+      document.getElementById('adminModal')?.classList.add("hidden");
+      document.getElementById('appContent')?.classList.remove("hidden");
+      setTimeout(()=>{ initMap(); setTimeout(()=>{ if(window.map){ map.invalidateSize(); } }, 80); }, 50);
+    }
+    function doAdminLogin(ev){
+      if(ev&&ev.preventDefault) ev.preventDefault();
+      try{
+        const raw=document.getElementById('adminCodeInput')?.value||"";
+        const ok=allowBypass()||normalizeCode(raw)===normalizeCode(ADMIN_CODE);
+        if(ok) showApp();
+        else{ const err=document.getElementById('errorMessage'); if(err){ err.textContent='Código incorrecto. Intenta con "admin123"'; err.style.display="block"; } }
+      }catch(e){ console.error(e); }
+    }
+    document.addEventListener("DOMContentLoaded",()=>{
+      document.getElementById('adminModal')?.classList.remove("hidden");
+      document.getElementById('adminLoginBtn')?.addEventListener("click", doAdminLogin);
+      const adminInput=document.getElementById('adminCodeInput');
+      adminInput?.addEventListener("keydown",e=>{ if(e.key==="Enter") doAdminLogin(e); });
+      adminInput?.addEventListener("input", ()=>{ const err=document.getElementById('errorMessage'); if(err) err.style.display="none"; });
+      if(allowBypass()) showApp();
+    });
   </script>
 
-  <!-- Contenido de la app -->
+  <!-- Contenido -->
   <div id="appContent" class="max-w-7xl mx-auto flex flex-col space-y-6 hidden">
     <header class="text-center my-4">
       <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
@@ -93,70 +93,29 @@
       </div>
     </div>
 
-    <!-- Mapa -->
+    <!-- Mapa + barra -->
     <div class="bg-white p-6 rounded-2xl shadow-lg">
       <div class="flex flex-wrap gap-2 items-center mb-2">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
         <div class="ml-auto flex flex-wrap gap-2">
 
-          <!-- Geocerca (dibujo) -->
-          <button id="startFenceBtn"
-            class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">
-            Nueva geocerca
-          </button>
-          <button id="finishFenceBtn"
-            class="hidden inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg">
-            Finalizar geocerca
-          </button>
-          <button id="cancelFenceBtn"
-            class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">
-            Cancelar
-          </button>
+          <button id="startFenceBtn"  class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">Nueva geocerca</button>
+          <button id="finishFenceBtn" class="hidden inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg">Finalizar geocerca</button>
+          <button id="cancelFenceBtn" class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
 
-          <!-- Geocerca por coordenadas -->
-          <button id="createFenceByCoordsBtn"
-            class="inline-flex items-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg">
-            Geocerca (Lat/Lngs)
-          </button>
+          <button id="createFenceByCoordsBtn" class="inline-flex items-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg">Geocerca (Lat/Lngs)</button>
 
-          <!-- Fincas -->
-          <button id="createFarmBtn"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">
-            Crear finca
-          </button>
-          <button id="createByCoordsBtn"
-            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
-            Crear finca (Lat/Lng)
-          </button>
-          <button id="deleteFarmBtn"
-            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
-            Eliminar finca
-          </button>
+          <button id="createFarmBtn" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">Crear finca</button>
+          <button id="createByCoordsBtn" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Crear finca (Lat/Lng)</button>
+          <button id="deleteFarmBtn" class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">Eliminar finca</button>
 
-          <!-- Eliminar geocerca -->
-          <button id="deleteFenceBtn"
-            class="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-            Eliminar geocerca
-          </button>
+          <button id="deleteFenceBtn" class="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>Eliminar geocerca</button>
 
-          <!-- Edición & GeoJSON -->
-          <button id="editFenceBtn"
-            class="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-            Editar geocerca
-          </button>
-          <button id="saveFenceEditBtn"
-            class="hidden inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg">
-            Guardar cambios
-          </button>
-          <button id="cancelFenceEditBtn"
-            class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">
-            Cancelar edición
-          </button>
+          <button id="editFenceBtn" class="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>Editar geocerca</button>
+          <button id="saveFenceEditBtn" class="hidden inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar cambios</button>
+          <button id="cancelFenceEditBtn" class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar edición</button>
 
-          <button id="exportGeoJSONBtn"
-            class="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg">
-            Exportar GeoJSON
-          </button>
+          <button id="exportGeoJSONBtn" class="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg">Exportar GeoJSON</button>
           <label class="inline-flex items-center gap-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold px-4 py-2 rounded-lg cursor-pointer">
             Importar GeoJSON
             <input id="importGeoJSONInput" type="file" accept=".geojson,application/geo+json,application/json" class="hidden">
@@ -167,7 +126,7 @@
       <!-- Panel nombre para Crear finca (Lat/Lng) -->
       <div id="coordsNamePanel" class="hidden mb-3">
         <div class="rounded-xl border border-gray-200 p-3">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la nueva finca</label>
+          <label for="coordsNameInput" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la nueva finca</label>
           <div class="flex gap-2">
             <input id="coordsNameInput" type="text" class="border rounded-md p-2 w-full" placeholder="Ej.: Finca Palora Norte" />
             <button id="coordsNameSaveBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
@@ -180,7 +139,7 @@
       <!-- Panel nombre para geocerca -->
       <div id="fenceNamePanel" class="hidden mb-3">
         <div class="rounded-xl border border-gray-200 p-3">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la geocerca</label>
+          <label for="fenceNameInput" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la geocerca</label>
           <div class="flex gap-2">
             <input id="fenceNameInput" type="text" class="border rounded-md p-2 w-full" placeholder="Ej.: Geocerca Lote 1" />
             <button id="fenceNameSaveBtn" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
@@ -192,7 +151,7 @@
 
       <div id="map"></div>
 
-      <!-- ===== Explorador de elementos (doble clic para hacer zoom) ===== -->
+      <!-- Explorador -->
       <div id="indexPanel" class="mt-4">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-gray-800">Explorador de elementos</h3>
@@ -209,12 +168,10 @@
           </div>
         </div>
       </div>
-      <!-- ===== FIN ===== -->
 
       <p id="statusMessage" class="mt-3 text-sm text-gray-600">
-        Haz clic en el mapa para crear una nueva finca. También puedes usar <strong>Crear finca</strong> (centro del mapa) o <strong>Crear finca (Lat/Lng)</strong>.
-        Para geocercas: <strong>Nueva geocerca</strong> → clics en el mapa para vértices → <strong>Finalizar geocerca</strong> → asigna nombre y guarda.
-        Para borrar, primero haz <strong>click en la geocerca</strong> (se resalta) y luego pulsa <strong>Eliminar geocerca</strong>.
+        Haz clic en el mapa para crear una nueva finca. También puedes usar <strong>Crear finca</strong> o <strong>Crear finca (Lat/Lng)</strong>.
+        Para geocercas: <strong>Nueva geocerca</strong> → clics en el mapa → <strong>Finalizar geocerca</strong> → asigna nombre y guarda.
       </p>
     </div>
   </div>
@@ -263,11 +220,9 @@
 
     let currentFarms=[], currentFences=[];
 
-    /* ===== Edición (Leaflet.Draw toolbar) ===== */
+    /* ===== Edición ===== */
     let isEditingFence=false;
     let editBackupCoords=null;  // [{lat,lng},...]
-    let editGroup=null;         // L.FeatureGroup con la capa seleccionada
-    let editToolbar=null;       // L.EditToolbar.Edit instancia
 
     /* =================== Caché =================== */
     const saveCache = farms => { try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} };
@@ -331,10 +286,6 @@
       center = center || {lat:-0.1807, lng:-78.4678};
       map = L.map('map',{center:[center.lat,center.lng],zoom:6});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-
-      // Grupo para edición
-      editGroup = new L.FeatureGroup();
-      map.addLayer(editGroup);
 
       addMousePositionControl();
       renderFarmsFromCache();
@@ -643,7 +594,7 @@
       }
     }
 
-    /* =================== EDICIÓN DE GEOCERCAS (Leaflet.Draw) =================== */
+    /* =================== EDICIÓN DE GEOCERCAS (edición directa de capa) =================== */
     function updateEditButtonsState(){
       const canEdit=!!selectedFenceId && !!geofenceLayers[selectedFenceId] && !isEditingFence;
       const eBtn=document.getElementById('editFenceBtn'); if(eBtn) eBtn.disabled=!canEdit;
@@ -651,82 +602,90 @@
       document.getElementById('saveFenceEditBtn')?.classList.toggle('hidden', !editing);
       document.getElementById('cancelFenceEditBtn')?.classList.toggle('hidden', !editing);
     }
-    function ensureEditToolbar(){
-      if (!editToolbar) {
-        editToolbar = new L.EditToolbar.Edit(map, { featureGroup: editGroup, selectedPathOptions:{ maintainColor:true } });
-      }
-    }
+
     function startFenceEdit(){
-      if(!selectedFenceId || !geofenceLayers[selectedFenceId]){ alert('Primero selecciona una geocerca.'); return; }
+      if(!selectedFenceId || !geofenceLayers[selectedFenceId]){
+        alert('Primero selecciona una geocerca haciendo click sobre ella.');
+        return;
+      }
       if(isEditingFence) return;
-      if(!(window.L && L.Edit && L.Edit.Poly)){ alert('Leaflet.Draw no cargó.'); return; }
 
-      const poly=geofenceLayers[selectedFenceId];
-      // Respaldo (primer anillo)
-      const rings=poly.getLatLngs();
-      const ring0=Array.isArray(rings[0])?rings[0]:rings;
-      editBackupCoords=ring0.map(ll=>({lat:ll.lat,lng:ll.lng}));
+      const poly = geofenceLayers[selectedFenceId];
 
-      if(!editGroup.hasLayer(poly)) editGroup.addLayer(poly);
-      ensureEditToolbar();
-      editToolbar.enable();
-      isEditingFence=true;
+      // Respaldo (primer anillo) para cancelar
+      const rings = poly.getLatLngs();
+      const ring0  = Array.isArray(rings[0]) ? rings[0] : rings;
+      editBackupCoords = ring0.map(ll => ({ lat: ll.lat, lng: ll.lng }));
+
+      if (!(poly.editing && typeof poly.editing.enable === 'function')) {
+        alert('Leaflet.Draw no se cargó correctamente.');
+        return;
+      }
+      try { poly.editing.enable(); } catch(e){ console.warn(e); }
+
+      isEditingFence = true;
       updateEditButtonsState();
     }
 
-    // >>>> FIX 1: Guardar cambios (sin re-render global, actualiza caché y Firestore)
     async function saveFenceEdit(){
-      if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]){ alert('No estás en modo edición.'); return; }
-      const poly=geofenceLayers[selectedFenceId];
+      if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]){
+        alert('No estás en modo edición.');
+        return;
+      }
+      const poly = geofenceLayers[selectedFenceId];
 
-      const rings=poly.getLatLngs();
-      const ring0=Array.isArray(rings[0])?rings[0]:rings;
-      const newPath=ring0.map(ll=>({lat:ll.lat, lng:ll.lng}));
-      if(newPath.length<3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
+      const rings = poly.getLatLngs();
+      const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
+      const newPath = ring0.map(ll => ({ lat: ll.lat, lng: ll.lng }));
+      if (newPath.length < 3){
+        alert('La geocerca necesita al menos 3 puntos.');
+        return;
+      }
 
-      // Actualiza caché local inmediatamente
-      const fencesCache=loadFenceCache()||[];
-      const idx=fencesCache.findIndex(g=> g.id===selectedFenceId);
-      if(idx>=0){ fencesCache[idx].path=newPath; saveFenceCache(fencesCache); }
+      const fencesCache = loadFenceCache() || [];
+      const idx = fencesCache.findIndex(g => g.id === selectedFenceId);
+      if (idx >= 0){
+        fencesCache[idx].path = newPath;
+        saveFenceCache(fencesCache);
+      }
 
-      // Firestore si aplica
-      let firestoreOK=false;
+      let firestoreOK = false;
       try{
-        if(!String(selectedFenceId).startsWith('localgf-')){
-          await db.collection('geofences').doc(selectedFenceId).update({ path:newPath });
+        if (!String(selectedFenceId).startsWith('localgf-')){
+          await db.collection('geofences').doc(selectedFenceId).update({ path: newPath });
         }
-        firestoreOK=true;
-      }catch(err){ console.warn('Firestore update falló, se mantiene caché local:', err); }
+        firestoreOK = true;
+      }catch(err){
+        console.warn('No se pudo guardar edición en Firestore, se mantiene caché local:', err);
+      }
 
-      // Salir de edición sin quitar la capa
-      try{ editToolbar && editToolbar.disable(); }catch{}
-      try{ editGroup && editGroup.hasLayer(poly) && editGroup.removeLayer(poly); }catch{}
-      isEditingFence=false; editBackupCoords=null;
+      try { poly.editing.disable(); } catch(e){}
+
+      isEditingFence = false;
+      editBackupCoords = null;
       updateEditButtonsState();
 
-      // Forzar redibujado y mantener resaltado
-      try{ poly.setStyle(GEOFENCE_SELECTED_STYLE); poly.redraw && poly.redraw(); }catch{}
-
-      alert(firestoreOK? 'Cambios guardados.' : 'Cambios guardados localmente (sin conexión).');
+      try { poly.setStyle(GEOFENCE_SELECTED_STYLE); poly.redraw && poly.redraw(); } catch(e){}
+      alert(firestoreOK ? 'Cambios guardados.' : 'Cambios guardados localmente (sin conexión).');
     }
 
-    // >>>> FIX 2: Cancelar edición (restaura sin desaparecer)
     function cancelFenceEdit(){
       if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]) return;
-      const poly=geofenceLayers[selectedFenceId];
 
-      if(editBackupCoords && editBackupCoords.length>=3){
+      const poly = geofenceLayers[selectedFenceId];
+      if (editBackupCoords && editBackupCoords.length >= 3){
         try{
-          poly.setLatLngs(editBackupCoords.map(p=> L.latLng(p.lat,p.lng)));
+          poly.setLatLngs(editBackupCoords.map(p => L.latLng(p.lat, p.lng)));
           poly.redraw && poly.redraw();
         }catch(e){ console.warn(e); }
       }
-      try{ editToolbar && editToolbar.disable(); }catch{}
-      try{ editGroup && editGroup.hasLayer(poly) && editGroup.removeLayer(poly); }catch{}
-      isEditingFence=false; editBackupCoords=null;
+
+      try { poly.editing.disable(); } catch(e){}
+      isEditingFence = false;
+      editBackupCoords = null;
       updateEditButtonsState();
 
-      try{ poly.setStyle(GEOFENCE_SELECTED_STYLE); }catch{}
+      try { poly.setStyle(GEOFENCE_SELECTED_STYLE); } catch(e){}
     }
 
     /* =================== GEOJSON =================== */
@@ -988,10 +947,8 @@
         const text=await file.text(); await importGeoJSONFromText(text); e.target.value='';
       });
 
-      // Asegurar que el panel del explorador nunca quede oculto
       document.getElementById('indexPanel')?.classList.remove('hidden');
 
-      // Primera construcción
       buildIndexList();
       updateDeleteButtonState();
       updateDeleteFenceButtonState();
@@ -999,7 +956,7 @@
     });
   </script>
 
-  <!-- HOTFIX: si por alguna razón los botones avanzados no estaban -->
+  <!-- HOTFIX: por si la barra pierde los botones avanzados -->
   <script>
     function ensureAdvancedButtons(){
       const afterBtn=document.getElementById('deleteFenceBtn');
