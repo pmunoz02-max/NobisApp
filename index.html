@@ -59,7 +59,7 @@
             class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Iniciar dibujo de geocerca">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6H4z"/>
             </svg>
             Nueva geocerca
           </button>
@@ -168,8 +168,19 @@
     };
 
     firebase.initializeApp(firebaseConfig);
+
+    // === SOLO PARA MÓVIL: preferir long-polling si WebSocket falla ===
     const db = firebase.firestore();
+    db.settings({
+      experimentalAutoDetectLongPolling: true, // auto-cambia a long-polling si WS no funciona
+      experimentalForceLongPolling: true,      // fuerza long-polling en entornos file:// / WebView
+      useFetchStreams: false                   // compat Safari móviles
+    });
+
+    // Persistencia local (si falla, seguimos)
     db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
+
+    // Auth anónima
     firebase.auth().signInAnonymously().catch(console.error);
 
     let map;
@@ -182,10 +193,10 @@
 
     // Dibujo interactivo
     let isDrawingFence = false;
-    let drawingCoords = [];        // [{lat,lng}, ...]
-    let drawingPolyline = null;    // L.Polyline temporal
-    let drawingMarkers = [];       // pequeños marcadores de vértices
-    let pendingFenceCoords = null; // coords a guardar cuando se nombra
+    let drawingCoords = [];
+    let drawingPolyline = null;
+    let drawingMarkers = [];
+    let pendingFenceCoords = null;
 
     // Preview geocerca por lista
     let previewFenceLayer = null;
@@ -239,7 +250,7 @@
         const poly = L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
         poly.bindTooltip(g.name || 'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
         geofenceLayers[g.id] = poly;
-        poly.on('click', ()=> selectFence(g.id)); // seleccionar al click
+        poly.on('click', ()=> selectFence(g.id));
         if(selectedFenceId === g.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
       });
 
@@ -276,8 +287,8 @@
       subscribeFarms();
       subscribeGeofences();
 
-      // ===== Fallback para móviles: carga puntual si el snapshot no llega =====
-      setTimeout(()=>{ initialFetchAll(); }, 600);
+      // Fallback adicional por si el snapshot tarda
+      setTimeout(()=>{ initialFetchAll(); }, 800);
     }
 
     function subscribeFarms(){
@@ -324,7 +335,7 @@
             const poly = L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
             poly.bindTooltip(g.name || 'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
             geofenceLayers[doc.id]=poly;
-            poly.on('click', ()=> selectFence(doc.id)); // seleccionar al click
+            poly.on('click', ()=> selectFence(doc.id));
             if(selectedFenceId === doc.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
           }
         });
@@ -370,6 +381,14 @@
         }
       }catch(e){ console.warn('Fallback get geofences failed', e); }
     }
+
+    // === CLAVE EN MÓVILES: correr fallback tras autenticación lista ===
+    firebase.auth().onAuthStateChanged((user)=>{
+      if(user){
+        // Una vez logueado anónimo en móvil, forzamos una carga inicial
+        initialFetchAll();
+      }
+    });
 
     // Selección de geocerca
     function selectFence(id){
@@ -492,7 +511,7 @@
       pendingFenceCoords=null;
       document.getElementById('fenceNamePanel').classList.add('hidden');
       cancelFenceDraw();
-      removePreviewFence(); // limpiar preview si venía de coords
+      removePreviewFence();
     }
     function cancelFenceName(){
       document.getElementById('fenceNameInput').value='';
