@@ -173,17 +173,18 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    /* Transporte compatible con móviles */
+    /* Preferencias de transporte (mejor para móvil) */
     try {
       db.settings({
         experimentalForceLongPolling: true,
-        experimentalAutoDetectLongPolling: true, /* auto-detección activada */
+        experimentalAutoDetectLongPolling: true,
         useFetchStreams: false
       });
-    } catch (e) { console.warn('Firestore settings no soportados en este entorno:', e); }
+    } catch {}
 
-    /* Persistencia solo desktop (evita problemas en Safari/iOS) */
+    /* Persistencia: solo desktop para evitar fallos en Safari iOS */
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isFileOrigin = location.protocol === 'file:';
     if (!isMobile) {
       db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
     }
@@ -191,13 +192,12 @@
     /* Auth anónima */
     firebase.auth().signInAnonymously().catch(console.error);
 
-    /* ========= Estado ========= */
+    /* ===== Estado ===== */
     let map;
     const fincaMarkers = {};
+    const geofenceLayers = {};
     const LS_KEY = 'fincas_cache_v1';
-
-    const geofenceLayers = {}; // id -> L.Polygon
-    const LS_GF = 'geofences_cache_v1';
+    const LS_GF  = 'geofences_cache_v1';
 
     let isDrawingFence = false;
     let drawingCoords = [];
@@ -208,21 +208,16 @@
     let previewFenceLayer = null;
     let selectedFenceId = null;
 
-    let subsStarted = false;
-    let unsubFarms = null;
-    let unsubGeofences = null;
-
     const GEOFENCE_STYLE = {weight:2, fillOpacity:0.15};
     const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
 
-    /* ========= Helpers caché ========= */
+    /* ===== Caché ===== */
     function saveCache(farms){ try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} }
     function loadCache(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } }
-
     function saveFenceCache(fences){ try{ localStorage.setItem(LS_GF, JSON.stringify(fences)); }catch{} }
     function loadFenceCache(){ try{ return JSON.parse(localStorage.getItem(LS_GF)||'[]'); }catch{ return []; } }
 
-    /* ========= Render ========= */
+    /* ===== Render ===== */
     function renderFarmsFromCache(){
       const farms = loadCache();
       Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
@@ -262,17 +257,14 @@
         if(selectedFenceId === g.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
       });
 
-      if(selectedFenceId && !geofenceLayers[selectedFenceId]){
-        selectedFenceId = null;
-      }
+      if(selectedFenceId && !geofenceLayers[selectedFenceId]){ selectedFenceId = null; }
       updateDeleteFenceButtonState();
     }
 
-    /* ========= Mapa ========= */
-    function initMap(center){ 
+    /* ===== Mapa ===== */
+    function initMap(center){
       center = center || {lat:-0.1807, lng:-78.4678};
-      const zoom = 6;
-      map = L.map('map',{center:[center.lat,center.lng],zoom});
+      map = L.map('map',{center:[center.lat,center.lng],zoom:6});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
       addMousePositionControl();
@@ -280,12 +272,8 @@
       renderGeofencesFromCache();
 
       map.on('click', async e=>{
-        if(isDrawingFence){
-          addFenceVertex(e.latlng);
-          return;
-        }
-        const name = prompt("Nombre de la nueva finca:");
-        if(!name) return;
+        if(isDrawingFence){ addFenceVertex(e.latlng); return; }
+        const name = prompt("Nombre de la nueva finca:"); if(!name) return;
         try{
           await db.collection('farms').add({ name, fincaLocation:{lat:e.latlng.lat, lng:e.latlng.lng} });
         }catch{
@@ -295,30 +283,24 @@
         }
       });
 
-      startSubscriptions();
-      initialFetchAll();
-      setTimeout(initialFetchAll, 1200);
-      setTimeout(tryRESTFallbackIfEmpty, 3000);
+      // === Estrategia de carga según entorno ===
+      if (isMobile && isFileOrigin) {
+        // En móvil + file:// -> usar REST con polling
+        restRefreshAll();                 // carga inmediata
+        startRestPolling(15000);          // refresco periódico
+      } else {
+        // Web normal -> suscripciones + cargas iniciales y fallback REST
+        startSubscriptions();
+        initialFetchAll();
+        setTimeout(initialFetchAll, 1200);
+        setTimeout(tryRESTFallbackIfEmpty, 3000);
+      }
     }
 
+    /* ===== Suscripciones (solo http/https) ===== */
+    let unsubFarms = null, unsubGeofences = null, subsStarted=false;
     function startSubscriptions(){
-      if (subsStarted) return;
-      subsStarted = true;
-      subscribeFarms();
-      subscribeGeofences();
-    }
-
-    /* ======= NUEVO: reintentar tras auth ======= */
-    function restartSubscriptions(){
-      try { if (unsubFarms) { unsubFarms(); unsubFarms = null; } } catch {}
-      try { if (unsubGeofences) { unsubGeofences(); unsubGeofences = null; } } catch {}
-      subscribeFarms();
-      subscribeGeofences();
-      initialFetchAll();            // refresco inmediato
-    }
-
-    /* ========= Suscripciones Firestore ========= */
-    function subscribeFarms(){
+      if (subsStarted) return; subsStarted=true;
       unsubFarms = db.collection('farms').onSnapshot(snap=>{
         const farms = [];
         Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
@@ -326,31 +308,23 @@
 
         snap.forEach(doc=>{
           const d = doc.data();
-          const farm = { id: doc.id, name: d.name, fincaLocation: d.fincaLocation };
-          farms.push(farm);
+          farms.push({ id: doc.id, name: d.name, fincaLocation: d.fincaLocation });
           if(d.fincaLocation){
             const marker = L.marker([d.fincaLocation.lat, d.fincaLocation.lng]).addTo(map);
             marker.bindTooltip(d.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
             fincaMarkers[doc.id]=marker;
           }
         });
+        if (farms.length) saveCache(farms);
 
-        if (farms.length) { saveCache(farms); }
         const sel = document.getElementById('farmSelect');
         if (sel){
           sel.innerHTML = '';
-          farms.forEach(f=>{
-            const opt = document.createElement('option'); opt.value = f.id; opt.textContent = f.name || 'Finca'; sel.appendChild(opt);
-          });
+          farms.forEach(f=>{ const opt=document.createElement('option'); opt.value=f.id; opt.textContent=f.name||'Finca'; sel.appendChild(opt); });
         }
         updateDeleteButtonState();
-      }, err => {
-        console.warn('onSnapshot farms error', err);
-        renderFarmsFromCache();
-      });
-    }
+      }, err => { console.warn('onSnapshot farms error', err); renderFarmsFromCache(); });
 
-    function subscribeGeofences(){
       unsubGeofences = db.collection('geofences').onSnapshot(snap=>{
         const fences = [];
         Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
@@ -369,52 +343,31 @@
             if(selectedFenceId === doc.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
           }
         });
+        if (fences.length) saveFenceCache(fences);
 
-        if (fences.length) { saveFenceCache(fences); }
-        if(selectedFenceId && !geofenceLayers[selectedFenceId]){
-          selectedFenceId = null;
-        }
+        if(selectedFenceId && !geofenceLayers[selectedFenceId]){ selectedFenceId = null; }
         updateDeleteFenceButtonState();
-      }, err => {
-        console.warn('onSnapshot geofences error', err);
-        renderGeofencesFromCache();
-      });
+      }, err => { console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
     }
 
-    /* ========= Carga inicial (SDK) ========= */
-    async function initialFetchAll(){
-      await Promise.all([initialFetchFarms(), initialFetchGeofences()]);
-    }
+    /* ===== Carga inicial (SDK) ===== */
+    async function initialFetchAll(){ await Promise.all([initialFetchFarms(), initialFetchGeofences()]); }
     async function initialFetchFarms(){
       try{
         const snap = await db.collection('farms').get();
-        const farms = [];
-        snap.forEach(doc=>{
-          const d = doc.data();
-          farms.push({ id: doc.id, name: d.name, fincaLocation: d.fincaLocation });
-        });
-        if (farms.length) {
-          saveCache(farms);
-          renderFarmsFromCache();
-        }
-      }catch(e){ console.warn('Fallback get farms failed', e); }
+        const farms=[]; snap.forEach(doc=>{ const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); });
+        if (farms.length){ saveCache(farms); renderFarmsFromCache(); }
+      }catch(e){ console.warn('get farms failed', e); }
     }
     async function initialFetchGeofences(){
       try{
         const snap = await db.collection('geofences').get();
-        const fences = [];
-        snap.forEach(doc=>{
-          const d = doc.data();
-          fences.push({ id: doc.id, name: d.name, path: d.path || [] });
-        });
-        if (fences.length) {
-          saveFenceCache(fences);
-          renderGeofencesFromCache();
-        }
-      }catch(e){ console.warn('Fallback get geofences failed', e); }
+        const fences=[]; snap.forEach(doc=>{ const d=doc.data(); fences.push({id:doc.id,name:d.name,path:d.path||[]}); });
+        if (fences.length){ saveFenceCache(fences); renderGeofencesFromCache(); }
+      }catch(e){ console.warn('get geofences failed', e); }
     }
 
-    /* ========= Fallback REST ========= */
+    /* ===== REST fallback (también usado en móvil file://) ===== */
     const REST_BASE = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
     async function restList(collection){
       const url = `${REST_BASE}/${collection}?key=${firebaseConfig.apiKey}`;
@@ -473,13 +426,21 @@
       }catch(e){ console.warn('REST geofences error:', e); }
     }
     function tryRESTFallbackIfEmpty(){
-      const farmsEmpty = (loadCache().length === 0);
-      const fencesEmpty = (loadFenceCache().length === 0);
-      if (farmsEmpty) fetchFarmsViaREST();
-      if (fencesEmpty) fetchGeofencesViaREST();
+      if (loadCache().length === 0) fetchFarmsViaREST();
+      if (loadFenceCache().length === 0) fetchGeofencesViaREST();
     }
 
-    /* ========= Interacción geocercas ========= */
+    // === Polling REST solo en móvil file:// ===
+    let restPollTimer = null;
+    function restRefreshAll(){ fetchFarmsViaREST(); fetchGeofencesViaREST(); }
+    function startRestPolling(ms){
+      if (restPollTimer) return;
+      restPollTimer = setInterval(restRefreshAll, ms || 15000);
+      // también refresco cuando vuelve a primer plano
+      document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) restRefreshAll(); });
+    }
+
+    /* ===== Geocercas (interacción) ===== */
     function selectFence(id){
       if(selectedFenceId && geofenceLayers[selectedFenceId]){
         geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE);
@@ -491,13 +452,13 @@
       updateDeleteFenceButtonState();
     }
 
-    /* ========= Helpers numéricos ========= */
+    /* ===== Helpers numéricos ===== */
     function normDec(s){ return String(s||'').trim().replace(',', '.'); }
     function parseCoord(s){ const v=parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; }
     function validLat(v){ return v>=-90 && v<=90; }
     function validLng(v){ return v>=-180 && v<=180; }
 
-    /* ========= Crear fincas ========= */
+    /* ===== Crear fincas ===== */
     let pendingLat = null, pendingLng = null;
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
@@ -539,7 +500,7 @@
       const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
     }
 
-    /* ========= Dibujo geocerca ========= */
+    /* ===== Dibujo geocerca ===== */
     function addFenceVertex(latlng){
       drawingCoords.push({lat: latlng.lat, lng: latlng.lng});
       const m = L.circleMarker(latlng, {radius:4, weight:2}).addTo(map);
@@ -617,7 +578,7 @@
       removePreviewFence();
     }
 
-    /* ========= Geocerca por coordenadas ========= */
+    /* ===== Geocerca por coordenadas ===== */
     function parseLatLngList(texto){
       const items = String(texto || '')
         .split(/[\n;]+/)
@@ -680,7 +641,7 @@
       }
     }
 
-    /* ========= Eliminar ========= */
+    /* ===== Eliminar ===== */
     async function deleteSelectedFarm(){
       const sel=document.getElementById('farmSelect'); const id= sel ? sel.value : '';
       if(!id){ alert('No hay finca seleccionada.'); return; }
@@ -746,7 +707,7 @@
       btn.disabled = !selectedFenceId;
     }
 
-    /* ========= Control de coordenadas mouse ========= */
+    /* ===== Control de coordenadas mouse ===== */
     function addMousePositionControl(){
       const MousePos=L.Control.extend({
         options:{position:'bottomleft'},
@@ -758,7 +719,7 @@
       map.on('mouseout', ()=>ctrl.update(null,null));
     }
 
-    /* ========= Acceso ========= */
+    /* ===== Acceso ===== */
     const ADMIN_CODE = "admin123";
     function doAdminLogin(){
       try{
@@ -766,51 +727,40 @@
         const raw = inputEl ? String(inputEl.value || '') : '';
         const normalized = raw.trim().toLowerCase();
         if(normalized === ADMIN_CODE){
-          const modal = document.getElementById('adminModal'); if(modal){ modal.classList.add("hidden"); }
-          const app = document.getElementById('appContent'); if(app){ app.classList.remove("hidden"); }
+          document.getElementById('adminModal')?.classList.add("hidden");
+          document.getElementById('appContent')?.classList.remove("hidden");
           setTimeout(()=>{ initMap(); setTimeout(()=>{ if(map){ map.invalidateSize(); } }, 100); }, 100);
         }else{
-          const em = document.getElementById('errorMessage'); if(em) em.style.display="block";
+          document.getElementById('errorMessage').style.display="block";
         }
       }catch(e){ console.error(e); }
     }
 
-    /* ========= Reintento tras auth: aquí forzamos el resubscribe ========= */
-    firebase.auth().onAuthStateChanged(user=>{
-      if (user) {
-        restartSubscriptions();  // <- NUEVO: reintenta suscripciones con permisos
-      }
-    });
-
-    /* ========= Listeners UI ========= */
+    /* ===== Listeners UI ===== */
     document.addEventListener("DOMContentLoaded",function(){
-      const modal = document.getElementById('adminModal'); if(modal){ modal.classList.remove("hidden"); }
+      document.getElementById('adminModal')?.classList.remove("hidden");
 
-      const loginBtn = document.getElementById('adminLoginBtn'); if(loginBtn){ loginBtn.addEventListener("click", doAdminLogin); }
+      document.getElementById('adminLoginBtn')?.addEventListener("click", doAdminLogin);
       const adminInput = document.getElementById('adminCodeInput');
-      if(adminInput){
-        adminInput.addEventListener("keypress", function(e){ if(e.key==="Enter") doAdminLogin(); });
-        adminInput.addEventListener("keydown", function(e){ if(e.key==="Enter") doAdminLogin(); });
-      }
+      adminInput?.addEventListener("keypress", (e)=>{ if(e.key==="Enter") doAdminLogin(); });
+      adminInput?.addEventListener("keydown",  (e)=>{ if(e.key==="Enter") doAdminLogin(); });
 
-      const sel=document.getElementById('farmSelect'); if(sel){ sel.addEventListener('change', updateDeleteButtonState); }
+      document.getElementById('farmSelect')?.addEventListener('change', updateDeleteButtonState);
 
-      const btnCreate=document.getElementById('createFarmBtn'); if(btnCreate){ btnCreate.addEventListener('click', createFarmAtCenter); }
-      const btnDelete=document.getElementById('deleteFarmBtn'); if(btnDelete){ btnDelete.addEventListener('click', deleteSelectedFarm); }
-      const btnCoords=document.getElementById('createByCoordsBtn'); if(btnCoords){ btnCoords.addEventListener('click', createFarmByCoords); }
+      document.getElementById('createFarmBtn')?.addEventListener('click', createFarmAtCenter);
+      document.getElementById('deleteFarmBtn')?.addEventListener('click', deleteSelectedFarm);
+      document.getElementById('createByCoordsBtn')?.addEventListener('click', createFarmByCoords);
 
-      const b1=document.getElementById('startFenceBtn'); if(b1){ b1.addEventListener('click', startFenceDraw); }
-      const b2=document.getElementById('finishFenceBtn'); if(b2){ b2.addEventListener('click', finishFenceDraw); }
-      const b3=document.getElementById('cancelFenceBtn'); if(b3){ b3.addEventListener('click', cancelFenceDraw); }
-      const fSave=document.getElementById('fenceNameSaveBtn'); if(fSave){ fSave.addEventListener('click', saveFenceName); }
-      const fCancel=document.getElementById('fenceNameCancelBtn'); if(fCancel){ fCancel.addEventListener('click', cancelFenceName); }
-      const fInput=document.getElementById('fenceNameInput'); if(fInput){ fInput.addEventListener('keypress', function(e){ if(e.key==='Enter'){ e.preventDefault(); saveFenceName(); } }); }
+      document.getElementById('startFenceBtn')?.addEventListener('click', startFenceDraw);
+      document.getElementById('finishFenceBtn')?.addEventListener('click', finishFenceDraw);
+      document.getElementById('cancelFenceBtn')?.addEventListener('click', cancelFenceDraw);
+      document.getElementById('fenceNameSaveBtn')?.addEventListener('click', saveFenceName);
+      document.getElementById('fenceNameCancelBtn')?.addEventListener('click', cancelFenceName);
+      document.getElementById('fenceNameInput')?.addEventListener('keypress', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveFenceName(); } });
 
-      const cBtn=document.getElementById('createFenceByCoordsBtn'); if(cBtn){ cBtn.addEventListener('click', createFenceByCoords); }
-      if(fSave){ fSave.addEventListener('click', removePreviewFence); }
-      if(fCancel){ fCancel.addEventListener('click', removePreviewFence); }
-
-      const dFence=document.getElementById('deleteFenceBtn'); if(dFence){ dFence.addEventListener('click', deleteSelectedFence); }
+      document.getElementById('createFenceByCoordsBtn')?.addEventListener('click', createFenceByCoords);
+      document.getElementById('fenceNameSaveBtn')?.addEventListener('click', removePreviewFence);
+      document.getElementById('fenceNameCancelBtn')?.addEventListener('click', removePreviewFence);
 
       updateDeleteButtonState();
       updateDeleteFenceButtonState();
