@@ -50,31 +50,27 @@
       <div class="flex flex-wrap gap-2 items-center mb-2">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
         <div class="ml-auto flex flex-wrap gap-2">
-          <!-- Crear en centro -->
+          <!-- (ya estaban en tu código) herramientas geocerca - bloque 1 -->
+          <button id="startFenceBtn"
+            class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Iniciar dibujo de geocerca">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
+            </svg>
+            Nueva geocerca
+          </button>
+          <button id="finishFenceBtn"
+            class="hidden inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Finalizar geocerca">
+            Finalizar geocerca
+          </button>
+          <button id="cancelFenceBtn"
+            class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg"
+            title="Cancelar dibujo">
+            Cancelar
+          </button>
 
-          <!-- Herramientas de geocerca -->
-<button id="startFenceBtn"
-  class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
-  title="Iniciar dibujo de geocerca">
-  <!-- icono -->
-  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
-  </svg>
-  Nueva geocerca
-</button>
-
-<button id="finishFenceBtn"
-  class="hidden inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg"
-  title="Finalizar geocerca">
-  Finalizar geocerca
-</button>
-
-<button id="cancelFenceBtn"
-  class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg"
-  title="Cancelar dibujo">
-  Cancelar
-</button>
-
+          <!-- Crear finca (centro) -->
           <button id="createFarmBtn"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Crear finca en el centro del mapa">
@@ -96,7 +92,7 @@
             Eliminar finca
           </button>
 
-          <!-- ===== NUEVAS HERRAMIENTAS DE GEOCERCA ===== -->
+          <!-- (ya estaban en tu código) herramientas geocerca - bloque 2 -->
           <button id="startFenceBtn"
             class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Iniciar dibujo de geocerca">
@@ -113,10 +109,21 @@
             title="Cancelar dibujo">
             Cancelar
           </button>
+
+          <!-- NUEVO: Geocerca ingresando lista de Lat/Lngs -->
+          <button id="createFenceByCoordsBtn"
+            class="inline-flex items-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Crear geocerca ingresando una lista de coordenadas">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
+            </svg>
+            Geocerca (Lat/Lngs)
+          </button>
         </div>
       </div>
 
-      <!-- Panel nombre para Crear finca (Lat/Lng) - ya existente -->
+      <!-- Panel nombre para Crear finca (Lat/Lng) -->
       <div id="coordsNamePanel" class="hidden mb-3">
         <div class="rounded-xl border border-gray-200 p-3">
           <label for="coordsNameInput" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la nueva finca</label>
@@ -129,7 +136,7 @@
         </div>
       </div>
 
-      <!-- NUEVO: Panel nombre para geocerca -->
+      <!-- Panel nombre para geocerca -->
       <div id="fenceNamePanel" class="hidden mb-3">
         <div class="rounded-xl border border-gray-200 p-3">
           <label for="fenceNameInput" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la geocerca</label>
@@ -295,7 +302,7 @@
       }, ()=>{ renderFarmsFromCache(); });
     }
 
-    // ====== NUEVO: suscripción geocercas ======
+    // ====== suscripción geocercas ======
     function subscribeGeofences(){
       db.collection('geofences').onSnapshot(snap=>{
         const fences = [];
@@ -319,13 +326,13 @@
       }, ()=>{ renderGeofencesFromCache(); });
     }
 
-    // ===== Helpers números/coords existentes =====
+    // ===== Helpers números/coords =====
     function normDec(s){ return String(s||'').trim().replace(',', '.'); }
     function parseCoord(s){ const v=parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; }
     function validLat(v){ return v>=-90 && v<=90; }
     function validLng(v){ return v>=-180 && v<=180; }
 
-    // ===== Crear en centro (fincas, existente) =====
+    // ===== Crear en centro (fincas) =====
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
       const name = prompt("Nombre de la nueva finca:"); if(!name) return;
@@ -334,8 +341,8 @@
       catch{ const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:c.lat, lng:c.lng} }); saveCache(farms); renderFarmsFromCache(); }
     }
 
-    // ===== Crear por Lat/Lng (fincas, ya implementado con panel) =====
-    let pendingLat = null, pendingLng = null; // ya utilizado para fincas por coords
+    // ===== Crear por Lat/Lng (fincas) =====
+    let pendingLat = null, pendingLng = null;
     async function createFarmByCoords(){
       const latStr = prompt("Latitud (decimal, -90 a 90). Puedes usar coma o punto:"); if(latStr===null) return;
       const lngStr = prompt("Longitud (decimal, -180 a 180). Puedes usar coma o punto:"); if(lngStr===null) return;
@@ -362,13 +369,11 @@
     }
     function cancelCoordsName(){ pendingLat=null; pendingLng=null; document.getElementById('coordsNameInput').value=''; document.getElementById('coordsNamePanel').classList.add('hidden'); }
 
-    // ===== NUEVO: Herramientas de geocerca =====
+    // ===== Herramientas de geocerca (dibujo) =====
     function addFenceVertex(latlng){
       drawingCoords.push({lat: latlng.lat, lng: latlng.lng});
-      // marcador pequeño
       const m = L.circleMarker(latlng, {radius:4, weight:2}).addTo(map);
       drawingMarkers.push(m);
-      // actualizar línea/polígono temporal
       updateFencePreview();
     }
     function updateFencePreview(){
@@ -394,7 +399,6 @@
     function finishFenceDraw(){
       if(!isDrawingFence) return;
       if(drawingCoords.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
-      // pasar coords a pendiente y abrir panel de nombre
       pendingFenceCoords = drawingCoords.slice();
       const hint = document.getElementById('fenceNameHint');
       hint.textContent = `Vértices: ${pendingFenceCoords.length} puntos`;
@@ -411,7 +415,6 @@
       document.getElementById('startFenceBtn').classList.remove('hidden');
       document.getElementById('finishFenceBtn').classList.add('hidden');
       document.getElementById('cancelFenceBtn').classList.add('hidden');
-      // cerrar panel si estaba abierto
       document.getElementById('fenceNamePanel').classList.add('hidden');
       pendingFenceCoords = null;
     }
@@ -420,12 +423,8 @@
       const name = (input.value||'').trim() || 'Geocerca';
       if(!pendingFenceCoords || pendingFenceCoords.length<3){ alert('No hay geocerca lista para guardar.'); return; }
 
-      // guardar en Firestore o local
       try{
-        await db.collection('geofences').add({
-          name,
-          path: pendingFenceCoords
-        });
+        await db.collection('geofences').add({ name, path: pendingFenceCoords });
       }catch(err){
         console.error('No se pudo guardar en Firestore. Guardando localmente:', err);
         const fences = loadFenceCache();
@@ -434,19 +433,84 @@
         renderGeofencesFromCache();
       }
 
-      // limpiar estado de dibujo
       input.value='';
       pendingFenceCoords=null;
       document.getElementById('fenceNamePanel').classList.add('hidden');
-      cancelFenceDraw(); // también oculta botones y limpia preview
+      cancelFenceDraw();
+      removePreviewFence(); // por si venía de coords
     }
     function cancelFenceName(){
       document.getElementById('fenceNameInput').value='';
       document.getElementById('fenceNamePanel').classList.add('hidden');
-      // mantenemos el modo dibujo para que el usuario pueda ajustar o cancelar
+      // si venía de coords, limpiamos preview
+      removePreviewFence();
     }
 
-    // ===== UI varias ya existentes =====
+    // ===== NUEVO: Geocerca por lista de coordenadas =====
+    let previewFenceLayer = null;
+    function parseLatLngList(texto){
+      const items = String(texto || '')
+        .split(/[\n;]+/)        // separa por ; o saltos de línea
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const puntos = [];
+      for(const it of items){
+        const parts = it.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
+        if(parts.length < 2) continue;
+        const lat = parseCoord(parts[0]);
+        const lng = parseCoord(parts[1]);
+        if(Number.isFinite(lat) && Number.isFinite(lng) && validLat(lat) && validLng(lng)){
+          puntos.push({lat, lng});
+        }
+      }
+      return puntos;
+    }
+    function createFenceByCoords(){
+      if (isDrawingFence){
+        alert('Finaliza o cancela el dibujo de geocerca antes de crear por coordenadas.');
+        return;
+      }
+
+      const ejemplo = "-1.2345,-78.5678; -1.2350,-78.5684; -1.2362,-78.5690";
+      const raw = prompt(
+        "Ingresa puntos en formato lat,lng separados por ';' o por saltos de línea.\n" +
+        "Ejemplo:\n" + ejemplo
+      );
+      if(raw === null) return;
+
+      const pts = parseLatLngList(raw);
+      if(pts.length < 3){
+        alert('Se requieren al menos 3 puntos válidos (lat,lng).');
+        return;
+      }
+
+      pendingFenceCoords = pts;
+
+      if(map){
+        if(previewFenceLayer){ map.removeLayer(previewFenceLayer); previewFenceLayer = null; }
+        previewFenceLayer = L.polygon(pts.map(p => [p.lat, p.lng]), { dashArray: '4,4', weight: 2, fillOpacity: 0.1 }).addTo(map);
+        try { map.fitBounds(previewFenceLayer.getBounds(), { padding: [20,20] }); } catch {}
+      }
+
+      const hint = document.getElementById('fenceNameHint');
+      if (hint) hint.textContent = `Vértices: ${pts.length} puntos`;
+
+      const input = document.getElementById('fenceNameInput');
+      if (input) {
+        input.value = `Geocerca ${new Date().toLocaleDateString()}`;
+        document.getElementById('fenceNamePanel')?.classList.remove('hidden');
+        input.focus(); input.select();
+      }
+    }
+    function removePreviewFence(){
+      if(previewFenceLayer){
+        map.removeLayer(previewFenceLayer);
+        previewFenceLayer = null;
+      }
+    }
+
+    // ===== UI varias =====
     async function deleteSelectedFarm(){
       const sel=document.getElementById('farmSelect'); const id=sel&&sel.value;
       if(!id){ alert('No hay finca seleccionada.'); return; }
@@ -510,7 +574,7 @@
       const btnCoords=document.getElementById('createByCoordsBtn');
       if (btnCoords) btnCoords.addEventListener('click', createFarmByCoords);
 
-      // Geocercas: listeners
+      // Geocercas (dibujo)
       document.getElementById('startFenceBtn').addEventListener('click', startFenceDraw);
       document.getElementById('finishFenceBtn').addEventListener('click', finishFenceDraw);
       document.getElementById('cancelFenceBtn').addEventListener('click', cancelFenceDraw);
@@ -518,110 +582,14 @@
       document.getElementById('fenceNameCancelBtn').addEventListener('click', cancelFenceName);
       document.getElementById('fenceNameInput').addEventListener('keypress', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveFenceName(); } });
 
-      // guardar/cancelar nombre de finca por coords (ya existente)
-      document.getElementById('coordsNameSaveBtn').addEventListener('click', saveCoordsName);
-      document.getElementById('coordsNameCancelBtn').addEventListener('click', cancelCoordsName);
-      document.getElementById('coordsNameInput').addEventListener('keypress', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveCoordsName(); } });
+      // NUEVO: Geocerca por coordenadas
+      document.getElementById('createFenceByCoordsBtn').addEventListener('click', createFenceByCoords);
+      // limpiar previsualización si se guarda/cancela el nombre
+      document.getElementById('fenceNameSaveBtn').addEventListener('click', removePreviewFence);
+      document.getElementById('fenceNameCancelBtn').addEventListener('click', removePreviewFence);
 
       updateDeleteButtonState();
     });
-    <!-- NUEVO: Crear geocerca por coordenadas -->
-<button id="createFenceByCoordsBtn"
-  class="inline-flex items-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg"
-  title="Crear geocerca ingresando una lista de coordenadas">
-  <!-- icono -->
-  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-      d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
-  </svg>
-  Geocerca (Lat/Lngs)
-</button>
-// === NUEVO: previsualización temporal para geocerca por coordenadas ===
-let previewFenceLayer = null;
-
-// Reutiliza tus helpers normDec / parseCoord / validLat / validLng ya definidos
-function parseLatLngList(texto){
-  // Acepta: "lat,lng; lat,lng; ..." o líneas separadas
-  const items = String(texto || '')
-    .split(/[\n;]+/)              // separa por ; o salto de línea
-    .map(s => s.trim())
-    .filter(Boolean);
-
-  const puntos = [];
-  for(const it of items){
-    // separa por coma o espacios
-    const parts = it.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
-    if(parts.length < 2) continue;
-    const lat = parseCoord(parts[0]);
-    const lng = parseCoord(parts[1]);
-    if(Number.isFinite(lat) && Number.isFinite(lng) && validLat(lat) && validLng(lng)){
-      puntos.push({lat, lng});
-    }
-  }
-  return puntos;
-}
-
-// === NUEVO: Crear geocerca ingresando lista de coordenadas ===
-function createFenceByCoords(){
-  // si estás en modo dibujo, evita conflictos
-  if (typeof isDrawingFence !== 'undefined' && isDrawingFence){
-    alert('Finaliza o cancela el dibujo de geocerca antes de crear por coordenadas.');
-    return;
-  }
-
-  const ejemplo = "-1.2345,-78.5678; -1.2350,-78.5684; -1.2362,-78.5690";
-  const raw = prompt(
-    "Ingresa puntos en formato lat,lng separados por ';' o por saltos de línea.\n" +
-    "Ejemplo:\n" + ejemplo
-  );
-  if(raw === null) return;
-
-  const pts = parseLatLngList(raw);
-  if(pts.length < 3){
-    alert('Se requieren al menos 3 puntos válidos (lat,lng).');
-    return;
-  }
-
-  // Usa el mismo flujo de nombrado que ya tienes para geocercas
-  if (typeof pendingFenceCoords === 'undefined'){
-    // en tu código ya existe; si no, lo creamos local sin interferir
-    window.pendingFenceCoords = null;
-  }
-  pendingFenceCoords = pts;
-
-  // Previsualización en el mapa (no interfiere con el modo dibujo)
-  if (typeof map !== 'undefined' && map){
-    if(previewFenceLayer){ map.removeLayer(previewFenceLayer); previewFenceLayer = null; }
-    previewFenceLayer = L.polygon(pts.map(p => [p.lat, p.lng]), { dashArray: '4,4', weight: 2, fillOpacity: 0.1 }).addTo(map);
-    try { map.fitBounds(previewFenceLayer.getBounds(), { padding: [20,20] }); } catch {}
-  }
-
-  // Abre tu panel de nombre existente para geocercas
-  const hint = document.getElementById('fenceNameHint');
-  if (hint) hint.textContent = `Vértices: ${pts.length} puntos`;
-
-  const input = document.getElementById('fenceNameInput');
-  if (input) {
-    input.value = `Geocerca ${new Date().toLocaleDateString()}`;
-    document.getElementById('fenceNamePanel')?.classList.remove('hidden');
-    input.focus(); input.select();
-  }
-}
-
-// === NUEVO: limpiar la previsualización al guardar/cancelar nombre ===
-function removePreviewFence(){
-  if(previewFenceLayer){
-    map.removeLayer(previewFenceLayer);
-    previewFenceLayer = null;
-  }
-}
-// Botón nuevo
-document.getElementById('createFenceByCoordsBtn')?.addEventListener('click', createFenceByCoords);
-
-// Quitar preview cuando se guarda/cancela el nombre (sin tocar tus handlers existentes)
-document.getElementById('fenceNameSaveBtn')?.addEventListener('click', removePreviewFence);
-document.getElementById('fenceNameCancelBtn')?.addEventListener('click', removePreviewFence);
-
   </script>
 </body>
 </html>
