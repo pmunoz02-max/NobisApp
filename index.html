@@ -170,9 +170,12 @@
     firebase.initializeApp(firebaseConfig);
 
     const db = firebase.firestore();
+    /* === Cambios para móviles: forzar transporte compatible === */
     try {
       db.settings({
-        experimentalAutoDetectLongPolling: true
+        experimentalForceLongPolling: true,   // fuerza long-polling (iOS/Android)
+        experimentalAutoDetectLongPolling: false,
+        useFetchStreams: false                // evita fetch streams en navegadores móviles
       });
     } catch (e) {
       console.warn('Firestore settings no soportados en este entorno:', e);
@@ -201,32 +204,6 @@
     const GEOFENCE_STYLE = {weight:2, fillOpacity:0.15};
     const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
 
-    /* =========================
-       ACCESO (ARREGLADO)
-       ========================= */
-    const ADMIN_CODE = "admin123";
-    function doAdminLogin(){
-      try{
-        var inputEl = document.getElementById('adminCodeInput');
-        var raw = inputEl ? inputEl.value : "";
-        if(raw && raw.trim() === ADMIN_CODE){
-          var modal = document.getElementById('adminModal');
-          if(modal){ modal.classList.add("hidden"); }
-          var app = document.getElementById('appContent');
-          if(app){ app.classList.remove("hidden"); }
-          setTimeout(function(){ initMap(); setTimeout(function(){ if(map){ map.invalidateSize(); } }, 100); }, 100);
-        }else{
-          var em = document.getElementById('errorMessage');
-          if(em) em.style.display="block";
-        }
-      }catch(e){
-        console.error(e);
-      }
-    }
-
-    /* =========================
-       CACHE / RENDER
-       ========================= */
     function saveCache(farms){ try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} }
     function loadCache(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } }
 
@@ -278,9 +255,6 @@
       updateDeleteFenceButtonState();
     }
 
-    /* =========================
-       MAPA + SNAPSHOTS
-       ========================= */
     function initMap(center){ 
       center = center || {lat:-0.1807, lng:-78.4678};
       var zoom = 6;
@@ -310,7 +284,9 @@
       subscribeFarms();
       subscribeGeofences();
 
-      setTimeout(function(){ initialFetchAll(); }, 800);
+      /* === Carga inmediata en móviles (y fallback) === */
+      initialFetchAll();                 // sin esperar
+      setTimeout(function(){ initialFetchAll(); }, 1000); // reintento suave
     }
 
     function subscribeFarms(){
@@ -382,10 +358,8 @@
           const d = doc.data();
           farms.push({ id: doc.id, name: d.name, fincaLocation: d.fincaLocation });
         });
-        if(farms.length){
-          saveCache(farms);
-          renderFarmsFromCache();
-        }
+        saveCache(farms);
+        renderFarmsFromCache();
       }catch(e){ console.warn('Fallback get farms failed', e); }
     }
     async function initialFetchGeofences(){
@@ -396,16 +370,15 @@
           const d = doc.data();
           fences.push({ id: doc.id, name: d.name, path: d.path || [] });
         });
-        if(fences.length){
-          saveFenceCache(fences);
-          renderGeofencesFromCache();
-        }
+        saveFenceCache(fences);
+        renderGeofencesFromCache();
       }catch(e){ console.warn('Fallback get geofences failed', e); }
     }
 
-    /* =========================
-       UTILIDADES / CONTROLES
-       ========================= */
+    firebase.auth().onAuthStateChanged(function(user){
+      if(user){ initialFetchAll(); }
+    });
+
     function selectFence(id){
       if(selectedFenceId && geofenceLayers[selectedFenceId]){
         geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE);
@@ -686,9 +659,7 @@
       map.on('mouseout', function(){ ctrl.update(null,null); });
     }
 
-    /* =========================
-       LISTENERS INICIALES
-       ========================= */
+    /* === Listeners iniciales === */
     document.addEventListener("DOMContentLoaded",function(){
       var modal = document.getElementById('adminModal'); if(modal){ modal.classList.remove("hidden"); }
 
