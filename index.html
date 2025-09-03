@@ -8,10 +8,8 @@
 
   <!-- Leaflet core CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Leaflet.Draw CSS (redundante por seguridad) -->
+  <!-- Leaflet.Draw CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
-
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; margin: 0; padding: 0; overflow-x: hidden; }
     #map { height: 55vh; width: 100%; border-radius: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,.1); z-index: 1; }
@@ -52,43 +50,37 @@
       .trim()
       .toLowerCase();
   }
-
   function allowBypass(){
-    try {
+    try{
       const qs = new URLSearchParams(location.search);
-      if (qs.get("skipAdmin") === "1") return true;        // ?skipAdmin=1
+      if (qs.get("skipAdmin") === "1") return true;
       if (localStorage.getItem("admin_debug") === "1") return true;
-    } catch {}
+    }catch{}
     return false;
   }
-
   function showApp(){
     document.getElementById('adminModal')?.classList.add("hidden");
     document.getElementById('appContent')?.classList.remove("hidden");
     setTimeout(()=>{ initMap(); setTimeout(()=>{ if(window.map){ map.invalidateSize(); } }, 80); }, 50);
   }
-
   function doAdminLogin(ev){
-    if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+    if (ev && ev.preventDefault) ev.preventDefault();
     try{
       const raw = document.getElementById('adminCodeInput')?.value || "";
       const ok = allowBypass() || normalizeCode(raw) === normalizeCode(ADMIN_CODE);
-      if (ok){ showApp(); }
-      else{
+      if (ok) showApp();
+      else {
         const err = document.getElementById('errorMessage');
-        if (err){ err.textContent = 'Código incorrecto. Intenta con "admin123"'; err.style.display = "block"; }
+        if (err){ err.textContent = 'Código incorrecto. Intenta con "admin123"'; err.style.display="block"; }
       }
     }catch(e){ console.error(e); }
   }
-
-  document.addEventListener("DOMContentLoaded",function(){
+  document.addEventListener("DOMContentLoaded", ()=>{
     document.getElementById('adminModal')?.classList.remove("hidden");
     document.getElementById('adminLoginBtn')?.addEventListener("click", doAdminLogin);
     const adminInput = document.getElementById('adminCodeInput');
-    adminInput?.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ doAdminLogin(e); }});
-    adminInput?.addEventListener("input", ()=>{ document.getElementById('errorMessage').style.display="none"; });
-
-    // Auto-entrar si usas ?skipAdmin=1 o admin_debug
+    adminInput?.addEventListener("keydown", (e)=>{ if(e.key==="Enter") doAdminLogin(e); });
+    adminInput?.addEventListener("input", ()=>{ const err=document.getElementById('errorMessage'); if(err) err.style.display="none"; });
     if (allowBypass()) showApp();
   });
   </script>
@@ -118,9 +110,6 @@
           <button id="startFenceBtn"
             class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Iniciar dibujo de geocerca">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
-            </svg>
             Nueva geocerca
           </button>
           <button id="finishFenceBtn"
@@ -138,10 +127,6 @@
           <button id="createFenceByCoordsBtn"
             class="inline-flex items-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg"
             title="Crear geocerca ingresando una lista de coordenadas">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
-            </svg>
             Geocerca (Lat/Lngs)
           </button>
 
@@ -149,19 +134,16 @@
           <button id="createFarmBtn"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Crear finca en el centro del mapa">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             Crear finca
           </button>
           <button id="createByCoordsBtn"
             class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Crear finca ingresando Lat/Lng">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h4l3-3 4 8 3-5H22M3 19h18"/></svg>
             Crear finca (Lat/Lng)
           </button>
           <button id="deleteFarmBtn"
             class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             title="Eliminar la finca seleccionada">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             Eliminar finca
           </button>
 
@@ -169,13 +151,10 @@
           <button id="deleteFenceBtn"
             class="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             title="Eliminar la geocerca seleccionada" disabled>
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
             Eliminar geocerca
           </button>
 
-          <!-- ================== NUEVO: edición & GeoJSON ================== -->
+          <!-- Edición & GeoJSON -->
           <button id="editFenceBtn"
             class="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             title="Editar (mover vértices) de la geocerca seleccionada" disabled>
@@ -203,7 +182,6 @@
             <input id="importGeoJSONInput" type="file" accept=".geojson,application/geo+json,application/json"
               class="hidden">
           </label>
-          <!-- ============================================================= -->
         </div>
       </div>
 
@@ -235,7 +213,7 @@
 
       <div id="map"></div>
 
-      <!-- ===== Explorador de elementos (doble clic para hacer zoom) ===== -->
+      <!-- Explorador -->
       <div id="indexPanel" class="mt-4">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-gray-800">Explorador de elementos</h3>
@@ -252,7 +230,6 @@
           </div>
         </div>
       </div>
-      <!-- ===== FIN ===== -->
 
       <p id="statusMessage" class="mt-3 text-sm text-gray-600">
         Haz clic en el mapa para crear una nueva finca. También puedes usar <strong>Crear finca</strong> (centro del mapa) o <strong>Crear finca (Lat/Lng)</strong>.
@@ -274,6 +251,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 
   <script>
+    // ---------- Firebase ----------
     const firebaseConfig = {
       apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
       authDomain: "demo-finca-app.firebaseapp.com",
@@ -282,29 +260,18 @@
       messagingSenderId: "123456789012",
       appId: "1:123456789012:web:abcdef1234567890"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-
-    try {
-      db.settings({
-        experimentalForceLongPolling: true,
-        experimentalAutoDetectLongPolling: true,
-        useFetchStreams: false
-      });
-    } catch {}
-
+    try{
+      db.settings({ experimentalForceLongPolling:true, experimentalAutoDetectLongPolling:true, useFetchStreams:false });
+    }catch{}
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (!isMobile) {
-      db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
-    }
-
-    // Auth anónima
-    let authReady = false;
+    if (!isMobile) db.enablePersistence({ synchronizeTabs:true }).catch(()=>{});
+    let authReady=false;
     firebase.auth().signInAnonymously().catch(console.error);
-    firebase.auth().onAuthStateChanged((user)=>{ authReady = !!user; });
+    firebase.auth().onAuthStateChanged(u=>{ authReady=!!u; });
 
-    // ===== Estado =====
+    // ---------- Estado ----------
     let map;
     const fincaMarkers = {};
     const geofenceLayers = {};
@@ -323,23 +290,21 @@
     const GEOFENCE_STYLE = {weight:2, fillOpacity:0.15};
     const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
 
-    // Estado “vivo” para el explorador
     let currentFarms = [];
     let currentFences = [];
 
-    // ===== Edición (Leaflet.Draw) =====
+    // === Edición simple (sin toolbar): usamos poly.editing.enable() ===
     let isEditingFence = false;
-    let editBackupCoords = null; // [{lat,lng},...]
-    let editGroup = null;        // L.FeatureGroup
-    let editToolbar = null;      // L.EditToolbar.Edit
+    let editBackupCoords = null;    // [{lat,lng},...]
+    let editingLayer = null;        // L.Polygon que se está editando
 
-    // Caché
+    // ---------- Caché ----------
     const saveCache = farms => { try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} };
     const loadCache = () => { try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } };
     const saveFenceCache = fences => { try{ localStorage.setItem(LS_GF, JSON.stringify(fences)); }catch{} };
     const loadFenceCache = () => { try{ return JSON.parse(localStorage.getItem(LS_GF)||'[]'); }catch{ return []; } };
 
-    // Render
+    // ---------- Render ----------
     function renderFarmsFromCache(){
       const farms = loadCache();
       Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
@@ -382,7 +347,7 @@
         if(selectedFenceId === g.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
       });
 
-      if(selectedFenceId && !geofenceLayers[selectedFenceId]){ selectedFenceId = null; }
+      if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId = null;
       updateDeleteFenceButtonState();
       updateEditButtonsState();
 
@@ -390,15 +355,11 @@
       buildIndexList();
     }
 
-    // Mapa
+    // ---------- Mapa ----------
     function initMap(center){
       center = center || {lat:-0.1807, lng:-78.4678};
       map = L.map('map',{center:[center.lat,center.lng],zoom:6});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-
-      // Grupo para edición Leaflet.Draw
-      editGroup = new L.FeatureGroup();
-      map.addLayer(editGroup);
 
       addMousePositionControl();
       renderFarmsFromCache();
@@ -423,23 +384,23 @@
       });
     }
 
-    // Suscripciones (en vivo)
-    let unsubFarms = null, unsubGeofences = null, subsStarted=false;
+    // ---------- Suscripciones ----------
+    let unsubFarms=null, unsubGeofences=null, subsStarted=false;
     function startSubscriptions(){
       if (subsStarted) return; subsStarted=true;
 
       // Fincas
       unsubFarms = db.collection('farms').onSnapshot(snap=>{
-        const farms = [];
+        const farms=[];
         Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
         for(const k in fincaMarkers) delete fincaMarkers[k];
 
         snap.forEach(doc=>{
-          const d = doc.data();
-          farms.push({ id: doc.id, name: d.name, fincaLocation: d.fincaLocation });
+          const d=doc.data();
+          farms.push({ id:doc.id, name:d.name, fincaLocation:d.fincaLocation });
           if(d.fincaLocation){
-            const marker = L.marker([d.fincaLocation.lat, d.fincaLocation.lng]).addTo(map);
-            marker.bindTooltip(d.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
+            const marker=L.marker([d.fincaLocation.lat,d.fincaLocation.lng]).addTo(map);
+            marker.bindTooltip(d.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'});
             fincaMarkers[doc.id]=marker;
           }
         });
@@ -447,110 +408,92 @@
         currentFarms = farms.slice();
         if (farms.length) saveCache(farms);
 
-        const sel = document.getElementById('farmSelect');
+        const sel=document.getElementById('farmSelect');
         if (sel){
-          sel.innerHTML = '';
+          sel.innerHTML='';
           farms.forEach(f=>{ const opt=document.createElement('option'); opt.value=f.id; opt.textContent=f.name||'Finca'; sel.appendChild(opt); });
         }
         updateDeleteButtonState();
         buildIndexList();
-      }, err => { console.warn('onSnapshot farms error', err); renderFarmsFromCache(); });
+      }, err=>{ console.warn('onSnapshot farms error', err); renderFarmsFromCache(); });
 
       // Geocercas
       unsubGeofences = db.collection('geofences').onSnapshot(snap=>{
-        const fences = [];
+        const fences=[];
         Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
         for(const k in geofenceLayers) delete geofenceLayers[k];
 
         snap.forEach(doc=>{
-          const d = doc.data();
-          const g = { id: doc.id, name: d.name, path: d.path || [] };
+          const d=doc.data();
+          const g={ id:doc.id, name:d.name, path:d.path||[] };
           fences.push(g);
           if(Array.isArray(g.path) && g.path.length>=3){
-            const latlngs = g.path.map(pt=> [pt.lat, pt.lng]);
-            const poly = L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
-            poly.bindTooltip(g.name || 'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
+            const latlngs=g.path.map(pt=> [pt.lat, pt.lng]);
+            const poly=L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
+            poly.bindTooltip(g.name||'Geocerca',{permanent:true,direction:'center',className:'farm-label'});
             geofenceLayers[doc.id]=poly;
             poly.on('click', ()=> selectFence(doc.id));
-            if(selectedFenceId === doc.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
+            if(selectedFenceId===doc.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
           }
         });
 
         currentFences = fences.slice();
         if (fences.length) saveFenceCache(fences);
 
-        if(selectedFenceId && !geofenceLayers[selectedFenceId]){ selectedFenceId = null; }
+        if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null;
         updateDeleteFenceButtonState();
         updateEditButtonsState();
         buildIndexList();
-      }, err => { console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
+      }, err=>{ console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
     }
 
-    // Carga inicial
+    // ---------- Carga inicial ----------
     async function initialFetchAll(){ await Promise.all([initialFetchFarms(), initialFetchGeofences()]); }
     async function initialFetchFarms(){
       try{
         const snap = await db.collection('farms').get();
         const farms=[]; snap.forEach(doc=>{ const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); });
-        if (farms.length){
-          currentFarms = farms.slice();
-          saveCache(farms);
-          renderFarmsFromCache();
-        } else {
-          buildIndexList();
-        }
+        if (farms.length){ currentFarms=farms.slice(); saveCache(farms); renderFarmsFromCache(); } else { buildIndexList(); }
       }catch(e){ console.warn('get farms failed', e); buildIndexList(); }
     }
     async function initialFetchGeofences(){
       try{
         const snap = await db.collection('geofences').get();
         const fences=[]; snap.forEach(doc=>{ const d=doc.data(); fences.push({id:doc.id,name:d.name,path:d.path||[]}); });
-        if (fences.length){
-          currentFences = fences.slice();
-          saveFenceCache(fences);
-          renderGeofencesFromCache();
-        } else {
-          buildIndexList();
-        }
+        if (fences.length){ currentFences=fences.slice(); saveFenceCache(fences); renderGeofencesFromCache(); } else { buildIndexList(); }
       }catch(e){ console.warn('get geofences failed', e); buildIndexList(); }
     }
 
-    // Sync local -> Firestore
-    let syncRan = false;
+    // ---------- Sync local -> Firestore ----------
+    let syncRan=false;
     async function syncLocalPendingToFirestore(){
-      if (syncRan) return; syncRan = true;
+      if (syncRan) return; syncRan=true;
       try{
-        const farms = loadCache();
-        const pending = farms.filter(f => f && typeof f.id==='string' && f.id.startsWith('local-'));
-        if (pending.length){
-          for (const f of pending){
-            try{
-              await db.collection('farms').add({ name: f.name||'Finca', fincaLocation: f.fincaLocation||null });
-              const updated = loadCache().filter(x => x.id !== f.id);
-              saveCache(updated);
-            }catch(e){ console.warn('No se pudo subir finca local', f, e); }
-          }
-          renderFarmsFromCache();
+        const farms=loadCache();
+        const pending=farms.filter(f=> f && String(f.id).startsWith('local-'));
+        for (const f of pending){
+          try{
+            await db.collection('farms').add({ name:f.name||'Finca', fincaLocation:f.fincaLocation||null });
+            const updated=loadCache().filter(x=> x.id!==f.id); saveCache(updated);
+          }catch(e){ console.warn('No se pudo subir finca local', f, e); }
         }
+        renderFarmsFromCache();
       }catch(e){ console.warn('sync farms error', e); }
 
       try{
-        const fences = loadFenceCache();
-        const pendingG = fences.filter(g => g && typeof g.id==='string' && g.id.startsWith('localgf-'));
-        if (pendingG.length){
-          for (const g of pendingG){
-            try{
-              await db.collection('geofences').add({ name: g.name||'Geocerca', path: Array.isArray(g.path)? g.path : [] });
-              const updated = loadFenceCache().filter(x => x.id !== g.id);
-              saveFenceCache(updated);
-            }catch(e){ console.warn('No se pudo subir geocerca local', g, e); }
-          }
-          renderGeofencesFromCache();
+        const fences=loadFenceCache();
+        const pendingG=fences.filter(g=> g && String(g.id).startsWith('localgf-'));
+        for (const g of pendingG){
+          try{
+            await db.collection('geofences').add({ name:g.name||'Geocerca', path:Array.isArray(g.path)?g.path:[] });
+            const updated=loadFenceCache().filter(x=> x.id!==g.id); saveFenceCache(updated);
+          }catch(e){ console.warn('No se pudo subir geocerca local', g, e); }
         }
+        renderGeofencesFromCache();
       }catch(e){ console.warn('sync geofences error', e); }
     }
 
-    // ==================== Selección & utilidades ====================
+    // ---------- Selección ----------
     function selectFence(id){
       if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes de seleccionar otra.'); return; }
       if(selectedFenceId && geofenceLayers[selectedFenceId]){
@@ -564,6 +507,7 @@
       updateEditButtonsState();
     }
 
+    // ---------- Crear fincas ----------
     const normDec = s => String(s||'').trim().replace(',', '.');
     const parseCoord = s => { const v=parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; };
     const validLat = v => v>=-90 && v<=90;
@@ -585,31 +529,32 @@
       if(!Number.isFinite(lng) || !validLng(lng)){ alert('Longitud inválida o fuera de rango (-180 a 180).'); return; }
       pendingLat = lat; pendingLng = lng;
 
-      document.getElementById('coordsNameHint').textContent = `Coordenadas: Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
+      const coordsNameHint = document.getElementById('coordsNameHint');
+      if (coordsNameHint) coordsNameHint.textContent = `Coordenadas: Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
       const input = document.getElementById('coordsNameInput');
-      input.value = `Finca ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      document.getElementById('coordsNamePanel').classList.remove('hidden');
-      input.focus(); input.select();
-
+      if (input) input.value = `Finca ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      const panel = document.getElementById('coordsNamePanel');
+      if (panel) panel.classList.remove('hidden');
+      if (input){ input.focus(); input.select(); }
       if(map){ map.setView([lat, lng], Math.max(map.getZoom(), 12)); }
     }
     async function saveCoordsName(){
       if(pendingLat==null || pendingLng==null) { cancelCoordsName(); return; }
       const input = document.getElementById('coordsNameInput');
-      const name = (input.value || '').trim() || `Finca ${pendingLat.toFixed(5)}, ${pendingLng.toFixed(5)}`;
+      const name = (input && input.value ? input.value : '').trim() || `Finca ${pendingLat.toFixed(5)}, ${pendingLng.toFixed(5)}`;
       try{ await db.collection('farms').add({ name, fincaLocation:{lat: pendingLat, lng: pendingLng} }); }
       catch{ const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:pendingLat, lng:pendingLng} }); saveCache(farms); renderFarmsFromCache(); }
-      pendingLat=null; pendingLng=null; input.value='';
-      document.getElementById('coordsNamePanel').classList.add('hidden');
+      pendingLat=null; pendingLng=null; if(input){ input.value=''; }
+      const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
       waitAuthThen(syncLocalPendingToFirestore);
     }
     function cancelCoordsName(){
       pendingLat=null; pendingLng=null;
-      document.getElementById('coordsNameInput').value='';
-      document.getElementById('coordsNamePanel').classList.add('hidden');
+      const input = document.getElementById('coordsNameInput'); if(input){ input.value=''; }
+      const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
     }
 
-    // ===== Dibujo de geocerca con clics =====
+    // ---------- Dibujo de geocerca ----------
     function addFenceVertex(latlng){
       drawingCoords.push({lat: latlng.lat, lng: latlng.lng});
       const m = L.circleMarker(latlng, {radius:4, weight:2}).addTo(map);
@@ -640,11 +585,14 @@
       if(!isDrawingFence) return;
       if(drawingCoords.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
       pendingFenceCoords = drawingCoords.slice();
-      document.getElementById('fenceNameHint').textContent = `Vértices: ${pendingFenceCoords.length} puntos`;
+      const hint = document.getElementById('fenceNameHint');
+      if(hint) hint.textContent = `Vértices: ${pendingFenceCoords.length} puntos`;
       const input = document.getElementById('fenceNameInput');
-      input.value = `Geocerca ${new Date().toLocaleDateString()}`;
-      document.getElementById('fenceNamePanel').classList.remove('hidden');
-      input.focus(); input.select();
+      if(input) {
+        input.value = `Geocerca ${new Date().toLocaleDateString()}`;
+        const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.remove('hidden'); }
+        input.focus(); input.select();
+      }
     }
     function cancelFenceDraw(){
       isDrawingFence = false;
@@ -654,12 +602,12 @@
       document.getElementById('startFenceBtn').classList.remove('hidden');
       document.getElementById('finishFenceBtn').classList.add('hidden');
       document.getElementById('cancelFenceBtn').classList.add('hidden');
-      document.getElementById('fenceNamePanel').classList.add('hidden');
+      const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
       pendingFenceCoords = null;
     }
     async function saveFenceName(){
       const input = document.getElementById('fenceNameInput');
-      const name = (input.value || '').trim() || 'Geocerca';
+      const name = (input && input.value ? input.value : '').trim() || 'Geocerca';
       if(!pendingFenceCoords || pendingFenceCoords.length<3){ alert('No hay geocerca lista para guardar.'); return; }
 
       try{
@@ -671,33 +619,25 @@
         renderGeofencesFromCache();
       }
 
-      input.value='';
+      if(input){ input.value=''; }
       pendingFenceCoords=null;
-      document.getElementById('fenceNamePanel').classList.add('hidden');
+      const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
       cancelFenceDraw();
       removePreviewFence();
       waitAuthThen(syncLocalPendingToFirestore);
     }
     function cancelFenceName(){
-      document.getElementById('fenceNameInput').value='';
-      document.getElementById('fenceNamePanel').classList.add('hidden');
+      const input=document.getElementById('fenceNameInput'); if(input){ input.value=''; }
+      const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
       removePreviewFence();
     }
-
-    // PREVIEW de geocerca
     function removePreviewFence(){
-      if(previewFenceLayer){
-        map.removeLayer(previewFenceLayer);
-        previewFenceLayer = null;
-      }
+      if(previewFenceLayer){ map.removeLayer(previewFenceLayer); previewFenceLayer = null; }
     }
 
-    // ===== Geocerca por coordenadas =====
+    // ---------- Geocerca por coordenadas ----------
     function parseLatLngList(texto){
-      const items = String(texto || '')
-        .split(/[\n;]+/)
-        .map(s=> s.trim())
-        .filter(Boolean);
+      const items = String(texto || '').split(/[\n;]+/).map(s=> s.trim()).filter(Boolean);
       const puntos = [];
       items.forEach(it=>{
         const parts = it.split(/[,\s]+/).map(t=> t.trim()).filter(Boolean);
@@ -711,21 +651,12 @@
       return puntos;
     }
     function createFenceByCoords(){
-      if (isDrawingFence){
-        alert('Finaliza o cancela el dibujo de geocerca antes de crear por coordenadas.');
-        return;
-      }
+      if (isDrawingFence){ alert('Finaliza o cancela el dibujo de geocerca antes de crear por coordenadas.'); return; }
       const ejemplo = "-1.2345,-78.5678; -1.2350,-78.5684; -1.2362,-78.5690";
-      const raw = prompt(
-        "Ingresa puntos en formato lat,lng separados por ';' o por saltos de línea.\n" +
-        "Ejemplo:\n" + ejemplo
-      );
+      const raw = prompt("Ingresa puntos en formato lat,lng separados por ';' o por saltos de línea.\nEjemplo:\n"+ejemplo);
       if(raw === null) return;
       const pts = parseLatLngList(raw);
-      if(pts.length < 3){
-        alert('Se requieren al menos 3 puntos válidos (lat,lng).');
-        return;
-      }
+      if(pts.length < 3){ alert('Se requieren al menos 3 puntos válidos (lat,lng).'); return; }
       pendingFenceCoords = pts;
 
       if(map){
@@ -733,14 +664,16 @@
         previewFenceLayer = L.polygon(pts.map(p=> [p.lat, p.lng]), { dashArray: '4,4', weight: 2, fillOpacity: 0.1 }).addTo(map);
         try { map.fitBounds(previewFenceLayer.getBounds(), { padding: [20,20] }); } catch(e){}
       }
-      document.getElementById('fenceNameHint').textContent = `Vértices: ${pts.length} puntos`;
+      const hint = document.getElementById('fenceNameHint'); if (hint) hint.textContent = `Vértices: ${pts.length} puntos`;
       const input = document.getElementById('fenceNameInput');
-      input.value = `Geocerca ${new Date().toLocaleDateString()}`;
-      document.getElementById('fenceNamePanel').classList.remove('hidden');
-      input.focus(); input.select();
+      if (input) {
+        input.value = `Geocerca ${new Date().toLocaleDateString()}`;
+        const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.remove('hidden'); }
+        input.focus(); input.select();
+      }
     }
 
-    // ======================= EDICIÓN DE GEOCERCAS (Leaflet.Draw) =======================
+    // ---------- EDICIÓN DE GEOCERCAS (simple, robusta) ----------
     function updateEditButtonsState(){
       const canEdit = !!selectedFenceId && !!geofenceLayers[selectedFenceId] && !isEditingFence;
       const eBtn = document.getElementById('editFenceBtn');
@@ -750,20 +683,14 @@
       document.getElementById('cancelFenceEditBtn')?.classList.toggle('hidden', !editing);
     }
 
-    function ensureEditToolbar(){
-      if (!editToolbar) {
-        editToolbar = new L.EditToolbar.Edit(map, {
-          featureGroup: editGroup,
-          selectedPathOptions: { maintainColor: true }
-        });
-      }
+    function drawPluginReady(){
+      return !!(window.L && L.Edit && L.Edit.Poly);
     }
 
     function startFenceEdit(){
-      if(!selectedFenceId || !geofenceLayers[selectedFenceId]){
-        alert('Primero selecciona una geocerca haciendo click sobre ella.'); return;
-      }
+      if(!selectedFenceId || !geofenceLayers[selectedFenceId]){ alert('Primero selecciona una geocerca.'); return; }
       if(isEditingFence) return;
+      if(!drawPluginReady()){ alert('Leaflet.Draw no cargó. Revisa la red.'); return; }
 
       const poly = geofenceLayers[selectedFenceId];
 
@@ -772,110 +699,86 @@
       const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
       editBackupCoords = ring0.map(ll => ({lat: ll.lat, lng: ll.lng}));
 
-      // Mover la capa al featureGroup de edición (si no está)
-      if (!editGroup.hasLayer(poly)) editGroup.addLayer(poly);
-
-      // Habilitar edición
-      ensureEditToolbar();
-      editToolbar.enable();
+      // Habilitar edición directa
+      try { poly.editing.enable(); } catch(e){ console.warn(e); alert('No se pudo habilitar la edición.'); return; }
       isEditingFence = true;
+      editingLayer = poly;
       updateEditButtonsState();
     }
 
     async function saveFenceEdit(){
-  // Validaciones básicas
-  if (!isEditingFence) { alert('No estás en modo edición.'); return; }
-  if (!selectedFenceId || !geofenceLayers[selectedFenceId]) { alert('No hay geocerca seleccionada.'); return; }
+      if(!isEditingFence || !editingLayer){ alert('No estás en modo edición.'); return; }
 
-  const poly = geofenceLayers[selectedFenceId];
+      const poly = editingLayer;
+      const rings = poly.getLatLngs();
+      const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
+      const newPath = ring0.map(ll => ({ lat: ll.lat, lng: ll.lng }));
+      if (newPath.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
 
-  // Obtener el primer anillo del polígono editado
-  const rings = poly.getLatLngs();
-  const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
-  const newPath = ring0.map(ll => ({ lat: ll.lat, lng: ll.lng }));
+      // 1) Actualiza caché local
+      const fencesCache = loadFenceCache() || [];
+      const idxCache = fencesCache.findIndex(g => g.id === selectedFenceId);
+      if (idxCache >= 0) { fencesCache[idxCache].path = newPath; saveFenceCache(fencesCache); }
 
-  if (newPath.length < 3){
-    alert('La geocerca necesita al menos 3 puntos.');
-    return;
-  }
+      // 2) Firestore (si aplica)
+      let firestoreOK = false;
+      try{
+        if (!String(selectedFenceId).startsWith('localgf-')){
+          await db.collection('geofences').doc(selectedFenceId).update({ path: newPath });
+        }
+        firestoreOK = true;
+      }catch(err){
+        console.warn('No se pudo guardar en Firestore, se mantiene cambio local:', err);
+      }
 
-  // 1) Actualizar CACHÉ local de inmediato (experiencia instantánea)
-  const fencesCache = loadFenceCache() || [];
-  const idxCache = fencesCache.findIndex(g => g.id === selectedFenceId);
-  if (idxCache >= 0) {
-    fencesCache[idxCache].path = newPath;
-    try { saveFenceCache(fencesCache); } catch {}
-  }
-
-  // 2) Intentar guardar en Firestore (si el id no es local)
-  let firestoreOK = false;
-  try{
-    if (!selectedFenceId.startsWith('localgf-')) {
-      await db.collection('geofences').doc(selectedFenceId).update({ path: newPath });
-    }
-    firestoreOK = true;
-  }catch(err){
-    console.warn('No se pudo guardar en Firestore. Se mantiene el cambio en caché local:', err);
-  }
-
-  // 3) Salir del modo edición limpiamente (sin re-render global)
-  try { if (editToolbar) editToolbar.disable(); } catch {}
-  try { if (editGroup && editGroup.hasLayer(poly)) editGroup.removeLayer(poly); } catch {}
-  isEditingFence = false;
-  editBackupCoords = null;
-  updateEditButtonsState();
-
-  // Mantener resaltado el polígono seleccionado
-  try { poly.setStyle(GEOFENCE_SELECTED_STYLE); } catch {}
-
-  // (Opcional) Notifica el resultado
-  alert(firestoreOK ? 'Cambios guardados.' : 'Cambios guardados localmente (sin conexión o sin permisos).');
-
-  // No llamamos a renderGeofencesFromCache() aquí para no perder la edición visual.
-  // El onSnapshot actualizará más tarde desde Firestore cuando sea posible.
-}
-      // Deshabilitar edición y limpiar grupo
-      if (editToolbar) editToolbar.disable();
-      if (editGroup && editGroup.hasLayer(poly)) editGroup.removeLayer(poly);
+      // 3) Salir de edición
+      try { poly.editing.disable(); } catch {}
       isEditingFence = false;
+      editingLayer = null;
       editBackupCoords = null;
       updateEditButtonsState();
 
-      renderGeofencesFromCache(); // refresca estilos/tooltip
+      // Mantener resaltado
+      try { poly.setStyle(GEOFENCE_SELECTED_STYLE); poly.redraw && poly.redraw(); } catch {}
+
+      alert(firestoreOK ? 'Cambios guardados.' : 'Cambios guardados localmente.');
     }
 
     function cancelFenceEdit(){
-      if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]) return;
-      const poly = geofenceLayers[selectedFenceId];
+      if(!isEditingFence || !editingLayer) return;
+      const poly = editingLayer;
+
+      // Restaurar vértices
       if (editBackupCoords && editBackupCoords.length >= 3){
-        poly.setLatLngs(editBackupCoords.map(p => L.latLng(p.lat, p.lng)));
+        try {
+          poly.setLatLngs(editBackupCoords.map(p => L.latLng(p.lat, p.lng)));
+          poly.redraw && poly.redraw();
+        } catch(e){ console.warn(e); }
       }
-      if (editToolbar) editToolbar.disable();
-      if (editGroup && editGroup.hasLayer(poly)) editGroup.removeLayer(poly);
+
+      // Salir de edición
+      try { poly.editing.disable(); } catch {}
       isEditingFence = false;
+      editingLayer = null;
       editBackupCoords = null;
       updateEditButtonsState();
-    }
-    // ===============================================================================
 
-    // ======================= GEOJSON EXPORT/IMPORT ======================
+      // Mantener resaltado
+      try { poly.setStyle(GEOFENCE_SELECTED_STYLE); } catch {}
+    }
+
+    // ---------- GEOJSON ----------
     function fenceToFeature(id){
       const gf = (loadFenceCache()||[]).find(g => g.id === id);
       const layer = geofenceLayers[id];
       if(!gf || !layer) return null;
-
       const rings = layer.getLatLngs();
       const ring0 = (Array.isArray(rings[0]) ? rings[0] : rings).map(ll => [ll.lng, ll.lat]);
       if (ring0.length && (ring0[0][0] !== ring0[ring0.length-1][0] || ring0[0][1] !== ring0[ring0.length-1][1])){
         ring0.push([ring0[0][0], ring0[0][1]]);
       }
-      return {
-        type: "Feature",
-        properties: { id: gf.id, name: gf.name || 'Geocerca' },
-        geometry: { type: "Polygon", coordinates: [ ring0 ] }
-      };
+      return { type:"Feature", properties:{ id:gf.id, name:gf.name||'Geocerca' }, geometry:{ type:"Polygon", coordinates:[ ring0 ] } };
     }
-
     function exportGeoJSON(){
       let fc;
       if (selectedFenceId && geofenceLayers[selectedFenceId]){
@@ -891,71 +794,44 @@
         if (!features.length){ alert('No hay geocercas para exportar.'); return; }
         fc = { type: "FeatureCollection", features };
       }
-
       const blob = new Blob([JSON.stringify(fc, null, 2)], {type: "application/geo+json"});
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const name = selectedFenceId ? `geocerca_${selectedFenceId}.geojson` : 'geocercas.geojson';
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      const a = document.createElement('a'); a.href = url;
+      a.download = selectedFenceId ? `geocerca_${selectedFenceId}.geojson` : 'geocercas.geojson';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
-
     async function importGeoJSONFromText(text){
-      let obj;
-      try { obj = JSON.parse(text); } catch { alert('GeoJSON inválido.'); return; }
-
+      let obj; try { obj = JSON.parse(text); } catch { alert('GeoJSON inválido.'); return; }
       const asArray = (x) => Array.isArray(x) ? x : [x];
-
       let features = [];
-      if (obj.type === 'FeatureCollection') {
-        features = obj.features || [];
-      } else if (obj.type === 'Feature') {
-        features = [obj];
-      } else if (obj.type && obj.coordinates) {
-        features = [{ type: 'Feature', properties: {}, geometry: obj }];
-      } else {
-        alert('Estructura GeoJSON no reconocida.'); return;
-      }
+      if (obj.type === 'FeatureCollection') features = obj.features || [];
+      else if (obj.type === 'Feature') features = [obj];
+      else if (obj.type && obj.coordinates) features = [{ type:'Feature', properties:{}, geometry: obj }];
+      else { alert('Estructura GeoJSON no reconocida.'); return; }
 
-      let created = 0;
+      let created=0;
       for (const feat of features){
         const geom = feat.geometry || {};
         const props = feat.properties || {};
         const baseName = (props.name || 'Geocerca importada');
-
-        if (geom.type === 'Polygon'){
-          await createGeofenceFromPolygonCoords(geom.coordinates, baseName);
-          created++;
-        } else if (geom.type === 'MultiPolygon'){
-          const polys = asArray(geom.coordinates);
-          let i=1;
-          for (const poly of polys){
-            await createGeofenceFromPolygonCoords(poly, `${baseName} (${i})`);
-            i++; created++;
-          }
+        if (geom.type === 'Polygon'){ await createGeofenceFromPolygonCoords(geom.coordinates, baseName); created++; }
+        else if (geom.type === 'MultiPolygon'){
+          const polys = asArray(geom.coordinates); let i=1;
+          for (const poly of polys){ await createGeofenceFromPolygonCoords(poly, `${baseName} (${i})`); i++; created++; }
         }
       }
-
-      if (created === 0){
-        alert('El GeoJSON no contiene Polygon/MultiPolygon.');
-      } else {
+      if (created === 0) alert('El GeoJSON no contiene Polygon/MultiPolygon.');
+      else {
         try { await initialFetchGeofences(); } catch {}
         renderGeofencesFromCache();
         alert(`Importación completada: ${created} geocerca(s) creada(s).`);
       }
     }
-
     async function createGeofenceFromPolygonCoords(coords, name){
       if(!coords || !coords.length || !coords[0].length) return;
-      const outer = coords[0]
-        .map(pair => ({lat: pair[1], lng: pair[0]}))
-        .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+      const outer = coords[0].map(pair => ({lat: pair[1], lng: pair[0]}))
+                             .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
       if (outer.length < 3) return;
-
       try{
         await db.collection('geofences').add({ name: name || 'Geocerca', path: outer });
       }catch(err){
@@ -964,9 +840,8 @@
         saveFenceCache(fences);
       }
     }
-    // ===================================================================
 
-    // Construcción del explorador
+    // ---------- Explorador ----------
     function buildIndexList(){
       const farmUl = document.getElementById('farmList');
       const fenceUl = document.getElementById('fenceList');
@@ -980,14 +855,11 @@
 
       farmUl.innerHTML = '';
       if(!farms.length){
-        const li = document.createElement('li');
-        li.className = 'py-2 text-sm text-gray-500';
-        li.textContent = 'No hay fincas registradas.';
-        farmUl.appendChild(li);
+        const li = document.createElement('li'); li.className='py-2 text-sm text-gray-500';
+        li.textContent='No hay fincas registradas.'; farmUl.appendChild(li);
       }else{
         farms.forEach(f=>{
-          const li = document.createElement('li');
-          li.className = 'py-2';
+          const li = document.createElement('li'); li.className='py-2';
           li.innerHTML = `
             <div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer select-none"
                  data-id="${f.id}" data-type="farm" title="Doble clic para centrar">
@@ -1000,14 +872,11 @@
 
       fenceUl.innerHTML = '';
       if(!fences.length){
-        const li = document.createElement('li');
-        li.className = 'py-2 text-sm text-gray-500';
-        li.textContent = 'No hay geocercas registradas.';
-        fenceUl.appendChild(li);
+        const li = document.createElement('li'); li.className='py-2 text-sm text-gray-500';
+        li.textContent='No hay geocercas registradas.'; fenceUl.appendChild(li);
       }else{
         fences.forEach(g=>{
-          const li = document.createElement('li');
-          li.className = 'py-2';
+          const li = document.createElement('li'); li.className='py-2';
           li.innerHTML = `
             <div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer select-none"
                  data-id="${g.id}" data-type="fence" title="Doble clic para ajustar al polígono">
@@ -1019,7 +888,7 @@
       }
     }
 
-    // Zoom desde el explorador
+    // ---------- Zoom ----------
     function zoomToFarm(id){
       try{
         if (fincaMarkers[id]){
@@ -1032,9 +901,7 @@
         const f = farms.find(x=> x.id===id);
         if (f && f.fincaLocation){
           map.setView([f.fincaLocation.lat, f.fincaLocation.lng], Math.max(map.getZoom(), 16));
-        }else{
-          alert('No se pudo localizar esa finca.');
-        }
+        }else{ alert('No se pudo localizar esa finca.'); }
       }catch(e){ console.warn(e); }
     }
     function zoomToFence(id){
@@ -1051,13 +918,11 @@
           const b = L.latLngBounds(g.path.map(p=> [p.lat, p.lng]));
           map.fitBounds(b, { padding:[20,20] });
           selectFence(id);
-        }else{
-          alert('No se pudo localizar esa geocerca.');
-        }
+        }else{ alert('No se pudo localizar esa geocerca.'); }
       }catch(e){ console.warn(e); }
     }
 
-    // Borrado
+    // ---------- Borrado ----------
     async function deleteSelectedFarm(){
       const sel=document.getElementById('farmSelect'); const id= sel ? sel.value : '';
       if(!id){ alert('No hay finca seleccionada.'); return; }
@@ -1076,10 +941,7 @@
       if(!btn) return; btn.disabled = !(sel && sel.value);
     }
     async function deleteSelectedFence(){
-      if(!selectedFenceId){
-        alert('Primero selecciona una geocerca haciendo click sobre ella.');
-        return;
-      }
+      if(!selectedFenceId){ alert('Primero selecciona una geocerca.'); return; }
       if(isEditingFence){ alert('Estás editando. Guarda o cancela antes de eliminar.'); return; }
 
       const fencesCache = loadFenceCache();
@@ -1119,7 +981,7 @@
       btn.disabled = !selectedFenceId;
     }
 
-    // Coordenadas del mouse
+    // ---------- Utilidades ----------
     function addMousePositionControl(){
       const MousePos=L.Control.extend({
         options:{position:'bottomleft'},
@@ -1130,14 +992,12 @@
       map.on('mousemove', e=>ctrl.update(e.latlng.lat, e.latlng.lng));
       map.on('mouseout', ()=>ctrl.update(null,null));
     }
-
-    // Utilidades
     function waitAuthThen(fn){
       if (authReady) { fn(); return; }
       const iv = setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } }, 150);
     }
 
-    // Listeners (solo los de la app; SIN login duplicado)
+    // ---------- Listeners UI ----------
     document.addEventListener("DOMContentLoaded",function(){
       document.getElementById('farmSelect')?.addEventListener('change', updateDeleteButtonState);
 
@@ -1153,16 +1013,12 @@
 
       document.getElementById('createFenceByCoordsBtn')?.addEventListener('click', createFenceByCoords);
 
-      // Doble clic listas
+      // Explorador dblclick
       document.getElementById('farmList')?.addEventListener('dblclick', (e)=>{
-        const box = e.target.closest('[data-type="farm"][data-id]');
-        if (!box) return;
-        zoomToFarm(box.dataset.id);
+        const box = e.target.closest('[data-type="farm"][data-id]'); if (!box) return; zoomToFarm(box.dataset.id);
       });
       document.getElementById('fenceList')?.addEventListener('dblclick', (e)=>{
-        const box = e.target.closest('[data-type="fence"][data-id]');
-        if (!box) return;
-        zoomToFence(box.dataset.id);
+        const box = e.target.closest('[data-type="fence"][data-id]'); if (!box) return; zoomToFence(box.dataset.id);
       });
 
       // Edición y GeoJSON
@@ -1171,34 +1027,27 @@
       document.getElementById('cancelFenceEditBtn')?.addEventListener('click', cancelFenceEdit);
       document.getElementById('exportGeoJSONBtn')?.addEventListener('click', exportGeoJSON);
       document.getElementById('importGeoJSONInput')?.addEventListener('change', async (e) => {
-        const file = e.target.files?.[0];
-        if(!file) return;
-        const text = await file.text();
-        await importGeoJSONFromText(text);
-        e.target.value = '';
+        const file = e.target.files?.[0]; if(!file) return;
+        const text = await file.text(); await importGeoJSONFromText(text); e.target.value = '';
       });
 
-      // Asegurar que el panel del explorador nunca quede oculto
       document.getElementById('indexPanel')?.classList.remove('hidden');
-
-      // Primera construcción de listas
       buildIndexList();
-
       updateDeleteButtonState();
       updateDeleteFenceButtonState();
       updateEditButtonsState();
     });
   </script>
 
-  <!-- ===== HOTFIX: inserta botones si por alguna razón no están en el DOM ===== -->
+  <!-- HOTFIX por si los botones avanzados no se montaran por alguna razón -->
   <script>
     function ensureAdvancedButtons() {
       const afterBtn = document.getElementById('deleteFenceBtn');
       if (!afterBtn || !afterBtn.parentElement) return;
       const bar = afterBtn.parentElement;
 
-      if (document.getElementById('editFenceBtn') ||
-          document.getElementById('exportGeoJSONBtn') ||
+      if (document.getElementById('editFenceBtn') &&
+          document.getElementById('exportGeoJSONBtn') &&
           document.getElementById('importGeoJSONInput')) {
         updateEditButtonsState && updateEditButtonsState();
         return;
@@ -1213,32 +1062,13 @@
         return b;
       };
 
-      const editBtn = mkBtn(
-        'editFenceBtn',
-        'Editar geocerca',
-        'inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed',
-        'Editar (mover vértices) de la geocerca seleccionada'
-      ); editBtn.disabled = true;
+      const editBtn = mkBtn('editFenceBtn','Editar geocerca','inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed','Editar (mover vértices) de la geocerca seleccionada');
+      editBtn.disabled = true;
 
-      const saveBtn = mkBtn(
-        'saveFenceEditBtn',
-        'Guardar cambios',
-        'hidden inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg',
-        'Guardar cambios a la geocerca'
-      );
-      const cancelBtn = mkBtn(
-        'cancelFenceEditBtn',
-        'Cancelar edición',
-        'hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg',
-        'Cancelar edición y restaurar'
-      );
+      const saveBtn = mkBtn('saveFenceEditBtn','Guardar cambios','hidden inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg','Guardar cambios a la geocerca');
+      const cancelBtn = mkBtn('cancelFenceEditBtn','Cancelar edición','hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg','Cancelar edición y restaurar');
 
-      const exportBtn = mkBtn(
-        'exportGeoJSONBtn',
-        'Exportar GeoJSON',
-        'inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg',
-        'Exportar GeoJSON (seleccionada o todas)'
-      );
+      const exportBtn = mkBtn('exportGeoJSONBtn','Exportar GeoJSON','inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg','Exportar GeoJSON (seleccionada o todas)');
 
       const importLabel = document.createElement('label');
       importLabel.className = 'inline-flex items-center gap-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold px-4 py-2 rounded-lg cursor-pointer';
@@ -1258,18 +1088,13 @@
       cancelBtn.insertAdjacentElement('beforebegin', saveBtn);
       saveBtn.insertAdjacentElement('beforebegin', editBtn);
 
-      if (typeof startFenceEdit === 'function') editBtn.addEventListener('click', startFenceEdit);
-      if (typeof saveFenceEdit === 'function') saveBtn.addEventListener('click', saveFenceEdit);
-      if (typeof cancelFenceEdit === 'function') cancelBtn.addEventListener('click', cancelFenceEdit);
-      if (typeof exportGeoJSON === 'function') exportBtn.addEventListener('click', exportGeoJSON);
+      editBtn.addEventListener('click', startFenceEdit);
+      saveBtn.addEventListener('click', saveFenceEdit);
+      cancelBtn.addEventListener('click', cancelFenceEdit);
+      exportBtn.addEventListener('click', exportGeoJSON);
       importInput.addEventListener('change', async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const text = await file.text();
-        if (typeof importGeoJSONFromText === 'function') {
-          await importGeoJSONFromText(text);
-        }
-        e.target.value = '';
+        const file = e.target.files?.[0]; if (!file) return;
+        const text = await file.text(); await importGeoJSONFromText(text); e.target.value = '';
       });
 
       bar.classList.add('flex', 'flex-wrap', 'gap-2', 'overflow-x-auto');
