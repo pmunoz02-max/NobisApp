@@ -173,7 +173,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // Ajustes de transporte (mejor en móvil/Safari)
     try {
       db.settings({
         experimentalForceLongPolling: true,
@@ -182,16 +181,17 @@
       });
     } catch {}
 
-    // Persistencia: solo desktop (iOS suele fallar)
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (!isMobile) {
       db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
     }
 
-    // Auth anónima
+    // === Auth anónima ===
+    let authReady = false;
     firebase.auth().signInAnonymously().catch(console.error);
+    firebase.auth().onAuthStateChanged(()=>{ authReady = true; });
 
-    // ===== Estado =====
+    // ========= Estado =========
     let map;
     const fincaMarkers = {};
     const geofenceLayers = {};
@@ -210,13 +210,13 @@
     const GEOFENCE_STYLE = {weight:2, fillOpacity:0.15};
     const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
 
-    // ===== Caché =====
+    // ========= Caché =========
     const saveCache = farms => { try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} };
     const loadCache = () => { try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } };
     const saveFenceCache = fences => { try{ localStorage.setItem(LS_GF, JSON.stringify(fences)); }catch{} };
     const loadFenceCache = () => { try{ return JSON.parse(localStorage.getItem(LS_GF)||'[]'); }catch{ return []; } };
 
-    // ===== Render =====
+    // ========= Render =========
     function renderFarmsFromCache(){
       const farms = loadCache();
       Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
@@ -260,7 +260,7 @@
       updateDeleteFenceButtonState();
     }
 
-    // ===== Mapa =====
+    // ========= Mapa =========
     function initMap(center){
       center = center || {lat:-0.1807, lng:-78.4678};
       map = L.map('map',{center:[center.lat,center.lng],zoom:6});
@@ -282,19 +282,14 @@
         }
       });
 
-      // Suscripciones y cargas iniciales (escritorio/https)
       startSubscriptions();
       initialFetchAll();
-      setTimeout(initialFetchAll, 1200);
 
-      // 🔁 NUEVO: en móvil, polling con SDK (get) para asegurar visibilidad
-      if (isMobile) {
-        sdkRefreshAll();          // carga inmediata
-        startSDKPolling(12000);   // refresco periódico
-      }
+      // ⬇️ NUEVO: sincroniza “pendientes” locales al servidor, en cuanto hay auth
+      waitAuthThen(syncLocalPendingToFirestore);
     }
 
-    // ===== Suscripciones (realtime) =====
+    // ========= Suscripciones =========
     let unsubFarms = null, unsubGeofences = null, subsStarted=false;
     function startSubscriptions(){
       if (subsStarted) return; subsStarted=true;
@@ -348,7 +343,7 @@
       }, err => { console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
     }
 
-    // ===== Carga inicial (SDK get) =====
+    // ========= Carga inicial (SDK) =========
     async function initialFetchAll(){ await Promise.all([initialFetchFarms(), initialFetchGeofences()]); }
     async function initialFetchFarms(){
       try{
@@ -365,30 +360,51 @@
       }catch(e){ console.warn('get geofences failed', e); }
     }
 
-    // ===== NUEVO: Polling por SDK (get) solo móvil =====
-    let sdkPollTimer = null;
-    async function sdkFetchFarms(){
+    // ========= SYNC local -> Firestore (NUEVO) =========
+    let syncRan = false;
+    async function syncLocalPendingToFirestore(){
+      if (syncRan) return; syncRan = true;
+
+      // Fincas con id local-*
       try{
-        const snap = await db.collection('farms').get();
-        const farms=[]; snap.forEach(doc=>{ const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); });
-        saveCache(farms); renderFarmsFromCache();
-      }catch(e){ console.warn('sdkFetchFarms failed:', e); }
-    }
-    async function sdkFetchGeofences(){
+        const farms = loadCache();
+        const pending = farms.filter(f => f && typeof f.id==='string' && f.id.startsWith('local-'));
+        if (pending.length){
+          for (const f of pending){
+            try{
+              await db.collection('farms').add({ name: f.name||'Finca', fincaLocation: f.fincaLocation||null });
+              // quita la local
+              const updated = loadCache().filter(x => x.id !== f.id);
+              saveCache(updated);
+            }catch(e){ console.warn('No se pudo subir finca local', f, e); }
+          }
+          renderFarmsFromCache();
+        }
+      }catch(e){ console.warn('sync farms error', e); }
+
+      // Geocercas con id localgf-*
       try{
-        const snap = await db.collection('geofences').get();
-        const fences=[]; snap.forEach(doc=>{ const d=doc.data(); fences.push({id:doc.id,name:d.name,path:d.path||[]}); });
-        saveFenceCache(fences); renderGeofencesFromCache();
-      }catch(e){ console.warn('sdkFetchGeofences failed:', e); }
-    }
-    function sdkRefreshAll(){ sdkFetchFarms(); sdkFetchGeofences(); }
-    function startSDKPolling(ms){
-      if (sdkPollTimer) return;
-      sdkPollTimer = setInterval(sdkRefreshAll, ms || 12000);
-      document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) sdkRefreshAll(); });
+        const fences = loadFenceCache();
+        const pending = fences.filter(g => g && typeof g.id==='string' && g.id.startsWith('localgf-'));
+        if (pending.length){
+          for (const g of pending){
+            try{
+              await db.collection('geofences').add({ name: g.name||'Geocerca', path: Array.isArray(g.path)? g.path : [] });
+              const updated = loadFenceCache().filter(x => x.id !== g.id);
+              saveFenceCache(updated);
+            }catch(e){ console.warn('No se pudo subir geocerca local', g, e); }
+          }
+          renderGeofencesFromCache();
+        }
+      }catch(e){ console.warn('sync geofences error', e); }
     }
 
-    // ===== Geocercas (interacción) =====
+    function waitAuthThen(fn){
+      if (authReady) { fn(); return; }
+      const iv = setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } }, 150);
+    }
+
+    // ========= Interacción geocercas =========
     function selectFence(id){
       if(selectedFenceId && geofenceLayers[selectedFenceId]){
         geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE);
@@ -400,13 +416,13 @@
       updateDeleteFenceButtonState();
     }
 
-    // ===== Helpers numéricos =====
+    // ========= Helpers numéricos =========
     const normDec = s => String(s||'').trim().replace(',', '.');
     const parseCoord = s => { const v=parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; };
     const validLat = v => v>=-90 && v<=90;
     const validLng = v => v>=-180 && v<=180;
 
-    // ===== Crear fincas =====
+    // ========= Crear fincas =========
     let pendingLat = null, pendingLng = null;
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
@@ -441,6 +457,8 @@
       catch{ const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:pendingLat, lng:pendingLng} }); saveCache(farms); renderFarmsFromCache(); }
       pendingLat=null; pendingLng=null; if(input){ input.value=''; }
       const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
+      // Tras guardar local, intenta sincronizar si hay auth:
+      waitAuthThen(syncLocalPendingToFirestore);
     }
     function cancelCoordsName(){
       pendingLat=null; pendingLng=null;
@@ -448,7 +466,7 @@
       const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
     }
 
-    // ===== Dibujo geocerca =====
+    // ========= Dibujo geocerca =========
     function addFenceVertex(latlng){
       drawingCoords.push({lat: latlng.lat, lng: latlng.lng});
       const m = L.circleMarker(latlng, {radius:4, weight:2}).addTo(map);
@@ -519,6 +537,8 @@
       const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
       cancelFenceDraw();
       removePreviewFence();
+      // Tras guardar local, intenta sincronizar si hay auth:
+      waitAuthThen(syncLocalPendingToFirestore);
     }
     function cancelFenceName(){
       const input=document.getElementById('fenceNameInput'); if(input){ input.value=''; }
@@ -526,7 +546,7 @@
       removePreviewFence();
     }
 
-    // ===== Geocerca por coordenadas =====
+    // ========= Geocerca por coordenadas =========
     function parseLatLngList(texto){
       const items = String(texto || '')
         .split(/[\n;]+/)
@@ -589,7 +609,7 @@
       }
     }
 
-    // ===== Eliminar =====
+    // ========= Eliminar =========
     async function deleteSelectedFarm(){
       const sel=document.getElementById('farmSelect'); const id= sel ? sel.value : '';
       if(!id){ alert('No hay finca seleccionada.'); return; }
@@ -649,7 +669,13 @@
       updateDeleteFenceButtonState();
     }
 
-    // ===== Control de coordenadas mouse =====
+    function updateDeleteFenceButtonState(){
+      const btn = document.getElementById('deleteFenceBtn');
+      if(!btn) return;
+      btn.disabled = !selectedFenceId;
+    }
+
+    // ========= Coordenadas del mouse =========
     function addMousePositionControl(){
       const MousePos=L.Control.extend({
         options:{position:'bottomleft'},
@@ -661,7 +687,7 @@
       map.on('mouseout', ()=>ctrl.update(null,null));
     }
 
-    // ===== Acceso =====
+    // ========= Acceso =========
     const ADMIN_CODE = "admin123";
     function doAdminLogin(){
       try{
@@ -678,7 +704,7 @@
       }catch(e){ console.error(e); }
     }
 
-    // ===== Listeners UI =====
+    // ========= Listeners UI =========
     document.addEventListener("DOMContentLoaded",function(){
       document.getElementById('adminModal')?.classList.remove("hidden");
 
