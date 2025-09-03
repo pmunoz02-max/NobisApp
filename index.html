@@ -282,20 +282,18 @@
         }
       });
 
-      // Espera auth real antes de tocar Firestore
       waitAuthThen(async ()=>{
         startSubscriptions();
         await initialFetchAll();
 
-        // 🔁 Móvil: fallback REST si seguimos sin datos
+        // Fallback en móvil si seguimos vacíos
         if (isMobile) {
-          setTimeout(() => { maybeRestFallback(); }, 1800);
-          // además polling SDK (por si el realtime no engancha)
+          setTimeout(() => { maybeRestFallback(); }, 1500);
           sdkRefreshAll();
           startSDKPolling(12000);
         }
 
-        // por si hay locales pendientes
+        // Sube locales pendientes si los hay
         syncLocalPendingToFirestore();
       });
     }
@@ -394,7 +392,7 @@
       document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) sdkRefreshAll(); });
     }
 
-    // ========= REST FALLBACK (solo lectura, solo si todo vacío en móvil) =========
+    // ========= REST autenticado (fallback) =========
     function fsVal(v){
       if(!v) return null;
       if('stringValue' in v) return v.stringValue;
@@ -411,16 +409,43 @@
       }
       return null;
     }
-    async function restFetchCollection(col){
-      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${col}?key=${firebaseConfig.apiKey}`;
-      const res = await fetch(url, { method:'GET' });
-      if(!res.ok) throw new Error(`REST ${col} ${res.status}`);
-      const j = await res.json();
-      const docs = (j.documents||[]).map(d=>{
-        const id = (d.name||'').split('/').pop();
-        const f = d.fields||{};
-        return { id, ...Object.fromEntries(Object.keys(f).map(k=>[k, fsVal(f[k])])) };
+    async function getIdToken(){
+      const u = firebase.auth().currentUser;
+      if(!u) throw new Error('No auth user');
+      return await u.getIdToken(true);
+    }
+    async function restFetchCollectionAuth(col, token){
+      // Usamos runQuery autenticado para respetar reglas con request.auth != null
+      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents:runQuery`;
+      const body = {
+        structuredQuery: {
+          from: [{ collectionId: col }],
+          orderBy: [{ field: { fieldPath: "__name__" }, direction: "ASCENDING" }]
+        }
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
       });
+      if(!res.ok){
+        const t = await res.text().catch(()=>String(res.status));
+        throw new Error(`REST runQuery ${col} ${res.status} ${t}`);
+      }
+      const rows = await res.json();
+      const docs = (rows||[])
+        .map(r => r && r.document)
+        .filter(Boolean)
+        .map(d => {
+          const id = (d.name||'').split('/').pop();
+          const f = d.fields||{};
+          const flat = {};
+          for(const k in f){ flat[k] = fsVal(f[k]); }
+          return { id, ...flat };
+        });
       return docs;
     }
     function isMapEmpty(){
@@ -429,17 +454,21 @@
       return (!farms || farms.length===0) && (!fences || fences.length===0);
     }
     async function maybeRestFallback(){
+      // Solo móvil y solo si seguimos vacíos tras SDK
       if (!isMobile) return;
-      if (!isMapEmpty()) return; // ya hay datos por SDK
+      if (!isMapEmpty()) return;
+
       try{
+        const token = await getIdToken();
+
         const [farms, fences] = await Promise.allSettled([
-          restFetchCollection('farms'),
-          restFetchCollection('geofences')
+          restFetchCollectionAuth('farms', token),
+          restFetchCollectionAuth('geofences', token)
         ]);
+
         if (farms.status==='fulfilled' && Array.isArray(farms.value)){
-          // adaptamos formato fincaLocation {lat,lng}
           const cleaned = farms.value.map(x=>{
-            let loc = x.fincaLocation;
+            const loc = x.fincaLocation;
             if (loc && typeof loc.lat==='number' && typeof loc.lng==='number'){
               return { id:x.id, name:x.name||'Finca', fincaLocation:{lat:loc.lat, lng:loc.lng} };
             }
@@ -455,11 +484,11 @@
           if (cleaned.length){ saveFenceCache(cleaned); renderGeofencesFromCache(); }
         }
       }catch(e){
-        console.warn('REST fallback failed', e);
+        console.warn('REST auth fallback failed', e);
       }
     }
 
-    // ========= SYNC local -> Firestore (ya existente) =========
+    // ========= SYNC local -> Firestore =========
     let syncRan = false;
     async function syncLocalPendingToFirestore(){
       if (syncRan) return; syncRan = true;
@@ -494,7 +523,7 @@
       }catch(e){ console.warn('sync geofences error', e); }
     }
 
-    // ========= Interacción geocercas =========
+    // ========= Helpers, selección, borrar, mouse, etc. (sin cambios) =========
     function selectFence(id){
       if(selectedFenceId && geofenceLayers[selectedFenceId]){
         geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE);
@@ -506,13 +535,11 @@
       updateDeleteFenceButtonState();
     }
 
-    // ========= Helpers numéricos =========
     const normDec = s => String(s||'').trim().replace(',', '.');
     const parseCoord = s => { const v=parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; };
     const validLat = v => v>=-90 && v<=90;
     const validLng = v => v>=-180 && v<=180;
 
-    // ========= Crear fincas =========
     let pendingLat = null, pendingLng = null;
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
@@ -555,7 +582,6 @@
       const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
     }
 
-    // ========= Dibujo geocerca =========
     function addFenceVertex(latlng){
       drawingCoords.push({lat: latlng.lat, lng: latlng.lng});
       const m = L.circleMarker(latlng, {radius:4, weight:2}).addTo(map);
@@ -634,7 +660,6 @@
       removePreviewFence();
     }
 
-    // ========= Geocerca por coordenadas =========
     function parseLatLngList(texto){
       const items = String(texto || '')
         .split(/[\n;]+/)
@@ -697,7 +722,6 @@
       }
     }
 
-    // ========= Eliminar =========
     async function deleteSelectedFarm(){
       const sel=document.getElementById('farmSelect'); const id= sel ? sel.value : '';
       if(!id){ alert('No hay finca seleccionada.'); return; }
@@ -763,7 +787,6 @@
       btn.disabled = !selectedFenceId;
     }
 
-    // ========= Coordenadas del mouse =========
     function addMousePositionControl(){
       const MousePos=L.Control.extend({
         options:{position:'bottomleft'},
@@ -775,13 +798,11 @@
       map.on('mouseout', ()=>ctrl.update(null,null));
     }
 
-    // ========= Utilidades =========
     function waitAuthThen(fn){
       if (authReady) { fn(); return; }
       const iv = setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } }, 150);
     }
 
-    // ========= Acceso =========
     const ADMIN_CODE = "admin123";
     function doAdminLogin(){
       try{
@@ -798,7 +819,6 @@
       }catch(e){ console.error(e); }
     }
 
-    // ========= Listeners UI =========
     document.addEventListener("DOMContentLoaded",function(){
       document.getElementById('adminModal')?.classList.remove("hidden");
 
