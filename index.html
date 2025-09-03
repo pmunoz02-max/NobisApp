@@ -201,6 +201,32 @@
     const GEOFENCE_STYLE = {weight:2, fillOpacity:0.15};
     const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
 
+    /* =========================
+       ACCESO (ARREGLADO)
+       ========================= */
+    const ADMIN_CODE = "admin123";
+    function doAdminLogin(){
+      try{
+        var inputEl = document.getElementById('adminCodeInput');
+        var raw = inputEl ? inputEl.value : "";
+        if(raw && raw.trim() === ADMIN_CODE){
+          var modal = document.getElementById('adminModal');
+          if(modal){ modal.classList.add("hidden"); }
+          var app = document.getElementById('appContent');
+          if(app){ app.classList.remove("hidden"); }
+          setTimeout(function(){ initMap(); setTimeout(function(){ if(map){ map.invalidateSize(); } }, 100); }, 100);
+        }else{
+          var em = document.getElementById('errorMessage');
+          if(em) em.style.display="block";
+        }
+      }catch(e){
+        console.error(e);
+      }
+    }
+
+    /* =========================
+       CACHE / RENDER
+       ========================= */
     function saveCache(farms){ try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} }
     function loadCache(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } }
 
@@ -252,6 +278,9 @@
       updateDeleteFenceButtonState();
     }
 
+    /* =========================
+       MAPA + SNAPSHOTS
+       ========================= */
     function initMap(center){ 
       center = center || {lat:-0.1807, lng:-78.4678};
       var zoom = 6;
@@ -374,10 +403,9 @@
       }catch(e){ console.warn('Fallback get geofences failed', e); }
     }
 
-    firebase.auth().onAuthStateChanged(function(user){
-      if(user){ initialFetchAll(); }
-    });
-
+    /* =========================
+       UTILIDADES / CONTROLES
+       ========================= */
     function selectFence(id){
       if(selectedFenceId && geofenceLayers[selectedFenceId]){
         geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE);
@@ -658,32 +686,9 @@
       map.on('mouseout', function(){ ctrl.update(null,null); });
     }
 
-    const ADMIN_CODE = "admin123";
-    function normalizeAdminInput(str){
-      var s = (str !== undefined && str !== null) ? String(str) : "";
-      s = s.trim();
-      var safe = (s && typeof s.normalize === "function") ? s.normalize("NFKC") : s;
-      return safe.replace(/["'“”\s]/g, "").toLowerCase();
-    }
-    function doAdminLogin(){
-      try{
-        var inputEl = document.getElementById('adminCodeInput');
-        var raw = inputEl ? inputEl.value : "";
-        if(normalizeAdminInput(raw)===normalizeAdminInput(ADMIN_CODE)){
-          var modal = document.getElementById('adminModal');
-          if(modal){ modal.classList.add("hidden"); }
-          var app = document.getElementById('appContent');
-          if(app){ app.classList.remove("hidden"); }
-          setTimeout(function(){ initMap(); setTimeout(function(){ if(map){ map.invalidateSize(); } }, 100); }, 100);
-        }else{
-          var em = document.getElementById('errorMessage');
-          if(em) em.style.display="block";
-        }
-      }catch(e){
-        console.error(e);
-      }
-    }
-
+    /* =========================
+       LISTENERS INICIALES
+       ========================= */
     document.addEventListener("DOMContentLoaded",function(){
       var modal = document.getElementById('adminModal'); if(modal){ modal.classList.remove("hidden"); }
 
