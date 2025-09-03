@@ -59,7 +59,7 @@
             class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
             title="Iniciar dibujo de geocerca">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6H4z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
             </svg>
             Nueva geocerca
           </button>
@@ -105,7 +105,7 @@
             Eliminar finca
           </button>
 
-          <!-- NUEVO: Eliminar geocerca seleccionada -->
+          <!-- Eliminar geocerca -->
           <button id="deleteFenceBtn"
             class="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             title="Eliminar la geocerca seleccionada" disabled>
@@ -275,6 +275,9 @@
 
       subscribeFarms();
       subscribeGeofences();
+
+      // ===== Fallback para móviles: carga puntual si el snapshot no llega =====
+      setTimeout(()=>{ initialFetchAll(); }, 600);
     }
 
     function subscribeFarms(){
@@ -303,7 +306,7 @@
           });
         }
         updateDeleteButtonState();
-      }, ()=>{ renderFarmsFromCache(); });
+      }, (err)=>{ console.warn('onSnapshot farms error', err); renderFarmsFromCache(); });
     }
 
     function subscribeGeofences(){
@@ -332,7 +335,40 @@
           selectedFenceId = null;
         }
         updateDeleteFenceButtonState();
-      }, ()=>{ renderGeofencesFromCache(); });
+      }, (err)=>{ console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
+    }
+
+    // ===== Carga puntual (fallback) =====
+    async function initialFetchAll(){
+      await Promise.all([initialFetchFarms(), initialFetchGeofences()]);
+    }
+    async function initialFetchFarms(){
+      try{
+        const snap = await db.collection('farms').get();
+        const farms = [];
+        snap.forEach(doc=>{
+          const d = doc.data();
+          farms.push({ id: doc.id, name: d.name, fincaLocation: d.fincaLocation });
+        });
+        if(farms.length){
+          saveCache(farms);
+          renderFarmsFromCache();
+        }
+      }catch(e){ console.warn('Fallback get farms failed', e); }
+    }
+    async function initialFetchGeofences(){
+      try{
+        const snap = await db.collection('geofences').get();
+        const fences = [];
+        snap.forEach(doc=>{
+          const d = doc.data();
+          fences.push({ id: doc.id, name: d.name, path: d.path || [] });
+        });
+        if(fences.length){
+          saveFenceCache(fences);
+          renderGeofencesFromCache();
+        }
+      }catch(e){ console.warn('Fallback get geofences failed', e); }
     }
 
     // Selección de geocerca
@@ -456,7 +492,7 @@
       pendingFenceCoords=null;
       document.getElementById('fenceNamePanel').classList.add('hidden');
       cancelFenceDraw();
-      removePreviewFence();
+      removePreviewFence(); // limpiar preview si venía de coords
     }
     function cancelFenceName(){
       document.getElementById('fenceNameInput').value='';
