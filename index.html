@@ -174,7 +174,64 @@
         Para geocercas: <strong>Nueva geocerca</strong> → clics en el mapa → <strong>Finalizar geocerca</strong> → asigna nombre y guarda.
       </p>
     </div>
-  </div>
+
+    <!-- === NUEVO: Gestión de Personal === -->
+    <div class="bg-white p-6 rounded-2xl shadow-lg">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-2xl font-semibold text-gray-700">Gestión de Personal</h2>
+        <span class="text-xs text-gray-500">Doble clic sobre una fila para ir a su asignación</span>
+      </div>
+
+      <!-- Formulario -->
+      <div class="rounded-xl border border-gray-200 p-4 mb-4">
+        <div class="grid md:grid-cols-5 gap-3">
+          <div>
+            <label class="text-sm text-gray-600">Nombre</label>
+            <input id="pFirstName" type="text" class="w-full border rounded-md p-2" placeholder="Nombre" />
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Apellido</label>
+            <input id="pLastName" type="text" class="w-full border rounded-md p-2" placeholder="Apellido" />
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Cédula</label>
+            <input id="pIdNumber" type="text" class="w-full border rounded-md p-2" placeholder="Número de cédula" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-sm text-gray-600">Asignación</label>
+            <select id="pAssignSelect" class="w-full border rounded-md p-2">
+              <!-- se llena dinámicamente con Finca:… y Geocerca:… -->
+            </select>
+          </div>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button id="addPersonBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Agregar</button>
+          <span id="personFormError" class="text-sm text-rose-600 hidden"></span>
+        </div>
+      </div>
+
+      <!-- Lista -->
+      <div class="rounded-xl border border-gray-200">
+        <table class="min-w-full">
+          <thead class="bg-gray-50 text-left text-sm text-gray-600">
+            <tr>
+              <th class="px-3 py-2">Nombre</th>
+              <th class="px-3 py-2">Apellido</th>
+              <th class="px-3 py-2">Cédula</th>
+              <th class="px-3 py-2">Asignado a</th>
+              <th class="px-3 py-2 w-32">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="personnelTbody" class="text-sm">
+            <!-- filas dinámicas -->
+          </tbody>
+        </table>
+        <div id="personnelEmpty" class="py-4 text-center text-sm text-gray-500 hidden">No hay personal registrado.</div>
+      </div>
+    </div>
+    <!-- === FIN Gestión de Personal === -->
+
+  </div> <!-- /#appContent -->
 
   <!-- Leaflet core JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -210,7 +267,7 @@
     let map;
     const fincaMarkers = {};
     const geofenceLayers = {};
-    const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1';
+    const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1', LS_PERS='personnel_cache_v1';
 
     let isDrawingFence=false, drawingCoords=[], drawingPolyline=null, drawingMarkers=[], pendingFenceCoords=null;
     let previewFenceLayer=null, selectedFenceId=null;
@@ -218,18 +275,20 @@
     const GEOFENCE_STYLE = {weight:2, fillOpacity:0.15};
     const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
 
-    let currentFarms=[], currentFences=[];
+    let currentFarms=[], currentFences=[], currentPersonnel=[];
 
     /* ===== Edición ===== */
     let isEditingFence=false;
-    let editBackupCoords=null;   // [{lat,lng}, ...]
-    let tempEditLayer=null;      // <— capa temporal que SÍ se mueve con los handlers
+    let editBackupCoords=null;
+    let tempEditLayer=null;
 
     /* =================== Caché =================== */
     const saveCache = farms => { try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} };
     const loadCache = () => { try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } };
     const saveFenceCache = fences => { try{ localStorage.setItem(LS_GF, JSON.stringify(fences)); }catch{} };
     const loadFenceCache = () => { try{ return JSON.parse(localStorage.getItem(LS_GF)||'[]'); }catch{ return []; } };
+    const savePersonnelCache = list => { try{ localStorage.setItem(LS_PERS, JSON.stringify(list)); }catch{} };
+    const loadPersonnelCache = () => { try{ return JSON.parse(localStorage.getItem(LS_PERS)||'[]'); }catch{ return []; } };
 
     /* =================== Render =================== */
     function renderFarmsFromCache(){
@@ -257,6 +316,7 @@
 
       currentFarms = farms || [];
       buildIndexList();
+      rebuildAssignSelect(); // <— opciones para personal
     }
 
     function renderGeofencesFromCache(){
@@ -280,6 +340,7 @@
 
       currentFences = fences || [];
       buildIndexList();
+      rebuildAssignSelect(); // <— opciones para personal
     }
 
     /* =================== Mapa =================== */
@@ -312,7 +373,7 @@
     }
 
     /* =================== Suscripciones =================== */
-    let unsubFarms=null, unsubGeofences=null, subsStarted=false;
+    let unsubFarms=null, unsubGeofences=null, unsubPersonnel=null, subsStarted=false;
     function startSubscriptions(){
       if (subsStarted) return; subsStarted=true;
 
@@ -342,6 +403,7 @@
         }
         updateDeleteButtonState();
         buildIndexList();
+        rebuildAssignSelect();
       }, err=>{ console.warn('onSnapshot farms error', err); renderFarmsFromCache(); });
 
       // Geocercas
@@ -371,24 +433,52 @@
         updateDeleteFenceButtonState();
         updateEditButtonsState();
         buildIndexList();
+        rebuildAssignSelect();
       }, err=>{ console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
+
+      // === NUEVO: Personal
+      unsubPersonnel = db.collection('personnel').onSnapshot(snap=>{
+        const people=[];
+        snap.forEach(doc=>{
+          const d=doc.data()||{};
+          people.push({
+            id: doc.id,
+            firstName: d.firstName||'',
+            lastName:  d.lastName||'',
+            idNumber:  d.idNumber||'',
+            assignType: d.assignType||'farm', // 'farm' | 'geofence'
+            assignId:   d.assignId||null
+          });
+        });
+        currentPersonnel = people.slice();
+        if (people.length) savePersonnelCache(people);
+        renderPersonnelList();
+      }, err=>{ console.warn('onSnapshot personnel error', err); renderPersonnelList(true); });
     }
 
     /* =================== Carga inicial =================== */
-    async function initialFetchAll(){ await Promise.all([initialFetchFarms(), initialFetchGeofences()]); }
+    async function initialFetchAll(){ await Promise.all([initialFetchFarms(), initialFetchGeofences(), initialFetchPersonnel()]); }
     async function initialFetchFarms(){
       try{
         const snap=await db.collection('farms').get();
         const farms=[]; snap.forEach(doc=>{ const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); });
-        if (farms.length){ currentFarms=farms.slice(); saveCache(farms); renderFarmsFromCache(); } else { buildIndexList(); }
-      }catch(e){ console.warn('get farms failed', e); buildIndexList(); }
+        if (farms.length){ currentFarms=farms.slice(); saveCache(farms); renderFarmsFromCache(); } else { buildIndexList(); rebuildAssignSelect(); }
+      }catch(e){ console.warn('get farms failed', e); buildIndexList(); rebuildAssignSelect(); }
     }
     async function initialFetchGeofences(){
       try{
         const snap=await db.collection('geofences').get();
         const fences=[]; snap.forEach(doc=>{ const d=doc.data(); fences.push({id:doc.id,name:d.name,path:d.path||[]}); });
-        if (fences.length){ currentFences=fences.slice(); saveFenceCache(fences); renderGeofencesFromCache(); } else { buildIndexList(); }
-      }catch(e){ console.warn('get geofences failed', e); buildIndexList(); }
+        if (fences.length){ currentFences=fences.slice(); saveFenceCache(fences); renderGeofencesFromCache(); } else { buildIndexList(); rebuildAssignSelect(); }
+      }catch(e){ console.warn('get geofences failed', e); buildIndexList(); rebuildAssignSelect(); }
+    }
+    async function initialFetchPersonnel(){
+      try{
+        const snap=await db.collection('personnel').get();
+        const people=[]; snap.forEach(doc=>{ const d=doc.data()||{}; people.push({id:doc.id, firstName:d.firstName||'', lastName:d.lastName||'', idNumber:d.idNumber||'', assignType:d.assignType||'farm', assignId:d.assignId||null}); });
+        if (people.length){ currentPersonnel=people.slice(); savePersonnelCache(people); }
+        renderPersonnelList();
+      }catch(e){ console.warn('get personnel failed', e); renderPersonnelList(true); }
     }
 
     /* =================== Sync local -> Firestore =================== */
@@ -418,6 +508,26 @@
         }
         renderGeofencesFromCache();
       }catch(e){ console.warn('sync geofences error', e); }
+
+      // === NUEVO: personal
+      try{
+        const people=loadPersonnelCache();
+        const pendingP=people.filter(p=> p && String(p.id).startsWith('localp-'));
+        for (const p of pendingP){
+          try{
+            await db.collection('personnel').add({
+              firstName:p.firstName||'',
+              lastName:p.lastName||'',
+              idNumber:p.idNumber||'',
+              assignType:p.assignType||'farm',
+              assignId:p.assignId||null
+            });
+            const updated=loadPersonnelCache().filter(x=> x.id!==p.id);
+            savePersonnelCache(updated);
+          }catch(e){ console.warn('No se pudo subir personal local', p, e); }
+        }
+        renderPersonnelList();
+      }catch(e){ console.warn('sync personnel error', e); }
     }
 
     /* =================== Selección =================== */
@@ -612,16 +722,14 @@
       if(isEditingFence) return;
 
       const basePoly = geofenceLayers[selectedFenceId];
-
-      // Respaldo (primer anillo) para cancelar
       const rings = basePoly.getLatLngs();
       const ring0  = Array.isArray(rings[0]) ? rings[0] : rings;
       editBackupCoords = ring0.map(ll => ({ lat: ll.lat, lng: ll.lng }));
 
-      // Oculta visualmente la original mientras se edita
+      // Oculta visualmente la capa base
       try { basePoly.setStyle({ opacity: 0, fillOpacity: 0 }); } catch(e){}
 
-      // Capa temporal editable que SÍ se redibuja en vivo
+      // Capa temporal editable
       tempEditLayer = L.polygon(editBackupCoords.map(p => [p.lat, p.lng]), { color:'#ef4444', weight:3, fillOpacity:0.2 }).addTo(map);
       if (!(tempEditLayer.editing && typeof tempEditLayer.editing.enable === 'function')) {
         alert('Leaflet.Draw no se cargó correctamente.'); return;
@@ -638,18 +746,15 @@
       }
       const basePoly = geofenceLayers[selectedFenceId];
 
-      // Nuevos vértices desde la capa temporal
       const rings = tempEditLayer.getLatLngs();
       const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
       const newPath = ring0.map(ll => ({ lat: ll.lat, lng: ll.lng }));
       if (newPath.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
 
-      // Actualiza caché local
       const fencesCache = loadFenceCache() || [];
       const idx = fencesCache.findIndex(g => g.id === selectedFenceId);
       if (idx >= 0){ fencesCache[idx].path = newPath; saveFenceCache(fencesCache); }
 
-      // Guarda en Firestore si corresponde
       let firestoreOK = false;
       try{
         if (!String(selectedFenceId).startsWith('localgf-')){
@@ -658,7 +763,6 @@
         firestoreOK = true;
       }catch(err){ console.warn('No se pudo guardar edición en Firestore, se mantiene caché local:', err); }
 
-      // Refleja en la capa real y limpia la temporal
       try { basePoly.setLatLngs(newPath); basePoly.setStyle(GEOFENCE_SELECTED_STYLE); basePoly.redraw && basePoly.redraw(); } catch(e){}
       try { tempEditLayer.editing.disable(); map.removeLayer(tempEditLayer); } catch(e){}
       tempEditLayer = null;
@@ -674,7 +778,6 @@
       if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]) return;
       const basePoly = geofenceLayers[selectedFenceId];
 
-      // Restaura geometría original
       if (editBackupCoords && editBackupCoords.length >= 3){
         try{
           basePoly.setLatLngs(editBackupCoords.map(p => L.latLng(p.lat, p.lng)));
@@ -683,7 +786,6 @@
       }
       try { basePoly.setStyle(GEOFENCE_SELECTED_STYLE); } catch(e){}
 
-      // Quita la capa temporal si existe
       if (tempEditLayer){
         try { tempEditLayer.editing.disable(); map.removeLayer(tempEditLayer); } catch(e){}
         tempEditLayer = null;
@@ -919,7 +1021,167 @@
       const iv=setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } },150);
     }
 
-    /* =================== Listeners =================== */
+    /* =================== PERSONAL (nuevo) =================== */
+    function rebuildAssignSelect(){
+      const sel=document.getElementById('pAssignSelect');
+      if(!sel) return;
+      const farms=(currentFarms&&currentFarms.length)?currentFarms:(loadCache()||[]);
+      const fences=(currentFences&&currentFences.length)?currentFences:(loadFenceCache()||[]);
+      sel.innerHTML='';
+
+      if(farms.length){
+        const og=document.createElement('optgroup'); og.label='Fincas';
+        farms.forEach(f=>{
+          const opt=document.createElement('option');
+          opt.value=`farm:${f.id}`;
+          opt.textContent=`Finca: ${f.name||'Sin nombre'}`;
+          og.appendChild(opt);
+        });
+        sel.appendChild(og);
+      }
+      if(fences.length){
+        const og=document.createElement('optgroup'); og.label='Geocercas';
+        fences.forEach(g=>{
+          const opt=document.createElement('option');
+          opt.value=`geofence:${g.id}`;
+          opt.textContent=`Geocerca: ${g.name||'Sin nombre'}`;
+          og.appendChild(opt);
+        });
+        sel.appendChild(og);
+      }
+      if(!sel.options.length){
+        const opt=document.createElement('option');
+        opt.value=''; opt.textContent='(No hay fincas ni geocercas)';
+        sel.appendChild(opt);
+      }
+    }
+
+    function renderPersonnelList(useCacheOnly=false){
+      const tbody=document.getElementById('personnelTbody');
+      const empty=document.getElementById('personnelEmpty');
+      if(!tbody || !empty) return;
+
+      const source = !useCacheOnly && currentPersonnel && currentPersonnel.length
+        ? currentPersonnel
+        : (loadPersonnelCache()||[]);
+
+      tbody.innerHTML='';
+      if(!source.length){
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      source.slice()
+        .sort((a,b)=> (a.lastName||'').localeCompare(b.lastName||'') || (a.firstName||'').localeCompare(b.firstName||''))
+        .forEach(p=>{
+          const tr=document.createElement('tr'); tr.className='border-t';
+          const asText = p.assignType==='farm'
+            ? `Finca: ${(findFarmName(p.assignId)||'—')}`
+            : `Geocerca: ${(findFenceName(p.assignId)||'—')}`;
+
+          tr.innerHTML=`
+            <td class="px-3 py-2">${escapeHTML(p.firstName||'')}</td>
+            <td class="px-3 py-2">${escapeHTML(p.lastName||'')}</td>
+            <td class="px-3 py-2">${escapeHTML(p.idNumber||'')}</td>
+            <td class="px-3 py-2">${escapeHTML(asText)}</td>
+            <td class="px-3 py-2">
+              <button class="text-rose-600 hover:underline" data-del="${p.id}">Eliminar</button>
+            </td>
+          `;
+          tr.addEventListener('dblclick', ()=>{
+            if(p.assignType==='farm' && p.assignId) zoomToFarm(p.assignId);
+            else if(p.assignType==='geofence' && p.assignId) zoomToFence(p.assignId);
+          });
+          tbody.appendChild(tr);
+        });
+
+      // handlers de borrar
+      tbody.querySelectorAll('[data-del]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const id=btn.getAttribute('data-del');
+          await deletePerson(id);
+        });
+      });
+    }
+
+    function escapeHTML(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+    function findFarmName(id){
+      const src=(currentFarms&&currentFarms.length)?currentFarms:(loadCache()||[]);
+      const f=src.find(x=> x.id===id);
+      return f? (f.name||'Finca') : null;
+    }
+    function findFenceName(id){
+      const src=(currentFences&&currentFences.length)?currentFences:(loadFenceCache()||[]);
+      const g=src.find(x=> x.id===id);
+      return g? (g.name||'Geocerca') : null;
+    }
+
+    async function addPerson(){
+      const fn=document.getElementById('pFirstName')?.value.trim()||'';
+      const ln=document.getElementById('pLastName')?.value.trim()||'';
+      const idn=document.getElementById('pIdNumber')?.value.trim()||'';
+      const assignVal=document.getElementById('pAssignSelect')?.value||'';
+      const err=document.getElementById('personFormError');
+
+      if(err){ err.classList.add('hidden'); err.textContent=''; }
+
+      if(!fn || !ln){ return showPersonError('Nombre y apellido son obligatorios.'); }
+      if(!/^[0-9]{6,15}$/.test(idn)){ return showPersonError('Cédula: usar solo dígitos (6–15).'); }
+      if(!assignVal){ return showPersonError('Seleccione una asignación.'); }
+
+      const [assignType, assignId] = assignVal.split(':');
+      const docData = { firstName: fn, lastName: ln, idNumber: idn, assignType, assignId };
+
+      try{
+        await db.collection('personnel').add(docData);
+      }catch(e){
+        // Guardado local si falla
+        const local = loadPersonnelCache();
+        local.push({ id:`localp-${Date.now()}`, ...docData });
+        savePersonnelCache(local);
+        currentPersonnel = local.slice();
+      }
+
+      // limpiar formulario y refrescar
+      document.getElementById('pFirstName').value='';
+      document.getElementById('pLastName').value='';
+      document.getElementById('pIdNumber').value='';
+      renderPersonnelList();
+      waitAuthThen(syncLocalPendingToFirestore);
+    }
+
+    function showPersonError(msg){
+      const err=document.getElementById('personFormError');
+      if(err){ err.textContent=msg; err.classList.remove('hidden'); }
+      return false;
+    }
+
+    async function deletePerson(id){
+      if(!id) return;
+      // local
+      let cache = loadPersonnelCache();
+      const item = (currentPersonnel||[]).find(p=> p.id===id) || cache.find(p=> p.id===id);
+      const label = item ? `${item.firstName||''} ${item.lastName||''}`.trim() : 'esta persona';
+      if(!confirm(`¿Eliminar ${label}?`)) return;
+
+      if(String(id).startsWith('localp-')){
+        cache = cache.filter(p=> p.id!==id); savePersonnelCache(cache);
+        currentPersonnel = cache.slice();
+        renderPersonnelList();
+        return;
+      }
+      try{
+        await db.collection('personnel').doc(id).delete();
+      }catch(e){
+        // si falla, al menos quítalo del cache
+        cache = cache.filter(p=> p.id!==id); savePersonnelCache(cache);
+        currentPersonnel = cache.slice();
+      }
+      renderPersonnelList();
+    }
+
+    /* =================== Listeners base =================== */
     document.addEventListener("DOMContentLoaded",function(){
       document.getElementById('farmSelect')?.addEventListener('change', updateDeleteButtonState);
 
@@ -955,6 +1217,11 @@
 
       document.getElementById('indexPanel')?.classList.remove('hidden');
 
+      // NUEVO: Personal
+      document.getElementById('addPersonBtn')?.addEventListener('click', addPerson);
+      rebuildAssignSelect();
+      renderPersonnelList();
+
       buildIndexList();
       updateDeleteButtonState();
       updateDeleteFenceButtonState();
@@ -962,7 +1229,7 @@
     });
   </script>
 
-  <!-- HOTFIX: por si la barra pierde los botones avanzados -->
+  <!-- HOTFIX botones avanzados -->
   <script>
     function ensureAdvancedButtons(){
       const afterBtn=document.getElementById('deleteFenceBtn');
