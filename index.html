@@ -222,7 +222,8 @@
 
     /* ===== Edición ===== */
     let isEditingFence=false;
-    let editBackupCoords=null;  // [{lat,lng},...]
+    let editBackupCoords=null;   // [{lat,lng}, ...]
+    let tempEditLayer=null;      // <— capa temporal que SÍ se mueve con los handlers
 
     /* =================== Caché =================== */
     const saveCache = farms => { try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} };
@@ -594,7 +595,7 @@
       }
     }
 
-    /* =================== EDICIÓN DE GEOCERCAS (edición directa de capa) =================== */
+    /* =================== EDICIÓN DE GEOCERCAS (con capa temporal) =================== */
     function updateEditButtonsState(){
       const canEdit=!!selectedFenceId && !!geofenceLayers[selectedFenceId] && !isEditingFence;
       const eBtn=document.getElementById('editFenceBtn'); if(eBtn) eBtn.disabled=!canEdit;
@@ -610,82 +611,87 @@
       }
       if(isEditingFence) return;
 
-      const poly = geofenceLayers[selectedFenceId];
+      const basePoly = geofenceLayers[selectedFenceId];
 
       // Respaldo (primer anillo) para cancelar
-      const rings = poly.getLatLngs();
+      const rings = basePoly.getLatLngs();
       const ring0  = Array.isArray(rings[0]) ? rings[0] : rings;
       editBackupCoords = ring0.map(ll => ({ lat: ll.lat, lng: ll.lng }));
 
-      if (!(poly.editing && typeof poly.editing.enable === 'function')) {
-        alert('Leaflet.Draw no se cargó correctamente.');
-        return;
+      // Oculta visualmente la original mientras se edita
+      try { basePoly.setStyle({ opacity: 0, fillOpacity: 0 }); } catch(e){}
+
+      // Capa temporal editable que SÍ se redibuja en vivo
+      tempEditLayer = L.polygon(editBackupCoords.map(p => [p.lat, p.lng]), { color:'#ef4444', weight:3, fillOpacity:0.2 }).addTo(map);
+      if (!(tempEditLayer.editing && typeof tempEditLayer.editing.enable === 'function')) {
+        alert('Leaflet.Draw no se cargó correctamente.'); return;
       }
-      try { poly.editing.enable(); } catch(e){ console.warn(e); }
+      try { tempEditLayer.editing.enable(); } catch(e){ console.warn(e); }
 
       isEditingFence = true;
       updateEditButtonsState();
     }
 
     async function saveFenceEdit(){
-      if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]){
-        alert('No estás en modo edición.');
-        return;
+      if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId] || !tempEditLayer){
+        alert('No estás en modo edición.'); return;
       }
-      const poly = geofenceLayers[selectedFenceId];
+      const basePoly = geofenceLayers[selectedFenceId];
 
-      const rings = poly.getLatLngs();
+      // Nuevos vértices desde la capa temporal
+      const rings = tempEditLayer.getLatLngs();
       const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
       const newPath = ring0.map(ll => ({ lat: ll.lat, lng: ll.lng }));
-      if (newPath.length < 3){
-        alert('La geocerca necesita al menos 3 puntos.');
-        return;
-      }
+      if (newPath.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
 
+      // Actualiza caché local
       const fencesCache = loadFenceCache() || [];
       const idx = fencesCache.findIndex(g => g.id === selectedFenceId);
-      if (idx >= 0){
-        fencesCache[idx].path = newPath;
-        saveFenceCache(fencesCache);
-      }
+      if (idx >= 0){ fencesCache[idx].path = newPath; saveFenceCache(fencesCache); }
 
+      // Guarda en Firestore si corresponde
       let firestoreOK = false;
       try{
         if (!String(selectedFenceId).startsWith('localgf-')){
           await db.collection('geofences').doc(selectedFenceId).update({ path: newPath });
         }
         firestoreOK = true;
-      }catch(err){
-        console.warn('No se pudo guardar edición en Firestore, se mantiene caché local:', err);
-      }
+      }catch(err){ console.warn('No se pudo guardar edición en Firestore, se mantiene caché local:', err); }
 
-      try { poly.editing.disable(); } catch(e){}
+      // Refleja en la capa real y limpia la temporal
+      try { basePoly.setLatLngs(newPath); basePoly.setStyle(GEOFENCE_SELECTED_STYLE); basePoly.redraw && basePoly.redraw(); } catch(e){}
+      try { tempEditLayer.editing.disable(); map.removeLayer(tempEditLayer); } catch(e){}
+      tempEditLayer = null;
 
       isEditingFence = false;
       editBackupCoords = null;
       updateEditButtonsState();
 
-      try { poly.setStyle(GEOFENCE_SELECTED_STYLE); poly.redraw && poly.redraw(); } catch(e){}
       alert(firestoreOK ? 'Cambios guardados.' : 'Cambios guardados localmente (sin conexión).');
     }
 
     function cancelFenceEdit(){
       if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]) return;
+      const basePoly = geofenceLayers[selectedFenceId];
 
-      const poly = geofenceLayers[selectedFenceId];
+      // Restaura geometría original
       if (editBackupCoords && editBackupCoords.length >= 3){
         try{
-          poly.setLatLngs(editBackupCoords.map(p => L.latLng(p.lat, p.lng)));
-          poly.redraw && poly.redraw();
+          basePoly.setLatLngs(editBackupCoords.map(p => L.latLng(p.lat, p.lng)));
+          basePoly.redraw && basePoly.redraw();
         }catch(e){ console.warn(e); }
       }
+      try { basePoly.setStyle(GEOFENCE_SELECTED_STYLE); } catch(e){}
 
-      try { poly.editing.disable(); } catch(e){}
+      // Quita la capa temporal si existe
+      if (tempEditLayer){
+        try { tempEditLayer.editing.disable(); map.removeLayer(tempEditLayer); } catch(e){}
+        tempEditLayer = null;
+      }
+
       isEditingFence = false;
       editBackupCoords = null;
       updateEditButtonsState();
-
-      try { poly.setStyle(GEOFENCE_SELECTED_STYLE); } catch(e){}
     }
 
     /* =================== GEOJSON =================== */
