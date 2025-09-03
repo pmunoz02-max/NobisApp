@@ -57,6 +57,7 @@
     function showApp(){
       document.getElementById('adminModal')?.classList.add("hidden");
       document.getElementById('appContent')?.classList.remove("hidden");
+      // Garantiza repintado del mapa y que se vea TODO el contenido (incl. personal)
       setTimeout(()=>{ initMap(); setTimeout(()=>{ if(window.map){ map.invalidateSize(); } }, 80); }, 50);
     }
     function doAdminLogin(ev){
@@ -175,11 +176,15 @@
       </p>
     </div>
 
-    <!-- === NUEVO: Gestión de Personal === -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
+    <!-- === Gestión de Personal === -->
+    <div id="personSection" class="bg-white p-6 rounded-2xl shadow-lg">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-2xl font-semibold text-gray-700">Gestión de Personal</h2>
-        <span class="text-xs text-gray-500">Doble clic sobre una fila para ir a su asignación</span>
+        <div class="flex items-center gap-2">
+          <input id="personSearch" type="text" placeholder="Buscar nombre, apellido, cédula o asignación..."
+                 class="w-72 max-w-full border rounded-md p-2">
+          <button id="personSearchClear" class="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700">Limpiar</button>
+        </div>
       </div>
 
       <!-- Formulario -->
@@ -199,9 +204,7 @@
           </div>
           <div class="md:col-span-2">
             <label class="text-sm text-gray-600">Asignación</label>
-            <select id="pAssignSelect" class="w-full border rounded-md p-2">
-              <!-- se llena dinámicamente con Finca:… y Geocerca:… -->
-            </select>
+            <select id="pAssignSelect" class="w-full border rounded-md p-2"></select>
           </div>
         </div>
         <div class="mt-3 flex gap-2">
@@ -211,7 +214,7 @@
       </div>
 
       <!-- Lista -->
-      <div class="rounded-xl border border-gray-200">
+      <div class="rounded-xl border border-gray-200 overflow-x-auto">
         <table class="min-w-full">
           <thead class="bg-gray-50 text-left text-sm text-gray-600">
             <tr>
@@ -219,7 +222,7 @@
               <th class="px-3 py-2">Apellido</th>
               <th class="px-3 py-2">Cédula</th>
               <th class="px-3 py-2">Asignado a</th>
-              <th class="px-3 py-2 w-32">Acciones</th>
+              <th class="px-3 py-2 w-40">Acciones</th>
             </tr>
           </thead>
           <tbody id="personnelTbody" class="text-sm">
@@ -232,6 +235,36 @@
     <!-- === FIN Gestión de Personal === -->
 
   </div> <!-- /#appContent -->
+
+  <!-- Modal edición de persona -->
+  <div id="editPersonModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl p-6">
+      <h3 class="text-xl font-semibold text-gray-800 mb-4">Editar persona</h3>
+      <div class="grid md:grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm text-gray-600">Nombre</label>
+          <input id="epFirstName" type="text" class="w-full border rounded-md p-2" />
+        </div>
+        <div>
+          <label class="text-sm text-gray-600">Apellido</label>
+          <input id="epLastName" type="text" class="w-full border rounded-md p-2" />
+        </div>
+        <div>
+          <label class="text-sm text-gray-600">Cédula</label>
+          <input id="epIdNumber" type="text" class="w-full border rounded-md p-2" />
+        </div>
+        <div>
+          <label class="text-sm text-gray-600">Asignación</label>
+          <select id="epAssignSelect" class="w-full border rounded-md p-2"></select>
+        </div>
+      </div>
+      <p id="epError" class="text-sm text-rose-600 mt-2 hidden"></p>
+      <div class="mt-4 flex justify-end gap-2">
+        <button id="epCancelBtn" class="px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700">Cancelar</button>
+        <button id="epSaveBtn" class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">Guardar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Leaflet core JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -276,8 +309,9 @@
     const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
 
     let currentFarms=[], currentFences=[], currentPersonnel=[];
+    let personEditId=null; // id de la persona que se edita
 
-    /* ===== Edición ===== */
+    /* ===== Edición geocerca (capa temporal) ===== */
     let isEditingFence=false;
     let editBackupCoords=null;
     let tempEditLayer=null;
@@ -316,7 +350,7 @@
 
       currentFarms = farms || [];
       buildIndexList();
-      rebuildAssignSelect(); // <— opciones para personal
+      rebuildAssignSelect(); // opciones para personal
     }
 
     function renderGeofencesFromCache(){
@@ -340,7 +374,7 @@
 
       currentFences = fences || [];
       buildIndexList();
-      rebuildAssignSelect(); // <— opciones para personal
+      rebuildAssignSelect();
     }
 
     /* =================== Mapa =================== */
@@ -436,7 +470,7 @@
         rebuildAssignSelect();
       }, err=>{ console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
 
-      // === NUEVO: Personal
+      // Personal
       unsubPersonnel = db.collection('personnel').onSnapshot(snap=>{
         const people=[];
         snap.forEach(doc=>{
@@ -446,7 +480,7 @@
             firstName: d.firstName||'',
             lastName:  d.lastName||'',
             idNumber:  d.idNumber||'',
-            assignType: d.assignType||'farm', // 'farm' | 'geofence'
+            assignType: d.assignType||'farm',
             assignId:   d.assignId||null
           });
         });
@@ -509,7 +543,6 @@
         renderGeofencesFromCache();
       }catch(e){ console.warn('sync geofences error', e); }
 
-      // === NUEVO: personal
       try{
         const people=loadPersonnelCache();
         const pendingP=people.filter(p=> p && String(p.id).startsWith('localp-'));
@@ -530,7 +563,7 @@
       }catch(e){ console.warn('sync personnel error', e); }
     }
 
-    /* =================== Selección =================== */
+    /* =================== Selección & util =================== */
     function selectFence(id){
       if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes de seleccionar otra.'); return; }
       if(selectedFenceId && geofenceLayers[selectedFenceId]){
@@ -544,12 +577,12 @@
       updateEditButtonsState();
     }
 
-    /* =================== Crear fincas =================== */
     const normDec = s => String(s||'').trim().replace(',', '.');
     const parseCoord = s => { const v=parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; };
     const validLat = v => v>=-90 && v<=90;
     const validLng = v => v>=-180 && v<=180;
 
+    /* =================== Crear fincas =================== */
     let pendingLat=null, pendingLng=null;
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
@@ -705,7 +738,7 @@
       }
     }
 
-    /* =================== EDICIÓN DE GEOCERCAS (con capa temporal) =================== */
+    /* =================== EDICIÓN DE GEOCERCAS (capa temporal) =================== */
     function updateEditButtonsState(){
       const canEdit=!!selectedFenceId && !!geofenceLayers[selectedFenceId] && !isEditingFence;
       const eBtn=document.getElementById('editFenceBtn'); if(eBtn) eBtn.disabled=!canEdit;
@@ -945,7 +978,7 @@
       }catch(e){ console.warn(e); }
     }
 
-    /* =================== Borrado =================== */
+    /* =================== Borrado geocerca/finca =================== */
     async function deleteSelectedFarm(){
       const sel=document.getElementById('farmSelect'); const id= sel ? sel.value : '';
       if(!id){ alert('No hay finca seleccionada.'); return; }
@@ -1021,13 +1054,16 @@
       const iv=setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } },150);
     }
 
-    /* =================== PERSONAL (nuevo) =================== */
+    /* =================== PERSONAL =================== */
     function rebuildAssignSelect(){
       const sel=document.getElementById('pAssignSelect');
       if(!sel) return;
+      buildAssignOptions(sel);
+    }
+    function buildAssignOptions(selectEl){
       const farms=(currentFarms&&currentFarms.length)?currentFarms:(loadCache()||[]);
       const fences=(currentFences&&currentFences.length)?currentFences:(loadFenceCache()||[]);
-      sel.innerHTML='';
+      selectEl.innerHTML='';
 
       if(farms.length){
         const og=document.createElement('optgroup'); og.label='Fincas';
@@ -1037,7 +1073,7 @@
           opt.textContent=`Finca: ${f.name||'Sin nombre'}`;
           og.appendChild(opt);
         });
-        sel.appendChild(og);
+        selectEl.appendChild(og);
       }
       if(fences.length){
         const og=document.createElement('optgroup'); og.label='Geocercas';
@@ -1047,62 +1083,13 @@
           opt.textContent=`Geocerca: ${g.name||'Sin nombre'}`;
           og.appendChild(opt);
         });
-        sel.appendChild(og);
+        selectEl.appendChild(og);
       }
-      if(!sel.options.length){
+      if(!selectEl.options.length){
         const opt=document.createElement('option');
         opt.value=''; opt.textContent='(No hay fincas ni geocercas)';
-        sel.appendChild(opt);
+        selectEl.appendChild(opt);
       }
-    }
-
-    function renderPersonnelList(useCacheOnly=false){
-      const tbody=document.getElementById('personnelTbody');
-      const empty=document.getElementById('personnelEmpty');
-      if(!tbody || !empty) return;
-
-      const source = !useCacheOnly && currentPersonnel && currentPersonnel.length
-        ? currentPersonnel
-        : (loadPersonnelCache()||[]);
-
-      tbody.innerHTML='';
-      if(!source.length){
-        empty.classList.remove('hidden');
-        return;
-      }
-      empty.classList.add('hidden');
-
-      source.slice()
-        .sort((a,b)=> (a.lastName||'').localeCompare(b.lastName||'') || (a.firstName||'').localeCompare(b.firstName||''))
-        .forEach(p=>{
-          const tr=document.createElement('tr'); tr.className='border-t';
-          const asText = p.assignType==='farm'
-            ? `Finca: ${(findFarmName(p.assignId)||'—')}`
-            : `Geocerca: ${(findFenceName(p.assignId)||'—')}`;
-
-          tr.innerHTML=`
-            <td class="px-3 py-2">${escapeHTML(p.firstName||'')}</td>
-            <td class="px-3 py-2">${escapeHTML(p.lastName||'')}</td>
-            <td class="px-3 py-2">${escapeHTML(p.idNumber||'')}</td>
-            <td class="px-3 py-2">${escapeHTML(asText)}</td>
-            <td class="px-3 py-2">
-              <button class="text-rose-600 hover:underline" data-del="${p.id}">Eliminar</button>
-            </td>
-          `;
-          tr.addEventListener('dblclick', ()=>{
-            if(p.assignType==='farm' && p.assignId) zoomToFarm(p.assignId);
-            else if(p.assignType==='geofence' && p.assignId) zoomToFence(p.assignId);
-          });
-          tbody.appendChild(tr);
-        });
-
-      // handlers de borrar
-      tbody.querySelectorAll('[data-del]').forEach(btn=>{
-        btn.addEventListener('click', async ()=>{
-          const id=btn.getAttribute('data-del');
-          await deletePerson(id);
-        });
-      });
     }
 
     function escapeHTML(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
@@ -1115,6 +1102,70 @@
       const src=(currentFences&&currentFences.length)?currentFences:(loadFenceCache()||[]);
       const g=src.find(x=> x.id===id);
       return g? (g.name||'Geocerca') : null;
+    }
+
+    function getPersonSearchTerm(){
+      return (document.getElementById('personSearch')?.value||'').trim().toLowerCase();
+    }
+
+    function renderPersonnelList(useCacheOnly=false){
+      const tbody=document.getElementById('personnelTbody');
+      const empty=document.getElementById('personnelEmpty');
+      if(!tbody || !empty) return;
+
+      const source = !useCacheOnly && currentPersonnel && currentPersonnel.length
+        ? currentPersonnel
+        : (loadPersonnelCache()||[]);
+
+      const q = getPersonSearchTerm();
+
+      tbody.innerHTML='';
+      let shown = 0;
+
+      source.slice()
+        .sort((a,b)=> (a.lastName||'').localeCompare(b.lastName||'') || (a.firstName||'').localeCompare(b.firstName||''))
+        .forEach(p=>{
+          const asText = p.assignType==='farm'
+            ? `Finca: ${(findFarmName(p.assignId)||'—')}`
+            : `Geocerca: ${(findFenceName(p.assignId)||'—')}`;
+
+          const haystack = `${p.firstName||''} ${p.lastName||''} ${p.idNumber||''} ${asText}`.toLowerCase();
+          if (q && !haystack.includes(q)) return;
+
+          const tr=document.createElement('tr'); tr.className='border-t';
+          tr.innerHTML=`
+            <td class="px-3 py-2">${escapeHTML(p.firstName||'')}</td>
+            <td class="px-3 py-2">${escapeHTML(p.lastName||'')}</td>
+            <td class="px-3 py-2">${escapeHTML(p.idNumber||'')}</td>
+            <td class="px-3 py-2">${escapeHTML(asText)}</td>
+            <td class="px-3 py-2">
+              <button class="text-indigo-600 hover:underline mr-3" data-edit="${p.id}">Editar</button>
+              <button class="text-rose-600 hover:underline" data-del="${p.id}">Eliminar</button>
+            </td>
+          `;
+          tr.addEventListener('dblclick', ()=>{
+            if(p.assignType==='farm' && p.assignId) zoomToFarm(p.assignId);
+            else if(p.assignType==='geofence' && p.assignId) zoomToFence(p.assignId);
+          });
+          tbody.appendChild(tr);
+          shown++;
+        });
+
+      empty.classList.toggle('hidden', shown>0);
+
+      // handlers
+      tbody.querySelectorAll('[data-del]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const id=btn.getAttribute('data-del');
+          await deletePerson(id);
+        });
+      });
+      tbody.querySelectorAll('[data-edit]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const id=btn.getAttribute('data-edit');
+          openEditPerson(id);
+        });
+      });
     }
 
     async function addPerson(){
@@ -1136,14 +1187,12 @@
       try{
         await db.collection('personnel').add(docData);
       }catch(e){
-        // Guardado local si falla
         const local = loadPersonnelCache();
         local.push({ id:`localp-${Date.now()}`, ...docData });
         savePersonnelCache(local);
         currentPersonnel = local.slice();
       }
 
-      // limpiar formulario y refrescar
       document.getElementById('pFirstName').value='';
       document.getElementById('pLastName').value='';
       document.getElementById('pIdNumber').value='';
@@ -1159,7 +1208,6 @@
 
     async function deletePerson(id){
       if(!id) return;
-      // local
       let cache = loadPersonnelCache();
       const item = (currentPersonnel||[]).find(p=> p.id===id) || cache.find(p=> p.id===id);
       const label = item ? `${item.firstName||''} ${item.lastName||''}`.trim() : 'esta persona';
@@ -1174,11 +1222,87 @@
       try{
         await db.collection('personnel').doc(id).delete();
       }catch(e){
-        // si falla, al menos quítalo del cache
         cache = cache.filter(p=> p.id!==id); savePersonnelCache(cache);
         currentPersonnel = cache.slice();
       }
       renderPersonnelList();
+    }
+
+    /* ====== Editar persona (modal) ====== */
+    function openEditPerson(id){
+      const src = (currentPersonnel && currentPersonnel.length) ? currentPersonnel : (loadPersonnelCache()||[]);
+      const p = src.find(x=> x.id===id);
+      if(!p){ alert('No se encontró el registro.'); return; }
+      personEditId = id;
+
+      // campos
+      const fn = document.getElementById('epFirstName');
+      const ln = document.getElementById('epLastName');
+      const idn= document.getElementById('epIdNumber');
+      const sel= document.getElementById('epAssignSelect');
+      buildAssignOptions(sel);
+
+      fn.value = p.firstName||'';
+      ln.value = p.lastName||'';
+      idn.value= p.idNumber||'';
+
+      const value = `${p.assignType||'farm'}:${p.assignId||''}`;
+      const opt = Array.from(sel.options).find(o=> o.value===value);
+      sel.value = opt ? value : (sel.options[0]?.value||'');
+
+      document.getElementById('epError').classList.add('hidden');
+      document.getElementById('editPersonModal').classList.remove('hidden');
+      document.getElementById('editPersonModal').classList.add('flex');
+    }
+    function closeEditPerson(){
+      document.getElementById('editPersonModal').classList.add('hidden');
+      document.getElementById('editPersonModal').classList.remove('flex');
+      personEditId = null;
+    }
+    async function saveEditPerson(){
+      const id = personEditId;
+      if(!id) return;
+
+      const fn=document.getElementById('epFirstName')?.value.trim()||'';
+      const ln=document.getElementById('epLastName')?.value.trim()||'';
+      const idn=document.getElementById('epIdNumber')?.value.trim()||'';
+      const assignVal=document.getElementById('epAssignSelect')?.value||'';
+      const err=document.getElementById('epError');
+
+      err.classList.add('hidden'); err.textContent='';
+
+      if(!fn || !ln){ err.textContent='Nombre y apellido son obligatorios.'; err.classList.remove('hidden'); return; }
+      if(!/^[0-9]{6,15}$/.test(idn)){ err.textContent='Cédula: usar solo dígitos (6–15).'; err.classList.remove('hidden'); return; }
+      if(!assignVal){ err.textContent='Seleccione una asignación.'; err.classList.remove('hidden'); return; }
+
+      const [assignType, assignId] = assignVal.split(':');
+      const docData = { firstName: fn, lastName: ln, idNumber: idn, assignType, assignId };
+
+      // Actualiza caches locales
+      let cache = loadPersonnelCache();
+      const idxLocal = cache.findIndex(p=> p.id===id);
+      if (idxLocal>=0){ cache[idxLocal] = { id, ...docData }; savePersonnelCache(cache); }
+
+      // Si existe en la colección en vivo, actualiza; si era localp- sólo cache.
+      let ok = false;
+      try{
+        if (!String(id).startsWith('localp-')){
+          await db.collection('personnel').doc(id).update(docData);
+        }
+        ok = true;
+      }catch(e){
+        // Mantener en cache si falla
+        ok = false;
+      }
+
+      // Refresca UI
+      if (currentPersonnel && currentPersonnel.length){
+        const idx = currentPersonnel.findIndex(p=> p.id===id);
+        if (idx>=0){ currentPersonnel[idx] = { id, ...docData }; }
+      }
+      renderPersonnelList();
+      closeEditPerson();
+      if(!ok) alert('Cambios guardados localmente (sin conexión). Se sincronizarán luego.');
     }
 
     /* =================== Listeners base =================== */
@@ -1217,8 +1341,18 @@
 
       document.getElementById('indexPanel')?.classList.remove('hidden');
 
-      // NUEVO: Personal
+      // Personal
       document.getElementById('addPersonBtn')?.addEventListener('click', addPerson);
+      document.getElementById('personSearch')?.addEventListener('input', ()=> renderPersonnelList());
+      document.getElementById('personSearchClear')?.addEventListener('click', ()=>{
+        const inp=document.getElementById('personSearch'); if(inp){ inp.value=''; }
+        renderPersonnelList();
+      });
+
+      // Modal edición
+      document.getElementById('epCancelBtn')?.addEventListener('click', closeEditPerson);
+      document.getElementById('epSaveBtn')?.addEventListener('click', saveEditPerson);
+
       rebuildAssignSelect();
       renderPersonnelList();
 
@@ -1229,7 +1363,7 @@
     });
   </script>
 
-  <!-- HOTFIX botones avanzados -->
+  <!-- HOTFIX botones avanzados (por si se rehidrata el DOM) -->
   <script>
     function ensureAdvancedButtons(){
       const afterBtn=document.getElementById('deleteFenceBtn');
