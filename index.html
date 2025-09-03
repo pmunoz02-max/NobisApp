@@ -25,77 +25,85 @@
 </head>
 <body class="bg-gray-100 p-4 sm:p-8 overflow-x-hidden">
 
-  <!-- Modal admin -->
-<script>
-// === PARCHE LOGIN ROBUSTO ===
-const ADMIN_CODE = "admin123";
+  <!-- Modal admin (RESTABLECIDO) -->
+  <div id="adminModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+      <h1 class="text-3xl font-bold text-gray-800 mb-4">Acceso de Administrador</h1>
+      <p class="text-gray-600 mb-6">Introduce tu código de administrador.</p>
+      <input type="password" id="adminCodeInput" placeholder="Código de acceso"
+             class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2"
+             autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text">
+      <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
+      <button id="adminLoginBtn"
+              class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">
+        Acceder
+      </button>
+    </div>
+  </div>
 
-// Normaliza: NFKC, quita espacios, quita zero-width, minúsculas
-function normalizeCode(s){
-  return String(s || "")
-    .normalize("NFKC")
-    .replace(/[\u200B-\u200D\uFEFF]/g, "") // zero-width
-    .trim()
-    .toLowerCase();
-}
+  <!-- === PARCHE LOGIN ROBUSTO (ÚNICA VERSIÓN ACTIVA) === -->
+  <script>
+  const ADMIN_CODE = "admin123";
 
-function allowBypass(){
-  try {
-    const qs = new URLSearchParams(location.search);
-    if (qs.get("skipAdmin") === "1") return true;         // ?skipAdmin=1
-    if (localStorage.getItem("admin_debug") === "1") return true; // setea manualmente si quieres
-  } catch {}
-  return false;
-}
+  function normalizeCode(s){
+    return String(s || "")
+      .normalize("NFKC")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .trim()
+      .toLowerCase();
+  }
 
-function showApp(){
-  document.getElementById('adminModal')?.classList.add("hidden");
-  document.getElementById('appContent')?.classList.remove("hidden");
-  setTimeout(()=>{ initMap(); setTimeout(()=>{ if(window.map){ map.invalidateSize(); } }, 80); }, 50);
-}
+  function allowBypass(){
+    try {
+      const qs = new URLSearchParams(location.search);
+      if (qs.get("skipAdmin") === "1") return true;               // ?skipAdmin=1
+      if (localStorage.getItem("admin_debug") === "1") return true;
+    } catch {}
+    return false;
+  }
 
-function doAdminLogin(ev){
-  if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
-  try{
-    const inputEl = document.getElementById('adminCodeInput');
-    const raw = inputEl ? inputEl.value : "";
-    const ok = allowBypass() || normalizeCode(raw) === normalizeCode(ADMIN_CODE);
-    if (ok){
-      showApp();
-    }else{
-      const err = document.getElementById('errorMessage');
-      if (err){
-        err.textContent = 'Código incorrecto. Intenta con "admin123"';
-        err.style.display = "block";
+  function showApp(){
+    document.getElementById('adminModal')?.classList.add("hidden");
+    document.getElementById('appContent')?.classList.remove("hidden");
+    setTimeout(()=>{ initMap(); setTimeout(()=>{ if(window.map){ map.invalidateSize(); } }, 80); }, 50);
+  }
+
+  function doAdminLogin(ev){
+    if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+    try{
+      const inputEl = document.getElementById('adminCodeInput');
+      const raw = inputEl ? inputEl.value : "";
+      const ok = allowBypass() || normalizeCode(raw) === normalizeCode(ADMIN_CODE);
+      if (ok){
+        showApp();
+      }else{
+        const err = document.getElementById('errorMessage');
+        if (err){
+          err.textContent = 'Código incorrecto. Intenta con "admin123"';
+          err.style.display = "block";
+        }
       }
-    }
-  }catch(e){ console.error(e); }
-}
+    }catch(e){ console.error(e); }
+  }
 
-// Reengancha listeners de forma segura
-document.addEventListener("DOMContentLoaded",function(){
-  // si quieres habilitar bypass persistente en esta máquina:
-  // localStorage.setItem("admin_debug","1"); // y para desactivar: localStorage.removeItem("admin_debug");
+  document.addEventListener("DOMContentLoaded",function(){
+    const modal = document.getElementById('adminModal');
+    modal?.classList.remove("hidden");
 
-  const modal = document.getElementById('adminModal');
-  modal?.classList.remove("hidden");
+    const btn = document.getElementById('adminLoginBtn');
+    btn?.addEventListener("click", doAdminLogin);
 
-  const btn = document.getElementById('adminLoginBtn');
-  btn?.addEventListener("click", doAdminLogin);
+    const adminInput = document.getElementById('adminCodeInput');
+    adminInput?.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ doAdminLogin(e); }});
+    adminInput?.addEventListener("input", ()=>{ 
+      const err = document.getElementById('errorMessage');
+      if (err) err.style.display="none";
+    });
 
-  const adminInput = document.getElementById('adminCodeInput');
-  adminInput?.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ doAdminLogin(e); }});
-  adminInput?.addEventListener("input", ()=>{ 
-    // Oculta el mensaje de error al escribir
-    const err = document.getElementById('errorMessage');
-    if (err) err.style.display="none";
+    // Auto-entrar si usas ?skipAdmin=1 o admin_debug
+    if (allowBypass()) showApp();
   });
-
-  // Auto-entrar si usas ?skipAdmin=1
-  if (allowBypass()) showApp();
-});
-</script>
-
+  </script>
 
   <!-- Contenido de la app -->
   <div id="appContent" class="max-w-7xl mx-auto flex flex-col space-y-6 hidden">
@@ -333,9 +341,9 @@ document.addEventListener("DOMContentLoaded",function(){
 
     // ===== Edición (Leaflet.Draw) =====
     let isEditingFence = false;
-    let editBackupCoords = null; // [{lat,lng},...]
-    let editGroup = null;        // L.FeatureGroup con la capa seleccionada
-    let editToolbar = null;      // L.EditToolbar.Edit instancia
+    let editBackupCoords = null; 
+    let editGroup = null;        
+    let editToolbar = null;      
 
     // Caché
     const saveCache = farms => { try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} };
@@ -1123,31 +1131,8 @@ document.addEventListener("DOMContentLoaded",function(){
       const iv = setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } }, 150);
     }
 
-    const ADMIN_CODE = "admin123";
-    function doAdminLogin(){
-      try{
-        const inputEl = document.getElementById('adminCodeInput');
-        const raw = inputEl ? String(inputEl.value || '') : '';
-        const normalized = raw.trim().toLowerCase();
-        if(normalized === ADMIN_CODE){
-          document.getElementById('adminModal')?.classList.add("hidden");
-          document.getElementById('appContent')?.classList.remove("hidden");
-          setTimeout(()=>{ initMap(); setTimeout(()=>{ if(map){ map.invalidateSize(); } }, 100); }, 100);
-        }else{
-          document.getElementById('errorMessage').style.display="block";
-        }
-      }catch(e){ console.error(e); }
-    }
-
-    // Listeners
+    // Listeners (solo los de la app; SIN login duplicado)
     document.addEventListener("DOMContentLoaded",function(){
-      document.getElementById('adminModal')?.classList.remove("hidden");
-
-      document.getElementById('adminLoginBtn')?.addEventListener("click", doAdminLogin);
-      const adminInput = document.getElementById('adminCodeInput');
-      adminInput?.addEventListener("keypress", (e)=>{ if(e.key==="Enter") doAdminLogin(); });
-      adminInput?.addEventListener("keydown",  (e)=>{ if(e.key==="Enter") doAdminLogin(); });
-
       document.getElementById('farmSelect')?.addEventListener('change', updateDeleteButtonState);
 
       document.getElementById('createFarmBtn')?.addEventListener('click', createFarmAtCenter);
@@ -1184,7 +1169,7 @@ document.addEventListener("DOMContentLoaded",function(){
         if(!file) return;
         const text = await file.text();
         await importGeoJSONFromText(text);
-        e.target.value = ''; // reset input
+        e.target.value = '';
       });
 
       // Asegurar que el panel del explorador nunca quede oculto
