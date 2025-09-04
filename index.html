@@ -33,13 +33,10 @@
              class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2"
              autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text">
       <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
-      <button id="adminLoginBtn"
-              onclick="doAdminLogin()"
-              class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">
-        Acceder
-      </button>
-    </div>
-  </div>
+      <button id="addPersonBtn" type="button"
+  class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
+  Agregar
+</button>
 
   <!-- Contenido de la app -->
   <div id="appContent" class="max-w-7xl mx-auto flex flex-col space-y-6 hidden">
@@ -1475,6 +1472,20 @@
       updateDeleteFenceButtonState();
       updateEditButtonsState();
     });
+    // === FIX botón Agregar ===
+// (1) nos aseguramos de exponer la función en window
+window.addPerson = typeof addPerson === 'function' ? addPerson : function(){};
+
+// (2) binding seguro del click (evita que un form haga submit por accidente)
+const _btnAdd = document.getElementById('addPersonBtn');
+if (_btnAdd) {
+  _btnAdd.addEventListener('click', function (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    try { window.addPerson(); } catch (e) { console.error('addPerson error:', e); }
+  });
+}
+
   </script>
 </body>
 </html>
