@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gestión de Personal de Finca (Leaflet + Firebase)</title>
+  <title>Gestión de Fincas (Multiusuario)</title>
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet -->
@@ -22,32 +22,70 @@
     .badge-green{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
     .badge-gray{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb}
     .multiselect{min-height:42px}
+    .tab-btn{padding:.5rem 1rem;border-radius:.5rem}
+    .tab-active{background:#e5e7eb}
   </style>
 </head>
 <body class="p-4 sm:p-8">
 
-  <!-- Modal admin -->
-  <div id="adminModal" class="fixed inset-0 bg-gray-900/75 flex items-center justify-center z-50 p-4">
-    <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
-      <h1 class="text-3xl font-bold mb-4">Acceso de Administrador</h1>
-      <p class="text-gray-600 mb-6">Introduce tu código de administrador.</p>
-      <input id="adminCodeInput" type="password" placeholder="Código de acceso"
-             class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
-      <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
-      <button id="adminLoginBtn"
-              class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-lg">
-        Acceder
-      </button>
+  <!-- ========= Autenticación (Login / Registro con código) ========= -->
+  <div id="authModal" class="fixed inset-0 bg-gray-900/80 flex items-center justify-center z-50 p-4">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6">
+      <h1 class="text-2xl font-bold mb-2 text-center">Acceso</h1>
+      <p class="text-gray-600 text-center mb-4">Inicia sesión o crea tu cuenta con un código de invitación</p>
+
+      <div class="flex gap-2 justify-center mb-4">
+        <button id="tabLogin" class="tab-btn tab-active">Iniciar sesión</button>
+        <button id="tabRegister" class="tab-btn">Crear cuenta</button>
+      </div>
+
+      <!-- Login -->
+      <div id="loginPanel">
+        <div class="grid gap-3">
+          <input id="loginEmail" type="email" placeholder="Correo"
+                 class="w-full rounded-md border-gray-300 p-3">
+          <input id="loginPassword" type="password" placeholder="Contraseña"
+                 class="w-full rounded-md border-gray-300 p-3">
+          <button id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-lg">Entrar</button>
+          <div id="loginError" class="text-sm text-red-600 hidden"></div>
+        </div>
+      </div>
+
+      <!-- Registro -->
+      <div id="registerPanel" class="hidden">
+        <div class="grid gap-3">
+          <input id="regEmail" type="email" placeholder="Correo"
+                 class="w-full rounded-md border-gray-300 p-3">
+          <input id="regPassword" type="password" placeholder="Contraseña"
+                 class="w-full rounded-md border-gray-300 p-3">
+          <input id="regCode" type="text" placeholder="Código de invitación"
+                 class="w-full rounded-md border-gray-300 p-3">
+          <button id="registerBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-3 rounded-lg">Crear cuenta</button>
+          <div id="registerError" class="text-sm text-red-600 hidden"></div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Contenido -->
+  <!-- ========= Barra superior: usuario + salir ========= -->
+  <div id="topBar" class="max-w-7xl mx-auto mb-4 hidden">
+    <div class="bg-white border border-gray-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+      <div class="text-sm text-gray-600">Conectado como: <span id="currentUserEmail" class="font-medium">—</span></div>
+      <span id="roleBadge" class="ml-2 text-xs px-2 py-1 rounded bg-gray-100 border border-gray-200 text-gray-700">usuario</span>
+      <div class="ml-auto flex items-center gap-2">
+        <button id="openAdminBtn" class="hidden bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-3 py-2 rounded-lg">Admin de la App</button>
+        <button id="logoutBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-semibold px-3 py-2 rounded-lg">Salir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========= Contenido principal ========= -->
   <div id="appContent" class="max-w-7xl mx-auto flex flex-col space-y-6 hidden">
 
     <!-- Header -->
-    <header class="text-center my-4">
+    <header class="text-center my-2">
       <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
-      <p class="text-md sm:text-lg text-gray-600 mt-2">Leaflet + Firestore (con caché local)</p>
+      <p class="text-md sm:text-lg text-gray-600 mt-1">Leaflet + Firestore (multiusuario)</p>
     </header>
 
     <!-- Finca activa -->
@@ -56,7 +94,7 @@
       <select id="farmSelect" class="mt-1 w-full border rounded-md p-2"></select>
     </div>
 
-    <!-- Mapa + barra -->
+    <!-- ======= Mapa + barra ======= -->
     <div class="bg-white p-6 rounded-2xl shadow-lg">
       <div class="flex flex-wrap gap-2 items-center mb-2">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
@@ -221,7 +259,6 @@
         <span class="text-xs text-gray-500">Doble clic en una fila para ir a su finca/geocerca</span>
       </div>
 
-      <!-- Form alta -->
       <div class="grid md:grid-cols-5 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700">
@@ -259,7 +296,6 @@
         <span id="actFormError" class="text-sm text-red-600 ml-3 hidden"></span>
       </div>
 
-      <!-- Filtros -->
       <div class="mt-6 grid md:grid-cols-4 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700">Persona</label>
@@ -418,11 +454,10 @@
           <button id="repGenerateBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Generar</button>
         </div>
         <div class="flex items-end">
-          <button id="repDownloadBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">Descargar CSV (Excel)</button>
+          <button id="repDownloadBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">Descargar CSV</button>
         </div>
       </div>
 
-      <!-- Tabla -->
       <div class="mt-4 overflow-auto">
         <table class="min-w-full text-left" id="repTable">
           <thead id="repTableHead"></thead>
@@ -430,15 +465,14 @@
         </table>
       </div>
 
-      <!-- Gráfico -->
       <div class="mt-6 bg-white rounded-xl border border-gray-200 p-4">
         <canvas id="repChart" height="120"></canvas>
       </div>
     </div>
 
-  </div><!-- /#appContent -->
+  </div><!-- /appContent -->
 
-  <!-- Modal: elegir persona activa (costos) -->
+  <!-- ========= Modal: elegir persona activa (Costos) ========= -->
   <div id="lcPersonModal" class="fixed inset-0 bg-gray-900/75 hidden items-center justify-center z-50 p-4">
     <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-5">
       <div class="flex items-center justify-between mb-3">
@@ -449,6 +483,34 @@
       <div id="lcModalList" class="max-h-80 overflow-auto divide-y divide-gray-100"></div>
       <div class="mt-4 text-right">
         <button id="lcModalCancel" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========= Modal Administración de la App ========= -->
+  <div id="adminAppModal" class="fixed inset-0 bg-gray-900/80 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold">Administración de la App</h2>
+        <button id="adminCloseBtn" class="text-gray-600 hover:text-gray-900">✕</button>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- Usuarios -->
+        <div class="border rounded-xl p-4">
+          <h3 class="font-semibold mb-3">Usuarios</h3>
+          <div id="adminUsersList" class="max-h-96 overflow-auto divide-y divide-gray-100 text-sm"></div>
+        </div>
+
+        <!-- Códigos de invitación -->
+        <div class="border rounded-xl p-4">
+          <h3 class="font-semibold mb-3">Códigos de invitación</h3>
+          <div class="flex gap-2 mb-3">
+            <input id="adminNewCodeUses" type="number" min="1" step="1" value="1" class="w-32 border rounded-md p-2" placeholder="Usos">
+            <button id="adminGenCodeBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-2 rounded-lg">Crear código</button>
+          </div>
+          <div id="adminCodesList" class="max-h-96 overflow-auto divide-y divide-gray-100 text-sm"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -466,7 +528,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <script>
-    /* ---------- Firebase ---------- */
+    /* ================= Firebase ================= */
     const firebaseConfig = {
       apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
       authDomain: "demo-finca-app.firebaseapp.com",
@@ -478,35 +540,175 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     try { db.settings({ experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: true, useFetchStreams: false }); } catch {}
-    let authReady = false;
-    firebase.auth().signInAnonymously().catch(console.error);
-    firebase.auth().onAuthStateChanged(u => authReady = !!u);
+    const auth = firebase.auth();
 
-    /* ---------- Estado y caché ---------- */
-    let map;
-    const fincaMarkers = {}, geofenceLayers = {};
-    const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1', LS_PE='personnel_cache_v1', LS_AC='activities_cache_v1', LS_AD='activity_defs_v1', LS_LC='labor_costs_cache_v1';
+    /* ============ Multi-tenant: helpers ============ */
+    const OWNER_EMAIL = "cambia_esto@tu-dominio.com"; // <— CAMBIA ESTO
+    let currentUser = null;
+    let currentUserDoc = null; // {email, role, active}
+    let LS_PREFIX = "u_anon_";    // prefijo por usuario para separar cachés
+
+    const lsKey = (base)=> `${LS_PREFIX}${base}`;
     const save = (k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
     const load = (k)=>{try{return JSON.parse(localStorage.getItem(k)||'[]')}catch{return []}};
-    const saveFarms=(v)=>save(LS_KEY,v), loadFarms=()=>load(LS_KEY);
-    const saveFences=(v)=>save(LS_GF,v), loadFences=()=>load(LS_GF);
-    const savePeople=(v)=>save(LS_PE,v),  loadPeople=()=>load(LS_PE);
-    const saveActs=(v)=>save(LS_AC,v),    loadActs=()=>load(LS_AC);
-    const saveLaborCosts=(v)=>save(LS_LC,v), loadLaborCosts=()=>load(LS_LC);
+    const wipeUserCache = ()=>{
+      save(lsKey('fincas_v1'), []);
+      save(lsKey('geofences_v1'), []);
+      save(lsKey('personnel_v1'), []);
+      save(lsKey('activities_v1'), []);
+      save(lsKey('labor_costs_v1'), []);
+    };
 
+    const saveFarms=(v)=>save(lsKey('fincas_v1'),v),         loadFarms=()=>load(lsKey('fincas_v1'));
+    const saveFences=(v)=>save(lsKey('geofences_v1'),v),     loadFences=()=>load(lsKey('geofences_v1'));
+    const savePeople=(v)=>save(lsKey('personnel_v1'),v),     loadPeople=()=>load(lsKey('personnel_v1'));
+    const saveActs=(v)=>save(lsKey('activities_v1'),v),      loadActs=()=>load(lsKey('activities_v1'));
+    const saveLaborCosts=(v)=>save(lsKey('labor_costs_v1'),v), loadLaborCosts=()=>load(lsKey('labor_costs_v1'));
+
+    // actividades maestras (por usuario)
+    const LS_AD = ()=>lsKey('activity_defs_v1');
     const DEFAULT_ACTIVITY_OPTIONS = ['Siembra','Riego','Cosecha','Poda','Fertilización','Fumigación','Mantenimiento','Limpieza','Transporte','Supervisión'];
-    const loadActivityDefs = () => { try { const val = JSON.parse(localStorage.getItem(LS_AD) || 'null'); if (Array.isArray(val) && val.length) return val; } catch {} return DEFAULT_ACTIVITY_OPTIONS.slice(); };
-    const saveActivityDefs = (arr) => { try{ localStorage.setItem(LS_AD, JSON.stringify(arr)); }catch{} };
+    const loadActivityDefs = () => { try{ const arr=JSON.parse(localStorage.getItem(LS_AD())||'null'); if(Array.isArray(arr)&&arr.length) return arr; }catch{} return DEFAULT_ACTIVITY_OPTIONS.slice(); };
+    const saveActivityDefs = (arr)=>{ try{ localStorage.setItem(LS_AD(), JSON.stringify(arr)); }catch{} };
     let activityDefs = loadActivityDefs();
 
-    let currentFarms=[], currentFences=[], currentPersonnel=[], currentActivities=[], currentLaborCosts=[];
+    // Colecciones dentro de la carpeta del usuario
+    const tenantDoc = ()=> db.collection('tenants').doc(currentUser.uid);
+    const col = (name)=> tenantDoc().collection(name); // farms, geofences, personnel, activities, labor_costs
+
+    /* =================== Estado general =================== */
+    let map;
+    const fincaMarkers = {}, geofenceLayers = {};
     const GEOFENCE_STYLE={weight:2,fillOpacity:.15}, GEOFENCE_SELECTED_STYLE={weight:3,color:'#ef4444',fillOpacity:.2};
     let isDrawingFence=false, drawingCoords=[], drawingPolyline=null, drawingMarkers=[], pendingFenceCoords=null;
-    let selectedFenceId=null, editGroup=null, editToolbar=null, isEditingFence=false, editBackupCoords=null;
+    let selectedFenceId=null, editGroup=null, isEditingFence=false;
+    let currentFarms=[], currentFences=[], currentPersonnel=[], currentActivities=[], currentLaborCosts=[];
 
-    function waitAuthThen(fn){ if(authReady) return fn(); const t=setInterval(()=>{ if(authReady){clearInterval(t); fn();}},120); }
+    /* =================== Autenticación =================== */
+    async function createUserDocIfMissing(u){
+      const ref = db.collection('users').doc(u.uid);
+      const snap = await ref.get();
+      if(!snap.exists){
+        const role = (u.email && u.email.toLowerCase()===OWNER_EMAIL.toLowerCase()) ? 'owner' : 'user';
+        await ref.set({ email: u.email||'', role, active: true, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+      const doc = (await ref.get()).data();
+      return doc;
+    }
+    function setUiAfterLogin(){
+      document.getElementById('authModal').classList.add('hidden');
+      document.getElementById('topBar').classList.remove('hidden');
+      document.getElementById('appContent').classList.remove('hidden');
+      document.getElementById('currentUserEmail').textContent = currentUser.email || '(sin email)';
+      const roleBadge = document.getElementById('roleBadge');
+      roleBadge.textContent = currentUserDoc?.role || 'usuario';
+      // admin button visible para owner/admin
+      const isAdmin = ['owner','admin'].includes(currentUserDoc?.role);
+      document.getElementById('openAdminBtn').classList.toggle('hidden', !isAdmin);
+      // prefijo de cache
+      LS_PREFIX = `u_${currentUser.uid}_`;
+    }
+    function setUiLoggedOut(){
+      document.getElementById('authModal').classList.remove('hidden');
+      document.getElementById('topBar').classList.add('hidden');
+      document.getElementById('appContent').classList.add('hidden');
+      currentUser=null; currentUserDoc=null; LS_PREFIX='u_anon_';
+    }
 
-    /* ---------- Mapa ---------- */
+    // Tabs login/register
+    function switchTab(which){
+      const loginPanel = document.getElementById('loginPanel');
+      const registerPanel = document.getElementById('registerPanel');
+      const tabLogin = document.getElementById('tabLogin');
+      const tabRegister = document.getElementById('tabRegister');
+      if(which==='login'){
+        loginPanel.classList.remove('hidden');
+        registerPanel.classList.add('hidden');
+        tabLogin.classList.add('tab-active');
+        tabRegister.classList.remove('tab-active');
+      }else{
+        registerPanel.classList.remove('hidden');
+        loginPanel.classList.add('hidden');
+        tabRegister.classList.add('tab-active');
+        tabLogin.classList.remove('tab-active');
+      }
+    }
+
+    async function doLogin(){
+      const email = (document.getElementById('loginEmail').value||'').trim();
+      const pass  = (document.getElementById('loginPassword').value||'').trim();
+      const err = document.getElementById('loginError'); err.classList.add('hidden'); err.textContent='';
+      try{
+        const cred = await auth.signInWithEmailAndPassword(email, pass);
+        currentUser = cred.user;
+        // Verifica estado activo
+        currentUserDoc = await createUserDocIfMissing(currentUser);
+        if(currentUserDoc.active === false){
+          await auth.signOut();
+          err.textContent='Tu cuenta está deshabilitada por el administrador.'; err.classList.remove('hidden'); return;
+        }
+        // limpiar cache visual para evitar ver restos de otro usuario
+        wipeUserCache();
+        // iniciar app
+        setUiAfterLogin();
+        bootAfterAuth();
+      }catch(e){
+        err.textContent = 'No se pudo iniciar sesión.'; err.classList.remove('hidden'); console.error(e);
+      }
+    }
+    async function doRegister(){
+      const email = (document.getElementById('regEmail').value||'').trim();
+      const pass  = (document.getElementById('regPassword').value||'').trim();
+      const code  = (document.getElementById('regCode').value||'').trim();
+      const err = document.getElementById('registerError'); err.classList.add('hidden'); err.textContent='';
+      if(!code){ err.textContent='Ingresa un código de invitación.'; err.classList.remove('hidden'); return; }
+
+      const codeRef = db.collection('access_keys').doc(code);
+      try{
+        await db.runTransaction(async tx=>{
+          const snap = await tx.get(codeRef);
+          if(!snap.exists) throw new Error('Código inválido.');
+          const d = snap.data();
+          if(d.active===false) throw new Error('Código deshabilitado.');
+          const used = d.used||0, max = d.maxUses||1;
+          if(used>=max) throw new Error('Código sin cupos disponibles.');
+          tx.update(codeRef, { used: used+1 });
+        });
+
+        const cred = await auth.createUserWithEmailAndPassword(email, pass);
+        currentUser = cred.user;
+        currentUserDoc = await createUserDocIfMissing(currentUser);
+        if(currentUserDoc.active === false){
+          await auth.signOut();
+          err.textContent='Tu cuenta está deshabilitada.'; err.classList.remove('hidden'); return;
+        }
+        // Primer inicio: BD vacía por diseño (tenant nuevo)
+        wipeUserCache();
+        setUiAfterLogin();
+        bootAfterAuth();
+      }catch(e){
+        err.textContent = e.message || 'No se pudo registrar.'; err.classList.remove('hidden'); console.error(e);
+      }
+    }
+    async function doLogout(){
+      try{ await auth.signOut(); }catch{}
+      setUiLoggedOut();
+      // limpia suscripciones activas
+      stopSubscriptions();
+    }
+
+    /* =================== App previa (adaptada a tenant) =================== */
+    function bootAfterAuth(){
+      setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80);
+    }
+
+    function addMousePositionControl(){
+      const MousePos=L.Control.extend({options:{position:'bottomleft'},onAdd:function(){const d=L.DomUtil.create('div','mousepos-control');d.innerHTML='Lat: — Lng: —';this._div=d;return d;},update:function(lat,lng){this._div.innerHTML=(lat!=null&&lng!=null)?`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`:'Lat: — Lng: —';}});
+      const ctrl=new MousePos(); ctrl.addTo(map);
+      map.on('mousemove',e=>ctrl.update(e.latlng.lat,e.latlng.lng));
+      map.on('mouseout',()=>ctrl.update(null,null));
+    }
+
     function initMap(center){ center=center||{lat:-0.1807,lng:-78.4678};
       map=L.map('map',{center:[center.lat,center.lng],zoom:6});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
@@ -516,17 +718,13 @@
       map.on('click', async e=>{
         if(isDrawingFence){ addFenceVertex(e.latlng); return; }
         const name=prompt('Nombre de la nueva finca:'); if(!name) return;
-        try{ await db.collection('farms').add({name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}}); }
+        try{ await col('farms').add({name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}}); }
         catch{ const farms=loadFarms(); farms.push({id:'local-'+Date.now(),name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}}); saveFarms(farms); renderFarmsFromCache(); }
       });
-      waitAuthThen(async()=>{ startSubscriptions(); await Promise.all([initialFetchFarms(),initialFetchGeofences(),initialFetchPersonnel(),initialFetchActivities(),initialFetchLaborCosts()]); syncLocalPendingToFirestore(); });
+      startSubscriptions();
+      initialFetchAll();
     }
-    function addMousePositionControl(){
-      const MousePos=L.Control.extend({options:{position:'bottomleft'},onAdd:function(){const d=L.DomUtil.create('div','mousepos-control');d.innerHTML='Lat: — Lng: —';this._div=d;return d;},update:function(lat,lng){this._div.innerHTML=(lat!=null&&lng!=null)?`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`:'Lat: — Lng: —';}});
-      const ctrl=new MousePos(); ctrl.addTo(map);
-      map.on('mousemove',e=>ctrl.update(e.latlng.lat,e.latlng.lng));
-      map.on('mouseout',()=>ctrl.update(null,null));
-    }
+
     function renderFarmsFromCache(){
       const farms=loadFarms();
       Object.values(fincaMarkers).forEach(m=>map.removeLayer(m)); for(const k in fincaMarkers) delete fincaMarkers[k];
@@ -542,71 +740,66 @@
       updateDeleteFenceButtonState(); updateEditButtonsState(); currentFences=fences||[]; buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
     }
 
-    /* ---------- Suscripciones ---------- */
-    let unsubFarms=null,unsubGeofences=null,unsubPersonnel=null,unsubActivities=null,unsubLaborCosts=null,subsStarted=false;
+    /* ======== Suscripciones Firestore (scoped) ======== */
+    let unsubFarms=null,unsubGeofences=null,unsubPersonnel=null,unsubActivities=null,unsubLaborCosts=null;
+    function stopSubscriptions(){
+      [unsubFarms,unsubGeofences,unsubPersonnel,unsubActivities,unsubLaborCosts].forEach(fn=>{try{fn&&fn()}catch{}});
+      unsubFarms=unsubGeofences=unsubPersonnel=unsubActivities=unsubLaborCosts=null;
+    }
     function startSubscriptions(){
-      if(subsStarted) return; subsStarted=true;
-      unsubFarms=db.collection('farms').onSnapshot(s=>{
+      stopSubscriptions();
+      unsubFarms=col('farms').onSnapshot(s=>{
         const farms=[]; Object.values(fincaMarkers).forEach(m=>map.removeLayer(m)); for(const k in fincaMarkers) delete fincaMarkers[k];
         s.forEach(doc=>{const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); if(d.fincaLocation){const m=L.marker([d.fincaLocation.lat,d.fincaLocation.lng]).addTo(map); m.bindTooltip(d.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'}); fincaMarkers[doc.id]=m; }});
-        if(farms.length){ currentFarms=farms.slice(); saveFarms(farms); }
-        else { currentFarms=loadFarms(); renderFarmsFromCache(); return; }
+        currentFarms=farms.slice(); saveFarms(farms);
         const sel=document.getElementById('farmSelect'); if(sel){ sel.innerHTML=''; farms.forEach(f=>{const o=document.createElement('option'); o.value=f.id; o.textContent=f.name||'Finca'; sel.appendChild(o);}); }
         updateDeleteButtonState(); buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
-      },()=>renderFarmsFromCache());
+      });
 
-      unsubGeofences=db.collection('geofences').onSnapshot(s=>{
+      unsubGeofences=col('geofences').onSnapshot(s=>{
         const fences=[]; Object.values(geofenceLayers).forEach(p=>map.removeLayer(p)); for(const k in geofenceLayers) delete geofenceLayers[k];
         s.forEach(doc=>{const d=doc.data(); const g={id:doc.id,name:d.name,path:d.path||[]}; fences.push(g);
           if(Array.isArray(g.path)&&g.path.length>=3){ const latlngs=g.path.map(p=>[p.lat,p.lng]); const poly=L.polygon(latlngs,GEOFENCE_STYLE).addTo(map); poly.bindTooltip(g.name||'Geocerca',{permanent:true,direction:'center',className:'farm-label'}); geofenceLayers[doc.id]=poly; poly.on('click',()=>selectFence(doc.id)); if(selectedFenceId===doc.id) poly.setStyle(GEOFENCE_SELECTED_STYLE); }
         });
-        if(fences.length){ currentFences=fences.slice(); saveFences(fences); }
-        else { currentFences=loadFences(); renderGeofencesFromCache(); return; }
+        currentFences=fences.slice(); saveFences(fences);
         if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null;
         updateDeleteFenceButtonState(); updateEditButtonsState(); buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
-      },()=>renderGeofencesFromCache());
+      });
 
-      unsubPersonnel=db.collection('personnel').onSnapshot(s=>{
+      unsubPersonnel=col('personnel').onSnapshot(s=>{
         const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,firstName:d.firstName||'',lastName:d.lastName||'',idNumber:d.idNumber||'',assignType:d.assignType||'',assignId:d.assignId||'',active:(d.active!==false)});});
-        if(list.length){ currentPersonnel=list.slice(); savePeople(list); }
-        else { currentPersonnel=loadPeople(); }
-        renderPersonnelList(); buildActivityFormOptions(); buildReportFilterOptions();
-      },()=>{ currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildReportFilterOptions(); });
+        currentPersonnel=list.slice(); savePeople(list); renderPersonnelList(); buildActivityFormOptions(); buildReportFilterOptions();
+      });
 
-      unsubActivities=db.collection('activities').onSnapshot(s=>{
-        const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({
-          id:doc.id, activity:d.activity||'', personId:d.personId||'', personName:d.personName||'',
-          assignType:d.assignType||'', assignId:d.assignId||'', entityName:d.entityName||'',
-          startDate:d.startDate||'', endDate:d.endDate||''
-        });});
-        if(list.length){ currentActivities=list.slice(); saveActs(list); }
-        else { currentActivities=loadActs(); }
-        renderActivityList(); buildReportFilterOptions();
-      },()=>{ currentActivities=loadActs(); renderActivityList(); buildReportFilterOptions(); });
+      unsubActivities=col('activities').onSnapshot(s=>{
+        const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,activity:d.activity||'',personId:d.personId||'',personName:d.personName||'',assignType:d.assignType||'',assignId:d.assignId||'',entityName:d.entityName||'',startDate:d.startDate||'',endDate:d.endDate||''});});
+        currentActivities=list.slice(); saveActs(list); renderActivityList(); buildReportFilterOptions();
+      });
 
-      unsubLaborCosts=db.collection('labor_costs').onSnapshot(s=>{
+      unsubLaborCosts=col('labor_costs').onSnapshot(s=>{
         const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,personId:d.personId||'',personName:d.personName||'',dailyCost:+(d.dailyCost||0),startDate:d.startDate||'',endDate:d.endDate||''});});
-        if(list.length){ currentLaborCosts=list.slice(); saveLaborCosts(list); }
-        else { currentLaborCosts=loadLaborCosts(); }
-        renderLaborCostList();
-      },()=>{ currentLaborCosts=loadLaborCosts(); renderLaborCostList(); });
+        currentLaborCosts=list.slice(); saveLaborCosts(list); renderLaborCostList();
+      });
     }
 
-    async function initialFetchFarms(){ try{ const s=await db.collection('farms').get(); const arr=[]; s.forEach(doc=>{const d=doc.data(); arr.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation});}); currentFarms=arr.length?arr.slice():loadFarms(); if(arr.length) saveFarms(arr); renderFarmsFromCache(); }catch{ renderFarmsFromCache(); } }
-    async function initialFetchGeofences(){ try{ const s=await db.collection('geofences').get(); const arr=[]; s.forEach(doc=>{const d=doc.data(); arr.push({id:doc.id,name:d.name,path:d.path||[]});}); currentFences=arr.length?arr.slice():loadFences(); if(arr.length) saveFences(arr); renderGeofencesFromCache(); }catch{ renderGeofencesFromCache(); } }
-    async function initialFetchPersonnel(){ try{ const s=await db.collection('personnel').get(); const arr=[]; s.forEach(doc=>{const d=doc.data(); arr.push({id:doc.id,firstName:d.firstName||'',lastName:d.lastName||'',idNumber:d.idNumber||'',assignType:d.assignType||'',assignId:d.assignId||'',active:(d.active!==false)});}); currentPersonnel=arr.length?arr.slice():loadPeople(); if(arr.length) savePeople(arr); renderPersonnelList(); }catch{ currentPersonnel=loadPeople(); renderPersonnelList(); } }
-    async function initialFetchActivities(){ try{ const s=await db.collection('activities').get(); const arr=[]; s.forEach(doc=>{const d=doc.data(); arr.push({id:doc.id,activity:d.activity||'',personId:d.personId||'',personName:d.personName||'',assignType:d.assignType||'',assignId:d.assignId||'',entityName:d.entityName||'',startDate:d.startDate||'',endDate:d.endDate||''});}); currentActivities=arr.length?arr.slice():loadActs(); if(arr.length) saveActs(arr); renderActivityList(); }catch{ currentActivities=loadActs(); renderActivityList(); } }
-    async function initialFetchLaborCosts(){ try{ const s=await db.collection('labor_costs').get(); const arr=[]; s.forEach(doc=>{const d=doc.data(); arr.push({id:doc.id,personId:d.personId||'',personName:d.personName||'',dailyCost:+(d.dailyCost||0),startDate:d.startDate||'',endDate:d.endDate||''});}); currentLaborCosts=arr.length?arr.slice():loadLaborCosts(); if(arr.length) saveLaborCosts(arr); renderLaborCostList(); }catch{ currentLaborCosts=loadLaborCosts(); renderLaborCostList(); } }
-
-    async function syncLocalPendingToFirestore(){
-      try{ const farms=loadFarms().filter(f=>String(f.id||'').startsWith('local-')); for(const f of farms){ try{await db.collection('farms').add({name:f.name||'Finca',fincaLocation:f.fincaLocation||null});}catch{} saveFarms(loadFarms().filter(x=>x.id!==f.id)); } }catch{}
-      try{ const fences=loadFences().filter(g=>String(g.id||'').startsWith('localgf-')); for(const g of fences){ try{await db.collection('geofences').add({name:g.name||'Geocerca',path:Array.isArray(g.path)?g.path:[]});}catch{} saveFences(loadFences().filter(x=>x.id!==g.id)); } }catch{}
-      try{ const ppl=loadPeople().filter(p=>String(p.id||'').startsWith('localp-')); for(const p of ppl){ try{await db.collection('personnel').add({firstName:p.firstName||'',lastName:p.lastName||'',idNumber:p.idNumber||'',assignType:p.assignType||'',assignId:p.assignId||'',active:(p.active!==false)}); }catch{} savePeople(loadPeople().filter(x=>x.id!==p.id)); } }catch{}
-      try{ const acts=loadActs().filter(a=>String(a.id||'').startsWith('locala-')); for(const a of acts){ try{await db.collection('activities').add({activity:a.activity,personId:a.personId,personName:a.personName,assignType:a.assignType,assignId:a.assignId,entityName:a.entityName,startDate:a.startDate,endDate:a.endDate});}catch{} saveActs(loadActs().filter(x=>x.id!==a.id)); } }catch{}
-      try{ const lcs=loadLaborCosts().filter(c=>String(c.id||'').startsWith('localc-')); for(const c of lcs){ try{await db.collection('labor_costs').add({personId:c.personId,personName:c.personName,dailyCost:c.dailyCost,startDate:c.startDate,endDate:c.endDate});}catch{} saveLaborCosts(loadLaborCosts().filter(x=>x.id!==c.id)); } }catch{}
+    async function initialFetchAll(){
+      try{
+        const [fs,gs,ps,as,cs] = await Promise.all([
+          col('farms').get(), col('geofences').get(), col('personnel').get(), col('activities').get(), col('labor_costs').get()
+        ]);
+        const arrF=[],arrG=[],arrP=[],arrA=[],arrC=[];
+        fs.forEach(doc=>{const d=doc.data(); arrF.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation});});
+        gs.forEach(doc=>{const d=doc.data(); arrG.push({id:doc.id,name:d.name,path:d.path||[]});});
+        ps.forEach(doc=>{const d=doc.data(); arrP.push({id:doc.id,firstName:d.firstName||'',lastName:d.lastName||'',idNumber:d.idNumber||'',assignType:d.assignType||'',assignId:d.assignId||'',active:(d.active!==false)});});
+        as.forEach(doc=>{const d=doc.data(); arrA.push({id:doc.id,activity:d.activity||'',personId:d.personId||'',personName:d.personName||'',assignType:d.assignType||'',assignId:d.assignId||'',entityName:d.entityName||'',startDate:d.startDate||'',endDate:d.endDate||''});});
+        cs.forEach(doc=>{const d=doc.data(); arrC.push({id:doc.id,personId:d.personId||'',personName:d.personName||'',dailyCost:+(d.dailyCost||0),startDate:d.startDate||'',endDate:d.endDate||''});});
+        saveFarms(arrF); saveFences(arrG); savePeople(arrP); saveActs(arrA); saveLaborCosts(arrC);
+        currentFarms=arrF; currentFences=arrG; currentPersonnel=arrP; currentActivities=arrA; currentLaborCosts=arrC;
+        renderFarmsFromCache(); renderGeofencesFromCache(); renderPersonnelList(); renderActivityList(); renderLaborCostList(); buildReportFilterOptions();
+      }catch(e){ console.warn('Carga inicial falló, usando caché'); renderFarmsFromCache(); renderGeofencesFromCache(); renderPersonnelList(); renderActivityList(); renderLaborCostList(); buildReportFilterOptions(); }
     }
 
-    /* ---------- Geocercas ---------- */
+    /* ======= Geocercas (igual UX) ======= */
     function selectFence(id){ if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes.'); return; } if(selectedFenceId&&geofenceLayers[selectedFenceId]) geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE); selectedFenceId=id; if(geofenceLayers[id]) geofenceLayers[id].setStyle(GEOFENCE_SELECTED_STYLE); updateDeleteFenceButtonState(); updateEditButtonsState(); }
     function updateDeleteButtonState(){ const sel=document.getElementById('farmSelect'), btn=document.getElementById('deleteFarmBtn'); if(btn) btn.disabled=!(sel&&sel.value); }
     function updateDeleteFenceButtonState(){ const btn=document.getElementById('deleteFenceBtn'); if(btn) btn.disabled=!selectedFenceId; }
@@ -615,9 +808,9 @@
     function startFenceDraw(){ if(isDrawingFence) return; isDrawingFence=true; drawingCoords=[]; drawingMarkers.forEach(m=>map.removeLayer(m)); drawingMarkers=[]; if(drawingPolyline){map.removeLayer(drawingPolyline);drawingPolyline=null;} document.getElementById('startFenceBtn').classList.add('hidden'); document.getElementById('finishFenceBtn').classList.remove('hidden'); document.getElementById('cancelFenceBtn').classList.remove('hidden'); }
     function finishFenceDraw(){ if(!isDrawingFence) return; if(drawingCoords.length<3){alert('La geocerca necesita al menos 3 puntos.');return;} pendingFenceCoords=drawingCoords.slice(); document.getElementById('fenceNameHint').textContent=`Vértices: ${pendingFenceCoords.length} puntos`; const input=document.getElementById('fenceNameInput'); input.value=`Geocerca ${new Date().toLocaleDateString()}`; document.getElementById('fenceNamePanel').classList.remove('hidden'); input.focus(); input.select(); }
     function cancelFenceDraw(){ isDrawingFence=false; drawingCoords=[]; drawingMarkers.forEach(m=>map.removeLayer(m)); drawingMarkers=[]; if(drawingPolyline){map.removeLayer(drawingPolyline);drawingPolyline=null;} document.getElementById('startFenceBtn').classList.remove('hidden'); document.getElementById('finishFenceBtn').classList.add('hidden'); document.getElementById('cancelFenceBtn').classList.add('hidden'); document.getElementById('fenceNamePanel').classList.add('hidden'); pendingFenceCoords=null; }
-    async function saveFenceName(){ const input=document.getElementById('fenceNameInput'); const name=(input.value||'').trim()||'Geocerca'; if(!pendingFenceCoords||pendingFenceCoords.length<3){alert('No hay geocerca lista.');return;} try{ await db.collection('geofences').add({name,path:pendingFenceCoords}); }catch{ const fences=loadFences(); fences.push({id:'localgf-'+Date.now(),name,path:pendingFenceCoords}); saveFences(fences); renderGeofencesFromCache(); } input.value=''; pendingFenceCoords=null; document.getElementById('fenceNamePanel').classList.add('hidden'); cancelFenceDraw(); }
+    async function saveFenceName(){ const input=document.getElementById('fenceNameInput'); const name=(input.value||'').trim()||'Geocerca'; if(!pendingFenceCoords||pendingFenceCoords.length<3){alert('No hay geocerca lista.');return;} try{ await col('geofences').add({name,path:pendingFenceCoords}); }catch{ const fences=loadFences(); fences.push({id:'localgf-'+Date.now(),name,path:pendingFenceCoords}); saveFences(fences); renderGeofencesFromCache(); } input.value=''; pendingFenceCoords=null; document.getElementById('fenceNamePanel').classList.add('hidden'); cancelFenceDraw(); }
 
-    /* ---------- Explorador ---------- */
+    /* ======= Explorador ======= */
     function buildIndexList(){
       const farmUl=document.getElementById('farmList'), fenceUl=document.getElementById('fenceList'); if(!farmUl||!fenceUl) return;
       const farms=(currentFarms?.length?currentFarms:loadFarms()).slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
@@ -628,7 +821,7 @@
     function zoomToFarm(id){ if(fincaMarkers[id]){ map.setView(fincaMarkers[id].getLatLng(),Math.max(map.getZoom(),16)); try{fincaMarkers[id].openTooltip();}catch{} return; } const f=loadFarms().find(x=>x.id===id); if(f?.fincaLocation) map.setView([f.fincaLocation.lat,f.fincaLocation.lng],Math.max(map.getZoom(),16)); else alert('No se pudo localizar esa finca.'); }
     function zoomToFence(id){ if(geofenceLayers[id]){ map.fitBounds(geofenceLayers[id].getBounds(),{padding:[20,20]}); selectFence(id); return; } const g=loadFences().find(x=>x.id===id); if(g?.path?.length>=3){ map.fitBounds(L.latLngBounds(g.path.map(p=>[p.lat,p.lng])),{padding:[20,20]}); selectFence(id); } else alert('No se pudo localizar esa geocerca.'); }
 
-    /* ---------- Gestión de personal ---------- */
+    /* ======= Personal ======= */
     function buildAssignOptions(){
       const sel=document.getElementById('pAssignSelect'); if(!sel) return;
       const farms=currentFarms?.length?currentFarms:loadFarms();
@@ -669,10 +862,10 @@
         currentPersonnel = cache.slice(); renderPersonnelList();
 
         try{
-          const ref = await db.collection('personnel').add({firstName: fn, lastName: ln, idNumber: idn, assignType, assignId, active});
+          const ref = await col('personnel').add({firstName: fn, lastName: ln, idNumber: idn, assignType, assignId, active});
           cache = loadPeople().map(p => p.id === tempId ? ({...p, id: ref.id}) : p);
           savePeople(cache); currentPersonnel = cache.slice(); renderPersonnelList();
-        }catch{ waitAuthThen(syncLocalPendingToFirestore); }
+        }catch{}
 
         document.getElementById('pFirstName').value='';
         document.getElementById('pLastName').value='';
@@ -724,7 +917,7 @@
       const it=(currentPersonnel||[]).find(p=>p.id===id)||cache.find(p=>p.id===id);
       const label=it?`${it.firstName||''} ${it.lastName||''}`.trim():'esta persona';
       if(!confirm(`¿Eliminar ${label}?`)) return;
-      try{ await db.collection('personnel').doc(id).delete(); }
+      try{ await col('personnel').doc(id).delete(); }
       catch{ cache=cache.filter(p=>p.id!==id); savePeople(cache); }
       currentPersonnel=loadPeople(); renderPersonnelList();
     }
@@ -743,15 +936,14 @@
       if(pick===null) return; pick=(+pick)-1; if(pick<0||pick>=choices.length){ alert('Selección inválida.'); return; }
       const [assignType,assignId]=choices[pick].v.split(':');
       const doc={firstName:fn,lastName:ln,idNumber:idn,assignType,assignId,active};
-      (async()=>{ try{ await db.collection('personnel').doc(id).update(doc); }
+      (async()=>{ try{ await col('personnel').doc(id).update(doc); }
         catch{ const cache=loadPeople(); const i=cache.findIndex(x=>x.id===id); if(i>=0){ cache[i]={...cache[i],...doc}; savePeople(cache);} }
         currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildReportFilterOptions();
       })();
     }
 
-    /* ---------- GESTIÓN DE ACTIVIDADES ---------- */
+    /* ======= Actividades ======= */
     function showActError(msg){ const e=document.getElementById('actFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
-
     function buildActivityFormOptions(){
       const actSel=document.getElementById('actActivitySelect');
       const actFilter=document.getElementById('actFilterActivity');
@@ -781,6 +973,11 @@
       const aSel=document.getElementById('repActivities'); if(aSel){ aSel.innerHTML = activityDefs.map(a=>`<option value="${a}">${a}</option>`).join(''); }
       setDefaultReportDates();
     }
+    function setDefaultActivityDates(){
+      const today = new Date(), y=today.getFullYear(), m=String(today.getMonth()+1).padStart(2,'0'), d=String(today.getDate()).padStart(2,'0'), v=`${y}-${m}-${d}`;
+      const s = document.getElementById('actStartDate'); const e = document.getElementById('actEndDate');
+      if(s && !s.value) s.value=v; if(e && !e.value) e.value=v;
+    }
     function setDefaultReportDates(){
       const today = new Date();
       const toY = today.getFullYear(), toM = String(today.getMonth()+1).padStart(2,'0'), toD = String(today.getDate()).padStart(2,'0');
@@ -791,7 +988,6 @@
       if(document.getElementById('repFrom') && !document.getElementById('repFrom').value) document.getElementById('repFrom').value = from;
       if(document.getElementById('repTo') && !document.getElementById('repTo').value) document.getElementById('repTo').value = to;
     }
-
     function manageActivityList(){
       const op = prompt('Gestionar actividades:\n1) Agregar\n2) Eliminar\n\nEscribe 1 o 2');
       if(op===null) return;
@@ -816,7 +1012,6 @@
         alert('Eliminada: '+removed);
       }
     }
-
     async function addActivity(){
       try{
         const activity=(document.getElementById('actActivitySelect').value||'').trim();
@@ -849,12 +1044,10 @@
         currentActivities=cache.slice(); renderActivityList();
 
         try{
-          const ref=await db.collection('activities').add({
-            activity, personId, personName, assignType, assignId, entityName, startDate:start, endDate:end
-          });
+          const ref=await col('activities').add({activity, personId, personName, assignType, assignId, entityName, startDate:start, endDate:end});
           cache = loadActs().map(a=>a.id===tempId?({...a,id:ref.id}):a);
           saveActs(cache); currentActivities=cache.slice(); renderActivityList();
-        }catch{ waitAuthThen(syncLocalPendingToFirestore); }
+        }catch{ }
 
         document.getElementById('actStartDate').value='';
         document.getElementById('actEndDate').value='';
@@ -900,13 +1093,13 @@
     }
     async function deleteActivity(id){
       if(!id) return;
-      try{ await db.collection('activities').doc(id).delete(); }
+      try{ await col('activities').doc(id).delete(); }
       catch{ const cache=loadActs().filter(a=>a.id!==id); saveActs(cache); }
       currentActivities=loadActs(); renderActivityList();
     }
     window.deleteActivity=deleteActivity;
 
-    /* ---------- COSTOS ---------- */
+    /* ======= Costos ======= */
     function showLcError(msg){ const e=document.getElementById('lcFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
     function openLcModal(){ const m=document.getElementById('lcPersonModal'); m.classList.remove('hidden'); m.classList.add('flex'); renderLcModalList(); document.getElementById('lcModalSearch').value=''; document.getElementById('lcModalSearch').focus(); }
     function closeLcModal(){ const m=document.getElementById('lcPersonModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
@@ -953,10 +1146,10 @@
         currentLaborCosts = cache.slice(); renderLaborCostList();
 
         try{
-          const ref = await db.collection('labor_costs').add({personId, personName, dailyCost:+dailyCost, startDate:start, endDate:end});
+          const ref = await col('labor_costs').add({personId, personName, dailyCost:+dailyCost, startDate:start, endDate:end});
           cache = loadLaborCosts().map(x=>x.id===tempId?({...x,id:ref.id}):x);
           saveLaborCosts(cache); currentLaborCosts=cache.slice(); renderLaborCostList();
-        }catch{ waitAuthThen(syncLocalPendingToFirestore); }
+        }catch{ }
 
         document.getElementById('lcPersonDisplay').value='';
         document.getElementById('lcPersonDisplay').dataset.personId='';
@@ -986,13 +1179,13 @@
     }
     async function deleteLaborCost(id){
       if(!id) return;
-      try{ await db.collection('labor_costs').doc(id).delete(); }
+      try{ await col('labor_costs').doc(id).delete(); }
       catch{ const cache=loadLaborCosts().filter(x=>x.id!==id); saveLaborCosts(cache); }
       currentLaborCosts=loadLaborCosts(); renderLaborCostList();
     }
     window.deleteLaborCost=deleteLaborCost;
 
-    /* ---------- Reportes ---------- */
+    /* ======= Reportes ======= */
     let reportChart = null, lastReportHeader = [], lastReportRows = [];
     function exportReportCSV(){
       if(!lastReportHeader.length){ alert('Primero genera un reporte.'); return; }
@@ -1021,7 +1214,7 @@
           data: { labels, datasets: [{ label: labelText, data }] },
           options: { responsive:true, maintainAspectRatio:false }
         });
-      }catch{ /* si Chart.js no cargó, omitimos el gráfico */ }
+      }catch{}
     }
     function getMultiValues(selectEl){ return Array.from((selectEl?.selectedOptions)||[]).map(o=>o.value); }
     function overlap(aStart, aEnd, bStart, bEnd){ return (!bStart || aEnd>=bStart) && (!bEnd || aStart<=bEnd); }
@@ -1091,52 +1284,128 @@
       renderReportChart(labels, data, chartType, metric==='days'?'Días':'Actividades');
     }
 
-    /* ---------- Entrada (LOGIN) ---------- */
-    function handleAdminLogin(){
-      const val = (document.getElementById('adminCodeInput').value || '').trim().toLowerCase();
-      const ok = (val === 'admin123');
-      if(!ok){
-        document.getElementById('errorMessage').style.display='block';
-        return;
-      }
-      try{ localStorage.setItem('admin_ok','1'); }catch{}
-      document.getElementById('adminModal').classList.add('hidden');
-      document.getElementById('appContent').classList.remove('hidden');
-      setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80);
+    /* =================== Admin de la App =================== */
+    function randCode(n=8){
+      const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let s=''; for(let i=0;i<n;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+      return s;
     }
-    function setDefaultActivityDates(){
-      const today = new Date(), y=today.getFullYear(), m=String(today.getMonth()+1).padStart(2,'0'), d=String(today.getDate()).padStart(2,'0'), v=`${y}-${m}-${d}`;
-      const s = document.getElementById('actStartDate'); const e = document.getElementById('actEndDate');
-      if(s && !s.value) s.value=v; if(e && !e.value) e.value=v;
+    let unsubUsersAdmin=null, unsubCodesAdmin=null;
+    function openAdminModal(){
+      document.getElementById('adminAppModal').classList.remove('hidden');
+      document.getElementById('adminAppModal').classList.add('flex');
+      // subs
+      unsubUsersAdmin = db.collection('users').orderBy('email').onSnapshot(s=>{
+        const box=document.getElementById('adminUsersList'); box.innerHTML='';
+        s.forEach(doc=>{
+          const d=doc.data(); const id=doc.id;
+          const row=document.createElement('div');
+          row.className='py-2 flex items-center justify-between';
+          const role = d.role||'user';
+          const active = d.active!==false;
+          row.innerHTML=`
+            <div>
+              <div class="font-medium text-gray-800">${d.email||'—'}</div>
+              <div class="text-xs text-gray-500">Rol: ${role} · Estado: ${active?'activo':'deshabilitado'}</div>
+            </div>
+            <div class="flex gap-2">
+              <button class="text-xs px-2 py-1 rounded bg-gray-100 border hover:bg-gray-200" data-action="toggle" data-id="${id}">${active?'Deshabilitar':'Habilitar'}</button>
+              <button class="text-xs px-2 py-1 rounded bg-gray-100 border hover:bg-gray-200" data-action="role" data-id="${id}">${role==='admin'?'Quitar admin':'Hacer admin'}</button>
+            </div>`;
+          box.appendChild(row);
+        });
+        // eventos
+        box.querySelectorAll('button').forEach(b=>{
+          b.addEventListener('click', async (ev)=>{
+            const action = ev.currentTarget.dataset.action;
+            const uid = ev.currentTarget.dataset.id;
+            const ref = db.collection('users').doc(uid);
+            const snap = await ref.get(); if(!snap.exists) return;
+            const d = snap.data();
+            if(action==='toggle'){
+              await ref.update({ active: !(d.active!==false) });
+            }else if(action==='role'){
+              const newRole = (d.role==='admin') ? 'user' : 'admin';
+              await ref.update({ role: newRole });
+            }
+          });
+        });
+      });
+
+      unsubCodesAdmin = db.collection('access_keys').orderBy('createdAt','desc').onSnapshot(s=>{
+        const box=document.getElementById('adminCodesList'); box.innerHTML='';
+        s.forEach(doc=>{
+          const d=doc.data(); const code=doc.id;
+          const active = d.active!==false;
+          const used = d.used||0, max=d.maxUses||1;
+          const row=document.createElement('div');
+          row.className='py-2 flex items-center justify-between';
+          row.innerHTML=`
+            <div>
+              <div class="font-medium">${code} ${active?'':'<span class="text-xs text-rose-600">(deshabilitado)</span>'}</div>
+              <div class="text-xs text-gray-500">Usos: ${used}/${max} · Creado: ${d.createdAt?.toDate? d.createdAt.toDate().toLocaleString() : '—'}</div>
+            </div>
+            <div class="flex gap-2">
+              <button class="text-xs px-2 py-1 rounded bg-gray-100 border hover:bg-gray-200" data-action="toggle" data-id="${code}">${active?'Deshabilitar':'Habilitar'}</button>
+              <button class="text-xs px-2 py-1 rounded bg-gray-100 border hover:bg-gray-200" data-action="delete" data-id="${code}">Eliminar</button>
+            </div>`;
+          box.appendChild(row);
+        });
+        box.querySelectorAll('button').forEach(b=>{
+          b.addEventListener('click', async (ev)=>{
+            const action=ev.currentTarget.dataset.action;
+            const code=ev.currentTarget.dataset.id;
+            const ref=db.collection('access_keys').doc(code);
+            if(action==='toggle'){
+              const snap=await ref.get(); if(!snap.exists) return;
+              const d=snap.data(); await ref.update({ active: !(d.active!==false) });
+            }else if(action==='delete'){
+              if(confirm('¿Eliminar código '+code+'?')) await ref.delete();
+            }
+          });
+        });
+      });
     }
-    function setDefaultLaborCostDates(){
-      const today = new Date(), y=today.getFullYear(), m=String(today.getMonth()+1).padStart(2,'0'), d=String(today.getDate()).padStart(2,'0'), v=`${y}-${m}-${d}`;
-      if(document.getElementById('lcStartDate') && !document.getElementById('lcStartDate').value) document.getElementById('lcStartDate').value=v;
-      if(document.getElementById('lcEndDate') && !document.getElementById('lcEndDate').value) document.getElementById('lcEndDate').value=v;
+    function closeAdminModal(){
+      document.getElementById('adminAppModal').classList.add('hidden');
+      document.getElementById('adminAppModal').classList.remove('flex');
+      try{unsubUsersAdmin&&unsubUsersAdmin()}catch{}; unsubUsersAdmin=null;
+      try{unsubCodesAdmin&&unsubCodesAdmin()}catch{}; unsubCodesAdmin=null;
+    }
+    async function adminGenerateCode(){
+      const uses = Math.max(1, parseInt(document.getElementById('adminNewCodeUses').value||'1',10));
+      const code = randCode(8);
+      await db.collection('access_keys').doc(code).set({
+        active:true, used:0, maxUses:uses, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid
+      });
+      alert('Código creado: '+code);
     }
 
-    /* ---------- Listeners ---------- */
+    /* =================== Listeners globales =================== */
     document.addEventListener('DOMContentLoaded',()=>{
-      const already = localStorage.getItem('admin_ok')==='1';
-      if(already){
-        document.getElementById('adminModal').classList.add('hidden');
-        document.getElementById('appContent').classList.remove('hidden');
-        setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80);
-      }else{
-        document.getElementById('adminModal').classList.remove('hidden');
-      }
-      document.getElementById('adminLoginBtn').addEventListener('click', handleAdminLogin);
-      document.getElementById('adminCodeInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ handleAdminLogin(); }});
+      // Tabs auth
+      document.getElementById('tabLogin').addEventListener('click', ()=>switchTab('login'));
+      document.getElementById('tabRegister').addEventListener('click', ()=>switchTab('register'));
+      document.getElementById('loginBtn').addEventListener('click', doLogin);
+      document.getElementById('registerBtn').addEventListener('click', doRegister);
+      document.getElementById('logoutBtn').addEventListener('click', doLogout);
+      document.getElementById('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+      document.getElementById('regCode').addEventListener('keydown', e=>{ if(e.key==='Enter') doRegister(); });
 
-      // Mapa
+      // Admin modal
+      document.getElementById('openAdminBtn').addEventListener('click', openAdminModal);
+      document.getElementById('adminCloseBtn').addEventListener('click', closeAdminModal);
+      document.getElementById('adminGenCodeBtn').addEventListener('click', adminGenerateCode);
+
+      // Mapa (listeners de UI)
       document.getElementById('farmSelect').addEventListener('change',updateDeleteButtonState);
       document.getElementById('startFenceBtn').addEventListener('click',startFenceDraw);
       document.getElementById('finishFenceBtn').addEventListener('click',finishFenceDraw);
       document.getElementById('cancelFenceBtn').addEventListener('click',cancelFenceDraw);
       document.getElementById('fenceNameSaveBtn').addEventListener('click',saveFenceName);
       document.getElementById('fenceNameCancelBtn').addEventListener('click',()=>document.getElementById('fenceNamePanel').classList.add('hidden'));
-      document.getElementById('editFenceBtn').addEventListener('click',()=>{ /* opcional */ });
-      document.getElementById('exportGeoJSONBtn').addEventListener('click',()=>{ /* opcional */ });
+      document.getElementById('editFenceBtn').addEventListener('click',()=>{ /* opcional edición */ });
+      document.getElementById('exportGeoJSONBtn').addEventListener('click',()=>{ /* opcional export */ });
 
       // Listas dblclick
       document.getElementById('farmList').addEventListener('dblclick',e=>{const n=e.target.closest('[data-type="farm"][data-id]'); if(n) zoomToFarm(n.dataset.id);});
@@ -1167,17 +1436,25 @@
       document.getElementById('lcModalCancel').addEventListener('click', closeLcModal);
       document.getElementById('lcModalSearch').addEventListener('input', renderLcModalList);
       document.getElementById('lcAddCostBtn').addEventListener('click', addLaborCost);
-      setDefaultLaborCostDates();
 
       // Reportes
-      buildReportFilterOptions();
       document.getElementById('repGenerateBtn').addEventListener('click', generateReport);
       document.getElementById('repDownloadBtn').addEventListener('click', exportReportCSV);
 
-      // Primer pintado
-      buildIndexList(); buildAssignOptions(); buildActivityFormOptions();
-      updateDeleteButtonState(); updateDeleteFenceButtonState(); updateEditButtonsState();
-      renderLaborCostList();
+      // Observa cambios de sesión; auto-muestra login si no hay usuario
+      auth.onAuthStateChanged(async (u)=>{
+        if(u){
+          currentUser=u;
+          try{
+            currentUserDoc = await createUserDocIfMissing(u);
+            if(currentUserDoc.active===false){ await auth.signOut(); setUiLoggedOut(); return; }
+          }catch(e){ console.error(e); }
+          setUiAfterLogin();
+          bootAfterAuth();
+        }else{
+          setUiLoggedOut();
+        }
+      });
     });
   </script>
 </body>
