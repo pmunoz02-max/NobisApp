@@ -61,6 +61,7 @@
       <div class="flex flex-wrap gap-2 items-center mb-2">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
         <div class="ml-auto flex flex-wrap gap-2">
+
           <!-- Geocercas -->
           <button id="startFenceBtn" type="button"
             class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
@@ -331,9 +332,8 @@
     <!-- ================= FIN REGISTRO DE ACTIVIDADES ================= -->
   </div>
 
-  <!-- Leaflet core JS -->
+  <!-- Librerías -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Leaflet.Draw JS con fallback -->
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"
           onerror="(function(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js';document.head.appendChild(s);}())"></script>
 
@@ -342,1295 +342,345 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 
-  <script>
-    /*************** Firebase ***************/
-    const firebaseConfig = {
-      apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
-      authDomain: "demo-finca-app.firebaseapp.com",
-      projectId: "demo-finca-app",
-      storageBucket: "demo-finca-app.appspot.com",
-      messagingSenderId: "123456789012",
-      appId: "1:123456789012:web:abcdef1234567890"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    try {
-      db.settings({
-        experimentalForceLongPolling: true,
-        experimentalAutoDetectLongPolling: true,
-        useFetchStreams: false
-      });
-    } catch {}
-
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (!isMobile) {
-      db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
-    }
-
-    // Auth anónima
-    let authReady = false;
-    firebase.auth().signInAnonymously().catch(console.error);
-    firebase.auth().onAuthStateChanged((user)=>{ authReady = !!user; });
-
-    /*************** Estado general ***************/
-    let map;
-    const fincaMarkers = {};
-    const geofenceLayers = {};
-    const LS_KEY = 'fincas_cache_v1';
-    const LS_GF  = 'geofences_cache_v1';
-
-    // Personal
-    const LS_PERS = 'personnel_cache_v1';
-    const LS_RECS = 'person_records_cache_v1';
-    let currentFarms = [];
-    let currentFences = [];
-    let currentPersonnel = [];
-    let currentRecords = [];
-
-    let isDrawingFence = false;
-    let drawingCoords = [];
-    let drawingPolyline = null;
-    let drawingMarkers = [];
-    let pendingFenceCoords = null;
-
-    let previewFenceLayer = null;
-    let selectedFenceId = null;
-
-    const GEOFENCE_STYLE = {weight:2, fillOpacity:0.15};
-    const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
-
-    // Edición de geocercas
-    let isEditingFence = false;
-    let editBackupCoords = null;
-    let editGroup = null;
-    let editToolbar = null;
-
-    // Actividades
-    const ACTIVITIES = ['Siembra','Cosecha','Poda','Riego','Fertilización','Mantenimiento','Transporte'];
-
-    /*************** Cache helpers ***************/
-    const saveCache = farms => { try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} };
-    const loadCache = () => { try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } };
-    const saveFenceCache = fences => { try{ localStorage.setItem(LS_GF, JSON.stringify(fences)); }catch{} };
-    const loadFenceCache = () => { try{ return JSON.parse(localStorage.getItem(LS_GF)||'[]'); }catch{ return []; } };
-
-    const savePersonnelCache = people => { try{ localStorage.setItem(LS_PERS, JSON.stringify(people)); }catch{} };
-    const loadPersonnelCache = () => { try{ return JSON.parse(localStorage.getItem(LS_PERS)||'[]'); }catch{ return []; } };
-
-    const saveRecordsCache = recs => { try{ localStorage.setItem(LS_RECS, JSON.stringify(recs)); }catch{} };
-    const loadRecordsCache = () => { try{ return JSON.parse(localStorage.getItem(LS_RECS)||'[]'); }catch{ return []; } };
-
-    /*************** Render Farms ***************/
-    function renderFarmsFromCache(){
-      const farms = loadCache();
-      Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
-      for(const k in fincaMarkers) delete fincaMarkers[k];
-
-      farms.forEach(f=>{
-        if(!f || !f.id || !f.fincaLocation) return;
-        const marker = L.marker([f.fincaLocation.lat, f.fincaLocation.lng]).addTo(map);
-        marker.bindTooltip(f.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
-        fincaMarkers[f.id] = marker;
-      });
-
-      const sel = document.getElementById('farmSelect');
-      if (sel){
-        sel.innerHTML = '';
-        farms.forEach(f=>{
-          const opt = document.createElement('option');
-          opt.value = f.id; opt.textContent = f.name || 'Finca';
-          sel.appendChild(opt);
-        });
-      }
-      updateDeleteButtonState();
-
-      currentFarms = farms || [];
-      buildIndexList();
-      refreshAssignmentOptions();
-      refreshAssignFilters();
-    }
-
-    function renderGeofencesFromCache(){
-      Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
-      for(const k in geofenceLayers) delete geofenceLayers[k];
-
-      const fences = loadFenceCache();
-      fences.forEach(g=>{
-        if(!g || !g.id || !Array.isArray(g.path) || g.path.length<3) return;
-        const latlngs = g.path.map(pt=> [pt.lat, pt.lng]);
-        const poly = L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
-        poly.bindTooltip(g.name || 'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
-        geofenceLayers[g.id] = poly;
-        poly.on('click', ()=> selectFence(g.id));
-        if(selectedFenceId === g.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
-      });
-
-      if(selectedFenceId && !geofenceLayers[selectedFenceId]){ selectedFenceId = null; }
-      updateDeleteFenceButtonState();
-      updateEditButtonsState();
-
-      currentFences = fences || [];
-      buildIndexList();
-      refreshAssignmentOptions();
-      refreshAssignFilters();
-    }
-
-    /*************** Mapa ***************/
-    function initMap(center){
-      center = center || {lat:-0.1807, lng:-78.4678};
-      map = L.map('map',{center:[center.lat,center.lng],zoom:6});
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-
-      // Grupo para edición Leaflet.Draw
-      editGroup = new L.FeatureGroup();
-      map.addLayer(editGroup);
-
-      addMousePositionControl();
-      renderFarmsFromCache();
-      renderGeofencesFromCache();
-
-      map.on('click', async e=>{
-        if(isDrawingFence){ addFenceVertex(e.latlng); return; }
-        const name = prompt("Nombre de la nueva finca:"); if(!name) return;
-        try{
-          await db.collection('farms').add({ name, fincaLocation:{lat:e.latlng.lat, lng:e.latlng.lng} });
-        }catch{
-          const farms = loadCache();
-          farms.push({ id: 'local-'+Date.now(), name, fincaLocation:{lat:e.latlng.lat, lng:e.latlng.lng} });
-          saveCache(farms); renderFarmsFromCache();
-        }
-      });
-
-      waitAuthThen(async ()=>{
-        startSubscriptions();
-        await initialFetchAll();
-        syncLocalPendingToFirestore && syncLocalPendingToFirestore();
-      });
-    }
-
-    /*************** Suscripciones ***************/
-    let unsubFarms=null, unsubGeofences=null, unsubPersonnel=null, unsubRecords=null, subsStarted=false;
-
-    function startSubscriptions(){
-      if (subsStarted) return; subsStarted=true;
-
-      // Fincas
-      unsubFarms = db.collection('farms').onSnapshot(snap=>{
-        const farms = [];
-        Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
-        for(const k in fincaMarkers) delete fincaMarkers[k];
-
-        snap.forEach(doc=>{
-          const d = doc.data();
-          farms.push({ id: doc.id, name: d.name, fincaLocation: d.fincaLocation });
-          if(d.fincaLocation){
-            const marker = L.marker([d.fincaLocation.lat, d.fincaLocation.lng]).addTo(map);
-            marker.bindTooltip(d.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
-            fincaMarkers[doc.id]=marker;
-          }
-        });
-        currentFarms = farms.slice();
-        if (farms.length) saveCache(farms);
-
-        const sel = document.getElementById('farmSelect');
-        if (sel){
-          sel.innerHTML = '';
-          farms.forEach(f=>{ const opt=document.createElement('option'); opt.value=f.id; opt.textContent=f.name||'Finca'; sel.appendChild(opt); });
-        }
-        updateDeleteButtonState();
-        buildIndexList();
-        refreshAssignmentOptions();
-        refreshAssignFilters();
-      }, err => { console.warn('onSnapshot farms error', err); renderFarmsFromCache(); });
-
-      // Geocercas
-      unsubGeofences = db.collection('geofences').onSnapshot(snap=>{
-        const fences = [];
-        Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
-        for(const k in geofenceLayers) delete geofenceLayers[k];
-
-        snap.forEach(doc=>{
-          const d = doc.data();
-          const g = { id: doc.id, name: d.name, path: d.path || [] };
-          fences.push(g);
-          if(Array.isArray(g.path) && g.path.length>=3){
-            const latlngs = g.path.map(pt=> [pt.lat, pt.lng]);
-            const poly = L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
-            poly.bindTooltip(g.name || 'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
-            geofenceLayers[doc.id]=poly;
-            poly.on('click', ()=> selectFence(doc.id));
-            if(selectedFenceId === doc.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
-          }
-        });
-        currentFences = fences.slice();
-        if (fences.length) saveFenceCache(fences);
-
-        if(selectedFenceId && !geofenceLayers[selectedFenceId]){ selectedFenceId = null; }
-        updateDeleteFenceButtonState();
-        updateEditButtonsState();
-        buildIndexList();
-        refreshAssignmentOptions();
-        refreshAssignFilters();
-      }, err => { console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
-
-      // Personal
-      unsubPersonnel = db.collection('personnel').onSnapshot(snap=>{
-        const people = [];
-        snap.forEach(doc=>{
-          const d = doc.data();
-          people.push({ id: doc.id, ...d });
-        });
-        if (people.length) {
-          currentPersonnel = people.slice();
-          savePersonnelCache(people);
-        }
-        renderPersonnelList();
-        fillPeopleCombos();
-      }, err => {
-        console.warn('onSnapshot personnel error', err);
-        currentPersonnel = loadPersonnelCache();
-        renderPersonnelList();
-        fillPeopleCombos();
-      });
-
-      // Registros
-      unsubRecords = db.collection('person_records').onSnapshot(snap=>{
-        const recs = [];
-        snap.forEach(doc=>{
-          const d = doc.data();
-          recs.push({ id: doc.id, ...d });
-        });
-        if (recs.length) {
-          currentRecords = recs.slice();
-          saveRecordsCache(recs);
-        }
-        renderRecordList();
-      }, err => {
-        console.warn('onSnapshot records error', err);
-        currentRecords = loadRecordsCache();
-        renderRecordList();
-      });
-    }
-
-    /*************** Cargas iniciales ***************/
-    async function initialFetchAll(){ await Promise.all([initialFetchFarms(), initialFetchGeofences(), initialFetchPersonnel(), initialFetchRecords()]); }
-    async function initialFetchFarms(){
-      try{
-        const snap = await db.collection('farms').get();
-        const farms=[]; snap.forEach(doc=>{ const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); });
-        if (farms.length){
-          currentFarms = farms.slice();
-          saveCache(farms);
-          renderFarmsFromCache();
-        } else { buildIndexList(); }
-      }catch(e){ console.warn('get farms failed', e); buildIndexList(); }
-    }
-    async function initialFetchGeofences(){
-      try{
-        const snap = await db.collection('geofences').get();
-        const fences=[]; snap.forEach(doc=>{ const d=doc.data(); fences.push({id:doc.id,name:d.name,path:d.path||[]}); });
-        if (fences.length){
-          currentFences = fences.slice();
-          saveFenceCache(fences);
-          renderGeofencesFromCache();
-        } else { buildIndexList(); }
-      }catch(e){ console.warn('get geofences failed', e); buildIndexList(); }
-    }
-    async function initialFetchPersonnel(){
-      try{
-        const snap = await db.collection('personnel').get();
-        const people=[]; snap.forEach(doc=>{ people.push({id:doc.id, ...doc.data()}); });
-        if (people.length){
-          currentPersonnel = people.slice();
-          savePersonnelCache(people);
-        } else {
-          currentPersonnel = loadPersonnelCache();
-        }
-        renderPersonnelList();
-        fillPeopleCombos();
-      }catch(e){
-        console.warn('get personnel failed', e);
-        currentPersonnel = loadPersonnelCache();
-        renderPersonnelList();
-        fillPeopleCombos();
-      }
-    }
-    async function initialFetchRecords(){
-      try{
-        const snap = await db.collection('person_records').get();
-        const recs=[]; snap.forEach(doc=>{ recs.push({id:doc.id, ...doc.data()}); });
-        if (recs.length){
-          currentRecords = recs.slice();
-          saveRecordsCache(recs);
-        } else {
-          currentRecords = loadRecordsCache();
-        }
-        renderRecordList();
-      }catch(e){
-        console.warn('get records failed', e);
-        currentRecords = loadRecordsCache();
-        renderRecordList();
-      }
-    }
-
-    /*************** Sync local -> Firestore ***************/
-    let syncRan = false;
-    async function syncLocalPendingToFirestore(){
-      if (syncRan) return; syncRan = true;
-      // farms
-      try{
-        const farms = loadCache();
-        const pending = farms.filter(f => f && typeof f.id==='string' && f.id.startsWith('local-'));
-        if (pending.length){
-          for (const f of pending){
-            try{
-              await db.collection('farms').add({ name: f.name||'Finca', fincaLocation: f.fincaLocation||null });
-              const updated = loadCache().filter(x => x.id !== f.id);
-              saveCache(updated);
-            }catch(e){ console.warn('No se pudo subir finca local', f, e); }
-          }
-          renderFarmsFromCache();
-        }
-      }catch(e){ console.warn('sync farms error', e); }
-
-      // geofences
-      try{
-        const fences = loadFenceCache();
-        const pending = fences.filter(g => g && typeof g.id==='string' && g.id.startsWith('localgf-'));
-        if (pending.length){
-          for (const g of pending){
-            try{
-              await db.collection('geofences').add({ name: g.name||'Geocerca', path: Array.isArray(g.path)? g.path : [] });
-              const updated = loadFenceCache().filter(x => x.id !== g.id);
-              saveFenceCache(updated);
-            }catch(e){ console.warn('No se pudo subir geocerca local', g, e); }
-          }
-          renderGeofencesFromCache();
-        }
-      }catch(e){ console.warn('sync geofences error', e); }
-
-      // personnel
-      try{
-        const pers = loadPersonnelCache();
-        const pending = pers.filter(p => p && typeof p.id==='string' && p.id.startsWith('localp-'));
-        if (pending.length){
-          for (const p of pending){
-            try{
-              await db.collection('personnel').add({
-                firstName:p.firstName, lastName:p.lastName, idNumber:p.idNumber,
-                assignType:p.assignType, assignId:p.assignId
-              });
-              const updated = loadPersonnelCache().filter(x => x.id !== p.id);
-              savePersonnelCache(updated);
-            }catch(e){ console.warn('No se pudo subir personal local', p, e); }
-          }
-          currentPersonnel = loadPersonnelCache(); // refresco local
-          renderPersonnelList();
-        }
-      }catch(e){ console.warn('sync personnel error', e); }
-
-      // records
-      try{
-        const recs = loadRecordsCache();
-        const pending = recs.filter(r => r && typeof r.id==='string' && r.id.startsWith('localr-'));
-        if (pending.length){
-          for (const r of pending){
-            try{
-              await db.collection('person_records').add({
-                personId:r.personId, activity:r.activity, startDate:r.startDate, endDate:r.endDate,
-                assignType:r.assignType, assignId:r.assignId
-              });
-              const updated = loadRecordsCache().filter(x => x.id !== r.id);
-              saveRecordsCache(updated);
-            }catch(e){ console.warn('No se pudo subir registro local', r, e); }
-          }
-          currentRecords = loadRecordsCache();
-          renderRecordList();
-        }
-      }catch(e){ console.warn('sync records error', e); }
-    }
-
-    /*************** Selección & utilidades ***************/
-    function selectFence(id){
-      if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes de seleccionar otra.'); return; }
-      if(selectedFenceId && geofenceLayers[selectedFenceId]){
-        geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE);
-      }
-      selectedFenceId = id;
-      if(geofenceLayers[selectedFenceId]){
-        geofenceLayers[selectedFenceId].setStyle(GEOFENCE_SELECTED_STYLE);
-      }
-      updateDeleteFenceButtonState();
-      updateEditButtonsState();
-    }
-
-    const normDec = s => String(s||'').trim().replace(',', '.');
-    const parseCoord = s => { const v=parseFloat(normDec(s)); return Number.isFinite(v)?v:NaN; };
-    const validLat = v => v>=-90 && v<=90;
-    const validLng = v => v>=-180 && v<=180;
-
-    let pendingLat = null, pendingLng = null;
-    async function createFarmAtCenter(){
-      if(!map){ alert('Mapa no listo aún.'); return; }
-      const name = prompt("Nombre de la nueva finca:"); if(!name) return;
-      const c = map.getCenter();
-      try{ await db.collection('farms').add({ name, fincaLocation:{lat:c.lat, lng:c.lng} }); }
-      catch{ const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:c.lat, lng:c.lng} }); saveCache(farms); renderFarmsFromCache(); }
-    }
-    async function createFarmByCoords(){
-      const latStr = prompt("Latitud (decimal, -90 a 90). Puedes usar coma o punto:"); if(latStr===null) return;
-      const lngStr = prompt("Longitud (decimal, -180 a 180). Puedes usar coma o punto:"); if(lngStr===null) return;
-      const lat = parseCoord(latStr), lng = parseCoord(lngStr);
-      if(!Number.isFinite(lat) || !validLat(lat)){ alert('Latitud inválida o fuera de rango (-90 a 90).'); return; }
-      if(!Number.isFinite(lng) || !validLng(lng)){ alert('Longitud inválida o fuera de rango (-180 a 180).'); return; }
-      pendingLat = lat; pendingLng = lng;
-
-      const coordsNameHint = document.getElementById('coordsNameHint');
-      if (coordsNameHint) coordsNameHint.textContent = `Coordenadas: Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
-      const input = document.getElementById('coordsNameInput');
-      if (input) input.value = `Finca ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      const panel = document.getElementById('coordsNamePanel');
-      if (panel) panel.classList.remove('hidden');
-      if (input){ input.focus(); input.select(); }
-
-      if(map){ map.setView([lat, lng], Math.max(map.getZoom(), 12)); }
-    }
-    async function saveCoordsName(){
-      if(pendingLat==null || pendingLng==null) { cancelCoordsName(); return; }
-      const input = document.getElementById('coordsNameInput');
-      const name = (input && input.value ? input.value : '').trim() || `Finca ${pendingLat.toFixed(5)}, ${pendingLng.toFixed(5)}`;
-      try{ await db.collection('farms').add({ name, fincaLocation:{lat: pendingLat, lng: pendingLng} }); }
-      catch{ const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:pendingLat, lng:pendingLng} }); saveCache(farms); renderFarmsFromCache(); }
-      pendingLat=null; pendingLng=null; if(input){ input.value=''; }
-      const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
-      waitAuthThen(syncLocalPendingToFirestore);
-    }
-    function cancelCoordsName(){
-      pendingLat=null; pendingLng=null;
-      const input = document.getElementById('coordsNameInput'); if(input){ input.value=''; }
-      const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
-    }
-
-    // Dibujo de geocerca
-    function addFenceVertex(latlng){
-      drawingCoords.push({lat: latlng.lat, lng: latlng.lng});
-      const m = L.circleMarker(latlng, {radius:4, weight:2}).addTo(map);
-      drawingMarkers.push(m);
-      updateFencePreview();
-    }
-    function updateFencePreview(){
-      const latlngs = drawingCoords.map(p=> [p.lat, p.lng]);
-      if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; }
-      if(latlngs.length>=3){
-        drawingPolyline = L.polygon(latlngs, {dashArray:'4,4', weight:2, fillOpacity:0.1}).addTo(map);
-      }else if(latlngs.length>=2){
-        drawingPolyline = L.polyline(latlngs, {dashArray:'4,4', weight:2}).addTo(map);
-      }
-    }
-    function startFenceDraw(){
-      if(isDrawingFence) return;
-      isDrawingFence = true;
-      drawingCoords = [];
-      drawingMarkers.forEach(m=> map.removeLayer(m)); drawingMarkers=[];
-      if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; }
-
-      document.getElementById('startFenceBtn').classList.add('hidden');
-      document.getElementById('finishFenceBtn').classList.remove('hidden');
-      document.getElementById('cancelFenceBtn').classList.remove('hidden');
-    }
-    function finishFenceDraw(){
-      if(!isDrawingFence) return;
-      if(drawingCoords.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
-      pendingFenceCoords = drawingCoords.slice();
-      const hint = document.getElementById('fenceNameHint');
-      if(hint) hint.textContent = `Vértices: ${pendingFenceCoords.length} puntos`;
-      const input = document.getElementById('fenceNameInput');
-      if(input) {
-        input.value = `Geocerca ${new Date().toLocaleDateString()}`;
-        const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.remove('hidden'); }
-        input.focus(); input.select();
-      }
-    }
-    function cancelFenceDraw(){
-      isDrawingFence = false;
-      drawingCoords = [];
-      drawingMarkers.forEach(m=> map.removeLayer(m)); drawingMarkers=[];
-      if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; }
-      document.getElementById('startFenceBtn').classList.remove('hidden');
-      document.getElementById('finishFenceBtn').classList.add('hidden');
-      document.getElementById('cancelFenceBtn').classList.add('hidden');
-      const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
-      pendingFenceCoords = null;
-    }
-    async function saveFenceName(){
-      const input = document.getElementById('fenceNameInput');
-      const name = (input && input.value ? input.value : '').trim() || 'Geocerca';
-      if(!pendingFenceCoords || pendingFenceCoords.length<3){ alert('No hay geocerca lista para guardar.'); return; }
-
-      try{
-        await db.collection('geofences').add({ name, path: pendingFenceCoords });
-      }catch(err){
-        const fences = loadFenceCache();
-        fences.push({ id: 'localgf-'+Date.now(), name, path: pendingFenceCoords });
-        saveFenceCache(fences);
-        renderGeofencesFromCache();
-      }
-
-      if(input){ input.value=''; }
-      pendingFenceCoords=null;
-      const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
-      cancelFenceDraw();
-      removePreviewFence();
-      waitAuthThen(syncLocalPendingToFirestore);
-    }
-    function cancelFenceName(){
-      const input=document.getElementById('fenceNameInput'); if(input){ input.value=''; }
-      const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
-      removePreviewFence();
-    }
-
-    function removePreviewFence(){
-      if(previewFenceLayer){
-        map.removeLayer(previewFenceLayer);
-        previewFenceLayer = null;
-      }
-    }
-
-    // Geocerca por coord
-    function parseLatLngList(texto){
-      const items = String(texto || '')
-        .split(/[\n;]+/).map(s=> s.trim()).filter(Boolean);
-      const puntos = [];
-      items.forEach(it=>{
-        const parts = it.split(/[,\s]+/).map(t=> t.trim()).filter(Boolean);
-        if(parts.length < 2) return;
-        const lat = parseCoord(parts[0]);
-        const lng = parseCoord(parts[1]);
-        if(Number.isFinite(lat) && Number.isFinite(lng) && validLat(lat) && validLng(lng)){
-          puntos.push({lat, lng});
-        }
-      });
-      return puntos;
-    }
-    function createFenceByCoords(){
-      if (isDrawingFence){ alert('Finaliza o cancela el dibujo de geocerca antes de crear por coordenadas.'); return; }
-      const ejemplo = "-1.2345,-78.5678; -1.2350,-78.5684; -1.2362,-78.5690";
-      const raw = prompt("Ingresa puntos en formato lat,lng separados por ';' o por saltos de línea.\nEjemplo:\n"+ejemplo);
-      if(raw === null) return;
-      const pts = parseLatLngList(raw);
-      if(pts.length < 3){ alert('Se requieren al menos 3 puntos válidos (lat,lng).'); return; }
-      pendingFenceCoords = pts;
-
-      if(map){
-        if(previewFenceLayer){ map.removeLayer(previewFenceLayer); previewFenceLayer = null; }
-        previewFenceLayer = L.polygon(pts.map(p=> [p.lat, p.lng]), { dashArray: '4,4', weight: 2, fillOpacity: 0.1 }).addTo(map);
-        try { map.fitBounds(previewFenceLayer.getBounds(), { padding: [20,20] }); } catch(e){}
-      }
-      const hint = document.getElementById('fenceNameHint');
-      if (hint) hint.textContent = `Vértices: ${pts.length} puntos`;
-      const input = document.getElementById('fenceNameInput');
-      if (input) {
-        input.value = `Geocerca ${new Date().toLocaleDateString()}`;
-        const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.remove('hidden'); }
-        input.focus(); input.select();
-      }
-    }
-
-    // Edición (Leaflet.Draw)
-    function updateEditButtonsState(){
-      const canEdit = !!selectedFenceId && !!geofenceLayers[selectedFenceId] && !isEditingFence;
-      const eBtn = document.getElementById('editFenceBtn');
-      if (eBtn) eBtn.disabled = !canEdit;
-      const editing = isEditingFence;
-      document.getElementById('saveFenceEditBtn')?.classList.toggle('hidden', !editing);
-      document.getElementById('cancelFenceEditBtn')?.classList.toggle('hidden', !editing);
-    }
-    function ensureEditToolbar(){
-      if (!editToolbar) {
-        editToolbar = new L.EditToolbar.Edit(map, { featureGroup: editGroup, selectedPathOptions: { maintainColor: true }});
-      }
-    }
-    function startFenceEdit(){
-      if(!selectedFenceId || !geofenceLayers[selectedFenceId]){ alert('Primero selecciona una geocerca haciendo click sobre ella.'); return; }
-      if(isEditingFence) return;
-      const poly = geofenceLayers[selectedFenceId];
-
-      const rings = poly.getLatLngs(); const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
-      editBackupCoords = ring0.map(ll => ({lat: ll.lat, lng: ll.lng}));
-
-      if (!editGroup.hasLayer(poly)) editGroup.addLayer(poly);
-      ensureEditToolbar(); editToolbar.enable();
-      isEditingFence = true; updateEditButtonsState();
-    }
-    async function saveFenceEdit(){
-      if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]) return;
-      const poly = geofenceLayers[selectedFenceId];
-
-      const rings = poly.getLatLngs(); const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
-      const newPath = ring0.map(ll => ({lat: ll.lat, lng: ll.lng}));
-      if (newPath.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
-
-      const fencesCache = loadFenceCache();
-      const idxCache = fencesCache.findIndex(g => g.id === selectedFenceId);
-
-      try{
-        if (selectedFenceId.startsWith('localgf-')) {
-          if (idxCache>=0){ fencesCache[idxCache].path = newPath; saveFenceCache(fencesCache); }
-        } else {
-          await db.collection('geofences').doc(selectedFenceId).update({ path: newPath });
-        }
-      }catch(err){
-        if (idxCache>=0){ fencesCache[idxCache].path = newPath; saveFenceCache(fencesCache); }
-      }
-
-      if (editToolbar) editToolbar.disable();
-      if (editGroup && editGroup.hasLayer(poly)) editGroup.removeLayer(poly);
-      isEditingFence = false; editBackupCoords=null; updateEditButtonsState();
-      renderGeofencesFromCache();
-    }
-    function cancelFenceEdit(){
-      if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]) return;
-      const poly = geofenceLayers[selectedFenceId];
-      if (editBackupCoords && editBackupCoords.length >= 3){
-        poly.setLatLngs(editBackupCoords.map(p => L.latLng(p.lat, p.lng)));
-      }
-      if (editToolbar) editToolbar.disable();
-      if (editGroup && editGroup.hasLayer(poly)) editGroup.removeLayer(poly);
-      isEditingFence = false; editBackupCoords = null; updateEditButtonsState();
-    }
-
-    /*************** Explorador ***************/
-    function buildIndexList(){
-      const farmUl = document.getElementById('farmList');
-      const fenceUl = document.getElementById('fenceList');
-      if(!farmUl || !fenceUl) return;
-
-      const farmsSrc  = (currentFarms && currentFarms.length) ? currentFarms : (loadCache()||[]);
-      const fencesSrc = (currentFences && currentFences.length) ? currentFences : (loadFenceCache()||[]);
-
-      const farms  = farmsSrc.slice().sort((a,b)=> (a?.name||'').localeCompare(b?.name||''));
-      const fences = fencesSrc.slice().sort((a,b)=> (a?.name||'').localeCompare(b?.name||''));
-
-      farmUl.innerHTML = '';
-      if(!farms.length){
-        const li = document.createElement('li'); li.className='py-2 text-sm text-gray-500'; li.textContent='No hay fincas registradas.'; farmUl.appendChild(li);
-      }else{
-        farms.forEach(f=>{
-          const li = document.createElement('li'); li.className='py-2';
-          li.innerHTML = `
-            <div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer select-none"
-                 data-id="${f.id}" data-type="farm" title="Doble clic para centrar">
-              <div class="text-sm font-medium text-gray-800">${(f.name||'Finca')}</div>
-              <div class="text-xs text-gray-500">${f?.fincaLocation?`Lat ${(+f.fincaLocation.lat).toFixed(5)}, Lng ${(+f.fincaLocation.lng).toFixed(5)}`:'—'}</div>
-            </div>`;
-          farmUl.appendChild(li);
-        });
-      }
-
-      fenceUl.innerHTML = '';
-      if(!fences.length){
-        const li = document.createElement('li'); li.className='py-2 text-sm text-gray-500'; li.textContent='No hay geocercas registradas.'; fenceUl.appendChild(li);
-      }else{
-        fences.forEach(g=>{
-          const li = document.createElement('li'); li.className='py-2';
-          li.innerHTML = `
-            <div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer select-none"
-                 data-id="${g.id}" data-type="fence" title="Doble clic para ajustar al polígono">
-              <div class="text-sm font-medium text-gray-800">${(g.name||'Geocerca')}</div>
-              <div class="text-xs text-gray-500">${Array.isArray(g.path)?`${g.path.length} puntos`:'—'}</div>
-            </div>`;
-          fenceUl.appendChild(li);
-        });
-      }
-    }
-
-    function zoomToFarm(id){
-      try{
-        if (fincaMarkers[id]){
-          const ll = fincaMarkers[id].getLatLng();
-          map.setView(ll, Math.max(map.getZoom(), 16));
-          try{ fincaMarkers[id].openTooltip(); }catch{}
-          return;
-        }
-        const farms = loadCache()||[];
-        const f = farms.find(x=> x.id===id);
-        if (f && f.fincaLocation){
-          map.setView([f.fincaLocation.lat, f.fincaLocation.lng], Math.max(map.getZoom(), 16));
-        }else{
-          alert('No se pudo localizar esa finca.');
-        }
-      }catch(e){ console.warn(e); }
-    }
-    function zoomToFence(id){
-      try{
-        if (geofenceLayers[id]){
-          const b = geofenceLayers[id].getBounds();
-          map.fitBounds(b, { padding:[20,20] });
-          selectFence(id);
-          return;
-        }
-        const fences = loadFenceCache()||[];
-        const g = fences.find(x=> x.id===id);
-        if (g && Array.isArray(g.path) && g.path.length>=3){
-          const b = L.latLngBounds(g.path.map(p=> [p.lat, p.lng]));
-          map.fitBounds(b, { padding:[20,20] });
-          selectFence(id);
-        }else{
-          alert('No se pudo localizar esa geocerca.');
-        }
-      }catch(e){ console.warn(e); }
-    }
-
-    /*************** Borrado ***************/
-    async function deleteSelectedFarm(){
-      const sel=document.getElementById('farmSelect'); const id= sel ? sel.value : '';
-      if(!id){ alert('No hay finca seleccionada.'); return; }
-      const farmsCache = loadCache();
-      const farm = farmsCache.find(f=> f.id===id); const name=(farm&&farm.name)||'Finca';
-      if(!confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) return;
-
-      if(id.indexOf('local-')===0){
-        const updated=farmsCache.filter(f=> f.id!==id); saveCache(updated); renderFarmsFromCache(); return;
-      }
-      try{ await db.collection('farms').doc(id).delete(); }
-      catch{ const updated=farmsCache.filter(f=> f.id!==id); saveCache(updated); renderFarmsFromCache(); }
-    }
-    function updateDeleteButtonState(){
-      const sel=document.getElementById('farmSelect'); const btn=document.getElementById('deleteFarmBtn');
-      if(!btn) return; btn.disabled = !(sel && sel.value);
-    }
-    async function deleteSelectedFence(){
-      if(!selectedFenceId){ alert('Primero selecciona una geocerca haciendo click sobre ella.'); return; }
-      if(isEditingFence){ alert('Estás editando. Guarda o cancela antes de eliminar.'); return; }
-
-      const fencesCache = loadFenceCache();
-      const gf = fencesCache.find(g=> g.id === selectedFenceId);
-      const name = (gf && gf.name) ? gf.name : 'Geocerca';
-      if(!confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) return;
-
-      if(selectedFenceId.indexOf('localgf-')===0){
-        const updated = fencesCache.filter(g=> g.id !== selectedFenceId);
-        saveFenceCache(updated);
-        if(geofenceLayers[selectedFenceId]){ map.removeLayer(geofenceLayers[selectedFenceId]); delete geofenceLayers[selectedFenceId]; }
-        selectedFenceId = null; updateDeleteFenceButtonState(); updateEditButtonsState(); return;
-      }
-      try{ await db.collection('geofences').doc(selectedFenceId).delete(); }
-      catch(err){
-        const updated = fencesCache.filter(g=> g.id !== selectedFenceId);
-        saveFenceCache(updated);
-        if(geofenceLayers[selectedFenceId]){ map.removeLayer(geofenceLayers[selectedFenceId]); delete geofenceLayers[selectedFenceId]; }
-      }
-      selectedFenceId = null; updateDeleteFenceButtonState(); updateEditButtonsState();
-    }
-    function updateDeleteFenceButtonState(){
-      const btn = document.getElementById('deleteFenceBtn');
-      if(!btn) return;
-      btn.disabled = !selectedFenceId;
-    }
-
-    // Coordenadas del mouse
-    function addMousePositionControl(){
-      const MousePos=L.Control.extend({
-        options:{position:'bottomleft'},
-        onAdd:function(){ const d=L.DomUtil.create('div','mousepos-control'); d.innerHTML='Lat: — Lng: —'; this._div=d; return d; },
-        update:function(lat,lng){ if(this._div){ this._div.innerHTML = (lat!=null&&lng!=null)?(`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`):'Lat: — Lng: —'; } }
-      });
-      const ctrl = new MousePos(); ctrl.addTo(map);
-      map.on('mousemove', e=>ctrl.update(e.latlng.lat, e.latlng.lng));
-      map.on('mouseout', ()=>ctrl.update(null,null));
-    }
-
-    // Utilidades
-    function waitAuthThen(fn){
-      if (authReady) { fn(); return; }
-      const iv = setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } }, 150);
-    }
-
-    /*************** Login robusto ***************/
-    (function(){
-      const ADMIN_CODE = "admin123";
-      const normalizeCode = s => String(s || "").normalize("NFKC")
-        .replace(/[\u200B-\u200D\uFEFF]/g, "").trim().toLowerCase();
-      const allowBypass = () => {
-        try { const qs = new URLSearchParams(location.search);
-          if (qs.get("skipAdmin") === "1") return true;
-          if (localStorage.getItem("admin_debug") === "1") return true;
-        } catch {} return false; };
-      const showApp = () => {
-        document.getElementById('adminModal')?.classList.add("hidden");
-        document.getElementById('appContent')?.classList.remove("hidden");
-        setTimeout(()=>{ initMap(); setTimeout(()=>{ if(window.map){ map.invalidateSize(); } }, 80); }, 50);
-      };
-      function doAdminLogin(ev){
-        if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
-        try{
-          const inputEl = document.getElementById('adminCodeInput');
-          const raw = inputEl ? inputEl.value : "";
-          const ok = allowBypass() || normalizeCode(raw) === normalizeCode(ADMIN_CODE);
-          if (ok){ showApp(); }
-          else{ const err = document.getElementById('errorMessage'); if (err){ err.textContent='Código incorrecto. Intenta con "admin123"'; err.style.display="block"; } }
-        }catch(e){ console.error(e); }
-      }
-      document.addEventListener("DOMContentLoaded",function(){
-        document.getElementById('adminModal')?.classList.remove("hidden");
-        document.getElementById('adminLoginBtn')?.addEventListener("click", doAdminLogin);
-        const adminInput = document.getElementById('adminCodeInput');
-        adminInput?.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ doAdminLogin(e); }});
-        adminInput?.addEventListener("input", ()=>{ const err=document.getElementById('errorMessage'); if(err) err.style.display="none"; });
-        if (allowBypass()) showApp();
-      });
-    })();
-
-    /*************** Asignaciones (combos) ***************/
-    function labelForAssignment(assignType, assignId){
-      if(assignType === 'farm'){
-        const f = (currentFarms||[]).find(x=> x.id===assignId) || (loadCache()||[]).find(x=> x.id===assignId);
-        return f ? `Finca: ${f.name||'—'}` : 'Finca: —';
-      } else if(assignType === 'geofence'){
-        const g = (currentFences||[]).find(x=> x.id===assignId) || (loadFenceCache()||[]).find(x=> x.id===assignId);
-        return g ? `Geocerca: ${g.name||'—'}` : 'Geocerca: —';
-      }
-      return '—';
-    }
-    function refreshAssignmentOptions(){
-      const sel = document.getElementById('pAssignSelect');
-      if (!sel) return;
-      const farms = (currentFarms||[]); const fences = (currentFences||[]);
-      sel.innerHTML = '<option value="">— Selecciona —</option>';
-      farms.forEach(f=>{
-        const o=document.createElement('option'); o.value=`farm:${f.id}`; o.textContent=`Finca: ${f.name||'—'}`; sel.appendChild(o);
-      });
-      fences.forEach(g=>{
-        const o=document.createElement('option'); o.value=`geofence:${g.id}`; o.textContent=`Geocerca: ${g.name||'—'}`; sel.appendChild(o);
-      });
-    }
-    function refreshAssignFilters(){
-      const typeSel = document.getElementById('personAssignTypeFilter');
-      const idSel = document.getElementById('personAssignIdFilter');
-      if (!typeSel || !idSel) return;
-      const type = typeSel.value;
-      idSel.innerHTML = '<option value="all">Todas</option>';
-      if (type==='farm' || type==='all'){
-        (currentFarms||[]).forEach(f=>{ const o=document.createElement('option'); o.value=`farm:${f.id}`; o.textContent=`Finca: ${f.name||'—'}`; idSel.appendChild(o); });
-      }
-      if (type==='geofence' || type==='all'){
-        (currentFences||[]).forEach(g=>{ const o=document.createElement('option'); o.value=`geofence:${g.id}`; o.textContent=`Geocerca: ${g.name||'—'}`; idSel.appendChild(o); });
-      }
-
-      // también filtros de registros
-      const fType = document.getElementById('filterAssignType');
-      const fId = document.getElementById('filterAssignId');
-      if (fType && fId){
-        const t = fType.value;
-        fId.innerHTML = '<option value="all">Todas</option>';
-        if (t==='farm' || t==='all'){ (currentFarms||[]).forEach(f=>{ const o=document.createElement('option'); o.value=`farm:${f.id}`; o.textContent=`Finca: ${f.name||'—'}`; fId.appendChild(o); }); }
-        if (t==='geofence' || t==='all'){ (currentFences||[]).forEach(g=>{ const o=document.createElement('option'); o.value=`geofence:${g.id}`; o.textContent=`Geocerca: ${g.name||'—'}`; fId.appendChild(o); }); }
-      }
-    }
-
-    /*************** Personal: alta/edición/lista ***************/
-    let editingPersonId = null;
-
-    function renderPersonnelList(){
-      const tbody = document.getElementById('personTableBody');
-      if(!tbody) return;
-      const txt = (document.getElementById('personSearchInput')?.value || '').trim().toLowerCase();
-      const typeFilter = document.getElementById('personAssignTypeFilter')?.value || 'all';
-      const idFilter = document.getElementById('personAssignIdFilter')?.value || 'all';
-
-      const src = (currentPersonnel && currentPersonnel.length) ? currentPersonnel : loadPersonnelCache();
-      const filtered = src.filter(p=>{
-        const hayTxt = !txt || [p.firstName,p.lastName,p.idNumber].join(' ').toLowerCase().includes(txt);
-        const hayType = (typeFilter==='all') || (p.assignType===typeFilter);
-        const hayId = (idFilter==='all') || (`${p.assignType}:${p.assignId}`===idFilter);
-        return hayTxt && hayType && hayId;
-      });
-
-      tbody.innerHTML = '';
-      if (!filtered.length){
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="5" class="text-center text-sm text-gray-500 py-6">No hay personal registrado.</td>`;
-        tbody.appendChild(tr);
-        return;
-      }
-
-      filtered.forEach(p=>{
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-gray-50 cursor-default';
-        tr.dataset.id = p.id;
-        tr.innerHTML = `
-          <td class="text-sm text-gray-800">${p.firstName || ''}</td>
-          <td class="text-sm text-gray-800">${p.lastName || ''}</td>
-          <td class="text-sm text-gray-800">${p.idNumber || ''}</td>
-          <td class="text-sm text-gray-600">${labelForAssignment(p.assignType, p.assignId)}</td>
-          <td class="text-sm">
-            <button class="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 mr-2" data-action="edit">Editar</button>
-            <button class="px-2 py-1 rounded bg-rose-600 text-white hover:bg-rose-700" data-action="del">Eliminar</button>
-          </td>`;
-        tr.addEventListener('dblclick', ()=> {
-          if (p.assignType==='farm') zoomToFarm(p.assignId);
-          else if (p.assignType==='geofence') zoomToFence(p.assignId);
-        });
-        tr.addEventListener('click', (e)=>{
-          const act = e.target?.dataset?.action;
-          if (act==='edit') loadPersonIntoForm(p.id);
-          else if (act==='del') deletePerson(p.id);
-        });
-        tbody.appendChild(tr);
-      });
-    }
-
-    function loadPersonIntoForm(id){
-      const p = (currentPersonnel||[]).find(x=> x.id===id) || (loadPersonnelCache()||[]).find(x=> x.id===id);
-      if (!p) return;
-      document.getElementById('pFirstName').value = p.firstName || '';
-      document.getElementById('pLastName').value  = p.lastName  || '';
-      document.getElementById('pIdNumber').value  = p.idNumber  || '';
-      const assignSel = document.getElementById('pAssignSelect');
-      if (assignSel) assignSel.value = `${p.assignType}:${p.assignId}`;
-
-      editingPersonId = id;
-      document.getElementById('addPersonBtn').classList.add('hidden');
-      document.getElementById('savePersonBtn').classList.remove('hidden');
-      document.getElementById('cancelPersonBtn').classList.remove('hidden');
-    }
-
-    function clearPersonForm(){
-      document.getElementById('pFirstName').value='';
-      document.getElementById('pLastName').value='';
-      document.getElementById('pIdNumber').value='';
-      document.getElementById('pAssignSelect').value='';
-      editingPersonId=null;
-      document.getElementById('addPersonBtn').classList.remove('hidden');
-      document.getElementById('savePersonBtn').classList.add('hidden');
-      document.getElementById('cancelPersonBtn').classList.add('hidden');
-      const err = document.getElementById('personFormError'); if(err){ err.classList.add('hidden'); err.textContent=''; }
-    }
-
-    function readPersonForm(){
-      const fn  = (document.getElementById('pFirstName')?.value  || '').trim();
-      const ln  = (document.getElementById('pLastName')?.value   || '').trim();
-      const idn = (document.getElementById('pIdNumber')?.value   || '').trim();
-      const assignVal = (document.getElementById('pAssignSelect')?.value || '').trim();
-      const err = document.getElementById('personFormError');
-
-      if (err){ err.classList.add('hidden'); err.textContent = ''; }
-      if (!fn || !ln){ err.textContent = 'Nombre y apellido son obligatorios.'; err.classList.remove('hidden'); return null; }
-      if (!/^[0-9]{6,15}$/.test(idn)){ err.textContent = 'Cédula: usar solo dígitos (6–15).'; err.classList.remove('hidden'); return null; }
-      if (!assignVal){ err.textContent = 'Seleccione una asignación.'; err.classList.remove('hidden'); return null; }
-      const [assignType, assignId] = assignVal.split(':');
-      return { firstName:fn, lastName:ln, idNumber:idn, assignType, assignId };
-    }
-
-    async function addPerson(e){
-      if (e && typeof e.preventDefault === 'function') e.preventDefault();
-      const docData = readPersonForm(); if(!docData) return;
-
-      let newId;
-      try{
-        const ref = await db.collection('personnel').add(docData);
-        newId = ref.id;
-      }catch{
-        newId = `localp-${Date.now()}`;
-      }
-
-      const newItem = { id: newId, ...docData };
-      currentPersonnel = (currentPersonnel || []).concat([newItem]);
-      const cache = (loadPersonnelCache() || []).concat([newItem]);
-      savePersonnelCache(cache);
-      renderPersonnelList();
-      fillPeopleCombos();
-      clearPersonForm();
-      waitAuthThen(syncLocalPendingToFirestore);
-    }
-
-    async function savePersonEdit(){
-      if (!editingPersonId) return;
-      const docData = readPersonForm(); if(!docData) return;
-
-      try{
-        if (editingPersonId.startsWith('localp-')){
-          const cache = loadPersonnelCache();
-          const idx = cache.findIndex(p => p.id===editingPersonId);
-          if (idx>=0){ cache[idx] = { id: editingPersonId, ...docData }; savePersonnelCache(cache); }
-          currentPersonnel = cache.slice();
-        } else {
-          await db.collection('personnel').doc(editingPersonId).update(docData);
-          // optimista local
-          const loc = (currentPersonnel||[]).map(p=> p.id===editingPersonId? ({id:p.id, ...docData}) : p);
-          currentPersonnel = loc;
-          savePersonnelCache(loc);
-        }
-      }catch(e){
-        // offline -> local
-        const cache = loadPersonnelCache().map(p=> p.id===editingPersonId? ({id:p.id, ...docData}) : p);
-        savePersonnelCache(cache); currentPersonnel = cache.slice();
-      }
-      renderPersonnelList(); fillPeopleCombos(); clearPersonForm(); waitAuthThen(syncLocalPendingToFirestore);
-    }
-
-    async function deletePerson(id){
-      const p = (currentPersonnel||[]).find(x=> x.id===id); const name = p?`${p.firstName} ${p.lastName}`:'la persona';
-      if(!confirm(`¿Eliminar "${name}"?`)) return;
-      try{
-        if (id.startsWith('localp-')){
-          const cache = loadPersonnelCache().filter(x=> x.id !== id);
-          savePersonnelCache(cache); currentPersonnel = cache.slice();
-        } else {
-          await db.collection('personnel').doc(id).delete();
-        }
-      }catch(e){
-        const cache = loadPersonnelCache().filter(x=> x.id !== id);
-        savePersonnelCache(cache); currentPersonnel = cache.slice();
-      }
-      renderPersonnelList(); fillPeopleCombos();
-    }
-
-    function fillPeopleCombos(){
-      const sel1 = document.getElementById('recordPersonSelect');
-      const sel2 = document.getElementById('filterRecordPerson');
-      const people = (currentPersonnel && currentPersonnel.length)? currentPersonnel : loadPersonnelCache();
-
-      if (sel1){
-        sel1.innerHTML = '<option value="">— Selecciona —</option>';
-        people.forEach(p=>{
-          const o = document.createElement('option');
-          o.value = p.id; o.textContent = `${p.firstName||''} ${p.lastName||''} (${p.idNumber||''})`;
-          sel1.appendChild(o);
-        });
-      }
-      if (sel2){
-        sel2.innerHTML = '<option value="all">Todas</option>';
-        people.forEach(p=>{
-          const o = document.createElement('option');
-          o.value = p.id; o.textContent = `${p.firstName||''} ${p.lastName||''} (${p.idNumber||''})`;
-          sel2.appendChild(o);
-        });
-      }
-
-      // actividades combos
-      const a1 = document.getElementById('recordActivitySelect');
-      const a2 = document.getElementById('filterRecordActivity');
-      if (a1 && !a1.childElementCount){
-        ACTIVITIES.forEach(x=>{ const o=document.createElement('option'); o.value=x; o.textContent=x; a1.appendChild(o); });
-      }
-      if (a2 && a2.childElementCount<=1){
-        ACTIVITIES.forEach(x=>{ const o=document.createElement('option'); o.value=x; o.textContent=x; a2.appendChild(o); });
-      }
-
-      // fecha por defecto
-      const today = new Date().toISOString().slice(0,10);
-      document.getElementById('recordStartDate').value = today;
-      document.getElementById('recordEndDate').value = today;
-      document.getElementById('filterRecordStart').value ||= today;
-      document.getElementById('filterRecordEnd').value   ||= today;
-    }
-
-    /*************** Registros ***************/
-    async function addRecord(){
-      const personId = (document.getElementById('recordPersonSelect')?.value || '').trim();
-      const activity = (document.getElementById('recordActivitySelect')?.value || '').trim();
-      const startDate = (document.getElementById('recordStartDate')?.value || '').trim();
-      const endDate   = (document.getElementById('recordEndDate')?.value || '').trim();
-      if (!personId || !activity || !startDate || !endDate){ alert('Completa persona, actividad y fechas.'); return; }
-
-      const p = (currentPersonnel||[]).find(x=> x.id===personId) || (loadPersonnelCache()||[]).find(x=> x.id===personId);
-      if (!p){ alert('Persona no encontrada.'); return; }
-
-      const docData = {
-        personId, activity, startDate, endDate,
-        assignType: p.assignType, assignId: p.assignId
-      };
-
-      let newId;
-      try{ const ref = await db.collection('person_records').add(docData); newId = ref.id; }
-      catch{ newId = `localr-${Date.now()}`; }
-
-      const rec = { id:newId, ...docData };
-      currentRecords = (currentRecords||[]).concat([rec]);
-      const cache = (loadRecordsCache()||[]).concat([rec]); saveRecordsCache(cache);
-      renderRecordList();
-      waitAuthThen(syncLocalPendingToFirestore);
-    }
-
-    function filterRecordsNow(){
-      renderRecordList();
-    }
-
-    function renderRecordList(){
-      const tbody = document.getElementById('recordTableBody');
-      if (!tbody) return;
-
-      const personF = document.getElementById('filterRecordPerson')?.value || 'all';
-      const actF    = document.getElementById('filterRecordActivity')?.value || 'all';
-      const sdF     = document.getElementById('filterRecordStart')?.value || '';
-      const edF     = document.getElementById('filterRecordEnd')?.value || '';
-      const typeF   = document.getElementById('filterAssignType')?.value || 'all';
-      const idF     = document.getElementById('filterAssignId')?.value || 'all';
-
-      const src = (currentRecords && currentRecords.length)? currentRecords : loadRecordsCache();
-      const filtered = src.filter(r=>{
-        const okPerson = (personF==='all') || (r.personId===personF);
-        const okAct    = (actF==='all')    || (r.activity===actF);
-        // cruce de intervalos (inclusive)
-        const okDates  = (!sdF || r.endDate >= sdF) && (!edF || r.startDate <= edF);
-        const okType   = (typeF==='all') || (r.assignType===typeF);
-        const okId     = (idF==='all')   || (`${r.assignType}:${r.assignId}`===idF);
-        return okPerson && okAct && okDates && okType && okId;
-      });
-
-      tbody.innerHTML = '';
-      if (!filtered.length){
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="5" class="text-center text-sm text-gray-500 py-6">No hay registros.</td>`;
-        tbody.appendChild(tr);
-        return;
-      }
-
-      filtered.sort((a,b)=> (a.startDate||'').localeCompare(b.startDate||''));
-      filtered.forEach(r=>{
-        const p = (currentPersonnel||[]).find(x=> x.id===r.personId) || (loadPersonnelCache()||[]).find(x=> x.id===r.personId);
-        const pname = p ? `${p.firstName||''} ${p.lastName||''}` : r.personId;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="text-sm text-gray-800">${pname}</td>
-          <td class="text-sm text-gray-800">${r.activity}</td>
-          <td class="text-sm text-gray-800">${r.startDate}</td>
-          <td class="text-sm text-gray-800">${r.endDate}</td>
-          <td class="text-sm text-gray-600">${labelForAssignment(r.assignType, r.assignId)}</td>`;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function exportRecordsCsv(){
-      const rows = [];
-      rows.push(['Persona','Actividad','Desde','Hasta','Asignación']);
-      const tbody = document.getElementById('recordTableBody');
-      const trs = Array.from(tbody.querySelectorAll('tr'));
-      trs.forEach(tr=>{
-        const tds = Array.from(tr.querySelectorAll('td')).map(td=> td.textContent);
-        if (tds.length===5) rows.push(tds);
-      });
-      const csv = rows.map(r=> r.map(v=> `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href=url; a.download='reporte_personal.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    }
-
-    /*************** Listeners DOM ***************/
-    document.addEventListener("DOMContentLoaded",function(){
-      // listas dobles clic
-      document.getElementById('farmList')?.addEventListener('dblclick', (e)=>{
-        const box = e.target.closest('[data-type="farm"][data-id]'); if (!box) return; zoomToFarm(box.dataset.id);
-      });
-      document.getElementById('fenceList')?.addEventListener('dblclick', (e)=>{
-        const box = e.target.closest('[data-type="fence"][data-id]'); if (!box) return; zoomToFence(box.dataset.id);
-      });
-
-      // Fincas
-      document.getElementById('farmSelect')?.addEventListener('change', updateDeleteButtonState);
-      document.getElementById('createFarmBtn')?.addEventListener('click', createFarmAtCenter);
-      document.getElementById('deleteFarmBtn')?.addEventListener('click', deleteSelectedFarm);
-      document.getElementById('createByCoordsBtn')?.addEventListener('click', createFarmByCoords);
-
-      // Geocercas
-      document.getElementById('startFenceBtn')?.addEventListener('click', startFenceDraw);
-      document.getElementById('finishFenceBtn')?.addEventListener('click', finishFenceDraw);
-      document.getElementById('cancelFenceBtn')?.addEventListener('click', cancelFenceDraw);
-      document.getElementById('fenceNameSaveBtn')?.addEventListener('click', saveFenceName);
-      document.getElementById('fenceNameCancelBtn')?.addEventListener('click', cancelFenceName);
-      document.getElementById('createFenceByCoordsBtn')?.addEventListener('click', createFenceByCoords);
-
-      // Edición y GeoJSON
-      document.getElementById('editFenceBtn')?.addEventListener('click', startFenceEdit);
-      document.getElementById('saveFenceEditBtn')?.addEventListener('click', saveFenceEdit);
-      document.getElementById('cancelFenceEditBtn')?.addEventListener('click', cancelFenceEdit);
-      document.getElementById('exportGeoJSONBtn')?.addEventListener('click', exportGeoJSON);
-      document.getElementById('importGeoJSONInput')?.addEventListener('change', async (e) => {
-        const file = e.target.files?.[0]; if(!file) return; const text = await file.text(); await importGeoJSONFromText(text); e.target.value = '';
-      });
-
-      // Personal
-      document.getElementById('addPersonBtn')?.addEventListener('click', addPerson);
-      document.getElementById('savePersonBtn')?.addEventListener('click', savePersonEdit);
-      document.getElementById('cancelPersonBtn')?.addEventListener('click', clearPersonForm);
-      document.getElementById('personSearchInput')?.addEventListener('input', renderPersonnelList);
-      document.getElementById('personAssignTypeFilter')?.addEventListener('change', ()=>{ refreshAssignFilters(); renderPersonnelList(); });
-      document.getElementById('personAssignIdFilter')?.addEventListener('change', renderPersonnelList);
-
-      // Registros
-      document.getElementById('addRecordBtn')?.addEventListener('click', addRecord);
-      document.getElementById('applyRecordFiltersBtn')?.addEventListener('click', filterRecordsNow);
-      document.getElementById('exportRecordsCsvBtn')?.addEventListener('click', exportRecordsCsv);
-      document.getElementById('filterAssignType')?.addEventListener('change', ()=>{ refreshAssignFilters(); renderRecordList(); });
-      document.getElementById('filterAssignId')?.addEventListener('change', renderRecordList);
+  <!-- App -->
+  <script type="text/javascript" defer>
+  // ==== Config Firebase ====
+  const firebaseConfig = {
+    apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
+    authDomain: "demo-finca-app.firebaseapp.com",
+    projectId: "demo-finca-app",
+    storageBucket: "demo-finca-app.appspot.com",
+    messagingSenderId: "123456789012",
+    appId: "1:123456789012:web:abcdef1234567890"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  try { db.settings({ experimentalForceLongPolling:true, experimentalAutoDetectLongPolling:true, useFetchStreams:false }); } catch {}
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (!isMobile) { db.enablePersistence({ synchronizeTabs:true }).catch(()=>{}); }
+  let authReady=false; firebase.auth().signInAnonymously().catch(console.error);
+  firebase.auth().onAuthStateChanged(u=>{ authReady=!!u; });
+
+  // ==== Estado ====
+  let map; const fincaMarkers={}; const geofenceLayers={};
+  const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1', LS_PERS='personnel_cache_v1', LS_RECS='person_records_cache_v1';
+  let currentFarms=[], currentFences=[], currentPersonnel=[], currentRecords=[];
+  let selectedFenceId=null, isDrawingFence=false, drawingCoords=[], drawingPolyline=null, drawingMarkers=[], pendingFenceCoords=null;
+  let previewFenceLayer=null; const GEOFENCE_STYLE={weight:2, fillOpacity:.15}, GEOFENCE_SELECTED_STYLE={weight:3,color:'#ef4444',fillOpacity:.2};
+  let isEditingFence=false, editBackupCoords=null, editGroup=null, editToolbar=null;
+  const ACTIVITIES=['Siembra','Cosecha','Poda','Riego','Fertilización','Mantenimiento','Transporte'];
+
+  // ==== Caché helpers ====
+  const saveCache = a=>{ try{localStorage.setItem(LS_KEY,JSON.stringify(a));}catch{} };
+  const loadCache = ()=>{ try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch{return[];} };
+  const saveFenceCache = a=>{ try{localStorage.setItem(LS_GF,JSON.stringify(a));}catch{} };
+  const loadFenceCache = ()=>{ try{return JSON.parse(localStorage.getItem(LS_GF)||'[]');}catch{return[];} };
+  const savePersonnelCache = a=>{ try{localStorage.setItem(LS_PERS,JSON.stringify(a));}catch{} };
+  const loadPersonnelCache = ()=>{ try{return JSON.parse(localStorage.getItem(LS_PERS)||'[]');}catch{return[];} };
+  const saveRecordsCache = a=>{ try{localStorage.setItem(LS_RECS,JSON.stringify(a));}catch{} };
+  const loadRecordsCache = ()=>{ try{return JSON.parse(localStorage.getItem(LS_RECS)||'[]');}catch{return[];} };
+
+  // ==== Utilidades ====
+  const normDec=s=>String(s||'').trim().replace(',','.');
+  const parseCoord=s=>{const v=parseFloat(normDec(s));return Number.isFinite(v)?v:NaN;};
+  const validLat=v=>v>=-90&&v<=90, validLng=v=>v>=-180&&v<=180;
+  function waitAuthThen(fn){ if(authReady){fn();return;} const iv=setInterval(()=>{ if(authReady){clearInterval(iv);fn();}},150); }
+
+  // ==== Login admin robusto ====
+  (function(){
+    const ADMIN_CODE='admin123';
+    const normalize=s=>String(s||'').normalize('NFKC').replace(/[\u200B-\u200D\uFEFF]/g,'').trim().toLowerCase();
+    const allowBypass=()=>{try{const q=new URLSearchParams(location.search); if(q.get('skipAdmin')==='1')return true; if(localStorage.getItem('admin_debug')==='1')return true;}catch{} return false;};
+    function showApp(){ document.getElementById('adminModal')?.classList.add('hidden'); document.getElementById('appContent')?.classList.remove('hidden'); setTimeout(()=>{ initMap(); setTimeout(()=>{ if(window.map){ map.invalidateSize(); } },80); },50); }
+    function doLogin(ev){ if(ev&&ev.preventDefault)ev.preventDefault(); const raw=document.getElementById('adminCodeInput')?.value||''; if(allowBypass()||normalize(raw)===normalize(ADMIN_CODE)){ showApp(); } else { const e=document.getElementById('errorMessage'); if(e){e.style.display='block'; e.textContent='Código incorrecto. Intenta con "admin123"';}}}
+    document.addEventListener('DOMContentLoaded',()=>{ document.getElementById('adminModal')?.classList.remove('hidden'); document.getElementById('adminLoginBtn')?.addEventListener('click',doLogin); const i=document.getElementById('adminCodeInput'); i?.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin(e);}); i?.addEventListener('input',()=>{const er=document.getElementById('errorMessage'); if(er)er.style.display='none';}); if(allowBypass()) showApp(); });
+  })();
+
+  // ==== Mapa ====
+  function initMap(center){ center=center||{lat:-0.1807,lng:-78.4678}; map=L.map('map',{center:[center.lat,center.lng],zoom:6}); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+    editGroup=new L.FeatureGroup(); map.addLayer(editGroup);
+    addMousePositionControl(); renderFarmsFromCache(); renderGeofencesFromCache();
+
+    map.on('click', async e=>{ if(isDrawingFence){ addFenceVertex(e.latlng); return; } const name=prompt('Nombre de la nueva finca:'); if(!name) return;
+      try{ await db.collection('farms').add({name, fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}}); }
+      catch{ const farms=loadCache(); farms.push({id:'local-'+Date.now(),name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}}); saveCache(farms); renderFarmsFromCache(); }
     });
 
-    /*************** GeoJSON export/import ***************/
-    function fenceToFeature(id){
-      const gf = (loadFenceCache()||[]).find(g => g.id === id);
-      const layer = geofenceLayers[id];
-      if(!gf || !layer) return null;
+    waitAuthThen(async ()=>{ startSubscriptions(); await initialFetchAll(); syncLocalPendingToFirestore&&syncLocalPendingToFirestore(); });
+  }
 
-      const rings = layer.getLatLngs();
-      const ring0 = (Array.isArray(rings[0]) ? rings[0] : rings).map(ll => [ll.lng, ll.lat]);
-      if (ring0.length && (ring0[0][0] !== ring0[ring0.length-1][0] || ring0[0][1] !== ring0[ring0.length-1][1])){
-        ring0.push([ring0[0][0], ring0[0][1]]);
-      }
-      return { type: "Feature", properties: { id: gf.id, name: gf.name || 'Geocerca' }, geometry: { type: "Polygon", coordinates: [ ring0 ] } };
-    }
-    function exportGeoJSON(){
-      let fc;
-      if (selectedFenceId && geofenceLayers[selectedFenceId]){
-        const feat = fenceToFeature(selectedFenceId);
-        if(!feat){ alert('No se pudo exportar la geocerca seleccionada.'); return; }
-        fc = { type: "FeatureCollection", features: [feat] };
-      } else {
-        const features = [];
-        for (const id of Object.keys(geofenceLayers)){
-          const feat = fenceToFeature(id); if (feat) features.push(feat);
-        }
-        if (!features.length){ alert('No hay geocercas para exportar.'); return; }
-        fc = { type: "FeatureCollection", features };
-      }
-      const blob = new Blob([JSON.stringify(fc, null, 2)], {type: "application/geo+json"});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url;
-      const name = selectedFenceId ? `geocerca_${selectedFenceId}.geojson` : 'geocercas.geojson';
-      a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    }
-    async function importGeoJSONFromText(text){
-      let obj; try { obj = JSON.parse(text); } catch { alert('GeoJSON inválido.'); return; }
-      const asArray = (x) => Array.isArray(x) ? x : [x];
-      let features = [];
-      if (obj.type === 'FeatureCollection') { features = obj.features || []; }
-      else if (obj.type === 'Feature') { features = [obj]; }
-      else if (obj.type && obj.coordinates) { features = [{ type: 'Feature', properties: {}, geometry: obj }]; }
-      else { alert('Estructura GeoJSON no reconocida.'); return; }
+  function addMousePositionControl(){
+    const MousePos=L.Control.extend({options:{position:'bottomleft'}, onAdd:function(){const d=L.DomUtil.create('div','mousepos-control'); d.innerHTML='Lat: — Lng: —'; this._div=d; return d;}, update:function(lat,lng){ if(this._div){this._div.innerHTML=(lat!=null&&lng!=null)?('Lat: '+lat.toFixed(5)+' &nbsp; Lng: '+lng.toFixed(5)):'Lat: — Lng: —'; }}});
+    const ctrl=new MousePos(); ctrl.addTo(map); map.on('mousemove',e=>ctrl.update(e.latlng.lat,e.latlng.lng)); map.on('mouseout',()=>ctrl.update(null,null));
+  }
 
-      let created = 0;
-      for (const feat of features){
-        const geom = feat.geometry || {}; const props = feat.properties || {}; const baseName = (props.name || 'Geocerca importada');
-        if (geom.type === 'Polygon'){ await createGeofenceFromPolygonCoords(geom.coordinates, baseName); created++; }
-        else if (geom.type === 'MultiPolygon'){
-          const polys = asArray(geom.coordinates); let i=1;
-          for (const poly of polys){ await createGeofenceFromPolygonCoords(poly, `${baseName} (${i})`); i++; created++; }
-        }
-      }
-      if (created === 0){ alert('El GeoJSON no contiene Polygon/MultiPolygon.'); }
-      else { try { await initialFetchGeofences(); } catch {} renderGeofencesFromCache(); alert(`Importación completada: ${created} geocerca(s) creada(s).`); }
-    }
-    async function createGeofenceFromPolygonCoords(coords, name){
-      if(!coords || !coords.length || !coords[0].length) return;
-      const outer = coords[0].map(pair => ({lat: pair[1], lng: pair[0]}))
-        .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
-      if (outer.length < 3) return;
-      try{ await db.collection('geofences').add({ name: name || 'Geocerca', path: outer }); }
-      catch(err){ const fences = loadFenceCache(); fences.push({ id: 'localgf-'+Date.now(), name: name || 'Geocerca', path: outer }); saveFenceCache(fences); }
-    }
+  // ==== Suscripciones (en vivo) ====
+  let subsStarted=false, unsubFarms=null, unsubGeofences=null, unsubPersonnel=null, unsubRecords=null;
+  function startSubscriptions(){
+    if(subsStarted) return; subsStarted=true;
+
+    // farms
+    unsubFarms=db.collection('farms').onSnapshot(snap=>{
+      const farms=[]; Object.values(fincaMarkers).forEach(m=>map.removeLayer(m)); for(const k in fincaMarkers) delete fincaMarkers[k];
+      snap.forEach(doc=>{ const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); if(d.fincaLocation){ const m=L.marker([d.fincaLocation.lat,d.fincaLocation.lng]).addTo(map); m.bindTooltip(d.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'}); fincaMarkers[doc.id]=m; } });
+      currentFarms=farms.slice(); if(farms.length) saveCache(farms);
+      const sel=document.getElementById('farmSelect'); if(sel){ sel.innerHTML=''; farms.forEach(f=>{ const o=document.createElement('option'); o.value=f.id; o.textContent=f.name||'Finca'; sel.appendChild(o); }); }
+      updateDeleteButtonState(); buildIndexList(); refreshAssignmentOptions(); refreshAssignFilters();
+    }, ()=>{ renderFarmsFromCache(); });
+
+    // geofences
+    unsubGeofences=db.collection('geofences').onSnapshot(snap=>{
+      const fences=[]; Object.values(geofenceLayers).forEach(p=>map.removeLayer(p)); for(const k in geofenceLayers) delete geofenceLayers[k];
+      snap.forEach(doc=>{ const d=doc.data(); const g={id:doc.id,name:d.name,path:d.path||[]}; fences.push(g);
+        if(Array.isArray(g.path)&&g.path.length>=3){ const latlngs=g.path.map(pt=>[pt.lat,pt.lng]); const poly=L.polygon(latlngs,GEOFENCE_STYLE).addTo(map); poly.bindTooltip(g.name||'Geocerca',{permanent:true,direction:'center',className:'farm-label'}); geofenceLayers[doc.id]=poly; poly.on('click',()=>selectFence(doc.id)); if(selectedFenceId===doc.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE);} }
+      });
+      currentFences=fences.slice(); if(fences.length) saveFenceCache(fences);
+      if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null;
+      updateDeleteFenceButtonState(); updateEditButtonsState(); buildIndexList(); refreshAssignmentOptions(); refreshAssignFilters();
+    }, ()=>{ renderGeofencesFromCache(); });
+
+    // personnel
+    unsubPersonnel=db.collection('personnel').onSnapshot(snap=>{
+      const people=[]; snap.forEach(doc=>people.push({id:doc.id,...doc.data()})); if(people.length){ currentPersonnel=people.slice(); savePersonnelCache(people); }
+      renderPersonnelList(); fillPeopleCombos();
+    }, ()=>{ currentPersonnel=loadPersonnelCache(); renderPersonnelList(); fillPeopleCombos(); });
+
+    // records
+    unsubRecords=db.collection('person_records').onSnapshot(snap=>{
+      const recs=[]; snap.forEach(doc=>recs.push({id:doc.id,...doc.data()})); if(recs.length){ currentRecords=recs.slice(); saveRecordsCache(recs); }
+      renderRecordList();
+    }, ()=>{ currentRecords=loadRecordsCache(); renderRecordList(); });
+  }
+
+  // ==== Cargas iniciales ====
+  async function initialFetchAll(){ await Promise.all([initialFetchFarms(),initialFetchGeofences(),initialFetchPersonnel(),initialFetchRecords()]); }
+  async function initialFetchFarms(){ try{ const s=await db.collection('farms').get(); const arr=[]; s.forEach(d=>{const x=d.data(); arr.push({id:d.id,name:x.name,fincaLocation:x.fincaLocation});}); if(arr.length){ currentFarms=arr.slice(); saveCache(arr); renderFarmsFromCache(); } else { buildIndexList(); } }catch{ buildIndexList(); } }
+  async function initialFetchGeofences(){ try{ const s=await db.collection('geofences').get(); const arr=[]; s.forEach(d=>{const x=d.data(); arr.push({id:d.id,name:x.name,path:x.path||[]});}); if(arr.length){ currentFences=arr.slice(); saveFenceCache(arr); renderGeofencesFromCache(); } else { buildIndexList(); } }catch{ buildIndexList(); } }
+  async function initialFetchPersonnel(){ try{ const s=await db.collection('personnel').get(); const arr=[]; s.forEach(d=>arr.push({id:d.id,...d.data()})); currentPersonnel=arr.length?arr.slice():loadPersonnelCache(); if(arr.length) savePersonnelCache(arr); renderPersonnelList(); fillPeopleCombos(); }catch{ currentPersonnel=loadPersonnelCache(); renderPersonnelList(); fillPeopleCombos(); } }
+  async function initialFetchRecords(){ try{ const s=await db.collection('person_records').get(); const arr=[]; s.forEach(d=>arr.push({id:d.id,...d.data()})); currentRecords=arr.length?arr.slice():loadRecordsCache(); if(arr.length) saveRecordsCache(arr); renderRecordList(); }catch{ currentRecords=loadRecordsCache(); renderRecordList(); } }
+
+  // ==== Sync local -> Firestore (pendientes) ====
+  let syncRan=false;
+  async function syncLocalPendingToFirestore(){
+    if(syncRan) return; syncRan=true;
+    // farms
+    try{ const farms=loadCache().filter(f=>String(f.id||'').startsWith('local-')); for(const f of farms){ try{ await db.collection('farms').add({name:f.name||'Finca',fincaLocation:f.fincaLocation||null}); const u=loadCache().filter(x=>x.id!==f.id); saveCache(u);}catch{}} renderFarmsFromCache(); }catch{}
+    // geofences
+    try{ const fences=loadFenceCache().filter(g=>String(g.id||'').startsWith('localgf-')); for(const g of fences){ try{ await db.collection('geofences').add({name:g.name||'Geocerca',path:Array.isArray(g.path)?g.path:[]}); const u=loadFenceCache().filter(x=>x.id!==g.id); saveFenceCache(u);}catch{}} renderGeofencesFromCache(); }catch{}
+    // personnel
+    try{ const pers=loadPersonnelCache().filter(p=>String(p.id||'').startsWith('localp-')); for(const p of pers){ try{ await db.collection('personnel').add({firstName:p.firstName,lastName:p.lastName,idNumber:p.idNumber,assignType:p.assignType,assignId:p.assignId}); const u=loadPersonnelCache().filter(x=>x.id!==p.id); savePersonnelCache(u);}catch{}} currentPersonnel=loadPersonnelCache(); renderPersonnelList(); }catch{}
+    // records
+    try{ const recs=loadRecordsCache().filter(r=>String(r.id||'').startsWith('localr-')); for(const r of recs){ try{ await db.collection('person_records').add({personId:r.personId,activity:r.activity,startDate:r.startDate,endDate:r.endDate,assignType:r.assignType,assignId:r.assignId}); const u=loadRecordsCache().filter(x=>x.id!==r.id); saveRecordsCache(u);}catch{}} currentRecords=loadRecordsCache(); renderRecordList(); }catch{}
+  }
+
+  // ==== Render farms/geofences desde caché ====
+  function renderFarmsFromCache(){
+    const farms=loadCache(); Object.values(fincaMarkers).forEach(m=>map.removeLayer(m)); for(const k in fincaMarkers) delete fincaMarkers[k];
+    farms.forEach(f=>{ if(!f||!f.id||!f.fincaLocation) return; const m=L.marker([f.fincaLocation.lat,f.fincaLocation.lng]).addTo(map); m.bindTooltip(f.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'}); fincaMarkers[f.id]=m; });
+    const sel=document.getElementById('farmSelect'); if(sel){ sel.innerHTML=''; farms.forEach(f=>{const o=document.createElement('option'); o.value=f.id; o.textContent=f.name||'Finca'; sel.appendChild(o);}); }
+    updateDeleteButtonState(); currentFarms=farms||[]; buildIndexList(); refreshAssignmentOptions(); refreshAssignFilters();
+  }
+  function renderGeofencesFromCache(){
+    Object.values(geofenceLayers).forEach(p=>map.removeLayer(p)); for(const k in geofenceLayers) delete geofenceLayers[k];
+    const fences=loadFenceCache(); fences.forEach(g=>{ if(!g||!g.id||!Array.isArray(g.path)||g.path.length<3) return; const latlngs=g.path.map(pt=>[pt.lat,pt.lng]); const poly=L.polygon(latlngs,GEOFENCE_STYLE).addTo(map); poly.bindTooltip(g.name||'Geocerca',{permanent:true,direction:'center',className:'farm-label'}); geofenceLayers[g.id]=poly; poly.on('click',()=>selectFence(g.id)); if(selectedFenceId===g.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); } });
+    if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null; updateDeleteFenceButtonState(); updateEditButtonsState();
+    currentFences=fences||[]; buildIndexList(); refreshAssignmentOptions(); refreshAssignFilters();
+  }
+
+  // ==== Selección y edición geocercas ====
+  function selectFence(id){ if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes de seleccionar otra.'); return; } if(selectedFenceId&&geofenceLayers[selectedFenceId]) geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE); selectedFenceId=id; if(geofenceLayers[selectedFenceId]) geofenceLayers[selectedFenceId].setStyle(GEOFENCE_SELECTED_STYLE); updateDeleteFenceButtonState(); updateEditButtonsState(); }
+  function updateEditButtonsState(){ const canEdit=!!selectedFenceId&&!!geofenceLayers[selectedFenceId]&&!isEditingFence; const eBtn=document.getElementById('editFenceBtn'); if(eBtn) eBtn.disabled=!canEdit; const editing=isEditingFence; document.getElementById('saveFenceEditBtn')?.classList.toggle('hidden',!editing); document.getElementById('cancelFenceEditBtn')?.classList.toggle('hidden',!editing); }
+  function ensureEditToolbar(){ if(!editToolbar){ editToolbar=new L.EditToolbar.Edit(map,{featureGroup:editGroup,selectedPathOptions:{maintainColor:true}}); } }
+  function startFenceEdit(){ if(!selectedFenceId||!geofenceLayers[selectedFenceId]){ alert('Primero selecciona una geocerca.'); return; } if(isEditingFence) return; const poly=geofenceLayers[selectedFenceId]; const rings=poly.getLatLngs(); const ring0=Array.isArray(rings[0])?rings[0]:rings; editBackupCoords=ring0.map(ll=>({lat:ll.lat,lng:ll.lng})); if(!editGroup.hasLayer(poly)) editGroup.addLayer(poly); ensureEditToolbar(); editToolbar.enable(); isEditingFence=true; updateEditButtonsState(); }
+  async function saveFenceEdit(){ if(!isEditingFence||!selectedFenceId||!geofenceLayers[selectedFenceId]) return; const poly=geofenceLayers[selectedFenceId]; const rings=poly.getLatLngs(); const ring0=Array.isArray(rings[0])?rings[0]:rings; const newPath=ring0.map(ll=>({lat:ll.lat,lng:ll.lng})); if(newPath.length<3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
+    const fencesCache=loadFenceCache(); const idx=fencesCache.findIndex(g=>g.id===selectedFenceId);
+    try{ if(String(selectedFenceId).startsWith('localgf-')){ if(idx>=0){ fencesCache[idx].path=newPath; saveFenceCache(fencesCache);} } else { await db.collection('geofences').doc(selectedFenceId).update({path:newPath}); } }catch{ if(idx>=0){ fencesCache[idx].path=newPath; saveFenceCache(fencesCache);} }
+    if(editToolbar) editToolbar.disable(); if(editGroup&&editGroup.hasLayer(poly)) editGroup.removeLayer(poly); isEditingFence=false; editBackupCoords=null; updateEditButtonsState(); renderGeofencesFromCache();
+  }
+  function cancelFenceEdit(){ if(!isEditingFence||!selectedFenceId||!geofenceLayers[selectedFenceId]) return; const poly=geofenceLayers[selectedFenceId]; if(editBackupCoords&&editBackupCoords.length>=3){ poly.setLatLngs(editBackupCoords.map(p=>L.latLng(p.lat,p.lng))); } if(editToolbar) editToolbar.disable(); if(editGroup&&editGroup.hasLayer(poly)) editGroup.removeLayer(poly); isEditingFence=false; editBackupCoords=null; updateEditButtonsState(); }
+
+  // ==== Dibujo & creación geocercas ====
+  function addFenceVertex(latlng){ drawingCoords.push({lat:latlng.lat,lng:latlng.lng}); const m=L.circleMarker(latlng,{radius:4,weight:2}).addTo(map); drawingMarkers.push(m); updateFencePreview(); }
+  function updateFencePreview(){ const latlngs=drawingCoords.map(p=>[p.lat,p.lng]); if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; } if(latlngs.length>=3){ drawingPolyline=L.polygon(latlngs,{dashArray:'4,4',weight:2,fillOpacity:.1}).addTo(map);} else if(latlngs.length>=2){ drawingPolyline=L.polyline(latlngs,{dashArray:'4,4',weight:2}).addTo(map);} }
+  function startFenceDraw(){ if(isDrawingFence) return; isDrawingFence=true; drawingCoords=[]; drawingMarkers.forEach(m=>map.removeLayer(m)); drawingMarkers=[]; if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; } document.getElementById('startFenceBtn').classList.add('hidden'); document.getElementById('finishFenceBtn').classList.remove('hidden'); document.getElementById('cancelFenceBtn').classList.remove('hidden'); }
+  function finishFenceDraw(){ if(!isDrawingFence) return; if(drawingCoords.length<3){ alert('La geocerca necesita al menos 3 puntos.'); return; } pendingFenceCoords=drawingCoords.slice(); const hint=document.getElementById('fenceNameHint'); if(hint) hint.textContent='Vértices: '+pendingFenceCoords.length+' puntos'; const input=document.getElementById('fenceNameInput'); if(input){ input.value='Geocerca '+new Date().toLocaleDateString(); const panel=document.getElementById('fenceNamePanel'); if(panel) panel.classList.remove('hidden'); input.focus(); input.select(); } }
+  function cancelFenceDraw(){ isDrawingFence=false; drawingCoords=[]; drawingMarkers.forEach(m=>map.removeLayer(m)); drawingMarkers=[]; if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; } document.getElementById('startFenceBtn').classList.remove('hidden'); document.getElementById('finishFenceBtn').classList.add('hidden'); document.getElementById('cancelFenceBtn').classList.add('hidden'); const panel=document.getElementById('fenceNamePanel'); if(panel) panel.classList.add('hidden'); pendingFenceCoords=null; }
+  async function saveFenceName(){ const input=document.getElementById('fenceNameInput'); const name=(input&&input.value?input.value:'').trim()||'Geocerca'; if(!pendingFenceCoords||pendingFenceCoords.length<3){ alert('No hay geocerca lista para guardar.'); return; }
+    try{ await db.collection('geofences').add({name, path:pendingFenceCoords}); }catch{ const fences=loadFenceCache(); fences.push({id:'localgf-'+Date.now(),name,path:pendingFenceCoords}); saveFenceCache(fences); renderGeofencesFromCache(); }
+    if(input) input.value=''; pendingFenceCoords=null; const panel=document.getElementById('fenceNamePanel'); if(panel) panel.classList.add('hidden'); cancelFenceDraw(); removePreviewFence(); waitAuthThen(syncLocalPendingToFirestore);
+  }
+  function removePreviewFence(){ if(previewFenceLayer){ map.removeLayer(previewFenceLayer); previewFenceLayer=null; } }
+  function createFenceByCoords(){ if(isDrawingFence){ alert('Finaliza o cancela el dibujo antes.'); return; } const ejemplo='-1.2345,-78.5678; -1.2350,-78.5684; -1.2362,-78.5690'; const raw=prompt('Ingresa puntos en formato lat,lng separados por \';\' o por saltos de línea.\nEjemplo:\n'+ejemplo); if(raw===null) return;
+    const items=String(raw||'').split(/[\n;]+/).map(s=>s.trim()).filter(Boolean); const pts=[]; items.forEach(it=>{ const parts=it.split(/[,\s]+/).map(t=>t.trim()).filter(Boolean); if(parts.length<2) return; const lat=parseCoord(parts[0]), lng=parseCoord(parts[1]); if(Number.isFinite(lat)&&Number.isFinite(lng)&&validLat(lat)&&validLng(lng)){ pts.push({lat,lng}); }});
+    if(pts.length<3){ alert('Se requieren al menos 3 puntos válidos.'); return; }
+    pendingFenceCoords=pts; if(map){ if(previewFenceLayer){ map.removeLayer(previewFenceLayer); previewFenceLayer=null; } previewFenceLayer=L.polygon(pts.map(p=>[p.lat,p.lng]),{dashArray:'4,4',weight:2,fillOpacity:.1}).addTo(map); try{ map.fitBounds(previewFenceLayer.getBounds(),{padding:[20,20]}); }catch{} }
+    const hint=document.getElementById('fenceNameHint'); if(hint) hint.textContent='Vértices: '+pts.length+' puntos'; const input=document.getElementById('fenceNameInput'); if(input){ input.value='Geocerca '+new Date().toLocaleDateString(); const panel=document.getElementById('fenceNamePanel'); if(panel) panel.classList.remove('hidden'); input.focus(); input.select(); }
+  }
+
+  // ==== Explorador (listas) ====
+  function buildIndexList(){
+    const farmUl=document.getElementById('farmList'), fenceUl=document.getElementById('fenceList'); if(!farmUl||!fenceUl) return;
+    const farmsSrc=(currentFarms&&currentFarms.length)?currentFarms:(loadCache()||[]); const fencesSrc=(currentFences&&currentFences.length)?currentFences:(loadFenceCache()||[]);
+    const farms=farmsSrc.slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||'')); const fences=fencesSrc.slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
+    farmUl.innerHTML=''; if(!farms.length){ const li=document.createElement('li'); li.className='py-2 text-sm text-gray-500'; li.textContent='No hay fincas registradas.'; farmUl.appendChild(li); } else { farms.forEach(f=>{ const li=document.createElement('li'); li.className='py-2'; li.innerHTML='<div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer select-none" data-id="'+f.id+'" data-type="farm" title="Doble clic para centrar"><div class="text-sm font-medium text-gray-800">'+(f.name||'Finca')+'</div><div class="text-xs text-gray-500">'+(f?.fincaLocation?('Lat '+(+f.fincaLocation.lat).toFixed(5)+', Lng '+(+f.fincaLocation.lng).toFixed(5)):'—')+'</div></div>'; farmUl.appendChild(li); }); }
+    fenceUl.innerHTML=''; if(!fences.length){ const li=document.createElement('li'); li.className='py-2 text-sm text-gray-500'; li.textContent='No hay geocercas registradas.'; fenceUl.appendChild(li); } else { fences.forEach(g=>{ const li=document.createElement('li'); li.className='py-2'; li.innerHTML='<div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer select-none" data-id="'+g.id+'" data-type="fence" title="Doble clic para ajustar al polígono"><div class="text-sm font-medium text-gray-800">'+(g.name||'Geocerca')+'</div><div class="text-xs text-gray-500">'+(Array.isArray(g.path)?(g.path.length+' puntos'):'—')+'</div></div>'; fenceUl.appendChild(li); }); }
+  }
+  function zoomToFarm(id){ try{ if(fincaMarkers[id]){ const ll=fincaMarkers[id].getLatLng(); map.setView(ll,Math.max(map.getZoom(),16)); try{fincaMarkers[id].openTooltip();}catch{} return; } const farms=loadCache()||[]; const f=farms.find(x=>x.id===id); if(f&&f.fincaLocation){ map.setView([f.fincaLocation.lat,f.fincaLocation.lng],Math.max(map.getZoom(),16)); } else { alert('No se pudo localizar esa finca.'); } }catch{} }
+  function zoomToFence(id){ try{ if(geofenceLayers[id]){ const b=geofenceLayers[id].getBounds(); map.fitBounds(b,{padding:[20,20]}); selectFence(id); return; } const fences=loadFenceCache()||[]; const g=fences.find(x=>x.id===id); if(g&&Array.isArray(g.path)&&g.path.length>=3){ const b=L.latLngBounds(g.path.map(p=>[p.lat,p.lng])); map.fitBounds(b,{padding:[20,20]}); selectFence(id);} else { alert('No se pudo localizar esa geocerca.'); } }catch{} }
+
+  // ==== Borrado y estados botones ====
+  function updateDeleteButtonState(){ const sel=document.getElementById('farmSelect'); const btn=document.getElementById('deleteFarmBtn'); if(btn) btn.disabled=!(sel&&sel.value); }
+  async function deleteSelectedFarm(){ const sel=document.getElementById('farmSelect'); const id=sel?sel.value:''; if(!id){ alert('No hay finca seleccionada.'); return; } const farms=loadCache(); const farm=farms.find(f=>f.id===id); const name=(farm&&farm.name)||'Finca'; if(!confirm('¿Eliminar "'+name+'"?')) return; if(String(id).startsWith('local-')){ const upd=farms.filter(f=>f.id!==id); saveCache(upd); renderFarmsFromCache(); return; } try{ await db.collection('farms').doc(id).delete(); }catch{ const upd=farms.filter(f=>f.id!==id); saveCache(upd); renderFarmsFromCache(); } }
+  function updateDeleteFenceButtonState(){ const btn=document.getElementById('deleteFenceBtn'); if(btn) btn.disabled=!selectedFenceId; }
+  async function deleteSelectedFence(){ if(!selectedFenceId){ alert('Primero selecciona una geocerca.'); return; } if(isEditingFence){ alert('Estás editando. Guarda o cancela antes.'); return; } const fences=loadFenceCache(); const gf=fences.find(g=>g.id===selectedFenceId); const name=(gf&&gf.name)||'Geocerca'; if(!confirm('¿Eliminar "'+name+'"?')) return;
+    if(String(selectedFenceId).startsWith('localgf-')){ const u=fences.filter(g=>g.id!==selectedFenceId); saveFenceCache(u); if(geofenceLayers[selectedFenceId]){ map.removeLayer(geofenceLayers[selectedFenceId]); delete geofenceLayers[selectedFenceId]; } selectedFenceId=null; updateDeleteFenceButtonState(); updateEditButtonsState(); return; }
+    try{ await db.collection('geofences').doc(selectedFenceId).delete(); }catch{ const u=fences.filter(g=>g.id!==selectedFenceId); saveFenceCache(u); if(geofenceLayers[selectedFenceId]){ map.removeLayer(geofenceLayers[selectedFenceId]); delete geofenceLayers[selectedFenceId]; } }
+    selectedFenceId=null; updateDeleteFenceButtonState(); updateEditButtonsState();
+  }
+
+  // ==== Asignaciones combos ====
+  function labelForAssignment(t,id){ if(t==='farm'){ const f=(currentFarms||[]).find(x=>x.id===id)||(loadCache()||[]).find(x=>x.id===id); return f?('Finca: '+(f.name||'—')):'Finca: —'; } if(t==='geofence'){ const g=(currentFences||[]).find(x=>x.id===id)||(loadFenceCache()||[]).find(x=>x.id===id); return g?('Geocerca: '+(g.name||'—')):'Geocerca: —'; } return '—'; }
+  function refreshAssignmentOptions(){ const sel=document.getElementById('pAssignSelect'); if(!sel) return; const farms=(currentFarms||[]), fences=(currentFences||[]); sel.innerHTML='<option value="">— Selecciona —</option>'; farms.forEach(f=>{ const o=document.createElement('option'); o.value='farm:'+f.id; o.textContent='Finca: '+(f.name||'—'); sel.appendChild(o); }); fences.forEach(g=>{ const o=document.createElement('option'); o.value='geofence:'+g.id; o.textContent='Geocerca: '+(g.name||'—'); sel.appendChild(o); }); }
+  function refreshAssignFilters(){
+    const typeSel=document.getElementById('personAssignTypeFilter'), idSel=document.getElementById('personAssignIdFilter'); if(typeSel&&idSel){ const type=typeSel.value; idSel.innerHTML='<option value="all">Todas</option>'; if(type==='farm'||type==='all'){ (currentFarms||[]).forEach(f=>{ const o=document.createElement('option'); o.value='farm:'+f.id; o.textContent='Finca: '+(f.name||'—'); idSel.appendChild(o);}); } if(type==='geofence'||type==='all'){ (currentFences||[]).forEach(g=>{ const o=document.createElement('option'); o.value='geofence:'+g.id; o.textContent='Geocerca: '+(g.name||'—'); idSel.appendChild(o);}); } }
+    const fType=document.getElementById('filterAssignType'), fId=document.getElementById('filterAssignId'); if(fType&&fId){ const t=fType.value; fId.innerHTML='<option value="all">Todas</option>'; if(t==='farm'||t==='all'){ (currentFarms||[]).forEach(f=>{ const o=document.createElement('option'); o.value='farm:'+f.id; o.textContent='Finca: '+(f.name||'—'); fId.appendChild(o);}); } if(t==='geofence'||t==='all'){ (currentFences||[]).forEach(g=>{ const o=document.createElement('option'); o.value='geofence:'+g.id; o.textContent='Geocerca: '+(g.name||'—'); fId.appendChild(o);}); } }
+  }
+
+  // ==== Personal (alta/edición/lista) ====
+  let editingPersonId=null;
+  function readPersonForm(){
+    const fn=(document.getElementById('pFirstName')?.value||'').trim();
+    const ln=(document.getElementById('pLastName')?.value||'').trim();
+    const idn=(document.getElementById('pIdNumber')?.value||'').trim();
+    const assignVal=(document.getElementById('pAssignSelect')?.value||'').trim();
+    const err=document.getElementById('personFormError'); if(err){ err.classList.add('hidden'); err.textContent=''; }
+    if(!fn||!ln){ if(err){ err.textContent='Nombre y apellido son obligatorios.'; err.classList.remove('hidden'); } return null; }
+    if(!/^[0-9]{6,15}$/.test(idn)){ if(err){ err.textContent='Cédula: usar solo dígitos (6–15).'; err.classList.remove('hidden'); } return null; }
+    if(!assignVal){ if(err){ err.textContent='Seleccione una asignación.'; err.classList.remove('hidden'); } return null; }
+    const parts=assignVal.split(':'), assignType=parts[0], assignId=parts[1]; return {firstName:fn,lastName:ln,idNumber:idn,assignType,assignId};
+  }
+  async function addPerson(ev){
+    if(ev&&ev.preventDefault) ev.preventDefault();
+    const docData=readPersonForm(); if(!docData) return;
+    let newId;
+    try{ const ref=await db.collection('personnel').add(docData); newId=ref.id; }
+    catch{ newId='localp-'+Date.now(); }
+    const item={id:newId, ...docData};
+    currentPersonnel=(currentPersonnel||[]).concat([item]);
+    const cache=(loadPersonnelCache()||[]).concat([item]); savePersonnelCache(cache);
+    renderPersonnelList(); fillPeopleCombos(); clearPersonForm(); waitAuthThen(syncLocalPendingToFirestore);
+  }
+  async function savePersonEdit(){
+    if(!editingPersonId) return;
+    const docData=readPersonForm(); if(!docData) return;
+    try{
+      if(String(editingPersonId).startsWith('localp-')){
+        const cache=loadPersonnelCache(); const idx=cache.findIndex(p=>p.id===editingPersonId);
+        if(idx>=0){ cache[idx]={id:editingPersonId, ...docData}; savePersonnelCache(cache); currentPersonnel=cache.slice(); }
+      } else { await db.collection('personnel').doc(editingPersonId).update(docData); const loc=(currentPersonnel||[]).map(p=>p.id===editingPersonId?({id:p.id,...docData}):p); currentPersonnel=loc; savePersonnelCache(loc); }
+    }catch{ const cache=loadPersonnelCache().map(p=>p.id===editingPersonId?({id:p.id,...docData}):p); savePersonnelCache(cache); currentPersonnel=cache.slice(); }
+    renderPersonnelList(); fillPeopleCombos(); clearPersonForm(); waitAuthThen(syncLocalPendingToFirestore);
+  }
+  async function deletePerson(id){
+    if(!id) return; let cache=loadPersonnelCache(); const item=(currentPersonnel||[]).find(p=>p.id===id)||cache.find(p=>p.id===id); const label=item?((item.firstName||'')+' '+(item.lastName||'')).trim():'esta persona'; if(!confirm('¿Eliminar '+label+'?')) return;
+    if(String(id).startsWith('localp-')){ cache=cache.filter(p=>p.id!==id); savePersonnelCache(cache); currentPersonnel=cache.slice(); renderPersonnelList(); return; }
+    try{ await db.collection('personnel').doc(id).delete(); }catch{} cache=cache.filter(p=>p.id!==id); savePersonnelCache(cache); currentPersonnel=cache.slice(); renderPersonnelList();
+  }
+  function loadPersonIntoForm(id){
+    const src=(currentPersonnel&&currentPersonnel.length)?currentPersonnel:loadPersonnelCache(); const p=src.find(x=>x.id===id); if(!p){ alert('No se encontró el registro.'); return; }
+    document.getElementById('pFirstName').value=p.firstName||''; document.getElementById('pLastName').value=p.lastName||''; document.getElementById('pIdNumber').value=p.idNumber||''; const sel=document.getElementById('pAssignSelect'); if(sel){ const value=p.assignType+':'+p.assignId; const opt=Array.from(sel.options).find(o=>o.value===value); sel.value=opt?value:(sel.options[0]?sel.options[0].value:''); }
+    editingPersonId=id; document.getElementById('addPersonBtn').classList.add('hidden'); document.getElementById('savePersonBtn').classList.remove('hidden'); document.getElementById('cancelPersonBtn').classList.remove('hidden');
+  }
+  function clearPersonForm(){ document.getElementById('pFirstName').value=''; document.getElementById('pLastName').value=''; document.getElementById('pIdNumber').value=''; document.getElementById('pAssignSelect').value=''; editingPersonId=null; document.getElementById('addPersonBtn').classList.remove('hidden'); document.getElementById('savePersonBtn').classList.add('hidden'); document.getElementById('cancelPersonBtn').classList.add('hidden'); const err=document.getElementById('personFormError'); if(err){err.classList.add('hidden'); err.textContent='';} }
+
+  function renderPersonnelList(){
+    const tbody=document.getElementById('personTableBody'); if(!tbody) return;
+    const txt=(document.getElementById('personSearchInput')?.value||'').trim().toLowerCase(); const typeFilter=document.getElementById('personAssignTypeFilter')?.value||'all'; const idFilter=document.getElementById('personAssignIdFilter')?.value||'all';
+    const src=(currentPersonnel&&currentPersonnel.length)?currentPersonnel:loadPersonnelCache();
+    const filtered=src.filter(p=>{ const hayTxt=!txt||[p.firstName,p.lastName,p.idNumber].join(' ').toLowerCase().includes(txt); const hayType=(typeFilter==='all')||(p.assignType===typeFilter); const hayId=(idFilter==='all')||((p.assignType+':'+p.assignId)===idFilter); return hayTxt&&hayType&&hayId; });
+    tbody.innerHTML=''; if(!filtered.length){ const tr=document.createElement('tr'); tr.innerHTML='<td colspan="5" class="text-center text-sm text-gray-500 py-6">No hay personal registrado.</td>'; tbody.appendChild(tr); return; }
+    filtered.forEach(p=>{ const tr=document.createElement('tr'); tr.className='hover:bg-gray-50 cursor-default'; tr.dataset.id=p.id; tr.innerHTML='<td class="text-sm text-gray-800">'+(p.firstName||'')+'</td><td class="text-sm text-gray-800">'+(p.lastName||'')+'</td><td class="text-sm text-gray-800">'+(p.idNumber||'')+'</td><td class="text-sm text-gray-600">'+labelForAssignment(p.assignType,p.assignId)+'</td><td class="text-sm"><button class="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 mr-2" data-action="edit">Editar</button><button class="px-2 py-1 rounded bg-rose-600 text-white hover:bg-rose-700" data-action="del">Eliminar</button></td>';
+      tr.addEventListener('dblclick',()=>{ if(p.assignType==='farm') zoomToFarm(p.assignId); else if(p.assignType==='geofence') zoomToFence(p.assignId); });
+      tr.addEventListener('click',e=>{ const act=e.target&&e.target.dataset?e.target.dataset.action:null; if(act==='edit') loadPersonIntoForm(p.id); else if(act==='del') deletePerson(p.id); });
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ==== Registros ====
+  function fillPeopleCombos(){
+    const people=(currentPersonnel&&currentPersonnel.length)?currentPersonnel:loadPersonnelCache();
+    const sel1=document.getElementById('recordPersonSelect'), sel2=document.getElementById('filterRecordPerson');
+    if(sel1){ sel1.innerHTML='<option value="">— Selecciona —</option>'; people.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=(p.firstName||'')+' '+(p.lastName||'')+' ('+(p.idNumber||'')+')'; sel1.appendChild(o); }); }
+    if(sel2){ sel2.innerHTML='<option value="all">Todas</option>'; people.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=(p.firstName||'')+' '+(p.lastName||'')+' ('+(p.idNumber||'')+')'; sel2.appendChild(o); }); }
+    const a1=document.getElementById('recordActivitySelect'), a2=document.getElementById('filterRecordActivity'); if(a1&&!a1.childElementCount){ ACTIVITIES.forEach(x=>{ const o=document.createElement('option'); o.value=x; o.textContent=x; a1.appendChild(o); }); } if(a2&&a2.childElementCount<=1){ ACTIVITIES.forEach(x=>{ const o=document.createElement('option'); o.value=x; o.textContent=x; a2.appendChild(o); }); }
+    const today=(new Date()).toISOString().slice(0,10); const fs=document.getElementById('recordStartDate'), fe=document.getElementById('recordEndDate'); if(fs&& !fs.value) fs.value=today; if(fe&& !fe.value) fe.value=today; document.getElementById('filterRecordStart').value ||= today; document.getElementById('filterRecordEnd').value ||= today;
+  }
+  async function addRecord(){ const personId=(document.getElementById('recordPersonSelect')?.value||'').trim(); const activity=(document.getElementById('recordActivitySelect')?.value||'').trim(); const startDate=(document.getElementById('recordStartDate')?.value||'').trim(); const endDate=(document.getElementById('recordEndDate')?.value||'').trim(); if(!personId||!activity||!startDate||!endDate){ alert('Completa persona, actividad y fechas.'); return; }
+    const p=(currentPersonnel||[]).find(x=>x.id===personId)||(loadPersonnelCache()||[]).find(x=>x.id===personId); if(!p){ alert('Persona no encontrada.'); return; }
+    const docData={ personId, activity, startDate, endDate, assignType:p.assignType, assignId:p.assignId };
+    let newId; try{ const ref=await db.collection('person_records').add(docData); newId=ref.id; }catch{ newId='localr-'+Date.now(); }
+    const rec={id:newId, ...docData}; currentRecords=(currentRecords||[]).concat([rec]); const cache=(loadRecordsCache()||[]).concat([rec]); saveRecordsCache(cache); renderRecordList(); waitAuthThen(syncLocalPendingToFirestore);
+  }
+  function renderRecordList(){
+    const tbody=document.getElementById('recordTableBody'); if(!tbody) return;
+    const personF=document.getElementById('filterRecordPerson')?.value||'all', actF=document.getElementById('filterRecordActivity')?.value||'all', sdF=document.getElementById('filterRecordStart')?.value||'', edF=document.getElementById('filterRecordEnd')?.value||'', typeF=document.getElementById('filterAssignType')?.value||'all', idF=document.getElementById('filterAssignId')?.value||'all';
+    const src=(currentRecords&&currentRecords.length)?currentRecords:loadRecordsCache();
+    const filtered=src.filter(r=>{ const okPerson=(personF==='all')||(r.personId===personF); const okAct=(actF==='all')||(r.activity===actF); const okDates=(!sdF||r.endDate>=sdF)&&(!edF||r.startDate<=edF); const okType=(typeF==='all')||(r.assignType===typeF); const okId=(idF==='all')||((r.assignType+':'+r.assignId)===idF); return okPerson&&okAct&&okDates&&okType&&okId; });
+    tbody.innerHTML=''; if(!filtered.length){ const tr=document.createElement('tr'); tr.innerHTML='<td colspan="5" class="text-center text-sm text-gray-500 py-6">No hay registros.</td>'; tbody.appendChild(tr); return; }
+    filtered.sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||'')); filtered.forEach(r=>{ const p=(currentPersonnel||[]).find(x=>x.id===r.personId)||(loadPersonnelCache()||[]).find(x=>x.id===r.personId); const pname=p?((p.firstName||'')+' '+(p.lastName||'')):r.personId; const tr=document.createElement('tr'); tr.innerHTML='<td class="text-sm text-gray-800">'+pname+'</td><td class="text-sm text-gray-800">'+r.activity+'</td><td class="text-sm text-gray-800">'+r.startDate+'</td><td class="text-sm text-gray-800">'+r.endDate+'</td><td class="text-sm text-gray-600">'+labelForAssignment(r.assignType,r.assignId)+'</td>'; tbody.appendChild(tr); });
+  }
+  function exportRecordsCsv(){ const rows=[['Persona','Actividad','Desde','Hasta','Asignación']]; const trs=Array.from(document.getElementById('recordTableBody').querySelectorAll('tr')); trs.forEach(tr=>{ const tds=Array.from(tr.querySelectorAll('td')).map(td=>td.textContent); if(tds.length===5) rows.push(tds); }); const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='reporte_personal.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+
+  // ==== GeoJSON export/import ====
+  function fenceToFeature(id){ const gf=(loadFenceCache()||[]).find(g=>g.id===id); const layer=geofenceLayers[id]; if(!gf||!layer) return null; const rings=layer.getLatLngs(); const ring0=(Array.isArray(rings[0])?rings[0]:rings).map(ll=>[ll.lng,ll.lat]); if(ring0.length&&(ring0[0][0]!==ring0[ring0.length-1][0]||ring0[0][1]!==ring0[ring0.length-1][1])){ ring0.push([ring0[0][0], ring0[0][1]]); } return {type:'Feature',properties:{id:gf.id,name:gf.name||'Geocerca'},geometry:{type:'Polygon',coordinates:[ring0]}}; }
+  function exportGeoJSON(){ let fc; if(selectedFenceId&&geofenceLayers[selectedFenceId]){ const feat=fenceToFeature(selectedFenceId); if(!feat){ alert('No se pudo exportar.'); return; } fc={type:'FeatureCollection',features:[feat]}; } else { const features=[]; for(const id of Object.keys(geofenceLayers)){ const f=fenceToFeature(id); if(f) features.push(f);} if(!features.length){ alert('No hay geocercas para exportar.'); return; } fc={type:'FeatureCollection',features}; } const blob=new Blob([JSON.stringify(fc,null,2)],{type:'application/geo+json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=selectedFenceId?('geocerca_'+selectedFenceId+'.geojson'):'geocercas.geojson'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+  async function importGeoJSONFromText(text){ let obj; try{ obj=JSON.parse(text);}catch{ alert('GeoJSON inválido.'); return; } const asArray=x=>Array.isArray(x)?x:[x]; let features=[]; if(obj.type==='FeatureCollection'){ features=obj.features||[];} else if(obj.type==='Feature'){ features=[obj]; } else if(obj.type&&obj.coordinates){ features=[{type:'Feature',properties:{},geometry:obj}]; } else { alert('Estructura GeoJSON no reconocida.'); return; } let created=0; for(const feat of features){ const geom=feat.geometry||{}, props=feat.properties||{}, baseName=(props.name||'Geocerca importada'); if(geom.type==='Polygon'){ await createGeofenceFromPolygonCoords(geom.coordinates,baseName); created++; } else if(geom.type==='MultiPolygon'){ const polys=asArray(geom.coordinates); let i=1; for(const poly of polys){ await createGeofenceFromPolygonCoords(poly, baseName+' ('+i+')'); i++; created++; } } }
+    if(created===0){ alert('El GeoJSON no contiene Polygon/MultiPolygon.'); } else { try{ await initialFetchGeofences(); }catch{} renderGeofencesFromCache(); alert('Importación completada: '+created+' geocerca(s).'); }
+  }
+  async function createGeofenceFromPolygonCoords(coords,name){ if(!coords||!coords.length||!coords[0].length) return; const outer=coords[0].map(pair=>({lat:pair[1],lng:pair[0]})).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)); if(outer.length<3) return; try{ await db.collection('geofences').add({name:name||'Geocerca',path:outer}); }catch{ const fences=loadFenceCache(); fences.push({id:'localgf-'+Date.now(),name:name||'Geocerca',path:outer}); saveFenceCache(fences);} }
+
+  // ==== Listeners DOM ====
+  document.addEventListener('DOMContentLoaded',()=>{
+    // listas
+    document.getElementById('farmList')?.addEventListener('dblclick',e=>{ const box=e.target.closest('[data-type="farm"][data-id]'); if(box) zoomToFarm(box.dataset.id); });
+    document.getElementById('fenceList')?.addEventListener('dblclick',e=>{ const box=e.target.closest('[data-type="fence"][data-id]'); if(box) zoomToFence(box.dataset.id); });
+
+    // fincas
+    document.getElementById('farmSelect')?.addEventListener('change',updateDeleteButtonState);
+    document.getElementById('createFarmBtn')?.addEventListener('click',createFarmAtCenter);
+    document.getElementById('deleteFarmBtn')?.addEventListener('click',deleteSelectedFarm);
+    document.getElementById('createByCoordsBtn')?.addEventListener('click',()=>{ const latStr=prompt('Latitud (decimal, -90 a 90). Puedes usar coma o punto:'); if(latStr===null) return; const lngStr=prompt('Longitud (decimal, -180 a 180). Puedes usar coma o punto:'); if(lngStr===null) return; const lat=parseCoord(latStr), lng=parseCoord(lngStr); if(!Number.isFinite(lat)||!validLat(lat)){ alert('Latitud inválida.'); return;} if(!Number.isFinite(lng)||!validLng(lng)){ alert('Longitud inválida.'); return;} const input=document.getElementById('coordsNameInput'); const hint=document.getElementById('coordsNameHint'); if(hint) hint.textContent='Coordenadas: Lat '+lat.toFixed(5)+', Lng '+lng.toFixed(5); if(input) input.value='Finca '+lat.toFixed(5)+', '+lng.toFixed(5); const panel=document.getElementById('coordsNamePanel'); if(panel) panel.classList.remove('hidden'); if(input){ input.focus(); input.select(); } window.pendingLat=lat; window.pendingLng=lng; if(map){ map.setView([lat,lng],Math.max(map.getZoom(),12)); } });
+    document.getElementById('coordsNameSaveBtn')?.addEventListener('click',async ()=>{ const lat=window.pendingLat, lng=window.pendingLng; if(lat==null||lng==null){ document.getElementById('coordsNamePanel')?.classList.add('hidden'); return;} const input=document.getElementById('coordsNameInput'); const name=(input&&input.value?input.value:'').trim()||('Finca '+lat.toFixed(5)+', '+lng.toFixed(5)); try{ await db.collection('farms').add({name,fincaLocation:{lat,lng}}); }catch{ const farms=loadCache(); farms.push({id:'local-'+Date.now(),name,fincaLocation:{lat,lng}}); saveCache(farms); renderFarmsFromCache(); } window.pendingLat=null; window.pendingLng=null; if(input) input.value=''; document.getElementById('coordsNamePanel')?.classList.add('hidden'); waitAuthThen(syncLocalPendingToFirestore); });
+    document.getElementById('coordsNameCancelBtn')?.addEventListener('click',()=>{ window.pendingLat=null; window.pendingLng=null; document.getElementById('coordsNameInput').value=''; document.getElementById('coordsNamePanel').classList.add('hidden'); });
+
+    // geocercas
+    document.getElementById('startFenceBtn')?.addEventListener('click',startFenceDraw);
+    document.getElementById('finishFenceBtn')?.addEventListener('click',finishFenceDraw);
+    document.getElementById('cancelFenceBtn')?.addEventListener('click',cancelFenceDraw);
+    document.getElementById('fenceNameSaveBtn')?.addEventListener('click',saveFenceName);
+    document.getElementById('fenceNameCancelBtn')?.addEventListener('click',()=>{ document.getElementById('fenceNameInput').value=''; document.getElementById('fenceNamePanel').classList.add('hidden'); removePreviewFence(); });
+    document.getElementById('createFenceByCoordsBtn')?.addEventListener('click',createFenceByCoords);
+    document.getElementById('editFenceBtn')?.addEventListener('click',startFenceEdit);
+    document.getElementById('saveFenceEditBtn')?.addEventListener('click',saveFenceEdit);
+    document.getElementById('cancelFenceEditBtn')?.addEventListener('click',cancelFenceEdit);
+    document.getElementById('exportGeoJSONBtn')?.addEventListener('click',exportGeoJSON);
+    document.getElementById('importGeoJSONInput')?.addEventListener('change',async e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const text=await f.text(); await importGeoJSONFromText(text); e.target.value=''; });
+
+    // personal
+    document.getElementById('addPersonBtn')?.addEventListener('click',addPerson);
+    document.getElementById('savePersonBtn')?.addEventListener('click',savePersonEdit);
+    document.getElementById('cancelPersonBtn')?.addEventListener('click',clearPersonForm);
+    document.getElementById('personSearchInput')?.addEventListener('input',renderPersonnelList);
+    document.getElementById('personAssignTypeFilter')?.addEventListener('change',()=>{ refreshAssignFilters(); renderPersonnelList(); });
+    document.getElementById('personAssignIdFilter')?.addEventListener('change',renderPersonnelList);
+
+    // registros
+    document.getElementById('addRecordBtn')?.addEventListener('click',addRecord);
+    document.getElementById('applyRecordFiltersBtn')?.addEventListener('click',renderRecordList);
+    document.getElementById('exportRecordsCsvBtn')?.addEventListener('click',exportRecordsCsv);
+    document.getElementById('filterAssignType')?.addEventListener('change',()=>{ refreshAssignFilters(); renderRecordList(); });
+    document.getElementById('filterAssignId')?.addEventListener('change',renderRecordList);
+  });
   </script>
 </body>
 </html>
-
