@@ -201,7 +201,7 @@
       </div>
     </div>
 
-    <!-- ===== Gestión de Actividades (NUEVO) ===== -->
+    <!-- ===== Gestión de Actividades ===== -->
     <div class="bg-white p-6 rounded-2xl shadow-lg">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-2xl font-semibold text-gray-700">Gestión de Actividades</h2>
@@ -211,7 +211,13 @@
       <!-- Form alta -->
       <div class="grid md:grid-cols-5 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700">Actividad</label>
+          <label class="block text-sm font-medium text-gray-700">
+            Actividad
+            <button id="actManageBtn" type="button"
+                    class="ml-2 text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded">
+              Editar lista
+            </button>
+          </label>
           <select id="actActivitySelect" class="mt-1 w-full border rounded-md p-2"></select>
         </div>
         <div>
@@ -240,8 +246,8 @@
         <span id="actFormError" class="text-sm text-red-600 ml-3 hidden"></span>
       </div>
 
-      <!-- Filtros -->
-      <div class="mt-6 grid md:grid-cols-5 gap-4">
+      <!-- Filtros (sin “Tipo”) -->
+      <div class="mt-6 grid md:grid-cols-4 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700">Persona</label>
           <select id="actFilterPerson" class="mt-1 w-full border rounded-md p-2">
@@ -252,14 +258,6 @@
           <label class="block text-sm font-medium text-gray-700">Actividad</label>
           <select id="actFilterActivity" class="mt-1 w-full border rounded-md p-2">
             <option value="all">Todas</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Tipo</label>
-          <select id="actFilterType" class="mt-1 w-full border rounded-md p-2">
-            <option value="all">Todas</option>
-            <option value="farm">Finca</option>
-            <option value="fence">Geocerca</option>
           </select>
         </div>
         <div>
@@ -319,13 +317,25 @@
     /* ---------- Estado y caché ---------- */
     let map;
     const fincaMarkers = {}, geofenceLayers = {};
-    const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1', LS_PE='personnel_cache_v1', LS_AC='activities_cache_v1';
+    const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1', LS_PE='personnel_cache_v1', LS_AC='activities_cache_v1', LS_AD='activity_defs_v1';
     const save = (k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
     const load = (k)=>{try{return JSON.parse(localStorage.getItem(k)||'[]')}catch{return []}};
     const saveFarms=(v)=>save(LS_KEY,v), loadFarms=()=>load(LS_KEY);
     const saveFences=(v)=>save(LS_GF,v), loadFences=()=>load(LS_GF);
     const savePeople=(v)=>save(LS_PE,v),  loadPeople=()=>load(LS_PE);
     const saveActs=(v)=>save(LS_AC,v),    loadActs=()=>load(LS_AC);
+
+    // Definición dinámica de actividades
+    const DEFAULT_ACTIVITY_OPTIONS = ['Siembra','Riego','Cosecha','Poda','Fertilización','Fumigación','Mantenimiento','Limpieza','Transporte','Supervisión'];
+    const loadActivityDefs = () => {
+      try {
+        const val = JSON.parse(localStorage.getItem(LS_AD) || 'null');
+        if (Array.isArray(val) && val.length) return val;
+      } catch {}
+      return DEFAULT_ACTIVITY_OPTIONS.slice();
+    };
+    const saveActivityDefs = (arr) => { try{ localStorage.setItem(LS_AD, JSON.stringify(arr)); }catch{} };
+    let activityDefs = loadActivityDefs();
 
     let currentFarms=[], currentFences=[], currentPersonnel=[], currentActivities=[];
     const GEOFENCE_STYLE={weight:2,fillOpacity:.15}, GEOFENCE_SELECTED_STYLE={weight:3,color:'#ef4444',fillOpacity:.2};
@@ -334,9 +344,6 @@
 
     /* ---------- Util ---------- */
     function waitAuthThen(fn){ if(authReady) return fn(); const t=setInterval(()=>{ if(authReady){clearInterval(t); fn();}},120); }
-    const ACTIVITY_OPTIONS = [
-      'Siembra','Riego','Cosecha','Poda','Fertilización','Fumigación','Mantenimiento','Limpieza','Transporte','Supervisión'
-    ];
 
     /* ---------- Mapa ---------- */
     function initMap(center){ center=center||{lat:-0.1807,lng:-78.4678};
@@ -380,7 +387,7 @@
       if(subsStarted) return; subsStarted=true;
       unsubFarms=db.collection('farms').onSnapshot(s=>{
         const farms=[]; Object.values(fincaMarkers).forEach(m=>map.removeLayer(m)); for(const k in fincaMarkers) delete fincaMarkers[k];
-        s.forEach(doc=>{const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); if(d.fincaLocation){const m=L.marker([d.fincaLocation.lat,d.fincaLocation.lng]).addTo(map); m.bindTooltip(d.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'}); fincaMarkers[doc.id]=m; }});
+        s.forEach(doc=>{const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); if(d.fincaLocation){const m=L.marker([d.fincaLocation.lat,d.dincaLocation?.lng??d.fincaLocation.lng]).addTo(map); m.bindTooltip(d.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'}); fincaMarkers[doc.id]=m; }});
         currentFarms=farms.slice(); if(farms.length) saveFarms(farms);
         const sel=document.getElementById('farmSelect'); if(sel){ sel.innerHTML=''; farms.forEach(f=>{const o=document.createElement('option'); o.value=f.id; o.textContent=f.name||'Finca'; sel.appendChild(o);}); }
         updateDeleteButtonState(); buildIndexList(); buildAssignOptions(); buildActivityFormOptions();
@@ -401,7 +408,7 @@
         currentPersonnel=list.slice(); if(list.length) savePeople(list); renderPersonnelList(); buildActivityFormOptions();
       },()=>{ currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); });
 
-      // NUEVO: activities
+      // Activities
       unsubActivities=db.collection('activities').onSnapshot(s=>{
         const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({
           id:doc.id, activity:d.activity||'', personId:d.personId||'', personName:d.personName||'',
@@ -562,15 +569,15 @@
       })();
     }
 
-    /* ---------- GESTIÓN DE ACTIVIDADES (nuevo) ---------- */
+    /* ---------- GESTIÓN DE ACTIVIDADES ---------- */
     function showActError(msg){ const e=document.getElementById('actFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
 
     function buildActivityFormOptions(){
-      // Actividades predefinidas
+      // Actividades (dinámicas)
       const actSel=document.getElementById('actActivitySelect');
       const actFilter=document.getElementById('actFilterActivity');
-      if(actSel){ actSel.innerHTML = ACTIVITY_OPTIONS.map(a=>`<option value="${a}">${a}</option>`).join(''); }
-      if(actFilter){ actFilter.innerHTML = `<option value="all">Todas</option>` + ACTIVITY_OPTIONS.map(a=>`<option value="${a}">${a}</option>`).join(''); }
+      if(actSel){ actSel.innerHTML = activityDefs.map(a=>`<option value="${a}">${a}</option>`).join(''); }
+      if(actFilter){ actFilter.innerHTML = `<option value="all">Todas</option>` + activityDefs.map(a=>`<option value="${a}">${a}</option>`).join(''); }
 
       // Personas
       const people=currentPersonnel?.length?currentPersonnel:loadPeople();
@@ -579,7 +586,7 @@
       if(pSel){ pSel.innerHTML = people.length? people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}</option>`).join('') : `<option value="">No hay personal</option>`; }
       if(pFilter){ pFilter.innerHTML = `<option value="all">Todas</option>` + (people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}</option>`).join('')); }
 
-      // Entidades (fincas/geocercas)
+      // Entidades
       const farms=currentFarms?.length?currentFarms:loadFarms();
       const fences=currentFences?.length?currentFences:loadFences();
       const eSel=document.getElementById('actEntitySelect');
@@ -589,9 +596,32 @@
       }
     }
 
-    function buildActivityFilterOptions(){
-      // reutiliza buildActivityFormOptions para mantener sincronizados los dropdowns
-      buildActivityFormOptions();
+    function buildActivityFilterOptions(){ buildActivityFormOptions(); }
+
+    // Botón para administrar lista de actividades (agregar/eliminar)
+    function manageActivityList(){
+      const op = prompt('Gestionar actividades:\n1) Agregar\n2) Eliminar\n\nEscribe 1 o 2');
+      if(op===null) return;
+      if(op==='1'){
+        const name = (prompt('Nombre de la nueva actividad:')||'').trim();
+        if(!name) return;
+        if(activityDefs.some(a=>a.toLowerCase()===name.toLowerCase())){ alert('Ya existe esa actividad.'); return; }
+        activityDefs.push(name);
+        activityDefs.sort((a,b)=>a.localeCompare(b));
+        saveActivityDefs(activityDefs);
+        buildActivityFormOptions();
+        alert('Actividad agregada.');
+      }else if(op==='2'){
+        if(!activityDefs.length){ alert('No hay actividades para eliminar.'); return; }
+        const pick = prompt('Escribe el número a eliminar:\n' + activityDefs.map((a,i)=>`${i+1}. ${a}`).join('\n'));
+        if(pick===null) return;
+        const idx=(+pick)-1;
+        if(idx<0 || idx>=activityDefs.length){ alert('Selección inválida.'); return; }
+        const removed = activityDefs.splice(idx,1)[0];
+        saveActivityDefs(activityDefs);
+        buildActivityFormOptions();
+        alert('Eliminada: '+removed);
+      }
     }
 
     async function addActivity(){
@@ -645,7 +675,6 @@
       const tbody=document.getElementById('activityTableBody'); if(!tbody) return;
       const fPerson=(document.getElementById('actFilterPerson').value||'all');
       const fAct=(document.getElementById('actFilterActivity').value||'all');
-      const fType=(document.getElementById('actFilterType').value||'all');
       const fFrom=(document.getElementById('actFilterFrom').value||'');
       const fTo=(document.getElementById('actFilterTo').value||'');
 
@@ -654,7 +683,6 @@
         let ok=true;
         if(fPerson!=='all') ok=ok&&(a.personId===fPerson);
         if(ok&&fAct!=='all') ok=(a.activity===fAct);
-        if(ok&&fType!=='all') ok=(a.assignType===fType);
         if(ok&&fFrom) ok=ok&&(a.endDate>=fFrom);   // intervalo solapado
         if(ok&&fTo)   ok=ok&&(a.startDate<=fTo);
         return ok;
@@ -744,9 +772,9 @@
 
       // Actividades
       document.getElementById('addActivityBtn').addEventListener('click', addActivity);
+      document.getElementById('actManageBtn').addEventListener('click', manageActivityList);
       document.getElementById('actFilterPerson').addEventListener('change', renderActivityList);
       document.getElementById('actFilterActivity').addEventListener('change', renderActivityList);
-      document.getElementById('actFilterType').addEventListener('change', renderActivityList);
       document.getElementById('actFilterFrom').addEventListener('change', renderActivityList);
       document.getElementById('actFilterTo').addEventListener('change', renderActivityList);
 
