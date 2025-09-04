@@ -298,7 +298,7 @@
     </div>
 
     <!-- ===== Costos de mano de obra ===== -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
+    <div class="bg-white p-6 rounded-2xl shadow-lg" id="laborCostsModule">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-2xl font-semibold text-gray-700">Costos de mano de obra</h2>
         <span class="text-xs text-gray-500">Define el costo diario por persona y su rango de vigencia</span>
@@ -513,7 +513,7 @@
       try{ const lcs=loadLaborCosts().filter(c=>String(c.id||'').startsWith('localc-')); for(const c of lcs){ try{await db.collection('labor_costs').add({personId:c.personId,personName:c.personName,dailyCost:c.dailyCost,startDate:c.startDate,endDate:c.endDate});}catch{} saveLaborCosts(loadLaborCosts().filter(x=>x.id!==c.id)); } }catch{}
     }
 
-    /* ---------- Geocercas (sin cambios) ---------- */
+    /* ---------- Geocercas (igual) ---------- */
     function selectFence(id){ if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes.'); return; } if(selectedFenceId&&geofenceLayers[selectedFenceId]) geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE); selectedFenceId=id; if(geofenceLayers[id]) geofenceLayers[id].setStyle(GEOFENCE_SELECTED_STYLE); updateDeleteFenceButtonState(); updateEditButtonsState(); }
     function updateDeleteButtonState(){ const sel=document.getElementById('farmSelect'), btn=document.getElementById('deleteFarmBtn'); if(btn) btn.disabled=!(sel&&sel.value); }
     function updateDeleteFenceButtonState(){ const btn=document.getElementById('deleteFenceBtn'); if(btn) btn.disabled=!selectedFenceId; }
@@ -817,7 +817,7 @@
       modal.classList.add('hidden');
       modal.classList.remove('flex');
     }
-    function buildLaborCostPersonCache(){ /* no-op placeholder to keep consistent refresh points */ }
+    function buildLaborCostPersonCache(){ /* no-op */ }
 
     function renderLcModalList(){
       const cont=document.getElementById('lcModalList');
