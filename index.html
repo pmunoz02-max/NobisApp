@@ -42,8 +42,10 @@
       <!-- Login -->
       <div id="loginPanel">
         <div class="grid gap-3">
-          <input id="loginEmail" type="email" placeholder="Correo"
+          <label class="text-sm text-gray-700" for="loginEmail">Correo</label>
+          <input id="loginEmail" type="email" placeholder="tucorreo@dominio.com"
                  class="w-full rounded-md border-gray-300 p-3">
+          <label class="text-sm text-gray-700" for="loginPassword">Contraseña</label>
           <input id="loginPassword" type="password" placeholder="Contraseña"
                  class="w-full rounded-md border-gray-300 p-3">
           <button id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-lg">Entrar</button>
@@ -54,12 +56,16 @@
       <!-- Registro -->
       <div id="registerPanel" class="hidden">
         <div class="grid gap-3">
-          <input id="regEmail" type="email" placeholder="Correo"
+          <label class="text-sm text-gray-700" for="regEmail">Correo</label>
+          <input id="regEmail" type="email" placeholder="tucorreo@dominio.com"
                  class="w-full rounded-md border-gray-300 p-3">
+          <label class="text-sm text-gray-700" for="regPassword">Contraseña</label>
           <input id="regPassword" type="password" placeholder="Contraseña"
                  class="w-full rounded-md border-gray-300 p-3">
-          <input id="regCode" type="text" placeholder="Código de invitación"
+          <label class="text-sm text-gray-700" for="regCode">Código de invitación</label>
+          <input id="regCode" type="text" placeholder="Ej.: ABCD1234"
                  class="w-full rounded-md border-gray-300 p-3">
+          <p class="text-xs text-gray-500 -mt-2">* Si el correo coincide con el del dueño de la app, no se requiere código.</p>
           <button id="registerBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-3 rounded-lg">Crear cuenta</button>
           <div id="registerError" class="text-sm text-red-600 hidden"></div>
         </div>
@@ -545,8 +551,8 @@
     /* ============ Multi-tenant: helpers ============ */
     const OWNER_EMAIL = "cambia_esto@tu-dominio.com"; // <— CAMBIA ESTO
     let currentUser = null;
-    let currentUserDoc = null; // {email, role, active}
-    let LS_PREFIX = "u_anon_";    // prefijo por usuario para separar cachés
+    let currentUserDoc = null;
+    let LS_PREFIX = "u_anon_";
 
     const lsKey = (base)=> `${LS_PREFIX}${base}`;
     const save = (k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
@@ -565,16 +571,14 @@
     const saveActs=(v)=>save(lsKey('activities_v1'),v),      loadActs=()=>load(lsKey('activities_v1'));
     const saveLaborCosts=(v)=>save(lsKey('labor_costs_v1'),v), loadLaborCosts=()=>load(lsKey('labor_costs_v1'));
 
-    // actividades maestras (por usuario)
     const LS_AD = ()=>lsKey('activity_defs_v1');
     const DEFAULT_ACTIVITY_OPTIONS = ['Siembra','Riego','Cosecha','Poda','Fertilización','Fumigación','Mantenimiento','Limpieza','Transporte','Supervisión'];
     const loadActivityDefs = () => { try{ const arr=JSON.parse(localStorage.getItem(LS_AD())||'null'); if(Array.isArray(arr)&&arr.length) return arr; }catch{} return DEFAULT_ACTIVITY_OPTIONS.slice(); };
     const saveActivityDefs = (arr)=>{ try{ localStorage.setItem(LS_AD(), JSON.stringify(arr)); }catch{} };
     let activityDefs = loadActivityDefs();
 
-    // Colecciones dentro de la carpeta del usuario
     const tenantDoc = ()=> db.collection('tenants').doc(currentUser.uid);
-    const col = (name)=> tenantDoc().collection(name); // farms, geofences, personnel, activities, labor_costs
+    const col = (name)=> tenantDoc().collection(name);
 
     /* =================== Estado general =================== */
     let map;
@@ -602,10 +606,8 @@
       document.getElementById('currentUserEmail').textContent = currentUser.email || '(sin email)';
       const roleBadge = document.getElementById('roleBadge');
       roleBadge.textContent = currentUserDoc?.role || 'usuario';
-      // admin button visible para owner/admin
       const isAdmin = ['owner','admin'].includes(currentUserDoc?.role);
       document.getElementById('openAdminBtn').classList.toggle('hidden', !isAdmin);
-      // prefijo de cache
       LS_PREFIX = `u_${currentUser.uid}_`;
     }
     function setUiLoggedOut(){
@@ -615,7 +617,6 @@
       currentUser=null; currentUserDoc=null; LS_PREFIX='u_anon_';
     }
 
-    // Tabs login/register
     function switchTab(which){
       const loginPanel = document.getElementById('loginPanel');
       const registerPanel = document.getElementById('registerPanel');
@@ -634,81 +635,95 @@
       }
     }
 
+    function mapAuthError(e, fallback='Ocurrió un error'){
+      const code = e?.code || '';
+      if(code==='auth/invalid-email') return 'Correo inválido.';
+      if(code==='auth/user-not-found') return 'No existe una cuenta con ese correo.';
+      if(code==='auth/wrong-password' || code==='auth/invalid-credential') return 'Contraseña incorrecta.';
+      if(code==='auth/too-many-requests') return 'Demasiados intentos. Intenta de nuevo más tarde.';
+      if(code==='auth/email-already-in-use') return 'Ese correo ya está registrado.';
+      if(code==='auth/network-request-failed') return 'Problema de red. Revisa tu conexión.';
+      return fallback;
+    }
+
     async function doLogin(){
       const email = (document.getElementById('loginEmail').value||'').trim();
       const pass  = (document.getElementById('loginPassword').value||'').trim();
       const err = document.getElementById('loginError'); err.classList.add('hidden'); err.textContent='';
+      if(!email || !pass){ err.textContent='Ingresa correo y contraseña.'; err.classList.remove('hidden'); return; }
       try{
         const cred = await auth.signInWithEmailAndPassword(email, pass);
         currentUser = cred.user;
-        // Verifica estado activo
         currentUserDoc = await createUserDocIfMissing(currentUser);
         if(currentUserDoc.active === false){
           await auth.signOut();
           err.textContent='Tu cuenta está deshabilitada por el administrador.'; err.classList.remove('hidden'); return;
         }
-        // limpiar cache visual para evitar ver restos de otro usuario
         wipeUserCache();
-        // iniciar app
         setUiAfterLogin();
         bootAfterAuth();
       }catch(e){
-        err.textContent = 'No se pudo iniciar sesión.'; err.classList.remove('hidden'); console.error(e);
+        err.textContent = mapAuthError(e, 'No se pudo iniciar sesión.'); err.classList.remove('hidden'); console.error(e);
       }
     }
+
     async function doRegister(){
       const email = (document.getElementById('regEmail').value||'').trim();
       const pass  = (document.getElementById('regPassword').value||'').trim();
       const code  = (document.getElementById('regCode').value||'').trim();
       const err = document.getElementById('registerError'); err.classList.add('hidden'); err.textContent='';
-      if(!code){ err.textContent='Ingresa un código de invitación.'; err.classList.remove('hidden'); return; }
+      if(!email || !pass){ err.textContent='Correo y contraseña son obligatorios.'; err.classList.remove('hidden'); return; }
 
-      const codeRef = db.collection('access_keys').doc(code);
+      const isOwner = email.toLowerCase()===OWNER_EMAIL.toLowerCase();
+
       try{
-        await db.runTransaction(async tx=>{
-          const snap = await tx.get(codeRef);
-          if(!snap.exists) throw new Error('Código inválido.');
-          const d = snap.data();
-          if(d.active===false) throw new Error('Código deshabilitado.');
-          const used = d.used||0, max = d.maxUses||1;
-          if(used>=max) throw new Error('Código sin cupos disponibles.');
-          tx.update(codeRef, { used: used+1 });
-        });
+        if(!isOwner){
+          if(!code){ err.textContent='Ingresa un código de invitación.'; err.classList.remove('hidden'); return; }
+          const codeRef = db.collection('access_keys').doc(code);
+          await db.runTransaction(async tx=>{
+            const snap = await tx.get(codeRef);
+            if(!snap.exists) throw new Error('Código inválido.');
+            const d = snap.data();
+            if(d.active===false) throw new Error('Código deshabilitado.');
+            const used = d.used||0, max = d.maxUses||1;
+            if(used>=max) throw new Error('Código sin cupos disponibles.');
+            tx.update(codeRef, { used: used+1 });
+          });
+        }
 
         const cred = await auth.createUserWithEmailAndPassword(email, pass);
         currentUser = cred.user;
+
+        // crea perfil con rol adecuado
+        const role = isOwner ? 'owner' : 'user';
+        await db.collection('users').doc(currentUser.uid).set({
+          email, role, active:true, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, {merge:true});
+
         currentUserDoc = await createUserDocIfMissing(currentUser);
-        if(currentUserDoc.active === false){
-          await auth.signOut();
-          err.textContent='Tu cuenta está deshabilitada.'; err.classList.remove('hidden'); return;
-        }
-        // Primer inicio: BD vacía por diseño (tenant nuevo)
+
         wipeUserCache();
         setUiAfterLogin();
         bootAfterAuth();
       }catch(e){
-        err.textContent = e.message || 'No se pudo registrar.'; err.classList.remove('hidden'); console.error(e);
+        const msg = e.message || mapAuthError(e, 'No se pudo registrar.');
+        err.textContent = msg; err.classList.remove('hidden'); console.error(e);
       }
     }
     async function doLogout(){
       try{ await auth.signOut(); }catch{}
       setUiLoggedOut();
-      // limpia suscripciones activas
       stopSubscriptions();
     }
 
     /* =================== App previa (adaptada a tenant) =================== */
-    function bootAfterAuth(){
-      setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80);
-    }
-
+    function bootAfterAuth(){ setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80); }
     function addMousePositionControl(){
       const MousePos=L.Control.extend({options:{position:'bottomleft'},onAdd:function(){const d=L.DomUtil.create('div','mousepos-control');d.innerHTML='Lat: — Lng: —';this._div=d;return d;},update:function(lat,lng){this._div.innerHTML=(lat!=null&&lng!=null)?`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`:'Lat: — Lng: —';}});
       const ctrl=new MousePos(); ctrl.addTo(map);
       map.on('mousemove',e=>ctrl.update(e.latlng.lat,e.latlng.lng));
       map.on('mouseout',()=>ctrl.update(null,null));
     }
-
     function initMap(center){ center=center||{lat:-0.1807,lng:-78.4678};
       map=L.map('map',{center:[center.lat,center.lng],zoom:6});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
@@ -799,7 +814,7 @@
       }catch(e){ console.warn('Carga inicial falló, usando caché'); renderFarmsFromCache(); renderGeofencesFromCache(); renderPersonnelList(); renderActivityList(); renderLaborCostList(); buildReportFilterOptions(); }
     }
 
-    /* ======= Geocercas (igual UX) ======= */
+    /* ======= Geocercas ======= */
     function selectFence(id){ if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes.'); return; } if(selectedFenceId&&geofenceLayers[selectedFenceId]) geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE); selectedFenceId=id; if(geofenceLayers[id]) geofenceLayers[id].setStyle(GEOFENCE_SELECTED_STYLE); updateDeleteFenceButtonState(); updateEditButtonsState(); }
     function updateDeleteButtonState(){ const sel=document.getElementById('farmSelect'), btn=document.getElementById('deleteFarmBtn'); if(btn) btn.disabled=!(sel&&sel.value); }
     function updateDeleteFenceButtonState(){ const btn=document.getElementById('deleteFenceBtn'); if(btn) btn.disabled=!selectedFenceId; }
@@ -1294,7 +1309,6 @@
     function openAdminModal(){
       document.getElementById('adminAppModal').classList.remove('hidden');
       document.getElementById('adminAppModal').classList.add('flex');
-      // subs
       unsubUsersAdmin = db.collection('users').orderBy('email').onSnapshot(s=>{
         const box=document.getElementById('adminUsersList'); box.innerHTML='';
         s.forEach(doc=>{
@@ -1314,7 +1328,6 @@
             </div>`;
           box.appendChild(row);
         });
-        // eventos
         box.querySelectorAll('button').forEach(b=>{
           b.addEventListener('click', async (ev)=>{
             const action = ev.currentTarget.dataset.action;
@@ -1383,21 +1396,26 @@
 
     /* =================== Listeners globales =================== */
     document.addEventListener('DOMContentLoaded',()=>{
-      // Tabs auth
       document.getElementById('tabLogin').addEventListener('click', ()=>switchTab('login'));
       document.getElementById('tabRegister').addEventListener('click', ()=>switchTab('register'));
       document.getElementById('loginBtn').addEventListener('click', doLogin);
       document.getElementById('registerBtn').addEventListener('click', doRegister);
+      // Enter en login
+      document.getElementById('loginEmail').addEventListener('keydown',(e)=>{ if(e.key==='Enter') doLogin(); });
+      document.getElementById('loginPassword').addEventListener('keydown',(e)=>{ if(e.key==='Enter') doLogin(); });
+      // Enter en registro
+      document.getElementById('regEmail').addEventListener('keydown',(e)=>{ if(e.key==='Enter') doRegister(); });
+      document.getElementById('regPassword').addEventListener('keydown',(e)=>{ if(e.key==='Enter') doRegister(); });
+      document.getElementById('regCode').addEventListener('keydown',(e)=>{ if(e.key==='Enter') doRegister(); });
+
       document.getElementById('logoutBtn').addEventListener('click', doLogout);
-      document.getElementById('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
-      document.getElementById('regCode').addEventListener('keydown', e=>{ if(e.key==='Enter') doRegister(); });
 
       // Admin modal
       document.getElementById('openAdminBtn').addEventListener('click', openAdminModal);
       document.getElementById('adminCloseBtn').addEventListener('click', closeAdminModal);
       document.getElementById('adminGenCodeBtn').addEventListener('click', adminGenerateCode);
 
-      // Mapa (listeners de UI)
+      // Mapa
       document.getElementById('farmSelect').addEventListener('change',updateDeleteButtonState);
       document.getElementById('startFenceBtn').addEventListener('click',startFenceDraw);
       document.getElementById('finishFenceBtn').addEventListener('click',finishFenceDraw);
@@ -1441,7 +1459,7 @@
       document.getElementById('repGenerateBtn').addEventListener('click', generateReport);
       document.getElementById('repDownloadBtn').addEventListener('click', exportReportCSV);
 
-      // Observa cambios de sesión; auto-muestra login si no hay usuario
+      // Observa cambios de sesión
       auth.onAuthStateChanged(async (u)=>{
         if(u){
           currentUser=u;
