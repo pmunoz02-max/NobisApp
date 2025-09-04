@@ -1168,43 +1168,64 @@
       });
     }
 
-    async function addPerson(){
-      const fn=document.getElementById('pFirstName')?.value.trim()||'';
-      const ln=document.getElementById('pLastName')?.value.trim()||'';
-      const idn=document.getElementById('pIdNumber')?.value.trim()||'';
-      const assignVal=document.getElementById('pAssignSelect')?.value||'';
-      const err=document.getElementById('personFormError');
+    async function addPerson(e){
+  // por si el botón llega a estar dentro de un <form>
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
 
-      if(err){ err.classList.add('hidden'); err.textContent=''; }
+  const fn  = (document.getElementById('pFirstName')?.value  || '').trim();
+  const ln  = (document.getElementById('pLastName')?.value   || '').trim();
+  const idn = (document.getElementById('pIdNumber')?.value   || '').trim();
+  const assignVal = (document.getElementById('pAssignSelect')?.value || '').trim();
+  const err = document.getElementById('personFormError');
 
-      if(!fn || !ln){ return showPersonError('Nombre y apellido son obligatorios.'); }
-      if(!/^[0-9]{6,15}$/.test(idn)){ return showPersonError('Cédula: usar solo dígitos (6–15).'); }
-      if(!assignVal){ return showPersonError('Seleccione una asignación.'); }
+  if (err){ err.classList.add('hidden'); err.textContent = ''; }
 
-      const [assignType, assignId] = assignVal.split(':');
-      const docData = { firstName: fn, lastName: ln, idNumber: idn, assignType, assignId };
+  if (!fn || !ln){ 
+    err.textContent = 'Nombre y apellido son obligatorios.'; 
+    err.classList.remove('hidden'); 
+    return; 
+  }
+  if (!/^[0-9]{6,15}$/.test(idn)){ 
+    err.textContent = 'Cédula: usar solo dígitos (6–15).'; 
+    err.classList.remove('hidden'); 
+    return; 
+  }
+  if (!assignVal){
+    err.textContent = 'Seleccione una asignación.';
+    err.classList.remove('hidden');
+    return;
+  }
 
-      try{
-        await db.collection('personnel').add(docData);
-      }catch(e){
-        const local = loadPersonnelCache();
-        local.push({ id:`localp-${Date.now()}`, ...docData });
-        savePersonnelCache(local);
-        currentPersonnel = local.slice();
-      }
+  const [assignType, assignId] = assignVal.split(':');
+  const docData = { firstName: fn, lastName: ln, idNumber: idn, assignType, assignId };
 
-      document.getElementById('pFirstName').value='';
-      document.getElementById('pLastName').value='';
-      document.getElementById('pIdNumber').value='';
-      renderPersonnelList();
-      waitAuthThen(syncLocalPendingToFirestore);
-    }
+  // 1) Intento guardar en Firestore para obtener un id real
+  let newId;
+  try {
+    const ref = await db.collection('personnel').add(docData);
+    newId = ref.id;
+  } catch (e) {
+    // offline / reglas: generamos id local
+    newId = `localp-${Date.now()}`;
+  }
 
-    function showPersonError(msg){
-      const err=document.getElementById('personFormError');
-      if(err){ err.textContent=msg; err.classList.remove('hidden'); }
-      return false;
-    }
+  // 2) Inserción optimista inmediata en memoria y caché local
+  const newItem = { id: newId, ...docData };
+  currentPersonnel = (currentPersonnel || []).concat([newItem]);
+  const cache = (loadPersonnelCache() || []).concat([newItem]);
+  savePersonnelCache(cache);
+
+  // 3) Limpiar formulario y refrescar tabla
+  const f1 = document.getElementById('pFirstName'); if (f1) f1.value = '';
+  const f2 = document.getElementById('pLastName');  if (f2) f2.value = '';
+  const f3 = document.getElementById('pIdNumber');  if (f3) f3.value = '';
+  renderPersonnelList();
+
+  // 4) Si está autenticado, intentará sincronizar los locales
+  waitAuthThen(syncLocalPendingToFirestore);
+}
+// --- fin reemplazo ---
+</script>
 
     async function deletePerson(id){
       if(!id) return;
