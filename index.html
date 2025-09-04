@@ -28,7 +28,7 @@
 </head>
 <body class="p-4 sm:p-8">
 
-  <!-- ========= Autenticación (Login / Registro con código) ========= -->
+  <!-- ========= Autenticación ========= -->
   <div id="authModal" class="fixed inset-0 bg-gray-900/80 flex items-center justify-center z-50 p-4">
     <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6">
       <h1 class="text-2xl font-bold mb-2 text-center">Acceso</h1>
@@ -43,11 +43,11 @@
       <div id="loginPanel">
         <div class="grid gap-3">
           <label class="text-sm text-gray-700" for="loginEmail">Correo</label>
-          <input id="loginEmail" type="email" placeholder="tucorreo@dominio.com"
-                 class="w-full rounded-md border-gray-300 p-3">
+          <input id="loginEmail" name="email" autocomplete="username" type="email" placeholder="tucorreo@dominio.com"
+                 class="w-full rounded-md border-gray-300 p-3" required>
           <label class="text-sm text-gray-700" for="loginPassword">Contraseña</label>
-          <input id="loginPassword" type="password" placeholder="Contraseña"
-                 class="w-full rounded-md border-gray-300 p-3">
+          <input id="loginPassword" name="password" autocomplete="current-password" type="password" placeholder="Contraseña"
+                 class="w-full rounded-md border-gray-300 p-3" required>
           <button id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-lg">Entrar</button>
           <div id="loginError" class="text-sm text-red-600 hidden"></div>
         </div>
@@ -57,15 +57,15 @@
       <div id="registerPanel" class="hidden">
         <div class="grid gap-3">
           <label class="text-sm text-gray-700" for="regEmail">Correo</label>
-          <input id="regEmail" type="email" placeholder="tucorreo@dominio.com"
-                 class="w-full rounded-md border-gray-300 p-3">
+          <input id="regEmail" name="email" autocomplete="username" type="email" placeholder="tucorreo@dominio.com"
+                 class="w-full rounded-md border-gray-300 p-3" required>
           <label class="text-sm text-gray-700" for="regPassword">Contraseña</label>
-          <input id="regPassword" type="password" placeholder="Contraseña"
-                 class="w-full rounded-md border-gray-300 p-3">
+          <input id="regPassword" name="new-password" autocomplete="new-password" type="password" placeholder="Contraseña"
+                 class="w-full rounded-md border-gray-300 p-3" required>
           <label class="text-sm text-gray-700" for="regCode">Código de invitación</label>
           <input id="regCode" type="text" placeholder="Ej.: ABCD1234"
                  class="w-full rounded-md border-gray-300 p-3">
-          <p class="text-xs text-gray-500 -mt-2">* Si el correo coincide con el del dueño de la app, no se requiere código.</p>
+          <p class="text-xs text-gray-500 -mt-2">* Si eres el dueño (o es el primer usuario), no se requiere código.</p>
           <button id="registerBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-3 rounded-lg">Crear cuenta</button>
           <div id="registerError" class="text-sm text-red-600 hidden"></div>
         </div>
@@ -73,7 +73,7 @@
     </div>
   </div>
 
-  <!-- ========= Barra superior: usuario + salir ========= -->
+  <!-- ========= Barra superior ========= -->
   <div id="topBar" class="max-w-7xl mx-auto mb-4 hidden">
     <div class="bg-white border border-gray-200 rounded-2xl px-4 py-3 flex items-center gap-3">
       <div class="text-sm text-gray-600">Conectado como: <span id="currentUserEmail" class="font-medium">—</span></div>
@@ -599,6 +599,10 @@
       const doc = (await ref.get()).data();
       return doc;
     }
+    async function isFirstUser(){
+      const s = await db.collection('users').limit(1).get();
+      return s.empty;
+    }
     function setUiAfterLogin(){
       document.getElementById('authModal').classList.add('hidden');
       document.getElementById('topBar').classList.remove('hidden');
@@ -616,7 +620,6 @@
       document.getElementById('appContent').classList.add('hidden');
       currentUser=null; currentUserDoc=null; LS_PREFIX='u_anon_';
     }
-
     function switchTab(which){
       const loginPanel = document.getElementById('loginPanel');
       const registerPanel = document.getElementById('registerPanel');
@@ -634,24 +637,23 @@
         tabLogin.classList.remove('tab-active');
       }
     }
-
     function mapAuthError(e, fallback='Ocurrió un error'){
       const code = e?.code || '';
       if(code==='auth/invalid-email') return 'Correo inválido.';
-      if(code==='auth/user-not-found') return 'No existe una cuenta con ese correo.';
+      if(code==='auth/user-not-found') return 'No existe una cuenta con ese correo. Ve a "Crear cuenta".';
       if(code==='auth/wrong-password' || code==='auth/invalid-credential') return 'Contraseña incorrecta.';
       if(code==='auth/too-many-requests') return 'Demasiados intentos. Intenta de nuevo más tarde.';
       if(code==='auth/email-already-in-use') return 'Ese correo ya está registrado.';
       if(code==='auth/network-request-failed') return 'Problema de red. Revisa tu conexión.';
       return fallback;
     }
-
     async function doLogin(){
-      const email = (document.getElementById('loginEmail').value||'').trim();
+      const email = (document.getElementById('loginEmail').value||'').trim().toLowerCase();
       const pass  = (document.getElementById('loginPassword').value||'').trim();
       const err = document.getElementById('loginError'); err.classList.add('hidden'); err.textContent='';
       if(!email || !pass){ err.textContent='Ingresa correo y contraseña.'; err.classList.remove('hidden'); return; }
       try{
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
         const cred = await auth.signInWithEmailAndPassword(email, pass);
         currentUser = cred.user;
         currentUserDoc = await createUserDocIfMissing(currentUser);
@@ -663,20 +665,25 @@
         setUiAfterLogin();
         bootAfterAuth();
       }catch(e){
-        err.textContent = mapAuthError(e, 'No se pudo iniciar sesión.'); err.classList.remove('hidden'); console.error(e);
+        const msg = mapAuthError(e, 'No se pudo iniciar sesión.');
+        err.textContent = msg; err.classList.remove('hidden');
+        if(e?.code==='auth/user-not-found'){ switchTab('register'); document.getElementById('regEmail').value=email; }
+        console.error(e);
       }
     }
-
     async function doRegister(){
-      const email = (document.getElementById('regEmail').value||'').trim();
+      const email = (document.getElementById('regEmail').value||'').trim().toLowerCase();
       const pass  = (document.getElementById('regPassword').value||'').trim();
       const code  = (document.getElementById('regCode').value||'').trim();
       const err = document.getElementById('registerError'); err.classList.add('hidden'); err.textContent='';
       if(!email || !pass){ err.textContent='Correo y contraseña son obligatorios.'; err.classList.remove('hidden'); return; }
 
-      const isOwner = email.toLowerCase()===OWNER_EMAIL.toLowerCase();
-
       try{
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+        const first = await isFirstUser();
+        const isOwner = first || email===OWNER_EMAIL.toLowerCase();
+
         if(!isOwner){
           if(!code){ err.textContent='Ingresa un código de invitación.'; err.classList.remove('hidden'); return; }
           const codeRef = db.collection('access_keys').doc(code);
@@ -694,7 +701,6 @@
         const cred = await auth.createUserWithEmailAndPassword(email, pass);
         currentUser = cred.user;
 
-        // crea perfil con rol adecuado
         const role = isOwner ? 'owner' : 'user';
         await db.collection('users').doc(currentUser.uid).set({
           email, role, active:true, createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -716,7 +722,7 @@
       stopSubscriptions();
     }
 
-    /* =================== App previa (adaptada a tenant) =================== */
+    /* =================== App (todo lo demás) =================== */
     function bootAfterAuth(){ setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80); }
     function addMousePositionControl(){
       const MousePos=L.Control.extend({options:{position:'bottomleft'},onAdd:function(){const d=L.DomUtil.create('div','mousepos-control');d.innerHTML='Lat: — Lng: —';this._div=d;return d;},update:function(lat,lng){this._div.innerHTML=(lat!=null&&lng!=null)?`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`:'Lat: — Lng: —';}});
@@ -755,7 +761,7 @@
       updateDeleteFenceButtonState(); updateEditButtonsState(); currentFences=fences||[]; buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
     }
 
-    /* ======== Suscripciones Firestore (scoped) ======== */
+    /* ======== Suscripciones Firestore ======== */
     let unsubFarms=null,unsubGeofences=null,unsubPersonnel=null,unsubActivities=null,unsubLaborCosts=null;
     function stopSubscriptions(){
       [unsubFarms,unsubGeofences,unsubPersonnel,unsubActivities,unsubLaborCosts].forEach(fn=>{try{fn&&fn()}catch{}});
@@ -962,8 +968,9 @@
     function buildActivityFormOptions(){
       const actSel=document.getElementById('actActivitySelect');
       const actFilter=document.getElementById('actFilterActivity');
-      if(actSel){ actSel.innerHTML = activityDefs.map(a=>`<option value="${a}">${a}</option>`).join(''); }
-      if(actFilter){ actFilter.innerHTML = `<option value="all">Todas</option>` + activityDefs.map(a=>`<option value="${a}">${a}</option>`).join(''); }
+      const arr = loadActivityDefs();
+      if(actSel){ actSel.innerHTML = arr.map(a=>`<option value="${a}">${a}</option>`).join(''); }
+      if(actFilter){ actFilter.innerHTML = `<option value="all">Todas</option>` + arr.map(a=>`<option value="${a}">${a}</option>`).join(''); }
 
       const people=currentPersonnel?.length?currentPersonnel:loadPeople();
       const pSel=document.getElementById('actPersonSelect');
@@ -985,7 +992,7 @@
       const farms=currentFarms?.length?currentFarms:loadFarms();
       const fences=currentFences?.length?currentFences:loadFences();
       const eSel=document.getElementById('repEntities'); if(eSel){ const items=[...farms.map(f=>({v:`farm:${f.id}`,l:`Finca: ${f.name||'Finca'}`})), ...fences.map(g=>({v:`fence:${g.id}`,l:`Geocerca: ${g.name||'Geocerca'}`}))]; eSel.innerHTML = items.map(i=>`<option value="${i.v}">${i.l}</option>`).join(''); }
-      const aSel=document.getElementById('repActivities'); if(aSel){ aSel.innerHTML = activityDefs.map(a=>`<option value="${a}">${a}</option>`).join(''); }
+      const aSel=document.getElementById('repActivities'); if(aSel){ aSel.innerHTML = loadActivityDefs().map(a=>`<option value="${a}">${a}</option>`).join(''); }
       setDefaultReportDates();
     }
     function setDefaultActivityDates(){
@@ -1009,22 +1016,17 @@
       if(op==='1'){
         const name = (prompt('Nombre de la nueva actividad:')||'').trim();
         if(!name) return;
-        if(activityDefs.some(a=>a.toLowerCase()===name.toLowerCase())){ alert('Ya existe esa actividad.'); return; }
-        activityDefs.push(name);
-        activityDefs.sort((a,b)=>a.localeCompare(b));
-        saveActivityDefs(activityDefs);
-        buildActivityFormOptions(); buildReportFilterOptions();
-        alert('Actividad agregada.');
+        const arr = loadActivityDefs();
+        if(arr.some(a=>a.toLowerCase()===name.toLowerCase())){ alert('Ya existe esa actividad.'); return; }
+        arr.push(name); arr.sort((a,b)=>a.localeCompare(b)); saveActivityDefs(arr);
+        buildActivityFormOptions(); buildReportFilterOptions(); alert('Actividad agregada.');
       }else if(op==='2'){
-        if(!activityDefs.length){ alert('No hay actividades para eliminar.'); return; }
-        const pick = prompt('Escribe el número a eliminar:\n' + activityDefs.map((a,i)=>`${i+1}. ${a}`).join('\n'));
+        const arr = loadActivityDefs(); if(!arr.length){ alert('No hay actividades para eliminar.'); return; }
+        const pick = prompt('Escribe el número a eliminar:\n' + arr.map((a,i)=>`${i+1}. ${a}`).join('\n'));
         if(pick===null) return;
-        const idx=(+pick)-1;
-        if(idx<0 || idx>=activityDefs.length){ alert('Selección inválida.'); return; }
-        const removed = activityDefs.splice(idx,1)[0];
-        saveActivityDefs(activityDefs);
-        buildActivityFormOptions(); buildReportFilterOptions();
-        alert('Eliminada: '+removed);
+        const idx=(+pick)-1; if(idx<0 || idx>=arr.length){ alert('Selección inválida.'); return; }
+        const removed = arr.splice(idx,1)[0]; saveActivityDefs(arr);
+        buildActivityFormOptions(); buildReportFilterOptions(); alert('Eliminada: '+removed);
       }
     }
     async function addActivity(){
@@ -1394,19 +1396,22 @@
       alert('Código creado: '+code);
     }
 
-    /* =================== Listeners globales =================== */
+    /* =================== Listeners =================== */
     document.addEventListener('DOMContentLoaded',()=>{
       document.getElementById('tabLogin').addEventListener('click', ()=>switchTab('login'));
       document.getElementById('tabRegister').addEventListener('click', ()=>switchTab('register'));
       document.getElementById('loginBtn').addEventListener('click', doLogin);
       document.getElementById('registerBtn').addEventListener('click', doRegister);
-      // Enter en login
-      document.getElementById('loginEmail').addEventListener('keydown',(e)=>{ if(e.key==='Enter') doLogin(); });
-      document.getElementById('loginPassword').addEventListener('keydown',(e)=>{ if(e.key==='Enter') doLogin(); });
-      // Enter en registro
-      document.getElementById('regEmail').addEventListener('keydown',(e)=>{ if(e.key==='Enter') doRegister(); });
-      document.getElementById('regPassword').addEventListener('keydown',(e)=>{ if(e.key==='Enter') doRegister(); });
-      document.getElementById('regCode').addEventListener('keydown',(e)=>{ if(e.key==='Enter') doRegister(); });
+
+      // Enter en login/registro
+      ['loginEmail','loginPassword','regEmail','regPassword','regCode'].forEach(id=>{
+        const el=document.getElementById(id);
+        el.addEventListener('keydown',(e)=>{
+          if(e.key==='Enter'){
+            if(id.startsWith('login')) doLogin(); else doRegister();
+          }
+        });
+      });
 
       document.getElementById('logoutBtn').addEventListener('click', doLogout);
 
