@@ -139,18 +139,15 @@
       <div class="grid md:grid-cols-4 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700">Nombre</label>
-          <input id="pFirstName" type="text" class="mt-1 w-full border rounded-md p-2"
-                 onkeydown="if(event.key==='Enter'){addPerson()}">
+          <input id="pFirstName" type="text" class="mt-1 w-full border rounded-md p-2">
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700">Apellido</label>
-          <input id="pLastName" type="text" class="mt-1 w-full border rounded-md p-2"
-                 onkeydown="if(event.key==='Enter'){addPerson()}">
+          <input id="pLastName" type="text" class="mt-1 w-full border rounded-md p-2">
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700">Cédula</label>
-          <input id="pIdNumber" type="text" class="mt-1 w-full border rounded-md p-2"
-                 onkeydown="if(event.key==='Enter'){addPerson()}">
+          <input id="pIdNumber" type="text" class="mt-1 w-full border rounded-md p-2">
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700">Asignación</label>
@@ -159,8 +156,8 @@
       </div>
 
       <div class="mt-3">
-        <!-- AQUÍ EL CAMBIO CRÍTICO -->
-        <button id="addPersonBtn" type="button" onclick="addPerson()"
+        <!-- QUITAMOS EL onClick inline PARA EVITAR CSP -->
+        <button id="addPersonBtn" type="button"
                 class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
           Agregar
         </button>
@@ -336,7 +333,7 @@
     /* ---------- Explorador & zoom (sin cambios) ---------- */
     function buildIndexList(){
       const farmUl=document.getElementById('farmList'), fenceUl=document.getElementById('fenceList'); if(!farmUl||!fenceUl) return;
-      const farms=(currentFarms?.length?currentFarms:loadFarms()).slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||'')); 
+      const farms=(currentFarms?.length?currentFarms:loadFarms()).slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
       const fences=(currentFences?.length?currentFences:loadFences()).slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
       farmUl.innerHTML = farms.length? farms.map(f=>`<li class="py-2"><div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer" data-type="farm" data-id="${f.id}"><div class="text-sm font-medium text-gray-800">${f.name||'Finca'}</div><div class="text-xs text-gray-500">${f?.fincaLocation?`Lat ${(+f.fincaLocation.lat).toFixed(5)}, Lng ${(+f.fincaLocation.lng).toFixed(5)}`:'—'}</div></div></li>`).join('') : `<li class="py-2 text-sm text-gray-500">No hay fincas registradas.</li>`;
       fenceUl.innerHTML = fences.length? fences.map(g=>`<li class="py-2"><div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer" data-type="fence" data-id="${g.id}"><div class="text-sm font-medium text-gray-800">${g.name||'Geocerca'}</div><div class="text-xs text-gray-500">${Array.isArray(g.path)?`${g.path.length} puntos`:'—'}</div></div></li>`).join('') : `<li class="py-2 text-sm text-gray-500">No hay geocercas registradas.</li>`;
@@ -386,7 +383,7 @@
         currentPersonnel=loadPeople(); renderPersonnelList(); waitAuthThen(syncLocalPendingToFirestore);
       }catch(e){ console.error(e); showPersonError('No se pudo agregar.'); }
     }
-    // muy importante: la función queda disponible para el onclick inline
+    // importante: disponible en el ámbito global (si alguna parte lo invoca)
     window.addPerson = addPerson;
 
     function renderPersonnelList(){
@@ -457,7 +454,7 @@
     /* ---------- Listeners mínimos ---------- */
     document.addEventListener('DOMContentLoaded',()=>{
       document.getElementById('adminModal').classList.remove('hidden');
-      document.getElementById('adminLoginBtn').addEventListener('click',()=>{ 
+      document.getElementById('adminLoginBtn').addEventListener('click',()=>{
         const ok=(document.getElementById('adminCodeInput').value||'').trim().toLowerCase()==='admin123';
         if(!ok){ document.getElementById('errorMessage').style.display='block'; return; }
         document.getElementById('adminModal').classList.add('hidden');
@@ -472,12 +469,21 @@
       document.getElementById('cancelFenceBtn').addEventListener('click',cancelFenceDraw);
       document.getElementById('fenceNameSaveBtn').addEventListener('click',saveFenceName);
       document.getElementById('fenceNameCancelBtn').addEventListener('click',()=>document.getElementById('fenceNamePanel').classList.add('hidden'));
-      document.getElementById('editFenceBtn').addEventListener('click',()=>{ /* enable edit como ya lo tienes si lo usas */ });
+      document.getElementById('editFenceBtn').addEventListener('click',()=>{ /* enable edit si lo usas */ });
       document.getElementById('exportGeoJSONBtn').addEventListener('click',()=>{ /* export */ });
 
       // Listas dblclick
       document.getElementById('farmList').addEventListener('dblclick',e=>{const n=e.target.closest('[data-type="farm"][data-id]'); if(n) zoomToFarm(n.dataset.id);});
       document.getElementById('fenceList').addEventListener('dblclick',e=>{const n=e.target.closest('[data-type="fence"][data-id]'); if(n) zoomToFence(n.dataset.id);});
+
+      // ==== FIX: conectar botón Agregar vía JS (evita CSP) ====
+      document.getElementById('addPersonBtn').addEventListener('click', addPerson);
+
+      // ==== FIX: Enter en campos sin handlers inline ====
+      ['pFirstName','pLastName','pIdNumber'].forEach(id=>{
+        const el=document.getElementById(id);
+        el.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter'){ addPerson(); }});
+      });
 
       // Filtros personas
       document.getElementById('pSearchInput').addEventListener('input',renderPersonnelList);
@@ -490,4 +496,3 @@
   </script>
 </body>
 </html>
-
