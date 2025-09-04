@@ -296,6 +296,71 @@
         </table>
       </div>
     </div>
+
+    <!-- ===== Costos de mano de obra ===== -->
+    <div class="bg-white p-6 rounded-2xl shadow-lg">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-semibold text-gray-700">Costos de mano de obra</h2>
+        <span class="text-xs text-gray-500">Define el costo diario por persona y su rango de vigencia</span>
+      </div>
+
+      <div class="grid md:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Persona (activa)</label>
+          <div class="flex gap-2">
+            <input id="lcPersonDisplay" type="text" class="mt-1 w-full border rounded-md p-2" placeholder="Sin seleccionar" readonly>
+            <button id="lcChoosePersonBtn" type="button" class="mt-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-2 rounded-lg">Elegir</button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Costo por día</label>
+          <input id="lcDailyCost" type="number" step="0.01" min="0" class="mt-1 w-full border rounded-md p-2" placeholder="0.00">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Desde</label>
+          <input id="lcStartDate" type="date" class="mt-1 w-full border rounded-md p-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Hasta</label>
+          <input id="lcEndDate" type="date" class="mt-1 w-full border rounded-md p-2">
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <button id="lcAddCostBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar costo</button>
+        <span id="lcFormError" class="text-sm text-red-600 ml-3 hidden"></span>
+      </div>
+
+      <div class="mt-4 overflow-auto">
+        <table class="min-w-full text-left">
+          <thead>
+            <tr class="text-gray-600 text-sm">
+              <th class="px-3 py-2">PERSONA</th>
+              <th class="px-3 py-2">COSTO/DÍA</th>
+              <th class="px-3 py-2">DESDE</th>
+              <th class="px-3 py-2">HASTA</th>
+              <th class="px-3 py-2">ACCIONES</th>
+            </tr>
+          </thead>
+          <tbody id="laborCostTableBody" class="text-sm"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: elegir persona activa -->
+  <div id="lcPersonModal" class="fixed inset-0 bg-gray-900/75 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-semibold">Seleccionar persona (activa)</h3>
+        <button id="lcModalClose" class="text-gray-600 hover:text-gray-900">✕</button>
+      </div>
+      <input id="lcModalSearch" type="text" placeholder="Buscar por nombre o cédula" class="w-full border rounded-md p-2 mb-3">
+      <div id="lcModalList" class="max-h-80 overflow-auto divide-y divide-gray-100"></div>
+      <div class="mt-4 text-right">
+        <button id="lcModalCancel" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">Cancelar</button>
+      </div>
+    </div>
   </div>
 
   <!-- Scripts Leaflet -->
@@ -327,20 +392,21 @@
     /* ---------- Estado y caché ---------- */
     let map;
     const fincaMarkers = {}, geofenceLayers = {};
-    const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1', LS_PE='personnel_cache_v1', LS_AC='activities_cache_v1', LS_AD='activity_defs_v1';
+    const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1', LS_PE='personnel_cache_v1', LS_AC='activities_cache_v1', LS_AD='activity_defs_v1', LS_LC='labor_costs_cache_v1';
     const save = (k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
     const load = (k)=>{try{return JSON.parse(localStorage.getItem(k)||'[]')}catch{return []}};
     const saveFarms=(v)=>save(LS_KEY,v), loadFarms=()=>load(LS_KEY);
     const saveFences=(v)=>save(LS_GF,v), loadFences=()=>load(LS_GF);
     const savePeople=(v)=>save(LS_PE,v),  loadPeople=()=>load(LS_PE);
     const saveActs=(v)=>save(LS_AC,v),    loadActs=()=>load(LS_AC);
+    const saveLaborCosts=(v)=>save(LS_LC,v), loadLaborCosts=()=>load(LS_LC);
 
     const DEFAULT_ACTIVITY_OPTIONS = ['Siembra','Riego','Cosecha','Poda','Fertilización','Fumigación','Mantenimiento','Limpieza','Transporte','Supervisión'];
     const loadActivityDefs = () => { try { const val = JSON.parse(localStorage.getItem(LS_AD) || 'null'); if (Array.isArray(val) && val.length) return val; } catch {} return DEFAULT_ACTIVITY_OPTIONS.slice(); };
     const saveActivityDefs = (arr) => { try{ localStorage.setItem(LS_AD, JSON.stringify(arr)); }catch{} };
     let activityDefs = loadActivityDefs();
 
-    let currentFarms=[], currentFences=[], currentPersonnel=[], currentActivities=[];
+    let currentFarms=[], currentFences=[], currentPersonnel=[], currentActivities=[], currentLaborCosts=[];
     const GEOFENCE_STYLE={weight:2,fillOpacity:.15}, GEOFENCE_SELECTED_STYLE={weight:3,color:'#ef4444',fillOpacity:.2};
     let isDrawingFence=false, drawingCoords=[], drawingPolyline=null, drawingMarkers=[], pendingFenceCoords=null;
     let selectedFenceId=null, editGroup=null, editToolbar=null, isEditingFence=false, editBackupCoords=null;
@@ -360,7 +426,7 @@
         try{ await db.collection('farms').add({name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}}); }
         catch{ const farms=loadFarms(); farms.push({id:'local-'+Date.now(),name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}}); saveFarms(farms); renderFarmsFromCache(); }
       });
-      waitAuthThen(async()=>{ startSubscriptions(); await Promise.all([initialFetchFarms(),initialFetchGeofences(),initialFetchPersonnel(),initialFetchActivities()]); syncLocalPendingToFirestore(); });
+      waitAuthThen(async()=>{ startSubscriptions(); await Promise.all([initialFetchFarms(),initialFetchGeofences(),initialFetchPersonnel(),initialFetchActivities(),initialFetchLaborCosts()]); syncLocalPendingToFirestore(); });
     }
     function addMousePositionControl(){
       const MousePos=L.Control.extend({options:{position:'bottomleft'},onAdd:function(){const d=L.DomUtil.create('div','mousepos-control');d.innerHTML='Lat: — Lng: —';this._div=d;return d;},update:function(lat,lng){this._div.innerHTML=(lat!=null&&lng!=null)?`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`:'Lat: — Lng: —';}});
@@ -383,8 +449,8 @@
       updateDeleteFenceButtonState(); updateEditButtonsState(); currentFences=fences||[]; buildIndexList(); buildAssignOptions(); buildActivityFormOptions();
     }
 
-    /* ---------- Suscripciones (con fallback a caché si vienen vacías) ---------- */
-    let unsubFarms=null,unsubGeofences=null,unsubPersonnel=null,unsubActivities=null,subsStarted=false;
+    /* ---------- Suscripciones ---------- */
+    let unsubFarms=null,unsubGeofences=null,unsubPersonnel=null,unsubActivities=null,unsubLaborCosts=null,subsStarted=false;
     function startSubscriptions(){
       if(subsStarted) return; subsStarted=true;
       unsubFarms=db.collection('farms').onSnapshot(s=>{
@@ -411,8 +477,8 @@
         const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,firstName:d.firstName||'',lastName:d.lastName||'',idNumber:d.idNumber||'',assignType:d.assignType||'',assignId:d.assignId||'',active:(d.active!==false)});});
         if(list.length){ currentPersonnel=list.slice(); savePeople(list); }
         else { currentPersonnel=loadPeople(); }
-        renderPersonnelList(); buildActivityFormOptions();
-      },()=>{ currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); });
+        renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache();
+      },()=>{ currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache(); });
 
       unsubActivities=db.collection('activities').onSnapshot(s=>{
         const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({
@@ -424,21 +490,30 @@
         else { currentActivities=loadActs(); }
         renderActivityList(); buildActivityFilterOptions();
       },()=>{ currentActivities=loadActs(); renderActivityList(); buildActivityFilterOptions(); });
+
+      unsubLaborCosts=db.collection('labor_costs').onSnapshot(s=>{
+        const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,personId:d.personId||'',personName:d.personName||'',dailyCost:+(d.dailyCost||0),startDate:d.startDate||'',endDate:d.endDate||''});});
+        if(list.length){ currentLaborCosts=list.slice(); saveLaborCosts(list); }
+        else { currentLaborCosts=loadLaborCosts(); }
+        renderLaborCostList();
+      },()=>{ currentLaborCosts=loadLaborCosts(); renderLaborCostList(); });
     }
 
     async function initialFetchFarms(){ try{ const s=await db.collection('farms').get(); const arr=[]; s.forEach(doc=>{const d=doc.data(); arr.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation});}); currentFarms=arr.length?arr.slice():loadFarms(); if(arr.length) saveFarms(arr); renderFarmsFromCache(); }catch{ renderFarmsFromCache(); } }
     async function initialFetchGeofences(){ try{ const s=await db.collection('geofences').get(); const arr=[]; s.forEach(doc=>{const d=doc.data(); arr.push({id:doc.id,name:d.name,path:d.path||[]});}); currentFences=arr.length?arr.slice():loadFences(); if(arr.length) saveFences(arr); renderGeofencesFromCache(); }catch{ renderGeofencesFromCache(); } }
     async function initialFetchPersonnel(){ try{ const s=await db.collection('personnel').get(); const arr=[]; s.forEach(doc=>{const d=doc.data(); arr.push({id:doc.id,firstName:d.firstName||'',lastName:d.lastName||'',idNumber:d.idNumber||'',assignType:d.assignType||'',assignId:d.assignId||'',active:(d.active!==false)});}); currentPersonnel=arr.length?arr.slice():loadPeople(); if(arr.length) savePeople(arr); renderPersonnelList(); }catch{ currentPersonnel=loadPeople(); renderPersonnelList(); } }
     async function initialFetchActivities(){ try{ const s=await db.collection('activities').get(); const arr=[]; s.forEach(doc=>{const d=doc.data(); arr.push({id:doc.id,activity:d.activity||'',personId:d.personId||'',personName:d.personName||'',assignType:d.assignType||'',assignId:d.assignId||'',entityName:d.entityName||'',startDate:d.startDate||'',endDate:d.endDate||''});}); currentActivities=arr.length?arr.slice():loadActs(); if(arr.length) saveActs(arr); renderActivityList(); }catch{ currentActivities=loadActs(); renderActivityList(); } }
+    async function initialFetchLaborCosts(){ try{ const s=await db.collection('labor_costs').get(); const arr=[]; s.forEach(doc=>{const d=doc.data(); arr.push({id:doc.id,personId:d.personId||'',personName:d.personName||'',dailyCost:+(d.dailyCost||0),startDate:d.startDate||'',endDate:d.endDate||''});}); currentLaborCosts=arr.length?arr.slice():loadLaborCosts(); if(arr.length) saveLaborCosts(arr); renderLaborCostList(); }catch{ currentLaborCosts=loadLaborCosts(); renderLaborCostList(); } }
 
     async function syncLocalPendingToFirestore(){
       try{ const farms=loadFarms().filter(f=>String(f.id||'').startsWith('local-')); for(const f of farms){ try{await db.collection('farms').add({name:f.name||'Finca',fincaLocation:f.fincaLocation||null});}catch{} saveFarms(loadFarms().filter(x=>x.id!==f.id)); } }catch{}
       try{ const fences=loadFences().filter(g=>String(g.id||'').startsWith('localgf-')); for(const g of fences){ try{await db.collection('geofences').add({name:g.name||'Geocerca',path:Array.isArray(g.path)?g.path:[]});}catch{} saveFences(loadFences().filter(x=>x.id!==g.id)); } }catch{}
       try{ const ppl=loadPeople().filter(p=>String(p.id||'').startsWith('localp-')); for(const p of ppl){ try{await db.collection('personnel').add({firstName:p.firstName||'',lastName:p.lastName||'',idNumber:p.idNumber||'',assignType:p.assignType||'',assignId:p.assignId||'',active:(p.active!==false)}); }catch{} savePeople(loadPeople().filter(x=>x.id!==p.id)); } }catch{}
       try{ const acts=loadActs().filter(a=>String(a.id||'').startsWith('locala-')); for(const a of acts){ try{await db.collection('activities').add({activity:a.activity,personId:a.personId,personName:a.personName,assignType:a.assignType,assignId:a.assignId,entityName:a.entityName,startDate:a.startDate,endDate:a.endDate});}catch{} saveActs(loadActs().filter(x=>x.id!==a.id)); } }catch{}
+      try{ const lcs=loadLaborCosts().filter(c=>String(c.id||'').startsWith('localc-')); for(const c of lcs){ try{await db.collection('labor_costs').add({personId:c.personId,personName:c.personName,dailyCost:c.dailyCost,startDate:c.startDate,endDate:c.endDate});}catch{} saveLaborCosts(loadLaborCosts().filter(x=>x.id!==c.id)); } }catch{}
     }
 
-    /* ---------- Geocercas ---------- */
+    /* ---------- Geocercas (sin cambios) ---------- */
     function selectFence(id){ if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes.'); return; } if(selectedFenceId&&geofenceLayers[selectedFenceId]) geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE); selectedFenceId=id; if(geofenceLayers[id]) geofenceLayers[id].setStyle(GEOFENCE_SELECTED_STYLE); updateDeleteFenceButtonState(); updateEditButtonsState(); }
     function updateDeleteButtonState(){ const sel=document.getElementById('farmSelect'), btn=document.getElementById('deleteFarmBtn'); if(btn) btn.disabled=!(sel&&sel.value); }
     function updateDeleteFenceButtonState(){ const btn=document.getElementById('deleteFenceBtn'); if(btn) btn.disabled=!selectedFenceId; }
@@ -577,7 +652,7 @@
       const doc={firstName:fn,lastName:ln,idNumber:idn,assignType,assignId,active};
       (async()=>{ try{ await db.collection('personnel').doc(id).update(doc); }
         catch{ const cache=loadPeople(); const i=cache.findIndex(x=>x.id===id); if(i>=0){ cache[i]={...cache[i],...doc}; savePeople(cache);} }
-        currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions();
+        currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache();
       })();
     }
 
@@ -585,20 +660,17 @@
     function showActError(msg){ const e=document.getElementById('actFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
 
     function buildActivityFormOptions(){
-      // Actividades
       const actSel=document.getElementById('actActivitySelect');
       const actFilter=document.getElementById('actFilterActivity');
       if(actSel){ actSel.innerHTML = activityDefs.map(a=>`<option value="${a}">${a}</option>`).join(''); }
       if(actFilter){ actFilter.innerHTML = `<option value="all">Todas</option>` + activityDefs.map(a=>`<option value="${a}">${a}</option>`).join(''); }
 
-      // Personas (mostrar todas; marcar inactivas)
       const people=currentPersonnel?.length?currentPersonnel:loadPeople();
       const pSel=document.getElementById('actPersonSelect');
       const pFilter=document.getElementById('actFilterPerson');
       if(pSel){ pSel.innerHTML = people.length? people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}${(p.active===false)?' (inactivo)':''}</option>`).join('') : `<option value="">No hay personal</option>`; }
       if(pFilter){ pFilter.innerHTML = `<option value="all">Todas</option>` + (people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}${(p.active===false)?' (inactivo)':''}</option>`).join('')); }
 
-      // Entidades
       const farms=currentFarms?.length?currentFarms:loadFarms();
       const fences=currentFences?.length?currentFences:loadFences();
       const eSel=document.getElementById('actEntitySelect');
@@ -727,6 +799,116 @@
     }
     window.deleteActivity=deleteActivity;
 
+    /* ---------- COSTOS DE MANO DE OBRA ---------- */
+    let lcChosenPerson = { id:'', name:'' };
+
+    function showLcError(msg){ const e=document.getElementById('lcFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
+
+    function openLcModal(){
+      const modal=document.getElementById('lcPersonModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      renderLcModalList();
+      document.getElementById('lcModalSearch').value='';
+      document.getElementById('lcModalSearch').focus();
+    }
+    function closeLcModal(){
+      const modal=document.getElementById('lcPersonModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+    function buildLaborCostPersonCache(){ /* no-op placeholder to keep consistent refresh points */ }
+
+    function renderLcModalList(){
+      const cont=document.getElementById('lcModalList');
+      const q=(document.getElementById('lcModalSearch').value||'').trim().toLowerCase();
+      const people=(currentPersonnel?.length?currentPersonnel:loadPeople()).filter(p=>p.active!==false);
+      let list=people;
+      if(q){ list = people.filter(p=>(`${p.firstName||''} ${p.lastName||''} ${p.idNumber||''}`.toLowerCase().includes(q))); }
+      cont.innerHTML='';
+      if(!list.length){ cont.innerHTML='<div class="py-6 text-center text-gray-500">No hay personas activas.</div>'; return; }
+      list.forEach(p=>{
+        const btn=document.createElement('button');
+        btn.className='w-full text-left px-3 py-2 hover:bg-gray-100';
+        btn.innerHTML=`<div class="font-medium text-gray-800">${p.firstName||''} ${p.lastName||''}</div><div class="text-xs text-gray-500">Cédula: ${p.idNumber||''}</div>`;
+        btn.addEventListener('click', ()=>{
+          lcChosenPerson={ id:p.id, name:`${p.firstName||''} ${p.lastName||''}`.trim() };
+          const display=document.getElementById('lcPersonDisplay');
+          display.value=lcChosenPerson.name;
+          display.dataset.personId = lcChosenPerson.id;
+          closeLcModal();
+        });
+        cont.appendChild(btn);
+      });
+    }
+
+    async function addLaborCost(){
+      try{
+        showLcError('');
+        const display=document.getElementById('lcPersonDisplay');
+        const personId = display.dataset.personId || '';
+        const personName = display.value || '';
+        const dailyCost = parseFloat(document.getElementById('lcDailyCost').value);
+        const start = (document.getElementById('lcStartDate').value||'').trim();
+        const end   = (document.getElementById('lcEndDate').value||'').trim();
+
+        if(!personId) return showLcError('Elige una persona activa.');
+        if(!(dailyCost>=0)) return showLcError('Ingresa un costo válido.');
+        if(!start || !end) return showLcError('Selecciona el rango de fechas.');
+        if(start>end) return showLcError('La fecha inicio no puede ser mayor a la fecha fin.');
+
+        const tempId='localc-'+Date.now();
+        const rec={ id:tempId, personId, personName, dailyCost:+dailyCost, startDate:start, endDate:end };
+
+        let cache=loadLaborCosts(); cache.push(rec); saveLaborCosts(cache);
+        currentLaborCosts = cache.slice(); renderLaborCostList();
+
+        try{
+          const ref = await db.collection('labor_costs').add({personId, personName, dailyCost:+dailyCost, startDate:start, endDate:end});
+          cache = loadLaborCosts().map(x=>x.id===tempId?({...x,id:ref.id}):x);
+          saveLaborCosts(cache); currentLaborCosts=cache.slice(); renderLaborCostList();
+        }catch{ waitAuthThen(syncLocalPendingToFirestore); }
+
+        // limpiar
+        document.getElementById('lcPersonDisplay').value='';
+        document.getElementById('lcPersonDisplay').dataset.personId='';
+        document.getElementById('lcDailyCost').value='';
+        document.getElementById('lcStartDate').value='';
+        document.getElementById('lcEndDate').value='';
+      }catch(e){ console.error(e); showLcError('No se pudo guardar el costo.'); }
+    }
+    window.addLaborCost = addLaborCost;
+
+    function renderLaborCostList(){
+      const tbody=document.getElementById('laborCostTableBody'); if(!tbody) return;
+      let list=currentLaborCosts?.length?currentLaborCosts.slice():loadLaborCosts();
+      list.sort((a,b)=> (a.personName||'').localeCompare(b.personName||'') || (a.startDate||'').localeCompare(b.startDate||'') );
+      tbody.innerHTML='';
+      if(!list.length){ tbody.innerHTML=`<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">No hay costos registrados.</td></tr>`; return; }
+      list.forEach(c=>{
+        const tr=document.createElement('tr'); tr.className='border-t hover:bg-gray-50';
+        tr.innerHTML=`<td class="px-3 py-2">${c.personName||'—'}</td>
+                      <td class="px-3 py-2">$${(c.dailyCost||0).toFixed(2)}</td>
+                      <td class="px-3 py-2">${c.startDate}</td>
+                      <td class="px-3 py-2">${c.endDate}</td>
+                      <td class="px-3 py-2">
+                        <button class="text-rose-600 hover:underline" onclick="deleteLaborCost('${c.id}')">Eliminar</button>
+                      </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function deleteLaborCost(id){
+      if(!id) return;
+      const it=(currentLaborCosts||[]).find(x=>x.id===id)||(loadLaborCosts().find(x=>x.id===id));
+      const label = it ? `${it.personName} ($${(it.dailyCost||0).toFixed(2)})` : 'este registro';
+      if(!confirm(`¿Eliminar ${label}?`)) return;
+      try{ await db.collection('labor_costs').doc(id).delete(); }
+      catch{ const cache=loadLaborCosts().filter(x=>x.id!==id); saveLaborCosts(cache); }
+      currentLaborCosts=loadLaborCosts(); renderLaborCostList();
+    }
+    window.deleteLaborCost=deleteLaborCost;
+
     /* ---------- Entrada (LOGIN) ---------- */
     function handleAdminLogin(){
       const val = (document.getElementById('adminCodeInput').value || '').trim().toLowerCase();
@@ -741,7 +923,7 @@
       setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80);
     }
 
-    // Fechas por defecto (hoy) SOLO en formulario de alta de actividades
+    // Fechas por defecto
     function setDefaultActivityDates(){
       const today = new Date();
       const y = today.getFullYear();
@@ -750,6 +932,17 @@
       const val = `${y}-${m}-${d}`;
       const s = document.getElementById('actStartDate');
       const e = document.getElementById('actEndDate');
+      if(s && !s.value) s.value = val;
+      if(e && !e.value) e.value = val;
+    }
+    function setDefaultLaborCostDates(){
+      const today = new Date();
+      const y = today.getFullYear();
+      const m = String(today.getMonth()+1).padStart(2,'0');
+      const d = String(today.getDate()).padStart(2,'0');
+      const val = `${y}-${m}-${d}`;
+      const s = document.getElementById('lcStartDate');
+      const e = document.getElementById('lcEndDate');
       if(s && !s.value) s.value = val;
       if(e && !e.value) e.value = val;
     }
@@ -800,9 +993,18 @@
       document.getElementById('actFilterTo').addEventListener('change', renderActivityList);
       setDefaultActivityDates();
 
+      // Costos
+      document.getElementById('lcChoosePersonBtn').addEventListener('click', openLcModal);
+      document.getElementById('lcModalClose').addEventListener('click', closeLcModal);
+      document.getElementById('lcModalCancel').addEventListener('click', closeLcModal);
+      document.getElementById('lcModalSearch').addEventListener('input', renderLcModalList);
+      document.getElementById('lcAddCostBtn').addEventListener('click', addLaborCost);
+      setDefaultLaborCostDates();
+
       // Primer pintado
       buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildActivityFilterOptions();
       updateDeleteButtonState(); updateDeleteFenceButtonState(); updateEditButtonsState();
+      renderLaborCostList();
     });
   </script>
 </body>
