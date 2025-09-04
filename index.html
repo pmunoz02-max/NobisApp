@@ -20,6 +20,7 @@
     .error-message { color: #dc2626; font-size: 14px; margin-top: 6px; display: none; }
     .farm-label { background: #ffffff; border: 1px solid rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.15); font-size: 12px; }
     .mousepos-control { background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:.5rem;padding:.25rem .5rem;font-size:12px;box-shadow:0 1px 2px rgba(0,0,0,.1); }
+    .table-mini th, .table-mini td { padding: .5rem .75rem; }
   </style>
 </head>
 <body class="bg-gray-100 p-4 sm:p-8 overflow-x-hidden">
@@ -33,53 +34,14 @@
              class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2"
              autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text">
       <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
-      <button id="adminLoginBtn"
+      <button id="adminLoginBtn" type="button"
               class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">
         Acceder
       </button>
     </div>
   </div>
 
-  <!-- LOGIN ROBUSTO -->
-  <script>
-    const ADMIN_CODE = "admin123";
-    function normalizeCode(s){
-      return String(s||"").normalize("NFKC").replace(/[\u200B-\u200D\uFEFF]/g,"").trim().toLowerCase();
-    }
-    function allowBypass(){
-      try{
-        const qs=new URLSearchParams(location.search);
-        if(qs.get("skipAdmin")==="1") return true;
-        if(localStorage.getItem("admin_debug")==="1") return true;
-      }catch{}
-      return false;
-    }
-    function showApp(){
-      document.getElementById('adminModal')?.classList.add("hidden");
-      document.getElementById('appContent')?.classList.remove("hidden");
-      // Garantiza repintado del mapa y que se vea TODO el contenido (incl. personal)
-      setTimeout(()=>{ initMap(); setTimeout(()=>{ if(window.map){ map.invalidateSize(); } }, 80); }, 50);
-    }
-    function doAdminLogin(ev){
-      if(ev&&ev.preventDefault) ev.preventDefault();
-      try{
-        const raw=document.getElementById('adminCodeInput')?.value||"";
-        const ok=allowBypass()||normalizeCode(raw)===normalizeCode(ADMIN_CODE);
-        if(ok) showApp();
-        else{ const err=document.getElementById('errorMessage'); if(err){ err.textContent='Código incorrecto. Intenta con "admin123"'; err.style.display="block"; } }
-      }catch(e){ console.error(e); }
-    }
-    document.addEventListener("DOMContentLoaded",()=>{
-      document.getElementById('adminModal')?.classList.remove("hidden");
-      document.getElementById('adminLoginBtn')?.addEventListener("click", doAdminLogin);
-      const adminInput=document.getElementById('adminCodeInput');
-      adminInput?.addEventListener("keydown",e=>{ if(e.key==="Enter") doAdminLogin(e); });
-      adminInput?.addEventListener("input", ()=>{ const err=document.getElementById('errorMessage'); if(err) err.style.display="none"; });
-      if(allowBypass()) showApp();
-    });
-  </script>
-
-  <!-- Contenido -->
+  <!-- Contenido de la app -->
   <div id="appContent" class="max-w-7xl mx-auto flex flex-col space-y-6 hidden">
     <header class="text-center my-4">
       <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
@@ -94,30 +56,58 @@
       </div>
     </div>
 
-    <!-- Mapa + barra -->
+    <!-- Mapa -->
     <div class="bg-white p-6 rounded-2xl shadow-lg">
       <div class="flex flex-wrap gap-2 items-center mb-2">
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
         <div class="ml-auto flex flex-wrap gap-2">
+          <!-- Geocercas -->
+          <button id="startFenceBtn" type="button"
+            class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Iniciar dibujo de geocerca">Nueva geocerca</button>
+          <button id="finishFenceBtn" type="button"
+            class="hidden inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Finalizar geocerca">Finalizar geocerca</button>
+          <button id="cancelFenceBtn" type="button"
+            class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg"
+            title="Cancelar dibujo">Cancelar</button>
 
-          <button id="startFenceBtn"  class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">Nueva geocerca</button>
-          <button id="finishFenceBtn" class="hidden inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg">Finalizar geocerca</button>
-          <button id="cancelFenceBtn" class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
+          <button id="createFenceByCoordsBtn" type="button"
+            class="inline-flex items-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Crear geocerca ingresando una lista de coordenadas">Geocerca (Lat/Lngs)</button>
 
-          <button id="createFenceByCoordsBtn" class="inline-flex items-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg">Geocerca (Lat/Lngs)</button>
+          <!-- Fincas -->
+          <button id="createFarmBtn" type="button"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Crear finca en el centro del mapa">Crear finca</button>
+          <button id="createByCoordsBtn" type="button"
+            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Crear finca ingresando Lat/Lng">Crear finca (Lat/Lng)</button>
+          <button id="deleteFarmBtn" type="button"
+            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Eliminar la finca seleccionada">Eliminar finca</button>
 
-          <button id="createFarmBtn" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">Crear finca</button>
-          <button id="createByCoordsBtn" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Crear finca (Lat/Lng)</button>
-          <button id="deleteFarmBtn" class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">Eliminar finca</button>
+          <!-- Eliminar geocerca -->
+          <button id="deleteFenceBtn" type="button"
+            class="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Eliminar la geocerca seleccionada" disabled>Eliminar geocerca</button>
 
-          <button id="deleteFenceBtn" class="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>Eliminar geocerca</button>
+          <!-- Edición & GeoJSON -->
+          <button id="editFenceBtn" type="button"
+            class="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Editar (mover vértices) de la geocerca seleccionada" disabled>Editar geocerca</button>
+          <button id="saveFenceEditBtn" type="button"
+            class="hidden inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Guardar cambios a la geocerca">Guardar cambios</button>
+          <button id="cancelFenceEditBtn" type="button"
+            class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg"
+            title="Cancelar edición y restaurar">Cancelar edición</button>
 
-          <button id="editFenceBtn" class="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>Editar geocerca</button>
-          <button id="saveFenceEditBtn" class="hidden inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar cambios</button>
-          <button id="cancelFenceEditBtn" class="hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar edición</button>
-
-          <button id="exportGeoJSONBtn" class="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg">Exportar GeoJSON</button>
-          <label class="inline-flex items-center gap-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold px-4 py-2 rounded-lg cursor-pointer">
+          <button id="exportGeoJSONBtn" type="button"
+            class="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg"
+            title="Exportar GeoJSON (seleccionada o todas)">Exportar GeoJSON</button>
+          <label class="inline-flex items-center gap-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold px-4 py-2 rounded-lg cursor-pointer"
+            title="Importar GeoJSON (Polygon o MultiPolygon)">
             Importar GeoJSON
             <input id="importGeoJSONInput" type="file" accept=".geojson,application/geo+json,application/json" class="hidden">
           </label>
@@ -130,8 +120,8 @@
           <label for="coordsNameInput" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la nueva finca</label>
           <div class="flex gap-2">
             <input id="coordsNameInput" type="text" class="border rounded-md p-2 w-full" placeholder="Ej.: Finca Palora Norte" />
-            <button id="coordsNameSaveBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
-            <button id="coordsNameCancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
+            <button id="coordsNameSaveBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
+            <button id="coordsNameCancelBtn" type="button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
           </div>
           <p id="coordsNameHint" class="text-xs text-gray-500 mt-2"></p>
         </div>
@@ -143,8 +133,8 @@
           <label for="fenceNameInput" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la geocerca</label>
           <div class="flex gap-2">
             <input id="fenceNameInput" type="text" class="border rounded-md p-2 w-full" placeholder="Ej.: Geocerca Lote 1" />
-            <button id="fenceNameSaveBtn" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
-            <button id="fenceNameCancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
+            <button id="fenceNameSaveBtn" type="button" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
+            <button id="fenceNameCancelBtn" type="button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
           </div>
           <p id="fenceNameHint" class="text-xs text-gray-500 mt-2"></p>
         </div>
@@ -152,7 +142,7 @@
 
       <div id="map"></div>
 
-      <!-- Explorador -->
+      <!-- ===== Explorador de elementos (doble clic para hacer zoom) ===== -->
       <div id="indexPanel" class="mt-4">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-gray-800">Explorador de elementos</h3>
@@ -169,101 +159,176 @@
           </div>
         </div>
       </div>
+      <!-- ===== FIN ===== -->
 
       <p id="statusMessage" class="mt-3 text-sm text-gray-600">
-        Haz clic en el mapa para crear una nueva finca. También puedes usar <strong>Crear finca</strong> o <strong>Crear finca (Lat/Lng)</strong>.
-        Para geocercas: <strong>Nueva geocerca</strong> → clics en el mapa → <strong>Finalizar geocerca</strong> → asigna nombre y guarda.
+        Haz clic en el mapa para crear una nueva finca. También puedes usar <strong>Crear finca</strong> (centro del mapa) o <strong>Crear finca (Lat/Lng)</strong>.
+        Para geocercas: <strong>Nueva geocerca</strong> → clics en el mapa para vértices → <strong>Finalizar geocerca</strong> → asigna nombre y guarda.
+        Para borrar, primero haz <strong>click en la geocerca</strong> (se resalta) y luego pulsa <strong>Eliminar geocerca</strong>.
       </p>
     </div>
 
-    <!-- === Gestión de Personal === -->
-    <div id="personSection" class="bg-white p-6 rounded-2xl shadow-lg">
-      <div class="flex items-center justify-between mb-3">
+    <!-- ===================== GESTIÓN DE PERSONAL ===================== -->
+    <div id="personnelSection" class="bg-white p-6 rounded-2xl shadow-lg">
+      <div class="flex items-center justify-between mb-4">
         <h2 class="text-2xl font-semibold text-gray-700">Gestión de Personal</h2>
-        <div class="flex items-center gap-2">
-          <input id="personSearch" type="text" placeholder="Buscar nombre, apellido, cédula o asignación..."
-                 class="w-72 max-w-full border rounded-md p-2">
-          <button id="personSearchClear" class="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700">Limpiar</button>
-        </div>
+        <span class="text-xs text-gray-500">Doble clic sobre una fila para ir a su asignación</span>
       </div>
 
-      <!-- Formulario -->
+      <!-- Formulario alta / edición -->
       <div class="rounded-xl border border-gray-200 p-4 mb-4">
-        <div class="grid md:grid-cols-5 gap-3">
+        <div class="grid md:grid-cols-4 gap-3">
           <div>
-            <label class="text-sm text-gray-600">Nombre</label>
-            <input id="pFirstName" type="text" class="w-full border rounded-md p-2" placeholder="Nombre" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+            <input id="pFirstName" type="text" class="w-full border rounded-md p-2" placeholder="Nombre">
           </div>
           <div>
-            <label class="text-sm text-gray-600">Apellido</label>
-            <input id="pLastName" type="text" class="w-full border rounded-md p-2" placeholder="Apellido" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
+            <input id="pLastName" type="text" class="w-full border rounded-md p-2" placeholder="Apellido">
           </div>
           <div>
-            <label class="text-sm text-gray-600">Cédula</label>
-            <input id="pIdNumber" type="text" class="w-full border rounded-md p-2" placeholder="Número de cédula" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">Cédula</label>
+            <input id="pIdNumber" type="text" class="w-full border rounded-md p-2" placeholder="Solo números">
           </div>
-          <div class="md:col-span-2">
-            <label class="text-sm text-gray-600">Asignación</label>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Asignación</label>
             <select id="pAssignSelect" class="w-full border rounded-md p-2"></select>
           </div>
         </div>
-        <div class="mt-3 flex gap-2">
-          <button id="addPersonBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Agregar</button>
-          <span id="personFormError" class="text-sm text-rose-600 hidden"></span>
+        <div id="personFormError" class="mt-2 text-sm text-red-600 hidden"></div>
+        <div class="flex gap-2 mt-3">
+          <button id="addPersonBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Agregar</button>
+          <button id="savePersonBtn" type="button" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar cambios</button>
+          <button id="cancelPersonBtn" type="button" class="hidden bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar edición</button>
         </div>
       </div>
 
-      <!-- Lista -->
-      <div class="rounded-xl border border-gray-200 overflow-x-auto">
-        <table class="min-w-full">
-          <thead class="bg-gray-50 text-left text-sm text-gray-600">
+      <!-- Filtros lista personal -->
+      <div class="grid md:grid-cols-4 gap-3 mb-3">
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+          <input id="personSearchInput" type="text" class="w-full border rounded-md p-2" placeholder="Nombre, apellido o cédula">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Tipo asignación</label>
+          <select id="personAssignTypeFilter" class="w-full border rounded-md p-2">
+            <option value="all">Todas</option>
+            <option value="farm">Solo fincas</option>
+            <option value="geofence">Solo geocercas</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Finca/Geocerca</label>
+          <select id="personAssignIdFilter" class="w-full border rounded-md p-2">
+            <option value="all">Todas</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Tabla personal -->
+      <div class="overflow-auto border rounded-xl">
+        <table class="min-w-full table-mini">
+          <thead class="bg-gray-50">
             <tr>
-              <th class="px-3 py-2">Nombre</th>
-              <th class="px-3 py-2">Apellido</th>
-              <th class="px-3 py-2">Cédula</th>
-              <th class="px-3 py-2">Asignado a</th>
-              <th class="px-3 py-2 w-40">Acciones</th>
+              <th class="text-left text-xs font-semibold text-gray-600 uppercase">Nombre</th>
+              <th class="text-left text-xs font-semibold text-gray-600 uppercase">Apellido</th>
+              <th class="text-left text-xs font-semibold text-gray-600 uppercase">Cédula</th>
+              <th class="text-left text-xs font-semibold text-gray-600 uppercase">Asignado a</th>
+              <th class="text-left text-xs font-semibold text-gray-600 uppercase">Acciones</th>
             </tr>
           </thead>
-          <tbody id="personnelTbody" class="text-sm">
-            <!-- filas dinámicas -->
-          </tbody>
+          <tbody id="personTableBody" class="bg-white divide-y divide-gray-100"></tbody>
         </table>
-        <div id="personnelEmpty" class="py-4 text-center text-sm text-gray-500 hidden">No hay personal registrado.</div>
       </div>
     </div>
-    <!-- === FIN Gestión de Personal === -->
+    <!-- =================== FIN GESTIÓN DE PERSONAL =================== -->
 
-  </div> <!-- /#appContent -->
+    <!-- =================== REGISTRO DE ACTIVIDADES =================== -->
+    <div id="recordsSection" class="bg-white p-6 rounded-2xl shadow-lg">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-3">Registro de Actividades</h2>
 
-  <!-- Modal edición de persona -->
-  <div id="editPersonModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
-    <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl p-6">
-      <h3 class="text-xl font-semibold text-gray-800 mb-4">Editar persona</h3>
-      <div class="grid md:grid-cols-2 gap-3">
-        <div>
-          <label class="text-sm text-gray-600">Nombre</label>
-          <input id="epFirstName" type="text" class="w-full border rounded-md p-2" />
+      <div class="rounded-xl border border-gray-200 p-4 mb-4">
+        <div class="grid md:grid-cols-5 gap-3">
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Persona</label>
+            <select id="recordPersonSelect" class="w-full border rounded-md p-2"></select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Actividad</label>
+            <select id="recordActivitySelect" class="w-full border rounded-md p-2"></select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Desde</label>
+            <input id="recordStartDate" type="date" class="w-full border rounded-md p-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
+            <input id="recordEndDate" type="date" class="w-full border rounded-md p-2">
+          </div>
         </div>
-        <div>
-          <label class="text-sm text-gray-600">Apellido</label>
-          <input id="epLastName" type="text" class="w-full border rounded-md p-2" />
-        </div>
-        <div>
-          <label class="text-sm text-gray-600">Cédula</label>
-          <input id="epIdNumber" type="text" class="w-full border rounded-md p-2" />
-        </div>
-        <div>
-          <label class="text-sm text-gray-600">Asignación</label>
-          <select id="epAssignSelect" class="w-full border rounded-md p-2"></select>
+        <div class="flex gap-2 mt-3">
+          <button id="addRecordBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Registrar</button>
         </div>
       </div>
-      <p id="epError" class="text-sm text-rose-600 mt-2 hidden"></p>
-      <div class="mt-4 flex justify-end gap-2">
-        <button id="epCancelBtn" class="px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700">Cancelar</button>
-        <button id="epSaveBtn" class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">Guardar</button>
+
+      <!-- Filtros de reportes -->
+      <div class="grid md:grid-cols-6 gap-3 mb-3">
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Persona</label>
+          <select id="filterRecordPerson" class="w-full border rounded-md p-2">
+            <option value="all">Todas</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Actividad</label>
+          <select id="filterRecordActivity" class="w-full border rounded-md p-2">
+            <option value="all">Todas</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Desde</label>
+          <input id="filterRecordStart" type="date" class="w-full border rounded-md p-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
+          <input id="filterRecordEnd" type="date" class="w-full border rounded-md p-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Tipo asignación</label>
+          <select id="filterAssignType" class="w-full border rounded-md p-2">
+            <option value="all">Todas</option>
+            <option value="farm">Fincas</option>
+            <option value="geofence">Geocercas</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Finca/Geocerca</label>
+          <select id="filterAssignId" class="w-full border rounded-md p-2">
+            <option value="all">Todas</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-2 mb-3">
+        <button id="applyRecordFiltersBtn" type="button" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">Aplicar filtros</button>
+        <button id="exportRecordsCsvBtn" type="button" class="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg">Exportar CSV</button>
+      </div>
+
+      <div class="overflow-auto border rounded-xl">
+        <table class="min-w-full table-mini">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="text-left text-xs font-semibold text-gray-600 uppercase">Persona</th>
+              <th class="text-left text-xs font-semibold text-gray-600 uppercase">Actividad</th>
+              <th class="text-left text-xs font-semibold text-gray-600 uppercase">Desde</th>
+              <th class="text-left text-xs font-semibold text-gray-600 uppercase">Hasta</th>
+              <th class="text-left text-xs font-semibold text-gray-600 uppercase">Asignación</th>
+            </tr>
+          </thead>
+          <tbody id="recordTableBody" class="bg-white divide-y divide-gray-100"></tbody>
+        </table>
       </div>
     </div>
+    <!-- ================= FIN REGISTRO DE ACTIVIDADES ================= -->
   </div>
 
   <!-- Leaflet core JS -->
@@ -278,7 +343,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 
   <script>
-    /* =================== Firebase =================== */
+    /*************** Firebase ***************/
     const firebaseConfig = {
       apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
       authDomain: "demo-finca-app.firebaseapp.com",
@@ -287,44 +352,77 @@
       messagingSenderId: "123456789012",
       appId: "1:123456789012:web:abcdef1234567890"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    try{ db.settings({ experimentalForceLongPolling:true, experimentalAutoDetectLongPolling:true, useFetchStreams:false }); }catch{}
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (!isMobile) db.enablePersistence({ synchronizeTabs:true }).catch(()=>{});
-    let authReady=false;
-    firebase.auth().signInAnonymously().catch(console.error);
-    firebase.auth().onAuthStateChanged(u=>{ authReady=!!u; });
 
-    /* =================== Estado =================== */
+    try {
+      db.settings({
+        experimentalForceLongPolling: true,
+        experimentalAutoDetectLongPolling: true,
+        useFetchStreams: false
+      });
+    } catch {}
+
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (!isMobile) {
+      db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
+    }
+
+    // Auth anónima
+    let authReady = false;
+    firebase.auth().signInAnonymously().catch(console.error);
+    firebase.auth().onAuthStateChanged((user)=>{ authReady = !!user; });
+
+    /*************** Estado general ***************/
     let map;
     const fincaMarkers = {};
     const geofenceLayers = {};
-    const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1', LS_PERS='personnel_cache_v1';
+    const LS_KEY = 'fincas_cache_v1';
+    const LS_GF  = 'geofences_cache_v1';
 
-    let isDrawingFence=false, drawingCoords=[], drawingPolyline=null, drawingMarkers=[], pendingFenceCoords=null;
-    let previewFenceLayer=null, selectedFenceId=null;
+    // Personal
+    const LS_PERS = 'personnel_cache_v1';
+    const LS_RECS = 'person_records_cache_v1';
+    let currentFarms = [];
+    let currentFences = [];
+    let currentPersonnel = [];
+    let currentRecords = [];
+
+    let isDrawingFence = false;
+    let drawingCoords = [];
+    let drawingPolyline = null;
+    let drawingMarkers = [];
+    let pendingFenceCoords = null;
+
+    let previewFenceLayer = null;
+    let selectedFenceId = null;
 
     const GEOFENCE_STYLE = {weight:2, fillOpacity:0.15};
     const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
 
-    let currentFarms=[], currentFences=[], currentPersonnel=[];
-    let personEditId=null; // id de la persona que se edita
+    // Edición de geocercas
+    let isEditingFence = false;
+    let editBackupCoords = null;
+    let editGroup = null;
+    let editToolbar = null;
 
-    /* ===== Edición geocerca (capa temporal) ===== */
-    let isEditingFence=false;
-    let editBackupCoords=null;
-    let tempEditLayer=null;
+    // Actividades
+    const ACTIVITIES = ['Siembra','Cosecha','Poda','Riego','Fertilización','Mantenimiento','Transporte'];
 
-    /* =================== Caché =================== */
+    /*************** Cache helpers ***************/
     const saveCache = farms => { try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} };
     const loadCache = () => { try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } };
     const saveFenceCache = fences => { try{ localStorage.setItem(LS_GF, JSON.stringify(fences)); }catch{} };
     const loadFenceCache = () => { try{ return JSON.parse(localStorage.getItem(LS_GF)||'[]'); }catch{ return []; } };
-    const savePersonnelCache = list => { try{ localStorage.setItem(LS_PERS, JSON.stringify(list)); }catch{} };
+
+    const savePersonnelCache = people => { try{ localStorage.setItem(LS_PERS, JSON.stringify(people)); }catch{} };
     const loadPersonnelCache = () => { try{ return JSON.parse(localStorage.getItem(LS_PERS)||'[]'); }catch{ return []; } };
 
-    /* =================== Render =================== */
+    const saveRecordsCache = recs => { try{ localStorage.setItem(LS_RECS, JSON.stringify(recs)); }catch{} };
+    const loadRecordsCache = () => { try{ return JSON.parse(localStorage.getItem(LS_RECS)||'[]'); }catch{ return []; } };
+
+    /*************** Render Farms ***************/
     function renderFarmsFromCache(){
       const farms = loadCache();
       Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
@@ -337,12 +435,12 @@
         fincaMarkers[f.id] = marker;
       });
 
-      const sel=document.getElementById('farmSelect');
+      const sel = document.getElementById('farmSelect');
       if (sel){
         sel.innerHTML = '';
         farms.forEach(f=>{
-          const opt=document.createElement('option');
-          opt.value=f.id; opt.textContent=f.name||'Finca';
+          const opt = document.createElement('option');
+          opt.value = f.id; opt.textContent = f.name || 'Finca';
           sel.appendChild(opt);
         });
       }
@@ -350,7 +448,8 @@
 
       currentFarms = farms || [];
       buildIndexList();
-      rebuildAssignSelect(); // opciones para personal
+      refreshAssignmentOptions();
+      refreshAssignFilters();
     }
 
     function renderGeofencesFromCache(){
@@ -360,28 +459,33 @@
       const fences = loadFenceCache();
       fences.forEach(g=>{
         if(!g || !g.id || !Array.isArray(g.path) || g.path.length<3) return;
-        const latlngs=g.path.map(pt=> [pt.lat, pt.lng]);
-        const poly=L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
-        poly.bindTooltip(g.name||'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
-        geofenceLayers[g.id]=poly;
+        const latlngs = g.path.map(pt=> [pt.lat, pt.lng]);
+        const poly = L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
+        poly.bindTooltip(g.name || 'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
+        geofenceLayers[g.id] = poly;
         poly.on('click', ()=> selectFence(g.id));
-        if(selectedFenceId===g.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
+        if(selectedFenceId === g.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
       });
 
-      if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null;
+      if(selectedFenceId && !geofenceLayers[selectedFenceId]){ selectedFenceId = null; }
       updateDeleteFenceButtonState();
       updateEditButtonsState();
 
       currentFences = fences || [];
       buildIndexList();
-      rebuildAssignSelect();
+      refreshAssignmentOptions();
+      refreshAssignFilters();
     }
 
-    /* =================== Mapa =================== */
+    /*************** Mapa ***************/
     function initMap(center){
       center = center || {lat:-0.1807, lng:-78.4678};
       map = L.map('map',{center:[center.lat,center.lng],zoom:6});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+
+      // Grupo para edición Leaflet.Draw
+      editGroup = new L.FeatureGroup();
+      map.addLayer(editGroup);
 
       addMousePositionControl();
       renderFarmsFromCache();
@@ -406,164 +510,249 @@
       });
     }
 
-    /* =================== Suscripciones =================== */
-    let unsubFarms=null, unsubGeofences=null, unsubPersonnel=null, subsStarted=false;
+    /*************** Suscripciones ***************/
+    let unsubFarms=null, unsubGeofences=null, unsubPersonnel=null, unsubRecords=null, subsStarted=false;
+
     function startSubscriptions(){
       if (subsStarted) return; subsStarted=true;
 
       // Fincas
       unsubFarms = db.collection('farms').onSnapshot(snap=>{
-        const farms=[];
+        const farms = [];
         Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
         for(const k in fincaMarkers) delete fincaMarkers[k];
 
         snap.forEach(doc=>{
-          const d=doc.data();
-          farms.push({ id:doc.id, name:d.name, fincaLocation:d.fincaLocation });
+          const d = doc.data();
+          farms.push({ id: doc.id, name: d.name, fincaLocation: d.fincaLocation });
           if(d.fincaLocation){
-            const marker=L.marker([d.fincaLocation.lat,d.fincaLocation.lng]).addTo(map);
-            marker.bindTooltip(d.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'});
+            const marker = L.marker([d.fincaLocation.lat, d.fincaLocation.lng]).addTo(map);
+            marker.bindTooltip(d.name || 'Finca',{permanent:true, direction:'right', offset:[10,0], className:'farm-label'});
             fincaMarkers[doc.id]=marker;
           }
         });
-
         currentFarms = farms.slice();
         if (farms.length) saveCache(farms);
 
-        const sel=document.getElementById('farmSelect');
+        const sel = document.getElementById('farmSelect');
         if (sel){
-          sel.innerHTML='';
+          sel.innerHTML = '';
           farms.forEach(f=>{ const opt=document.createElement('option'); opt.value=f.id; opt.textContent=f.name||'Finca'; sel.appendChild(opt); });
         }
         updateDeleteButtonState();
         buildIndexList();
-        rebuildAssignSelect();
-      }, err=>{ console.warn('onSnapshot farms error', err); renderFarmsFromCache(); });
+        refreshAssignmentOptions();
+        refreshAssignFilters();
+      }, err => { console.warn('onSnapshot farms error', err); renderFarmsFromCache(); });
 
       // Geocercas
       unsubGeofences = db.collection('geofences').onSnapshot(snap=>{
-        const fences=[];
+        const fences = [];
         Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
         for(const k in geofenceLayers) delete geofenceLayers[k];
 
         snap.forEach(doc=>{
-          const d=doc.data();
-          const g={ id:doc.id, name:d.name, path:d.path||[] };
+          const d = doc.data();
+          const g = { id: doc.id, name: d.name, path: d.path || [] };
           fences.push(g);
           if(Array.isArray(g.path) && g.path.length>=3){
-            const latlngs=g.path.map(pt=> [pt.lat, pt.lng]);
-            const poly=L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
-            poly.bindTooltip(g.name||'Geocerca',{permanent:true,direction:'center',className:'farm-label'});
+            const latlngs = g.path.map(pt=> [pt.lat, pt.lng]);
+            const poly = L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
+            poly.bindTooltip(g.name || 'Geocerca',{permanent:true, direction:'center', className:'farm-label'});
             geofenceLayers[doc.id]=poly;
             poly.on('click', ()=> selectFence(doc.id));
-            if(selectedFenceId===doc.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
+            if(selectedFenceId === doc.id){ poly.setStyle(GEOFENCE_SELECTED_STYLE); }
           }
         });
-
         currentFences = fences.slice();
         if (fences.length) saveFenceCache(fences);
 
-        if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null;
+        if(selectedFenceId && !geofenceLayers[selectedFenceId]){ selectedFenceId = null; }
         updateDeleteFenceButtonState();
         updateEditButtonsState();
         buildIndexList();
-        rebuildAssignSelect();
-      }, err=>{ console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
+        refreshAssignmentOptions();
+        refreshAssignFilters();
+      }, err => { console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
 
       // Personal
       unsubPersonnel = db.collection('personnel').onSnapshot(snap=>{
-        const people=[];
+        const people = [];
         snap.forEach(doc=>{
-          const d=doc.data()||{};
-          people.push({
-            id: doc.id,
-            firstName: d.firstName||'',
-            lastName:  d.lastName||'',
-            idNumber:  d.idNumber||'',
-            assignType: d.assignType||'farm',
-            assignId:   d.assignId||null
-          });
+          const d = doc.data();
+          people.push({ id: doc.id, ...d });
         });
-        currentPersonnel = people.slice();
-        if (people.length) savePersonnelCache(people);
+        if (people.length) {
+          currentPersonnel = people.slice();
+          savePersonnelCache(people);
+        }
         renderPersonnelList();
-      }, err=>{ console.warn('onSnapshot personnel error', err); renderPersonnelList(true); });
+        fillPeopleCombos();
+      }, err => {
+        console.warn('onSnapshot personnel error', err);
+        currentPersonnel = loadPersonnelCache();
+        renderPersonnelList();
+        fillPeopleCombos();
+      });
+
+      // Registros
+      unsubRecords = db.collection('person_records').onSnapshot(snap=>{
+        const recs = [];
+        snap.forEach(doc=>{
+          const d = doc.data();
+          recs.push({ id: doc.id, ...d });
+        });
+        if (recs.length) {
+          currentRecords = recs.slice();
+          saveRecordsCache(recs);
+        }
+        renderRecordList();
+      }, err => {
+        console.warn('onSnapshot records error', err);
+        currentRecords = loadRecordsCache();
+        renderRecordList();
+      });
     }
 
-    /* =================== Carga inicial =================== */
-    async function initialFetchAll(){ await Promise.all([initialFetchFarms(), initialFetchGeofences(), initialFetchPersonnel()]); }
+    /*************** Cargas iniciales ***************/
+    async function initialFetchAll(){ await Promise.all([initialFetchFarms(), initialFetchGeofences(), initialFetchPersonnel(), initialFetchRecords()]); }
     async function initialFetchFarms(){
       try{
-        const snap=await db.collection('farms').get();
+        const snap = await db.collection('farms').get();
         const farms=[]; snap.forEach(doc=>{ const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); });
-        if (farms.length){ currentFarms=farms.slice(); saveCache(farms); renderFarmsFromCache(); } else { buildIndexList(); rebuildAssignSelect(); }
-      }catch(e){ console.warn('get farms failed', e); buildIndexList(); rebuildAssignSelect(); }
+        if (farms.length){
+          currentFarms = farms.slice();
+          saveCache(farms);
+          renderFarmsFromCache();
+        } else { buildIndexList(); }
+      }catch(e){ console.warn('get farms failed', e); buildIndexList(); }
     }
     async function initialFetchGeofences(){
       try{
-        const snap=await db.collection('geofences').get();
+        const snap = await db.collection('geofences').get();
         const fences=[]; snap.forEach(doc=>{ const d=doc.data(); fences.push({id:doc.id,name:d.name,path:d.path||[]}); });
-        if (fences.length){ currentFences=fences.slice(); saveFenceCache(fences); renderGeofencesFromCache(); } else { buildIndexList(); rebuildAssignSelect(); }
-      }catch(e){ console.warn('get geofences failed', e); buildIndexList(); rebuildAssignSelect(); }
+        if (fences.length){
+          currentFences = fences.slice();
+          saveFenceCache(fences);
+          renderGeofencesFromCache();
+        } else { buildIndexList(); }
+      }catch(e){ console.warn('get geofences failed', e); buildIndexList(); }
     }
     async function initialFetchPersonnel(){
       try{
-        const snap=await db.collection('personnel').get();
-        const people=[]; snap.forEach(doc=>{ const d=doc.data()||{}; people.push({id:doc.id, firstName:d.firstName||'', lastName:d.lastName||'', idNumber:d.idNumber||'', assignType:d.assignType||'farm', assignId:d.assignId||null}); });
-        if (people.length){ currentPersonnel=people.slice(); savePersonnelCache(people); }
+        const snap = await db.collection('personnel').get();
+        const people=[]; snap.forEach(doc=>{ people.push({id:doc.id, ...doc.data()}); });
+        if (people.length){
+          currentPersonnel = people.slice();
+          savePersonnelCache(people);
+        } else {
+          currentPersonnel = loadPersonnelCache();
+        }
         renderPersonnelList();
-      }catch(e){ console.warn('get personnel failed', e); renderPersonnelList(true); }
+        fillPeopleCombos();
+      }catch(e){
+        console.warn('get personnel failed', e);
+        currentPersonnel = loadPersonnelCache();
+        renderPersonnelList();
+        fillPeopleCombos();
+      }
+    }
+    async function initialFetchRecords(){
+      try{
+        const snap = await db.collection('person_records').get();
+        const recs=[]; snap.forEach(doc=>{ recs.push({id:doc.id, ...doc.data()}); });
+        if (recs.length){
+          currentRecords = recs.slice();
+          saveRecordsCache(recs);
+        } else {
+          currentRecords = loadRecordsCache();
+        }
+        renderRecordList();
+      }catch(e){
+        console.warn('get records failed', e);
+        currentRecords = loadRecordsCache();
+        renderRecordList();
+      }
     }
 
-    /* =================== Sync local -> Firestore =================== */
-    let syncRan=false;
+    /*************** Sync local -> Firestore ***************/
+    let syncRan = false;
     async function syncLocalPendingToFirestore(){
-      if (syncRan) return; syncRan=true;
+      if (syncRan) return; syncRan = true;
+      // farms
       try{
-        const farms=loadCache();
-        const pending=farms.filter(f=> f && String(f.id).startsWith('local-'));
-        for (const f of pending){
-          try{
-            await db.collection('farms').add({ name:f.name||'Finca', fincaLocation:f.fincaLocation||null });
-            const updated=loadCache().filter(x=> x.id!==f.id); saveCache(updated);
-          }catch(e){ console.warn('No se pudo subir finca local', f, e); }
+        const farms = loadCache();
+        const pending = farms.filter(f => f && typeof f.id==='string' && f.id.startsWith('local-'));
+        if (pending.length){
+          for (const f of pending){
+            try{
+              await db.collection('farms').add({ name: f.name||'Finca', fincaLocation: f.fincaLocation||null });
+              const updated = loadCache().filter(x => x.id !== f.id);
+              saveCache(updated);
+            }catch(e){ console.warn('No se pudo subir finca local', f, e); }
+          }
+          renderFarmsFromCache();
         }
-        renderFarmsFromCache();
       }catch(e){ console.warn('sync farms error', e); }
 
+      // geofences
       try{
-        const fences=loadFenceCache();
-        const pendingG=fences.filter(g=> g && String(g.id).startsWith('localgf-'));
-        for (const g of pendingG){
-          try{
-            await db.collection('geofences').add({ name:g.name||'Geocerca', path:Array.isArray(g.path)?g.path:[] });
-            const updated=loadFenceCache().filter(x=> x.id!==g.id); saveFenceCache(updated);
-          }catch(e){ console.warn('No se pudo subir geocerca local', g, e); }
+        const fences = loadFenceCache();
+        const pending = fences.filter(g => g && typeof g.id==='string' && g.id.startsWith('localgf-'));
+        if (pending.length){
+          for (const g of pending){
+            try{
+              await db.collection('geofences').add({ name: g.name||'Geocerca', path: Array.isArray(g.path)? g.path : [] });
+              const updated = loadFenceCache().filter(x => x.id !== g.id);
+              saveFenceCache(updated);
+            }catch(e){ console.warn('No se pudo subir geocerca local', g, e); }
+          }
+          renderGeofencesFromCache();
         }
-        renderGeofencesFromCache();
       }catch(e){ console.warn('sync geofences error', e); }
 
+      // personnel
       try{
-        const people=loadPersonnelCache();
-        const pendingP=people.filter(p=> p && String(p.id).startsWith('localp-'));
-        for (const p of pendingP){
-          try{
-            await db.collection('personnel').add({
-              firstName:p.firstName||'',
-              lastName:p.lastName||'',
-              idNumber:p.idNumber||'',
-              assignType:p.assignType||'farm',
-              assignId:p.assignId||null
-            });
-            const updated=loadPersonnelCache().filter(x=> x.id!==p.id);
-            savePersonnelCache(updated);
-          }catch(e){ console.warn('No se pudo subir personal local', p, e); }
+        const pers = loadPersonnelCache();
+        const pending = pers.filter(p => p && typeof p.id==='string' && p.id.startsWith('localp-'));
+        if (pending.length){
+          for (const p of pending){
+            try{
+              await db.collection('personnel').add({
+                firstName:p.firstName, lastName:p.lastName, idNumber:p.idNumber,
+                assignType:p.assignType, assignId:p.assignId
+              });
+              const updated = loadPersonnelCache().filter(x => x.id !== p.id);
+              savePersonnelCache(updated);
+            }catch(e){ console.warn('No se pudo subir personal local', p, e); }
+          }
+          currentPersonnel = loadPersonnelCache(); // refresco local
+          renderPersonnelList();
         }
-        renderPersonnelList();
       }catch(e){ console.warn('sync personnel error', e); }
+
+      // records
+      try{
+        const recs = loadRecordsCache();
+        const pending = recs.filter(r => r && typeof r.id==='string' && r.id.startsWith('localr-'));
+        if (pending.length){
+          for (const r of pending){
+            try{
+              await db.collection('person_records').add({
+                personId:r.personId, activity:r.activity, startDate:r.startDate, endDate:r.endDate,
+                assignType:r.assignType, assignId:r.assignId
+              });
+              const updated = loadRecordsCache().filter(x => x.id !== r.id);
+              saveRecordsCache(updated);
+            }catch(e){ console.warn('No se pudo subir registro local', r, e); }
+          }
+          currentRecords = loadRecordsCache();
+          renderRecordList();
+        }
+      }catch(e){ console.warn('sync records error', e); }
     }
 
-    /* =================== Selección & util =================== */
+    /*************** Selección & utilidades ***************/
     function selectFence(id){
       if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes de seleccionar otra.'); return; }
       if(selectedFenceId && geofenceLayers[selectedFenceId]){
@@ -582,8 +771,7 @@
     const validLat = v => v>=-90 && v<=90;
     const validLng = v => v>=-180 && v<=180;
 
-    /* =================== Crear fincas =================== */
-    let pendingLat=null, pendingLng=null;
+    let pendingLat = null, pendingLng = null;
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
       const name = prompt("Nombre de la nueva finca:"); if(!name) return;
@@ -599,11 +787,11 @@
       if(!Number.isFinite(lng) || !validLng(lng)){ alert('Longitud inválida o fuera de rango (-180 a 180).'); return; }
       pendingLat = lat; pendingLng = lng;
 
-      const coordsNameHint=document.getElementById('coordsNameHint');
+      const coordsNameHint = document.getElementById('coordsNameHint');
       if (coordsNameHint) coordsNameHint.textContent = `Coordenadas: Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
-      const input=document.getElementById('coordsNameInput');
+      const input = document.getElementById('coordsNameInput');
       if (input) input.value = `Finca ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      const panel=document.getElementById('coordsNamePanel');
+      const panel = document.getElementById('coordsNamePanel');
       if (panel) panel.classList.remove('hidden');
       if (input){ input.focus(); input.select(); }
 
@@ -611,40 +799,40 @@
     }
     async function saveCoordsName(){
       if(pendingLat==null || pendingLng==null) { cancelCoordsName(); return; }
-      const input=document.getElementById('coordsNameInput');
-      const name=(input&&input.value?input.value:'').trim() || `Finca ${pendingLat.toFixed(5)}, ${pendingLng.toFixed(5)}`;
+      const input = document.getElementById('coordsNameInput');
+      const name = (input && input.value ? input.value : '').trim() || `Finca ${pendingLat.toFixed(5)}, ${pendingLng.toFixed(5)}`;
       try{ await db.collection('farms').add({ name, fincaLocation:{lat: pendingLat, lng: pendingLng} }); }
       catch{ const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:pendingLat, lng:pendingLng} }); saveCache(farms); renderFarmsFromCache(); }
       pendingLat=null; pendingLng=null; if(input){ input.value=''; }
-      const panel=document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
+      const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
       waitAuthThen(syncLocalPendingToFirestore);
     }
     function cancelCoordsName(){
       pendingLat=null; pendingLng=null;
-      const input=document.getElementById('coordsNameInput'); if(input){ input.value=''; }
-      const panel=document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
+      const input = document.getElementById('coordsNameInput'); if(input){ input.value=''; }
+      const panel = document.getElementById('coordsNamePanel'); if(panel){ panel.classList.add('hidden'); }
     }
 
-    /* =================== Dibujo de geocerca =================== */
+    // Dibujo de geocerca
     function addFenceVertex(latlng){
       drawingCoords.push({lat: latlng.lat, lng: latlng.lng});
-      const m=L.circleMarker(latlng,{radius:4,weight:2}).addTo(map);
+      const m = L.circleMarker(latlng, {radius:4, weight:2}).addTo(map);
       drawingMarkers.push(m);
       updateFencePreview();
     }
     function updateFencePreview(){
-      const latlngs=drawingCoords.map(p=> [p.lat,p.lng]);
+      const latlngs = drawingCoords.map(p=> [p.lat, p.lng]);
       if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; }
       if(latlngs.length>=3){
-        drawingPolyline=L.polygon(latlngs,{dashArray:'4,4',weight:2,fillOpacity:0.1}).addTo(map);
+        drawingPolyline = L.polygon(latlngs, {dashArray:'4,4', weight:2, fillOpacity:0.1}).addTo(map);
       }else if(latlngs.length>=2){
-        drawingPolyline=L.polyline(latlngs,{dashArray:'4,4',weight:2}).addTo(map);
+        drawingPolyline = L.polyline(latlngs, {dashArray:'4,4', weight:2}).addTo(map);
       }
     }
     function startFenceDraw(){
       if(isDrawingFence) return;
-      isDrawingFence=true;
-      drawingCoords=[];
+      isDrawingFence = true;
+      drawingCoords = [];
       drawingMarkers.forEach(m=> map.removeLayer(m)); drawingMarkers=[];
       if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; }
 
@@ -654,40 +842,42 @@
     }
     function finishFenceDraw(){
       if(!isDrawingFence) return;
-      if(drawingCoords.length<3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
-      pendingFenceCoords=drawingCoords.slice();
-      const hint=document.getElementById('fenceNameHint');
+      if(drawingCoords.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
+      pendingFenceCoords = drawingCoords.slice();
+      const hint = document.getElementById('fenceNameHint');
       if(hint) hint.textContent = `Vértices: ${pendingFenceCoords.length} puntos`;
-      const input=document.getElementById('fenceNameInput');
-      if(input){
-        input.value=`Geocerca ${new Date().toLocaleDateString()}`;
+      const input = document.getElementById('fenceNameInput');
+      if(input) {
+        input.value = `Geocerca ${new Date().toLocaleDateString()}`;
         const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.remove('hidden'); }
         input.focus(); input.select();
       }
     }
     function cancelFenceDraw(){
-      isDrawingFence=false;
-      drawingCoords=[];
+      isDrawingFence = false;
+      drawingCoords = [];
       drawingMarkers.forEach(m=> map.removeLayer(m)); drawingMarkers=[];
       if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; }
       document.getElementById('startFenceBtn').classList.remove('hidden');
       document.getElementById('finishFenceBtn').classList.add('hidden');
       document.getElementById('cancelFenceBtn').classList.add('hidden');
       const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
-      pendingFenceCoords=null;
+      pendingFenceCoords = null;
     }
     async function saveFenceName(){
-      const input=document.getElementById('fenceNameInput');
-      const name=(input&&input.value?input.value:'').trim()||'Geocerca';
+      const input = document.getElementById('fenceNameInput');
+      const name = (input && input.value ? input.value : '').trim() || 'Geocerca';
       if(!pendingFenceCoords || pendingFenceCoords.length<3){ alert('No hay geocerca lista para guardar.'); return; }
+
       try{
         await db.collection('geofences').add({ name, path: pendingFenceCoords });
       }catch(err){
-        const fences=loadFenceCache();
-        fences.push({ id:'localgf-'+Date.now(), name, path: pendingFenceCoords });
+        const fences = loadFenceCache();
+        fences.push({ id: 'localgf-'+Date.now(), name, path: pendingFenceCoords });
         saveFenceCache(fences);
         renderGeofencesFromCache();
       }
+
       if(input){ input.value=''; }
       pendingFenceCoords=null;
       const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
@@ -700,224 +890,136 @@
       const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.add('hidden'); }
       removePreviewFence();
     }
-    function removePreviewFence(){ if(previewFenceLayer){ map.removeLayer(previewFenceLayer); previewFenceLayer=null; } }
 
-    /* =================== Geocerca por coordenadas =================== */
+    function removePreviewFence(){
+      if(previewFenceLayer){
+        map.removeLayer(previewFenceLayer);
+        previewFenceLayer = null;
+      }
+    }
+
+    // Geocerca por coord
     function parseLatLngList(texto){
-      const items=String(texto||'').split(/[\n;]+/).map(s=> s.trim()).filter(Boolean);
-      const puntos=[];
+      const items = String(texto || '')
+        .split(/[\n;]+/).map(s=> s.trim()).filter(Boolean);
+      const puntos = [];
       items.forEach(it=>{
-        const parts=it.split(/[,\s]+/).map(t=> t.trim()).filter(Boolean);
-        if(parts.length<2) return;
-        const lat=parseFloat(String(parts[0]).replace(',','.'));
-        const lng=parseFloat(String(parts[1]).replace(',','.'));
-        if(Number.isFinite(lat)&&Number.isFinite(lng)&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180){ puntos.push({lat,lng}); }
+        const parts = it.split(/[,\s]+/).map(t=> t.trim()).filter(Boolean);
+        if(parts.length < 2) return;
+        const lat = parseCoord(parts[0]);
+        const lng = parseCoord(parts[1]);
+        if(Number.isFinite(lat) && Number.isFinite(lng) && validLat(lat) && validLng(lng)){
+          puntos.push({lat, lng});
+        }
       });
       return puntos;
     }
     function createFenceByCoords(){
       if (isDrawingFence){ alert('Finaliza o cancela el dibujo de geocerca antes de crear por coordenadas.'); return; }
-      const ejemplo="-1.2345,-78.5678; -1.2350,-78.5684; -1.2362,-78.5690";
-      const raw=prompt("Ingresa puntos en formato lat,lng separados por ';' o por saltos de línea.\nEjemplo:\n"+ejemplo);
-      if(raw===null) return;
-      const pts=parseLatLngList(raw);
-      if(pts.length<3){ alert('Se requieren al menos 3 puntos válidos (lat,lng).'); return; }
-      pendingFenceCoords=pts;
+      const ejemplo = "-1.2345,-78.5678; -1.2350,-78.5684; -1.2362,-78.5690";
+      const raw = prompt("Ingresa puntos en formato lat,lng separados por ';' o por saltos de línea.\nEjemplo:\n"+ejemplo);
+      if(raw === null) return;
+      const pts = parseLatLngList(raw);
+      if(pts.length < 3){ alert('Se requieren al menos 3 puntos válidos (lat,lng).'); return; }
+      pendingFenceCoords = pts;
 
       if(map){
-        if(previewFenceLayer){ map.removeLayer(previewFenceLayer); previewFenceLayer=null; }
-        previewFenceLayer=L.polygon(pts.map(p=> [p.lat,p.lng]),{ dashArray:'4,4', weight:2, fillOpacity:0.1 }).addTo(map);
-        try{ map.fitBounds(previewFenceLayer.getBounds(), { padding:[20,20] }); }catch(e){}
+        if(previewFenceLayer){ map.removeLayer(previewFenceLayer); previewFenceLayer = null; }
+        previewFenceLayer = L.polygon(pts.map(p=> [p.lat, p.lng]), { dashArray: '4,4', weight: 2, fillOpacity: 0.1 }).addTo(map);
+        try { map.fitBounds(previewFenceLayer.getBounds(), { padding: [20,20] }); } catch(e){}
       }
-      const hint=document.getElementById('fenceNameHint'); if(hint) hint.textContent=`Vértices: ${pts.length} puntos`;
-      const input=document.getElementById('fenceNameInput');
-      if(input){
-        input.value=`Geocerca ${new Date().toLocaleDateString()}`;
+      const hint = document.getElementById('fenceNameHint');
+      if (hint) hint.textContent = `Vértices: ${pts.length} puntos`;
+      const input = document.getElementById('fenceNameInput');
+      if (input) {
+        input.value = `Geocerca ${new Date().toLocaleDateString()}`;
         const panel=document.getElementById('fenceNamePanel'); if(panel){ panel.classList.remove('hidden'); }
         input.focus(); input.select();
       }
     }
 
-    /* =================== EDICIÓN DE GEOCERCAS (capa temporal) =================== */
+    // Edición (Leaflet.Draw)
     function updateEditButtonsState(){
-      const canEdit=!!selectedFenceId && !!geofenceLayers[selectedFenceId] && !isEditingFence;
-      const eBtn=document.getElementById('editFenceBtn'); if(eBtn) eBtn.disabled=!canEdit;
-      const editing=isEditingFence;
+      const canEdit = !!selectedFenceId && !!geofenceLayers[selectedFenceId] && !isEditingFence;
+      const eBtn = document.getElementById('editFenceBtn');
+      if (eBtn) eBtn.disabled = !canEdit;
+      const editing = isEditingFence;
       document.getElementById('saveFenceEditBtn')?.classList.toggle('hidden', !editing);
       document.getElementById('cancelFenceEditBtn')?.classList.toggle('hidden', !editing);
     }
-
-    function startFenceEdit(){
-      if(!selectedFenceId || !geofenceLayers[selectedFenceId]){
-        alert('Primero selecciona una geocerca haciendo click sobre ella.');
-        return;
+    function ensureEditToolbar(){
+      if (!editToolbar) {
+        editToolbar = new L.EditToolbar.Edit(map, { featureGroup: editGroup, selectedPathOptions: { maintainColor: true }});
       }
-      if(isEditingFence) return;
-
-      const basePoly = geofenceLayers[selectedFenceId];
-      const rings = basePoly.getLatLngs();
-      const ring0  = Array.isArray(rings[0]) ? rings[0] : rings;
-      editBackupCoords = ring0.map(ll => ({ lat: ll.lat, lng: ll.lng }));
-
-      // Oculta visualmente la capa base
-      try { basePoly.setStyle({ opacity: 0, fillOpacity: 0 }); } catch(e){}
-
-      // Capa temporal editable
-      tempEditLayer = L.polygon(editBackupCoords.map(p => [p.lat, p.lng]), { color:'#ef4444', weight:3, fillOpacity:0.2 }).addTo(map);
-      if (!(tempEditLayer.editing && typeof tempEditLayer.editing.enable === 'function')) {
-        alert('Leaflet.Draw no se cargó correctamente.'); return;
-      }
-      try { tempEditLayer.editing.enable(); } catch(e){ console.warn(e); }
-
-      isEditingFence = true;
-      updateEditButtonsState();
     }
+    function startFenceEdit(){
+      if(!selectedFenceId || !geofenceLayers[selectedFenceId]){ alert('Primero selecciona una geocerca haciendo click sobre ella.'); return; }
+      if(isEditingFence) return;
+      const poly = geofenceLayers[selectedFenceId];
 
+      const rings = poly.getLatLngs(); const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
+      editBackupCoords = ring0.map(ll => ({lat: ll.lat, lng: ll.lng}));
+
+      if (!editGroup.hasLayer(poly)) editGroup.addLayer(poly);
+      ensureEditToolbar(); editToolbar.enable();
+      isEditingFence = true; updateEditButtonsState();
+    }
     async function saveFenceEdit(){
-      if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId] || !tempEditLayer){
-        alert('No estás en modo edición.'); return;
-      }
-      const basePoly = geofenceLayers[selectedFenceId];
+      if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]) return;
+      const poly = geofenceLayers[selectedFenceId];
 
-      const rings = tempEditLayer.getLatLngs();
-      const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
-      const newPath = ring0.map(ll => ({ lat: ll.lat, lng: ll.lng }));
+      const rings = poly.getLatLngs(); const ring0 = Array.isArray(rings[0]) ? rings[0] : rings;
+      const newPath = ring0.map(ll => ({lat: ll.lat, lng: ll.lng}));
       if (newPath.length < 3){ alert('La geocerca necesita al menos 3 puntos.'); return; }
 
-      const fencesCache = loadFenceCache() || [];
-      const idx = fencesCache.findIndex(g => g.id === selectedFenceId);
-      if (idx >= 0){ fencesCache[idx].path = newPath; saveFenceCache(fencesCache); }
+      const fencesCache = loadFenceCache();
+      const idxCache = fencesCache.findIndex(g => g.id === selectedFenceId);
 
-      let firestoreOK = false;
       try{
-        if (!String(selectedFenceId).startsWith('localgf-')){
+        if (selectedFenceId.startsWith('localgf-')) {
+          if (idxCache>=0){ fencesCache[idxCache].path = newPath; saveFenceCache(fencesCache); }
+        } else {
           await db.collection('geofences').doc(selectedFenceId).update({ path: newPath });
         }
-        firestoreOK = true;
-      }catch(err){ console.warn('No se pudo guardar edición en Firestore, se mantiene caché local:', err); }
+      }catch(err){
+        if (idxCache>=0){ fencesCache[idxCache].path = newPath; saveFenceCache(fencesCache); }
+      }
 
-      try { basePoly.setLatLngs(newPath); basePoly.setStyle(GEOFENCE_SELECTED_STYLE); basePoly.redraw && basePoly.redraw(); } catch(e){}
-      try { tempEditLayer.editing.disable(); map.removeLayer(tempEditLayer); } catch(e){}
-      tempEditLayer = null;
-
-      isEditingFence = false;
-      editBackupCoords = null;
-      updateEditButtonsState();
-
-      alert(firestoreOK ? 'Cambios guardados.' : 'Cambios guardados localmente (sin conexión).');
+      if (editToolbar) editToolbar.disable();
+      if (editGroup && editGroup.hasLayer(poly)) editGroup.removeLayer(poly);
+      isEditingFence = false; editBackupCoords=null; updateEditButtonsState();
+      renderGeofencesFromCache();
     }
-
     function cancelFenceEdit(){
       if(!isEditingFence || !selectedFenceId || !geofenceLayers[selectedFenceId]) return;
-      const basePoly = geofenceLayers[selectedFenceId];
-
+      const poly = geofenceLayers[selectedFenceId];
       if (editBackupCoords && editBackupCoords.length >= 3){
-        try{
-          basePoly.setLatLngs(editBackupCoords.map(p => L.latLng(p.lat, p.lng)));
-          basePoly.redraw && basePoly.redraw();
-        }catch(e){ console.warn(e); }
+        poly.setLatLngs(editBackupCoords.map(p => L.latLng(p.lat, p.lng)));
       }
-      try { basePoly.setStyle(GEOFENCE_SELECTED_STYLE); } catch(e){}
-
-      if (tempEditLayer){
-        try { tempEditLayer.editing.disable(); map.removeLayer(tempEditLayer); } catch(e){}
-        tempEditLayer = null;
-      }
-
-      isEditingFence = false;
-      editBackupCoords = null;
-      updateEditButtonsState();
+      if (editToolbar) editToolbar.disable();
+      if (editGroup && editGroup.hasLayer(poly)) editGroup.removeLayer(poly);
+      isEditingFence = false; editBackupCoords = null; updateEditButtonsState();
     }
 
-    /* =================== GEOJSON =================== */
-    function fenceToFeature(id){
-      const gf=(loadFenceCache()||[]).find(g=> g.id===id);
-      const layer=geofenceLayers[id];
-      if(!gf||!layer) return null;
-      const rings=layer.getLatLngs();
-      const ring0=(Array.isArray(rings[0])?rings[0]:rings).map(ll=>[ll.lng,ll.lat]);
-      if(ring0.length && (ring0[0][0]!==ring0[ring0.length-1][0] || ring0[0][1]!==ring0[ring0.length-1][1])) ring0.push([ring0[0][0], ring0[0][1]]);
-      return { type:"Feature", properties:{ id:gf.id, name:gf.name||'Geocerca' }, geometry:{ type:"Polygon", coordinates:[ring0] } };
-    }
-    function exportGeoJSON(){
-      let fc;
-      if(selectedFenceId && geofenceLayers[selectedFenceId]){
-        const feat=fenceToFeature(selectedFenceId);
-        if(!feat){ alert('No se pudo exportar la geocerca seleccionada.'); return; }
-        fc={ type:"FeatureCollection", features:[feat] };
-      }else{
-        const features=[];
-        for(const id of Object.keys(geofenceLayers)){
-          const feat=fenceToFeature(id); if(feat) features.push(feat);
-        }
-        if(!features.length){ alert('No hay geocercas para exportar.'); return; }
-        fc={ type:"FeatureCollection", features };
-      }
-      const blob=new Blob([JSON.stringify(fc,null,2)],{type:"application/geo+json"});
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a'); a.href=url;
-      a.download=selectedFenceId?`geocerca_${selectedFenceId}.geojson`:'geocercas.geojson';
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    }
-    async function importGeoJSONFromText(text){
-      let obj; try{ obj=JSON.parse(text); }catch{ alert('GeoJSON inválido.'); return; }
-      const asArray=x=>Array.isArray(x)?x:[x];
-      let features=[];
-      if(obj.type==='FeatureCollection') features=obj.features||[];
-      else if(obj.type==='Feature') features=[obj];
-      else if(obj.type && obj.coordinates) features=[{type:'Feature',properties:{},geometry:obj}];
-      else { alert('Estructura GeoJSON no reconocida.'); return; }
-
-      let created=0;
-      for(const feat of features){
-        const geom=feat.geometry||{};
-        const props=feat.properties||{};
-        const baseName=(props.name||'Geocerca importada');
-        if(geom.type==='Polygon'){ await createGeofenceFromPolygonCoords(geom.coordinates, baseName); created++; }
-        else if(geom.type==='MultiPolygon'){
-          const polys=asArray(geom.coordinates); let i=1;
-          for(const poly of polys){ await createGeofenceFromPolygonCoords(poly, `${baseName} (${i})`); i++; created++; }
-        }
-      }
-      if(created===0){ alert('El GeoJSON no contiene Polygon/MultiPolygon.'); }
-      else{
-        try{ await initialFetchGeofences(); }catch{}
-        renderGeofencesFromCache();
-        alert(`Importación completada: ${created} geocerca(s) creada(s).`);
-      }
-    }
-    async function createGeofenceFromPolygonCoords(coords, name){
-      if(!coords || !coords.length || !coords[0].length) return;
-      const outer=coords[0].map(pair=>({lat:pair[1], lng:pair[0]})).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
-      if(outer.length<3) return;
-      try{
-        await db.collection('geofences').add({ name:name||'Geocerca', path:outer });
-      }catch(err){
-        const fences=loadFenceCache();
-        fences.push({ id:'localgf-'+Date.now(), name:name||'Geocerca', path:outer });
-        saveFenceCache(fences);
-      }
-    }
-
-    /* =================== Explorador =================== */
+    /*************** Explorador ***************/
     function buildIndexList(){
-      const farmUl=document.getElementById('farmList');
-      const fenceUl=document.getElementById('fenceList');
+      const farmUl = document.getElementById('farmList');
+      const fenceUl = document.getElementById('fenceList');
       if(!farmUl || !fenceUl) return;
 
-      const farmsSrc=(currentFarms&&currentFarms.length)?currentFarms:(loadCache()||[]);
-      const fencesSrc=(currentFences&&currentFences.length)?currentFences:(loadFenceCache()||[]);
+      const farmsSrc  = (currentFarms && currentFarms.length) ? currentFarms : (loadCache()||[]);
+      const fencesSrc = (currentFences && currentFences.length) ? currentFences : (loadFenceCache()||[]);
 
-      const farms=farmsSrc.slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
-      const fences=fencesSrc.slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
+      const farms  = farmsSrc.slice().sort((a,b)=> (a?.name||'').localeCompare(b?.name||''));
+      const fences = fencesSrc.slice().sort((a,b)=> (a?.name||'').localeCompare(b?.name||''));
 
-      farmUl.innerHTML='';
+      farmUl.innerHTML = '';
       if(!farms.length){
-        const li=document.createElement('li'); li.className='py-2 text-sm text-gray-500'; li.textContent='No hay fincas registradas.'; farmUl.appendChild(li);
+        const li = document.createElement('li'); li.className='py-2 text-sm text-gray-500'; li.textContent='No hay fincas registradas.'; farmUl.appendChild(li);
       }else{
         farms.forEach(f=>{
-          const li=document.createElement('li'); li.className='py-2';
-          li.innerHTML=`
+          const li = document.createElement('li'); li.className='py-2';
+          li.innerHTML = `
             <div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer select-none"
                  data-id="${f.id}" data-type="farm" title="Doble clic para centrar">
               <div class="text-sm font-medium text-gray-800">${(f.name||'Finca')}</div>
@@ -927,13 +1029,13 @@
         });
       }
 
-      fenceUl.innerHTML='';
+      fenceUl.innerHTML = '';
       if(!fences.length){
-        const li=document.createElement('li'); li.className='py-2 text-sm text-gray-500'; li.textContent='No hay geocercas registradas.'; fenceUl.appendChild(li);
+        const li = document.createElement('li'); li.className='py-2 text-sm text-gray-500'; li.textContent='No hay geocercas registradas.'; fenceUl.appendChild(li);
       }else{
         fences.forEach(g=>{
-          const li=document.createElement('li'); li.className='py-2';
-          li.innerHTML=`
+          const li = document.createElement('li'); li.className='py-2';
+          li.innerHTML = `
             <div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer select-none"
                  data-id="${g.id}" data-type="fence" title="Doble clic para ajustar al polígono">
               <div class="text-sm font-medium text-gray-800">${(g.name||'Geocerca')}</div>
@@ -944,46 +1046,49 @@
       }
     }
 
-    /* =================== Zoom desde el explorador =================== */
     function zoomToFarm(id){
       try{
         if (fincaMarkers[id]){
-          const ll=fincaMarkers[id].getLatLng();
+          const ll = fincaMarkers[id].getLatLng();
           map.setView(ll, Math.max(map.getZoom(), 16));
           try{ fincaMarkers[id].openTooltip(); }catch{}
           return;
         }
-        const farms=loadCache()||[];
-        const f=farms.find(x=> x.id===id);
+        const farms = loadCache()||[];
+        const f = farms.find(x=> x.id===id);
         if (f && f.fincaLocation){
           map.setView([f.fincaLocation.lat, f.fincaLocation.lng], Math.max(map.getZoom(), 16));
-        }else{ alert('No se pudo localizar esa finca.'); }
+        }else{
+          alert('No se pudo localizar esa finca.');
+        }
       }catch(e){ console.warn(e); }
     }
     function zoomToFence(id){
       try{
         if (geofenceLayers[id]){
-          const b=geofenceLayers[id].getBounds();
-          map.fitBounds(b,{ padding:[20,20] });
+          const b = geofenceLayers[id].getBounds();
+          map.fitBounds(b, { padding:[20,20] });
           selectFence(id);
           return;
         }
-        const fences=loadFenceCache()||[];
-        const g=fences.find(x=> x.id===id);
+        const fences = loadFenceCache()||[];
+        const g = fences.find(x=> x.id===id);
         if (g && Array.isArray(g.path) && g.path.length>=3){
-          const b=L.latLngBounds(g.path.map(p=> [p.lat, p.lng]));
-          map.fitBounds(b,{ padding:[20,20] });
+          const b = L.latLngBounds(g.path.map(p=> [p.lat, p.lng]));
+          map.fitBounds(b, { padding:[20,20] });
           selectFence(id);
-        }else{ alert('No se pudo localizar esa geocerca.'); }
+        }else{
+          alert('No se pudo localizar esa geocerca.');
+        }
       }catch(e){ console.warn(e); }
     }
 
-    /* =================== Borrado geocerca/finca =================== */
+    /*************** Borrado ***************/
     async function deleteSelectedFarm(){
       const sel=document.getElementById('farmSelect'); const id= sel ? sel.value : '';
       if(!id){ alert('No hay finca seleccionada.'); return; }
-      const farmsCache=loadCache();
-      const farm=farmsCache.find(f=> f.id===id); const name=(farm&&farm.name)||'Finca';
+      const farmsCache = loadCache();
+      const farm = farmsCache.find(f=> f.id===id); const name=(farm&&farm.name)||'Finca';
       if(!confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) return;
 
       if(id.indexOf('local-')===0){
@@ -997,445 +1102,535 @@
       if(!btn) return; btn.disabled = !(sel && sel.value);
     }
     async function deleteSelectedFence(){
-      if(!selectedFenceId){ alert('Primero selecciona una geocerca.'); return; }
+      if(!selectedFenceId){ alert('Primero selecciona una geocerca haciendo click sobre ella.'); return; }
       if(isEditingFence){ alert('Estás editando. Guarda o cancela antes de eliminar.'); return; }
 
-      const fencesCache=loadFenceCache();
-      const gf=fencesCache.find(g=> g.id===selectedFenceId);
-      const name=(gf&&gf.name)?gf.name:'Geocerca';
+      const fencesCache = loadFenceCache();
+      const gf = fencesCache.find(g=> g.id === selectedFenceId);
+      const name = (gf && gf.name) ? gf.name : 'Geocerca';
       if(!confirm(`¿Eliminar "${name}"? Esta acción no se puede deshacer.`)) return;
 
       if(selectedFenceId.indexOf('localgf-')===0){
-        const updated=fencesCache.filter(g=> g.id!==selectedFenceId);
+        const updated = fencesCache.filter(g=> g.id !== selectedFenceId);
         saveFenceCache(updated);
-        if(geofenceLayers[selectedFenceId]){
-          map.removeLayer(geofenceLayers[selectedFenceId]);
-          delete geofenceLayers[selectedFenceId];
-        }
-        selectedFenceId=null;
-        updateDeleteFenceButtonState();
-        updateEditButtonsState();
-        return;
+        if(geofenceLayers[selectedFenceId]){ map.removeLayer(geofenceLayers[selectedFenceId]); delete geofenceLayers[selectedFenceId]; }
+        selectedFenceId = null; updateDeleteFenceButtonState(); updateEditButtonsState(); return;
       }
-      try{
-        await db.collection('geofences').doc(selectedFenceId).delete();
-      }catch(err){
-        console.warn('Fallo al eliminar en Firestore, limpiando localmente:', err);
-        const updated=fencesCache.filter(g=> g.id!==selectedFenceId);
+      try{ await db.collection('geofences').doc(selectedFenceId).delete(); }
+      catch(err){
+        const updated = fencesCache.filter(g=> g.id !== selectedFenceId);
         saveFenceCache(updated);
-        if(geofenceLayers[selectedFenceId]){
-          map.removeLayer(geofenceLayers[selectedFenceId]);
-          delete geofenceLayers[selectedFenceId];
-        }
+        if(geofenceLayers[selectedFenceId]){ map.removeLayer(geofenceLayers[selectedFenceId]); delete geofenceLayers[selectedFenceId]; }
       }
-      selectedFenceId=null;
-      updateDeleteFenceButtonState();
-      updateEditButtonsState();
+      selectedFenceId = null; updateDeleteFenceButtonState(); updateEditButtonsState();
     }
     function updateDeleteFenceButtonState(){
-      const btn=document.getElementById('deleteFenceBtn');
+      const btn = document.getElementById('deleteFenceBtn');
       if(!btn) return;
       btn.disabled = !selectedFenceId;
     }
 
-    /* =================== Utilidades =================== */
+    // Coordenadas del mouse
     function addMousePositionControl(){
       const MousePos=L.Control.extend({
         options:{position:'bottomleft'},
         onAdd:function(){ const d=L.DomUtil.create('div','mousepos-control'); d.innerHTML='Lat: — Lng: —'; this._div=d; return d; },
-        update:function(lat,lng){ if(this._div){ this._div.innerHTML=(lat!=null&&lng!=null)?(`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`):'Lat: — Lng: —'; } }
+        update:function(lat,lng){ if(this._div){ this._div.innerHTML = (lat!=null&&lng!=null)?(`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`):'Lat: — Lng: —'; } }
       });
-      const ctrl=new MousePos(); ctrl.addTo(map);
+      const ctrl = new MousePos(); ctrl.addTo(map);
       map.on('mousemove', e=>ctrl.update(e.latlng.lat, e.latlng.lng));
       map.on('mouseout', ()=>ctrl.update(null,null));
     }
+
+    // Utilidades
     function waitAuthThen(fn){
       if (authReady) { fn(); return; }
-      const iv=setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } },150);
+      const iv = setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } }, 150);
     }
 
-    /* =================== PERSONAL =================== */
-    function rebuildAssignSelect(){
-      const sel=document.getElementById('pAssignSelect');
-      if(!sel) return;
-      buildAssignOptions(sel);
-    }
-    function buildAssignOptions(selectEl){
-      const farms=(currentFarms&&currentFarms.length)?currentFarms:(loadCache()||[]);
-      const fences=(currentFences&&currentFences.length)?currentFences:(loadFenceCache()||[]);
-      selectEl.innerHTML='';
-
-      if(farms.length){
-        const og=document.createElement('optgroup'); og.label='Fincas';
-        farms.forEach(f=>{
-          const opt=document.createElement('option');
-          opt.value=`farm:${f.id}`;
-          opt.textContent=`Finca: ${f.name||'Sin nombre'}`;
-          og.appendChild(opt);
-        });
-        selectEl.appendChild(og);
+    /*************** Login robusto ***************/
+    (function(){
+      const ADMIN_CODE = "admin123";
+      const normalizeCode = s => String(s || "").normalize("NFKC")
+        .replace(/[\u200B-\u200D\uFEFF]/g, "").trim().toLowerCase();
+      const allowBypass = () => {
+        try { const qs = new URLSearchParams(location.search);
+          if (qs.get("skipAdmin") === "1") return true;
+          if (localStorage.getItem("admin_debug") === "1") return true;
+        } catch {} return false; };
+      const showApp = () => {
+        document.getElementById('adminModal')?.classList.add("hidden");
+        document.getElementById('appContent')?.classList.remove("hidden");
+        setTimeout(()=>{ initMap(); setTimeout(()=>{ if(window.map){ map.invalidateSize(); } }, 80); }, 50);
+      };
+      function doAdminLogin(ev){
+        if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+        try{
+          const inputEl = document.getElementById('adminCodeInput');
+          const raw = inputEl ? inputEl.value : "";
+          const ok = allowBypass() || normalizeCode(raw) === normalizeCode(ADMIN_CODE);
+          if (ok){ showApp(); }
+          else{ const err = document.getElementById('errorMessage'); if (err){ err.textContent='Código incorrecto. Intenta con "admin123"'; err.style.display="block"; } }
+        }catch(e){ console.error(e); }
       }
-      if(fences.length){
-        const og=document.createElement('optgroup'); og.label='Geocercas';
-        fences.forEach(g=>{
-          const opt=document.createElement('option');
-          opt.value=`geofence:${g.id}`;
-          opt.textContent=`Geocerca: ${g.name||'Sin nombre'}`;
-          og.appendChild(opt);
-        });
-        selectEl.appendChild(og);
-      }
-      if(!selectEl.options.length){
-        const opt=document.createElement('option');
-        opt.value=''; opt.textContent='(No hay fincas ni geocercas)';
-        selectEl.appendChild(opt);
-      }
-    }
-
-    function escapeHTML(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
-    function findFarmName(id){
-      const src=(currentFarms&&currentFarms.length)?currentFarms:(loadCache()||[]);
-      const f=src.find(x=> x.id===id);
-      return f? (f.name||'Finca') : null;
-    }
-    function findFenceName(id){
-      const src=(currentFences&&currentFences.length)?currentFences:(loadFenceCache()||[]);
-      const g=src.find(x=> x.id===id);
-      return g? (g.name||'Geocerca') : null;
-    }
-
-    function getPersonSearchTerm(){
-      return (document.getElementById('personSearch')?.value||'').trim().toLowerCase();
-    }
-
-    function renderPersonnelList(useCacheOnly=false){
-      const tbody=document.getElementById('personnelTbody');
-      const empty=document.getElementById('personnelEmpty');
-      if(!tbody || !empty) return;
-
-      const source = !useCacheOnly && currentPersonnel && currentPersonnel.length
-        ? currentPersonnel
-        : (loadPersonnelCache()||[]);
-
-      const q = getPersonSearchTerm();
-
-      tbody.innerHTML='';
-      let shown = 0;
-
-      source.slice()
-        .sort((a,b)=> (a.lastName||'').localeCompare(b.lastName||'') || (a.firstName||'').localeCompare(b.firstName||''))
-        .forEach(p=>{
-          const asText = p.assignType==='farm'
-            ? `Finca: ${(findFarmName(p.assignId)||'—')}`
-            : `Geocerca: ${(findFenceName(p.assignId)||'—')}`;
-
-          const haystack = `${p.firstName||''} ${p.lastName||''} ${p.idNumber||''} ${asText}`.toLowerCase();
-          if (q && !haystack.includes(q)) return;
-
-          const tr=document.createElement('tr'); tr.className='border-t';
-          tr.innerHTML=`
-            <td class="px-3 py-2">${escapeHTML(p.firstName||'')}</td>
-            <td class="px-3 py-2">${escapeHTML(p.lastName||'')}</td>
-            <td class="px-3 py-2">${escapeHTML(p.idNumber||'')}</td>
-            <td class="px-3 py-2">${escapeHTML(asText)}</td>
-            <td class="px-3 py-2">
-              <button class="text-indigo-600 hover:underline mr-3" data-edit="${p.id}">Editar</button>
-              <button class="text-rose-600 hover:underline" data-del="${p.id}">Eliminar</button>
-            </td>
-          `;
-          tr.addEventListener('dblclick', ()=>{
-            if(p.assignType==='farm' && p.assignId) zoomToFarm(p.assignId);
-            else if(p.assignType==='geofence' && p.assignId) zoomToFence(p.assignId);
-          });
-          tbody.appendChild(tr);
-          shown++;
-        });
-
-      empty.classList.toggle('hidden', shown>0);
-
-      // handlers
-      tbody.querySelectorAll('[data-del]').forEach(btn=>{
-        btn.addEventListener('click', async ()=>{
-          const id=btn.getAttribute('data-del');
-          await deletePerson(id);
-        });
+      document.addEventListener("DOMContentLoaded",function(){
+        document.getElementById('adminModal')?.classList.remove("hidden");
+        document.getElementById('adminLoginBtn')?.addEventListener("click", doAdminLogin);
+        const adminInput = document.getElementById('adminCodeInput');
+        adminInput?.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ doAdminLogin(e); }});
+        adminInput?.addEventListener("input", ()=>{ const err=document.getElementById('errorMessage'); if(err) err.style.display="none"; });
+        if (allowBypass()) showApp();
       });
-      tbody.querySelectorAll('[data-edit]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          const id=btn.getAttribute('data-edit');
-          openEditPerson(id);
-        });
+    })();
+
+    /*************** Asignaciones (combos) ***************/
+    function labelForAssignment(assignType, assignId){
+      if(assignType === 'farm'){
+        const f = (currentFarms||[]).find(x=> x.id===assignId) || (loadCache()||[]).find(x=> x.id===assignId);
+        return f ? `Finca: ${f.name||'—'}` : 'Finca: —';
+      } else if(assignType === 'geofence'){
+        const g = (currentFences||[]).find(x=> x.id===assignId) || (loadFenceCache()||[]).find(x=> x.id===assignId);
+        return g ? `Geocerca: ${g.name||'—'}` : 'Geocerca: —';
+      }
+      return '—';
+    }
+    function refreshAssignmentOptions(){
+      const sel = document.getElementById('pAssignSelect');
+      if (!sel) return;
+      const farms = (currentFarms||[]); const fences = (currentFences||[]);
+      sel.innerHTML = '<option value="">— Selecciona —</option>';
+      farms.forEach(f=>{
+        const o=document.createElement('option'); o.value=`farm:${f.id}`; o.textContent=`Finca: ${f.name||'—'}`; sel.appendChild(o);
       });
+      fences.forEach(g=>{
+        const o=document.createElement('option'); o.value=`geofence:${g.id}`; o.textContent=`Geocerca: ${g.name||'—'}`; sel.appendChild(o);
+      });
+    }
+    function refreshAssignFilters(){
+      const typeSel = document.getElementById('personAssignTypeFilter');
+      const idSel = document.getElementById('personAssignIdFilter');
+      if (!typeSel || !idSel) return;
+      const type = typeSel.value;
+      idSel.innerHTML = '<option value="all">Todas</option>';
+      if (type==='farm' || type==='all'){
+        (currentFarms||[]).forEach(f=>{ const o=document.createElement('option'); o.value=`farm:${f.id}`; o.textContent=`Finca: ${f.name||'—'}`; idSel.appendChild(o); });
+      }
+      if (type==='geofence' || type==='all'){
+        (currentFences||[]).forEach(g=>{ const o=document.createElement('option'); o.value=`geofence:${g.id}`; o.textContent=`Geocerca: ${g.name||'—'}`; idSel.appendChild(o); });
+      }
+
+      // también filtros de registros
+      const fType = document.getElementById('filterAssignType');
+      const fId = document.getElementById('filterAssignId');
+      if (fType && fId){
+        const t = fType.value;
+        fId.innerHTML = '<option value="all">Todas</option>';
+        if (t==='farm' || t==='all'){ (currentFarms||[]).forEach(f=>{ const o=document.createElement('option'); o.value=`farm:${f.id}`; o.textContent=`Finca: ${f.name||'—'}`; fId.appendChild(o); }); }
+        if (t==='geofence' || t==='all'){ (currentFences||[]).forEach(g=>{ const o=document.createElement('option'); o.value=`geofence:${g.id}`; o.textContent=`Geocerca: ${g.name||'—'}`; fId.appendChild(o); }); }
+      }
+    }
+
+    /*************** Personal: alta/edición/lista ***************/
+    let editingPersonId = null;
+
+    function renderPersonnelList(){
+      const tbody = document.getElementById('personTableBody');
+      if(!tbody) return;
+      const txt = (document.getElementById('personSearchInput')?.value || '').trim().toLowerCase();
+      const typeFilter = document.getElementById('personAssignTypeFilter')?.value || 'all';
+      const idFilter = document.getElementById('personAssignIdFilter')?.value || 'all';
+
+      const src = (currentPersonnel && currentPersonnel.length) ? currentPersonnel : loadPersonnelCache();
+      const filtered = src.filter(p=>{
+        const hayTxt = !txt || [p.firstName,p.lastName,p.idNumber].join(' ').toLowerCase().includes(txt);
+        const hayType = (typeFilter==='all') || (p.assignType===typeFilter);
+        const hayId = (idFilter==='all') || (`${p.assignType}:${p.assignId}`===idFilter);
+        return hayTxt && hayType && hayId;
+      });
+
+      tbody.innerHTML = '';
+      if (!filtered.length){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="5" class="text-center text-sm text-gray-500 py-6">No hay personal registrado.</td>`;
+        tbody.appendChild(tr);
+        return;
+      }
+
+      filtered.forEach(p=>{
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50 cursor-default';
+        tr.dataset.id = p.id;
+        tr.innerHTML = `
+          <td class="text-sm text-gray-800">${p.firstName || ''}</td>
+          <td class="text-sm text-gray-800">${p.lastName || ''}</td>
+          <td class="text-sm text-gray-800">${p.idNumber || ''}</td>
+          <td class="text-sm text-gray-600">${labelForAssignment(p.assignType, p.assignId)}</td>
+          <td class="text-sm">
+            <button class="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 mr-2" data-action="edit">Editar</button>
+            <button class="px-2 py-1 rounded bg-rose-600 text-white hover:bg-rose-700" data-action="del">Eliminar</button>
+          </td>`;
+        tr.addEventListener('dblclick', ()=> {
+          if (p.assignType==='farm') zoomToFarm(p.assignId);
+          else if (p.assignType==='geofence') zoomToFence(p.assignId);
+        });
+        tr.addEventListener('click', (e)=>{
+          const act = e.target?.dataset?.action;
+          if (act==='edit') loadPersonIntoForm(p.id);
+          else if (act==='del') deletePerson(p.id);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    function loadPersonIntoForm(id){
+      const p = (currentPersonnel||[]).find(x=> x.id===id) || (loadPersonnelCache()||[]).find(x=> x.id===id);
+      if (!p) return;
+      document.getElementById('pFirstName').value = p.firstName || '';
+      document.getElementById('pLastName').value  = p.lastName  || '';
+      document.getElementById('pIdNumber').value  = p.idNumber  || '';
+      const assignSel = document.getElementById('pAssignSelect');
+      if (assignSel) assignSel.value = `${p.assignType}:${p.assignId}`;
+
+      editingPersonId = id;
+      document.getElementById('addPersonBtn').classList.add('hidden');
+      document.getElementById('savePersonBtn').classList.remove('hidden');
+      document.getElementById('cancelPersonBtn').classList.remove('hidden');
+    }
+
+    function clearPersonForm(){
+      document.getElementById('pFirstName').value='';
+      document.getElementById('pLastName').value='';
+      document.getElementById('pIdNumber').value='';
+      document.getElementById('pAssignSelect').value='';
+      editingPersonId=null;
+      document.getElementById('addPersonBtn').classList.remove('hidden');
+      document.getElementById('savePersonBtn').classList.add('hidden');
+      document.getElementById('cancelPersonBtn').classList.add('hidden');
+      const err = document.getElementById('personFormError'); if(err){ err.classList.add('hidden'); err.textContent=''; }
+    }
+
+    function readPersonForm(){
+      const fn  = (document.getElementById('pFirstName')?.value  || '').trim();
+      const ln  = (document.getElementById('pLastName')?.value   || '').trim();
+      const idn = (document.getElementById('pIdNumber')?.value   || '').trim();
+      const assignVal = (document.getElementById('pAssignSelect')?.value || '').trim();
+      const err = document.getElementById('personFormError');
+
+      if (err){ err.classList.add('hidden'); err.textContent = ''; }
+      if (!fn || !ln){ err.textContent = 'Nombre y apellido son obligatorios.'; err.classList.remove('hidden'); return null; }
+      if (!/^[0-9]{6,15}$/.test(idn)){ err.textContent = 'Cédula: usar solo dígitos (6–15).'; err.classList.remove('hidden'); return null; }
+      if (!assignVal){ err.textContent = 'Seleccione una asignación.'; err.classList.remove('hidden'); return null; }
+      const [assignType, assignId] = assignVal.split(':');
+      return { firstName:fn, lastName:ln, idNumber:idn, assignType, assignId };
     }
 
     async function addPerson(e){
-  // por si el botón llega a estar dentro de un <form>
-  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+      const docData = readPersonForm(); if(!docData) return;
 
-  const fn  = (document.getElementById('pFirstName')?.value  || '').trim();
-  const ln  = (document.getElementById('pLastName')?.value   || '').trim();
-  const idn = (document.getElementById('pIdNumber')?.value   || '').trim();
-  const assignVal = (document.getElementById('pAssignSelect')?.value || '').trim();
-  const err = document.getElementById('personFormError');
+      let newId;
+      try{
+        const ref = await db.collection('personnel').add(docData);
+        newId = ref.id;
+      }catch{
+        newId = `localp-${Date.now()}`;
+      }
 
-  if (err){ err.classList.add('hidden'); err.textContent = ''; }
+      const newItem = { id: newId, ...docData };
+      currentPersonnel = (currentPersonnel || []).concat([newItem]);
+      const cache = (loadPersonnelCache() || []).concat([newItem]);
+      savePersonnelCache(cache);
+      renderPersonnelList();
+      fillPeopleCombos();
+      clearPersonForm();
+      waitAuthThen(syncLocalPendingToFirestore);
+    }
 
-  if (!fn || !ln){ 
-    err.textContent = 'Nombre y apellido son obligatorios.'; 
-    err.classList.remove('hidden'); 
-    return; 
-  }
-  if (!/^[0-9]{6,15}$/.test(idn)){ 
-    err.textContent = 'Cédula: usar solo dígitos (6–15).'; 
-    err.classList.remove('hidden'); 
-    return; 
-  }
-  if (!assignVal){
-    err.textContent = 'Seleccione una asignación.';
-    err.classList.remove('hidden');
-    return;
-  }
+    async function savePersonEdit(){
+      if (!editingPersonId) return;
+      const docData = readPersonForm(); if(!docData) return;
 
-  const [assignType, assignId] = assignVal.split(':');
-  const docData = { firstName: fn, lastName: ln, idNumber: idn, assignType, assignId };
-
-  // 1) Intento guardar en Firestore para obtener un id real
-  let newId;
-  try {
-    const ref = await db.collection('personnel').add(docData);
-    newId = ref.id;
-  } catch (e) {
-    // offline / reglas: generamos id local
-    newId = `localp-${Date.now()}`;
-  }
-
-  // 2) Inserción optimista inmediata en memoria y caché local
-  const newItem = { id: newId, ...docData };
-  currentPersonnel = (currentPersonnel || []).concat([newItem]);
-  const cache = (loadPersonnelCache() || []).concat([newItem]);
-  savePersonnelCache(cache);
-
-  // 3) Limpiar formulario y refrescar tabla
-  const f1 = document.getElementById('pFirstName'); if (f1) f1.value = '';
-  const f2 = document.getElementById('pLastName');  if (f2) f2.value = '';
-  const f3 = document.getElementById('pIdNumber');  if (f3) f3.value = '';
-  renderPersonnelList();
-
-  // 4) Si está autenticado, intentará sincronizar los locales
-  waitAuthThen(syncLocalPendingToFirestore);
-}
-// --- fin reemplazo ---
-</script>
+      try{
+        if (editingPersonId.startsWith('localp-')){
+          const cache = loadPersonnelCache();
+          const idx = cache.findIndex(p => p.id===editingPersonId);
+          if (idx>=0){ cache[idx] = { id: editingPersonId, ...docData }; savePersonnelCache(cache); }
+          currentPersonnel = cache.slice();
+        } else {
+          await db.collection('personnel').doc(editingPersonId).update(docData);
+          // optimista local
+          const loc = (currentPersonnel||[]).map(p=> p.id===editingPersonId? ({id:p.id, ...docData}) : p);
+          currentPersonnel = loc;
+          savePersonnelCache(loc);
+        }
+      }catch(e){
+        // offline -> local
+        const cache = loadPersonnelCache().map(p=> p.id===editingPersonId? ({id:p.id, ...docData}) : p);
+        savePersonnelCache(cache); currentPersonnel = cache.slice();
+      }
+      renderPersonnelList(); fillPeopleCombos(); clearPersonForm(); waitAuthThen(syncLocalPendingToFirestore);
+    }
 
     async function deletePerson(id){
-      if(!id) return;
-      let cache = loadPersonnelCache();
-      const item = (currentPersonnel||[]).find(p=> p.id===id) || cache.find(p=> p.id===id);
-      const label = item ? `${item.firstName||''} ${item.lastName||''}`.trim() : 'esta persona';
-      if(!confirm(`¿Eliminar ${label}?`)) return;
+      const p = (currentPersonnel||[]).find(x=> x.id===id); const name = p?`${p.firstName} ${p.lastName}`:'la persona';
+      if(!confirm(`¿Eliminar "${name}"?`)) return;
+      try{
+        if (id.startsWith('localp-')){
+          const cache = loadPersonnelCache().filter(x=> x.id !== id);
+          savePersonnelCache(cache); currentPersonnel = cache.slice();
+        } else {
+          await db.collection('personnel').doc(id).delete();
+        }
+      }catch(e){
+        const cache = loadPersonnelCache().filter(x=> x.id !== id);
+        savePersonnelCache(cache); currentPersonnel = cache.slice();
+      }
+      renderPersonnelList(); fillPeopleCombos();
+    }
 
-      if(String(id).startsWith('localp-')){
-        cache = cache.filter(p=> p.id!==id); savePersonnelCache(cache);
-        currentPersonnel = cache.slice();
-        renderPersonnelList();
+    function fillPeopleCombos(){
+      const sel1 = document.getElementById('recordPersonSelect');
+      const sel2 = document.getElementById('filterRecordPerson');
+      const people = (currentPersonnel && currentPersonnel.length)? currentPersonnel : loadPersonnelCache();
+
+      if (sel1){
+        sel1.innerHTML = '<option value="">— Selecciona —</option>';
+        people.forEach(p=>{
+          const o = document.createElement('option');
+          o.value = p.id; o.textContent = `${p.firstName||''} ${p.lastName||''} (${p.idNumber||''})`;
+          sel1.appendChild(o);
+        });
+      }
+      if (sel2){
+        sel2.innerHTML = '<option value="all">Todas</option>';
+        people.forEach(p=>{
+          const o = document.createElement('option');
+          o.value = p.id; o.textContent = `${p.firstName||''} ${p.lastName||''} (${p.idNumber||''})`;
+          sel2.appendChild(o);
+        });
+      }
+
+      // actividades combos
+      const a1 = document.getElementById('recordActivitySelect');
+      const a2 = document.getElementById('filterRecordActivity');
+      if (a1 && !a1.childElementCount){
+        ACTIVITIES.forEach(x=>{ const o=document.createElement('option'); o.value=x; o.textContent=x; a1.appendChild(o); });
+      }
+      if (a2 && a2.childElementCount<=1){
+        ACTIVITIES.forEach(x=>{ const o=document.createElement('option'); o.value=x; o.textContent=x; a2.appendChild(o); });
+      }
+
+      // fecha por defecto
+      const today = new Date().toISOString().slice(0,10);
+      document.getElementById('recordStartDate').value = today;
+      document.getElementById('recordEndDate').value = today;
+      document.getElementById('filterRecordStart').value ||= today;
+      document.getElementById('filterRecordEnd').value   ||= today;
+    }
+
+    /*************** Registros ***************/
+    async function addRecord(){
+      const personId = (document.getElementById('recordPersonSelect')?.value || '').trim();
+      const activity = (document.getElementById('recordActivitySelect')?.value || '').trim();
+      const startDate = (document.getElementById('recordStartDate')?.value || '').trim();
+      const endDate   = (document.getElementById('recordEndDate')?.value || '').trim();
+      if (!personId || !activity || !startDate || !endDate){ alert('Completa persona, actividad y fechas.'); return; }
+
+      const p = (currentPersonnel||[]).find(x=> x.id===personId) || (loadPersonnelCache()||[]).find(x=> x.id===personId);
+      if (!p){ alert('Persona no encontrada.'); return; }
+
+      const docData = {
+        personId, activity, startDate, endDate,
+        assignType: p.assignType, assignId: p.assignId
+      };
+
+      let newId;
+      try{ const ref = await db.collection('person_records').add(docData); newId = ref.id; }
+      catch{ newId = `localr-${Date.now()}`; }
+
+      const rec = { id:newId, ...docData };
+      currentRecords = (currentRecords||[]).concat([rec]);
+      const cache = (loadRecordsCache()||[]).concat([rec]); saveRecordsCache(cache);
+      renderRecordList();
+      waitAuthThen(syncLocalPendingToFirestore);
+    }
+
+    function filterRecordsNow(){
+      renderRecordList();
+    }
+
+    function renderRecordList(){
+      const tbody = document.getElementById('recordTableBody');
+      if (!tbody) return;
+
+      const personF = document.getElementById('filterRecordPerson')?.value || 'all';
+      const actF    = document.getElementById('filterRecordActivity')?.value || 'all';
+      const sdF     = document.getElementById('filterRecordStart')?.value || '';
+      const edF     = document.getElementById('filterRecordEnd')?.value || '';
+      const typeF   = document.getElementById('filterAssignType')?.value || 'all';
+      const idF     = document.getElementById('filterAssignId')?.value || 'all';
+
+      const src = (currentRecords && currentRecords.length)? currentRecords : loadRecordsCache();
+      const filtered = src.filter(r=>{
+        const okPerson = (personF==='all') || (r.personId===personF);
+        const okAct    = (actF==='all')    || (r.activity===actF);
+        // cruce de intervalos (inclusive)
+        const okDates  = (!sdF || r.endDate >= sdF) && (!edF || r.startDate <= edF);
+        const okType   = (typeF==='all') || (r.assignType===typeF);
+        const okId     = (idF==='all')   || (`${r.assignType}:${r.assignId}`===idF);
+        return okPerson && okAct && okDates && okType && okId;
+      });
+
+      tbody.innerHTML = '';
+      if (!filtered.length){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="5" class="text-center text-sm text-gray-500 py-6">No hay registros.</td>`;
+        tbody.appendChild(tr);
         return;
       }
-      try{
-        await db.collection('personnel').doc(id).delete();
-      }catch(e){
-        cache = cache.filter(p=> p.id!==id); savePersonnelCache(cache);
-        currentPersonnel = cache.slice();
-      }
-      renderPersonnelList();
+
+      filtered.sort((a,b)=> (a.startDate||'').localeCompare(b.startDate||''));
+      filtered.forEach(r=>{
+        const p = (currentPersonnel||[]).find(x=> x.id===r.personId) || (loadPersonnelCache()||[]).find(x=> x.id===r.personId);
+        const pname = p ? `${p.firstName||''} ${p.lastName||''}` : r.personId;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-sm text-gray-800">${pname}</td>
+          <td class="text-sm text-gray-800">${r.activity}</td>
+          <td class="text-sm text-gray-800">${r.startDate}</td>
+          <td class="text-sm text-gray-800">${r.endDate}</td>
+          <td class="text-sm text-gray-600">${labelForAssignment(r.assignType, r.assignId)}</td>`;
+        tbody.appendChild(tr);
+      });
     }
 
-    /* ====== Editar persona (modal) ====== */
-    function openEditPerson(id){
-      const src = (currentPersonnel && currentPersonnel.length) ? currentPersonnel : (loadPersonnelCache()||[]);
-      const p = src.find(x=> x.id===id);
-      if(!p){ alert('No se encontró el registro.'); return; }
-      personEditId = id;
-
-      // campos
-      const fn = document.getElementById('epFirstName');
-      const ln = document.getElementById('epLastName');
-      const idn= document.getElementById('epIdNumber');
-      const sel= document.getElementById('epAssignSelect');
-      buildAssignOptions(sel);
-
-      fn.value = p.firstName||'';
-      ln.value = p.lastName||'';
-      idn.value= p.idNumber||'';
-
-      const value = `${p.assignType||'farm'}:${p.assignId||''}`;
-      const opt = Array.from(sel.options).find(o=> o.value===value);
-      sel.value = opt ? value : (sel.options[0]?.value||'');
-
-      document.getElementById('epError').classList.add('hidden');
-      document.getElementById('editPersonModal').classList.remove('hidden');
-      document.getElementById('editPersonModal').classList.add('flex');
-    }
-    function closeEditPerson(){
-      document.getElementById('editPersonModal').classList.add('hidden');
-      document.getElementById('editPersonModal').classList.remove('flex');
-      personEditId = null;
-    }
-    async function saveEditPerson(){
-      const id = personEditId;
-      if(!id) return;
-
-      const fn=document.getElementById('epFirstName')?.value.trim()||'';
-      const ln=document.getElementById('epLastName')?.value.trim()||'';
-      const idn=document.getElementById('epIdNumber')?.value.trim()||'';
-      const assignVal=document.getElementById('epAssignSelect')?.value||'';
-      const err=document.getElementById('epError');
-
-      err.classList.add('hidden'); err.textContent='';
-
-      if(!fn || !ln){ err.textContent='Nombre y apellido son obligatorios.'; err.classList.remove('hidden'); return; }
-      if(!/^[0-9]{6,15}$/.test(idn)){ err.textContent='Cédula: usar solo dígitos (6–15).'; err.classList.remove('hidden'); return; }
-      if(!assignVal){ err.textContent='Seleccione una asignación.'; err.classList.remove('hidden'); return; }
-
-      const [assignType, assignId] = assignVal.split(':');
-      const docData = { firstName: fn, lastName: ln, idNumber: idn, assignType, assignId };
-
-      // Actualiza caches locales
-      let cache = loadPersonnelCache();
-      const idxLocal = cache.findIndex(p=> p.id===id);
-      if (idxLocal>=0){ cache[idxLocal] = { id, ...docData }; savePersonnelCache(cache); }
-
-      // Si existe en la colección en vivo, actualiza; si era localp- sólo cache.
-      let ok = false;
-      try{
-        if (!String(id).startsWith('localp-')){
-          await db.collection('personnel').doc(id).update(docData);
-        }
-        ok = true;
-      }catch(e){
-        // Mantener en cache si falla
-        ok = false;
-      }
-
-      // Refresca UI
-      if (currentPersonnel && currentPersonnel.length){
-        const idx = currentPersonnel.findIndex(p=> p.id===id);
-        if (idx>=0){ currentPersonnel[idx] = { id, ...docData }; }
-      }
-      renderPersonnelList();
-      closeEditPerson();
-      if(!ok) alert('Cambios guardados localmente (sin conexión). Se sincronizarán luego.');
+    function exportRecordsCsv(){
+      const rows = [];
+      rows.push(['Persona','Actividad','Desde','Hasta','Asignación']);
+      const tbody = document.getElementById('recordTableBody');
+      const trs = Array.from(tbody.querySelectorAll('tr'));
+      trs.forEach(tr=>{
+        const tds = Array.from(tr.querySelectorAll('td')).map(td=> td.textContent);
+        if (tds.length===5) rows.push(tds);
+      });
+      const csv = rows.map(r=> r.map(v=> `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='reporte_personal.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
 
-    /* =================== Listeners base =================== */
+    /*************** Listeners DOM ***************/
     document.addEventListener("DOMContentLoaded",function(){
-      document.getElementById('farmSelect')?.addEventListener('change', updateDeleteButtonState);
+      // listas dobles clic
+      document.getElementById('farmList')?.addEventListener('dblclick', (e)=>{
+        const box = e.target.closest('[data-type="farm"][data-id]'); if (!box) return; zoomToFarm(box.dataset.id);
+      });
+      document.getElementById('fenceList')?.addEventListener('dblclick', (e)=>{
+        const box = e.target.closest('[data-type="fence"][data-id]'); if (!box) return; zoomToFence(box.dataset.id);
+      });
 
+      // Fincas
+      document.getElementById('farmSelect')?.addEventListener('change', updateDeleteButtonState);
       document.getElementById('createFarmBtn')?.addEventListener('click', createFarmAtCenter);
       document.getElementById('deleteFarmBtn')?.addEventListener('click', deleteSelectedFarm);
       document.getElementById('createByCoordsBtn')?.addEventListener('click', createFarmByCoords);
 
+      // Geocercas
       document.getElementById('startFenceBtn')?.addEventListener('click', startFenceDraw);
       document.getElementById('finishFenceBtn')?.addEventListener('click', finishFenceDraw);
       document.getElementById('cancelFenceBtn')?.addEventListener('click', cancelFenceDraw);
       document.getElementById('fenceNameSaveBtn')?.addEventListener('click', saveFenceName);
       document.getElementById('fenceNameCancelBtn')?.addEventListener('click', cancelFenceName);
-
       document.getElementById('createFenceByCoordsBtn')?.addEventListener('click', createFenceByCoords);
-
-      // Doble clic listas
-      document.getElementById('farmList')?.addEventListener('dblclick', (e)=>{
-        const box=e.target.closest('[data-type="farm"][data-id]'); if(!box) return; zoomToFarm(box.dataset.id);
-      });
-      document.getElementById('fenceList')?.addEventListener('dblclick', (e)=>{
-        const box=e.target.closest('[data-type="fence"][data-id]'); if(!box) return; zoomToFence(box.dataset.id);
-      });
 
       // Edición y GeoJSON
       document.getElementById('editFenceBtn')?.addEventListener('click', startFenceEdit);
       document.getElementById('saveFenceEditBtn')?.addEventListener('click', saveFenceEdit);
       document.getElementById('cancelFenceEditBtn')?.addEventListener('click', cancelFenceEdit);
       document.getElementById('exportGeoJSONBtn')?.addEventListener('click', exportGeoJSON);
-      document.getElementById('importGeoJSONInput')?.addEventListener('change', async (e)=>{
-        const file=e.target.files?.[0]; if(!file) return;
-        const text=await file.text(); await importGeoJSONFromText(text); e.target.value='';
+      document.getElementById('importGeoJSONInput')?.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0]; if(!file) return; const text = await file.text(); await importGeoJSONFromText(text); e.target.value = '';
       });
-
-      document.getElementById('indexPanel')?.classList.remove('hidden');
 
       // Personal
       document.getElementById('addPersonBtn')?.addEventListener('click', addPerson);
-      document.getElementById('personSearch')?.addEventListener('input', ()=> renderPersonnelList());
-      document.getElementById('personSearchClear')?.addEventListener('click', ()=>{
-        const inp=document.getElementById('personSearch'); if(inp){ inp.value=''; }
-        renderPersonnelList();
-      });
+      document.getElementById('savePersonBtn')?.addEventListener('click', savePersonEdit);
+      document.getElementById('cancelPersonBtn')?.addEventListener('click', clearPersonForm);
+      document.getElementById('personSearchInput')?.addEventListener('input', renderPersonnelList);
+      document.getElementById('personAssignTypeFilter')?.addEventListener('change', ()=>{ refreshAssignFilters(); renderPersonnelList(); });
+      document.getElementById('personAssignIdFilter')?.addEventListener('change', renderPersonnelList);
 
-      // Modal edición
-      document.getElementById('epCancelBtn')?.addEventListener('click', closeEditPerson);
-      document.getElementById('epSaveBtn')?.addEventListener('click', saveEditPerson);
-
-      rebuildAssignSelect();
-      renderPersonnelList();
-
-      buildIndexList();
-      updateDeleteButtonState();
-      updateDeleteFenceButtonState();
-      updateEditButtonsState();
+      // Registros
+      document.getElementById('addRecordBtn')?.addEventListener('click', addRecord);
+      document.getElementById('applyRecordFiltersBtn')?.addEventListener('click', filterRecordsNow);
+      document.getElementById('exportRecordsCsvBtn')?.addEventListener('click', exportRecordsCsv);
+      document.getElementById('filterAssignType')?.addEventListener('change', ()=>{ refreshAssignFilters(); renderRecordList(); });
+      document.getElementById('filterAssignId')?.addEventListener('change', renderRecordList);
     });
-  </script>
 
-  <!-- HOTFIX botones avanzados (por si se rehidrata el DOM) -->
-  <script>
-    function ensureAdvancedButtons(){
-      const afterBtn=document.getElementById('deleteFenceBtn');
-      if(!afterBtn || !afterBtn.parentElement) return;
-      const bar=afterBtn.parentElement;
+    /*************** GeoJSON export/import ***************/
+    function fenceToFeature(id){
+      const gf = (loadFenceCache()||[]).find(g => g.id === id);
+      const layer = geofenceLayers[id];
+      if(!gf || !layer) return null;
 
-      if(document.getElementById('editFenceBtn') &&
-         document.getElementById('exportGeoJSONBtn') &&
-         document.getElementById('importGeoJSONInput')){
-        updateEditButtonsState && updateEditButtonsState();
-        return;
+      const rings = layer.getLatLngs();
+      const ring0 = (Array.isArray(rings[0]) ? rings[0] : rings).map(ll => [ll.lng, ll.lat]);
+      if (ring0.length && (ring0[0][0] !== ring0[ring0.length-1][0] || ring0[0][1] !== ring0[ring0.length-1][1])){
+        ring0.push([ring0[0][0], ring0[0][1]]);
       }
-      const mkBtn=(id,text,classes,title)=>{
-        const b=document.createElement('button'); b.id=id; b.type='button'; b.className=classes; b.textContent=text; if(title) b.title=title; return b;
-      };
-      const editBtn=mkBtn('editFenceBtn','Editar geocerca','inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed','Editar (mover vértices) de la geocerca seleccionada'); editBtn.disabled=true;
-      const saveBtn=mkBtn('saveFenceEditBtn','Guardar cambios','hidden inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg','Guardar cambios a la geocerca');
-      const cancelBtn=mkBtn('cancelFenceEditBtn','Cancelar edición','hidden inline-flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg','Cancelar edición y restaurar');
-      const exportBtn=mkBtn('exportGeoJSONBtn','Exportar GeoJSON','inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg','Exportar GeoJSON (seleccionada o todas)');
-
-      const importLabel=document.createElement('label');
-      importLabel.className='inline-flex items-center gap-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold px-4 py-2 rounded-lg cursor-pointer';
-      importLabel.title='Importar GeoJSON (Polygon o MultiPolygon)';
-      importLabel.textContent='Importar GeoJSON';
-      const importInput=document.createElement('input');
-      importInput.id='importGeoJSONInput'; importInput.type='file';
-      importInput.accept='.geojson,application/geo+json,application/json';
-      importInput.className='hidden';
-      importLabel.appendChild(importInput);
-
-      afterBtn.insertAdjacentElement('afterend', importLabel);
-      importLabel.insertAdjacentElement('beforebegin', exportBtn);
-      exportBtn.insertAdjacentElement('beforebegin', cancelBtn);
-      cancelBtn.insertAdjacentElement('beforebegin', saveBtn);
-      saveBtn.insertAdjacentElement('beforebegin', editBtn);
-
-      editBtn.addEventListener('click', startFenceEdit);
-      saveBtn.addEventListener('click', saveFenceEdit);
-      cancelBtn.addEventListener('click', cancelFenceEdit);
-      exportBtn.addEventListener('click', exportGeoJSON);
-      importInput.addEventListener('change', async (e)=>{
-        const file=e.target.files?.[0]; if(!file) return;
-        const text=await file.text(); await importGeoJSONFromText(text); e.target.value='';
-      });
-
-      bar.classList.add('flex','flex-wrap','gap-2','overflow-x-auto');
-      updateEditButtonsState && updateEditButtonsState();
+      return { type: "Feature", properties: { id: gf.id, name: gf.name || 'Geocerca' }, geometry: { type: "Polygon", coordinates: [ ring0 ] } };
     }
-    document.addEventListener('DOMContentLoaded', ensureAdvancedButtons);
-    setTimeout(ensureAdvancedButtons, 800);
-    setTimeout(ensureAdvancedButtons, 2000);
+    function exportGeoJSON(){
+      let fc;
+      if (selectedFenceId && geofenceLayers[selectedFenceId]){
+        const feat = fenceToFeature(selectedFenceId);
+        if(!feat){ alert('No se pudo exportar la geocerca seleccionada.'); return; }
+        fc = { type: "FeatureCollection", features: [feat] };
+      } else {
+        const features = [];
+        for (const id of Object.keys(geofenceLayers)){
+          const feat = fenceToFeature(id); if (feat) features.push(feat);
+        }
+        if (!features.length){ alert('No hay geocercas para exportar.'); return; }
+        fc = { type: "FeatureCollection", features };
+      }
+      const blob = new Blob([JSON.stringify(fc, null, 2)], {type: "application/geo+json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      const name = selectedFenceId ? `geocerca_${selectedFenceId}.geojson` : 'geocercas.geojson';
+      a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+    async function importGeoJSONFromText(text){
+      let obj; try { obj = JSON.parse(text); } catch { alert('GeoJSON inválido.'); return; }
+      const asArray = (x) => Array.isArray(x) ? x : [x];
+      let features = [];
+      if (obj.type === 'FeatureCollection') { features = obj.features || []; }
+      else if (obj.type === 'Feature') { features = [obj]; }
+      else if (obj.type && obj.coordinates) { features = [{ type: 'Feature', properties: {}, geometry: obj }]; }
+      else { alert('Estructura GeoJSON no reconocida.'); return; }
+
+      let created = 0;
+      for (const feat of features){
+        const geom = feat.geometry || {}; const props = feat.properties || {}; const baseName = (props.name || 'Geocerca importada');
+        if (geom.type === 'Polygon'){ await createGeofenceFromPolygonCoords(geom.coordinates, baseName); created++; }
+        else if (geom.type === 'MultiPolygon'){
+          const polys = asArray(geom.coordinates); let i=1;
+          for (const poly of polys){ await createGeofenceFromPolygonCoords(poly, `${baseName} (${i})`); i++; created++; }
+        }
+      }
+      if (created === 0){ alert('El GeoJSON no contiene Polygon/MultiPolygon.'); }
+      else { try { await initialFetchGeofences(); } catch {} renderGeofencesFromCache(); alert(`Importación completada: ${created} geocerca(s) creada(s).`); }
+    }
+    async function createGeofenceFromPolygonCoords(coords, name){
+      if(!coords || !coords.length || !coords[0].length) return;
+      const outer = coords[0].map(pair => ({lat: pair[1], lng: pair[0]}))
+        .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+      if (outer.length < 3) return;
+      try{ await db.collection('geofences').add({ name: name || 'Geocerca', path: outer }); }
+      catch(err){ const fences = loadFenceCache(); fences.push({ id: 'localgf-'+Date.now(), name: name || 'Geocerca', path: outer }); saveFenceCache(fences); }
+    }
   </script>
 </body>
 </html>
+
