@@ -325,13 +325,10 @@
     const savePeople=(v)=>save(LS_PE,v),  loadPeople=()=>load(LS_PE);
     const saveActs=(v)=>save(LS_AC,v),    loadActs=()=>load(LS_AC);
 
-    // Definición dinámica de actividades
+    // Definiciones de actividades (persisten en localStorage)
     const DEFAULT_ACTIVITY_OPTIONS = ['Siembra','Riego','Cosecha','Poda','Fertilización','Fumigación','Mantenimiento','Limpieza','Transporte','Supervisión'];
     const loadActivityDefs = () => {
-      try {
-        const val = JSON.parse(localStorage.getItem(LS_AD) || 'null');
-        if (Array.isArray(val) && val.length) return val;
-      } catch {}
+      try { const val = JSON.parse(localStorage.getItem(LS_AD) || 'null'); if (Array.isArray(val) && val.length) return val; } catch {}
       return DEFAULT_ACTIVITY_OPTIONS.slice();
     };
     const saveActivityDefs = (arr) => { try{ localStorage.setItem(LS_AD, JSON.stringify(arr)); }catch{} };
@@ -342,7 +339,6 @@
     let isDrawingFence=false, drawingCoords=[], drawingPolyline=null, drawingMarkers=[], pendingFenceCoords=null;
     let selectedFenceId=null, editGroup=null, editToolbar=null, isEditingFence=false, editBackupCoords=null;
 
-    /* ---------- Util ---------- */
     function waitAuthThen(fn){ if(authReady) return fn(); const t=setInterval(()=>{ if(authReady){clearInterval(t); fn();}},120); }
 
     /* ---------- Mapa ---------- */
@@ -387,7 +383,7 @@
       if(subsStarted) return; subsStarted=true;
       unsubFarms=db.collection('farms').onSnapshot(s=>{
         const farms=[]; Object.values(fincaMarkers).forEach(m=>map.removeLayer(m)); for(const k in fincaMarkers) delete fincaMarkers[k];
-        s.forEach(doc=>{const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); if(d.fincaLocation){const m=L.marker([d.fincaLocation.lat,d.dincaLocation?.lng??d.fincaLocation.lng]).addTo(map); m.bindTooltip(d.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'}); fincaMarkers[doc.id]=m; }});
+        s.forEach(doc=>{const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); if(d.fincaLocation){const m=L.marker([d.fincaLocation.lat,d.fincaLocation.lng]).addTo(map); m.bindTooltip(d.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'}); fincaMarkers[doc.id]=m; }});
         currentFarms=farms.slice(); if(farms.length) saveFarms(farms);
         const sel=document.getElementById('farmSelect'); if(sel){ sel.innerHTML=''; farms.forEach(f=>{const o=document.createElement('option'); o.value=f.id; o.textContent=f.name||'Finca'; sel.appendChild(o);}); }
         updateDeleteButtonState(); buildIndexList(); buildAssignOptions(); buildActivityFormOptions();
@@ -474,7 +470,6 @@
     }
     function showPersonError(msg){ const e=document.getElementById('pFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
 
-    // Alta optimista de Personal
     async function addPerson(){
       try{
         const fn=(document.getElementById('pFirstName').value||'').trim();
@@ -573,7 +568,7 @@
     function showActError(msg){ const e=document.getElementById('actFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
 
     function buildActivityFormOptions(){
-      // Actividades (dinámicas)
+      // Actividades
       const actSel=document.getElementById('actActivitySelect');
       const actFilter=document.getElementById('actFilterActivity');
       if(actSel){ actSel.innerHTML = activityDefs.map(a=>`<option value="${a}">${a}</option>`).join(''); }
@@ -595,10 +590,8 @@
         eSel.innerHTML = items.length? items.map(i=>`<option value="${i.v}">${i.l}</option>`).join('') : `<option value="">No hay entidades</option>`;
       }
     }
-
     function buildActivityFilterOptions(){ buildActivityFormOptions(); }
 
-    // Botón para administrar lista de actividades (agregar/eliminar)
     function manageActivityList(){
       const op = prompt('Gestionar actividades:\n1) Agregar\n2) Eliminar\n\nEscribe 1 o 2');
       if(op===null) return;
@@ -665,11 +658,12 @@
           saveActs(cache); currentActivities=cache.slice(); renderActivityList();
         }catch{ waitAuthThen(syncLocalPendingToFirestore); }
 
-        // limpiar
+        // limpiar fechas para siguiente carga
         document.getElementById('actStartDate').value='';
         document.getElementById('actEndDate').value='';
       }catch(e){ console.error(e); showActError('No se pudo agregar la actividad.'); }
     }
+    window.addActivity = addActivity; // exposición explícita
 
     function renderActivityList(){
       const tbody=document.getElementById('activityTableBody'); if(!tbody) return;
@@ -683,7 +677,7 @@
         let ok=true;
         if(fPerson!=='all') ok=ok&&(a.personId===fPerson);
         if(ok&&fAct!=='all') ok=(a.activity===fAct);
-        if(ok&&fFrom) ok=ok&&(a.endDate>=fFrom);   // intervalo solapado
+        if(ok&&fFrom) ok=ok&&(a.endDate>=fFrom);
         if(ok&&fTo)   ok=ok&&(a.startDate<=fTo);
         return ok;
       });
@@ -733,6 +727,19 @@
       setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80);
     }
 
+    // Fechas por defecto (hoy) SOLO en módulo Actividades
+    function setDefaultActivityDates(){
+      const today = new Date();
+      const y = today.getFullYear();
+      const m = String(today.getMonth()+1).padStart(2,'0');
+      const d = String(today.getDate()).padStart(2,'0');
+      const val = `${y}-${m}-${d}`;
+      const s = document.getElementById('actStartDate');
+      const e = document.getElementById('actEndDate');
+      if(s && !s.value) s.value = val;
+      if(e && !e.value) e.value = val;
+    }
+
     /* ---------- Listeners ---------- */
     document.addEventListener('DOMContentLoaded',()=>{
       const already = localStorage.getItem('admin_ok')==='1';
@@ -777,6 +784,7 @@
       document.getElementById('actFilterActivity').addEventListener('change', renderActivityList);
       document.getElementById('actFilterFrom').addEventListener('change', renderActivityList);
       document.getElementById('actFilterTo').addEventListener('change', renderActivityList);
+      setDefaultActivityDates(); // fechas por defecto en el formulario de alta
 
       // Primer pintado
       buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildActivityFilterOptions();
