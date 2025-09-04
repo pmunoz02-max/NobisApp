@@ -29,7 +29,6 @@
       <input id="adminCodeInput" type="password" placeholder="Código de acceso"
              class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
       <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
-      <!-- ID correcto para el botón del modal -->
       <button id="adminLoginBtn"
               class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-lg">
         Acceder
@@ -156,7 +155,6 @@
       </div>
 
       <div class="mt-3">
-        <!-- QUITAMOS EL onClick inline PARA EVITAR CSP -->
         <button id="addPersonBtn" type="button"
                 class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
           Agregar
@@ -164,7 +162,7 @@
         <span id="pFormError" class="text-sm text-red-600 ml-3 hidden"></span>
       </div>
 
-      <!-- Filtros (sin cambios) -->
+      <!-- Filtros -->
       <div class="mt-6 grid md:grid-cols-3 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700">Buscar</label>
@@ -229,7 +227,7 @@
     firebase.auth().signInAnonymously().catch(console.error);
     firebase.auth().onAuthStateChanged(u => authReady = !!u);
 
-    /* ---------- Estado y caché (sin cambios en lógica) ---------- */
+    /* ---------- Estado y caché ---------- */
     let map;
     const fincaMarkers = {}, geofenceLayers = {};
     const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1', LS_PE='personnel_cache_v1';
@@ -244,10 +242,9 @@
     let isDrawingFence=false, drawingCoords=[], drawingPolyline=null, drawingMarkers=[], pendingFenceCoords=null;
     let selectedFenceId=null, editGroup=null, editToolbar=null, isEditingFence=false, editBackupCoords=null;
 
-    /* ---------- Utilidades ---------- */
     function waitAuthThen(fn){ if(authReady) return fn(); const t=setInterval(()=>{ if(authReady){clearInterval(t); fn();}},120); }
 
-    /* ---------- Mapa & render (igual que tenías) ---------- */
+    /* ---------- Mapa ---------- */
     function initMap(center){ center=center||{lat:-0.1807,lng:-78.4678};
       map=L.map('map',{center:[center.lat,center.lng],zoom:6});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
@@ -283,7 +280,7 @@
       updateDeleteFenceButtonState(); updateEditButtonsState(); currentFences=fences||[]; buildIndexList(); buildAssignOptions();
     }
 
-    /* ---------- Suscripciones y cargas iniciales ---------- */
+    /* ---------- Firestore subs ---------- */
     let unsubFarms=null,unsubGeofences=null,unsubPersonnel=null,subsStarted=false;
     function startSubscriptions(){
       if(subsStarted) return; subsStarted=true;
@@ -319,7 +316,7 @@
       try{ const ppl=loadPeople().filter(p=>String(p.id||'').startsWith('localp-')); for(const p of ppl){ try{await db.collection('personnel').add({firstName:p.firstName||'',lastName:p.lastName||'',idNumber:p.idNumber||'',assignType:p.assignType||'',assignId:p.assignId||''});}catch{} savePeople(loadPeople().filter(x=>x.id!==p.id)); } }catch{}
     }
 
-    /* ---------- Geocercas: selección/edición (sin cambios de UX) ---------- */
+    /* ---------- Geocercas ---------- */
     function selectFence(id){ if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes.'); return; } if(selectedFenceId&&geofenceLayers[selectedFenceId]) geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE); selectedFenceId=id; if(geofenceLayers[id]) geofenceLayers[id].setStyle(GEOFENCE_SELECTED_STYLE); updateDeleteFenceButtonState(); updateEditButtonsState(); }
     function updateDeleteButtonState(){ const sel=document.getElementById('farmSelect'), btn=document.getElementById('deleteFarmBtn'); if(btn) btn.disabled=!(sel&&sel.value); }
     function updateDeleteFenceButtonState(){ const btn=document.getElementById('deleteFenceBtn'); if(btn) btn.disabled=!selectedFenceId; }
@@ -330,7 +327,7 @@
     function cancelFenceDraw(){ isDrawingFence=false; drawingCoords=[]; drawingMarkers.forEach(m=>map.removeLayer(m)); drawingMarkers=[]; if(drawingPolyline){map.removeLayer(drawingPolyline);drawingPolyline=null;} document.getElementById('startFenceBtn').classList.remove('hidden'); document.getElementById('finishFenceBtn').classList.add('hidden'); document.getElementById('cancelFenceBtn').classList.add('hidden'); document.getElementById('fenceNamePanel').classList.add('hidden'); pendingFenceCoords=null; }
     async function saveFenceName(){ const input=document.getElementById('fenceNameInput'); const name=(input.value||'').trim()||'Geocerca'; if(!pendingFenceCoords||pendingFenceCoords.length<3){alert('No hay geocerca lista.');return;} try{ await db.collection('geofences').add({name,path:pendingFenceCoords}); }catch{ const fences=loadFences(); fences.push({id:'localgf-'+Date.now(),name,path:pendingFenceCoords}); saveFences(fences); renderGeofencesFromCache(); } input.value=''; pendingFenceCoords=null; document.getElementById('fenceNamePanel').classList.add('hidden'); cancelFenceDraw(); }
 
-    /* ---------- Explorador & zoom (sin cambios) ---------- */
+    /* ---------- Explorador ---------- */
     function buildIndexList(){
       const farmUl=document.getElementById('farmList'), fenceUl=document.getElementById('fenceList'); if(!farmUl||!fenceUl) return;
       const farms=(currentFarms?.length?currentFarms:loadFarms()).slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
@@ -361,6 +358,8 @@
       }
     }
     function showPersonError(msg){ const e=document.getElementById('pFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
+
+    // NUEVO: alta optimista + reemplazo de id al confirmar en Firestore
     async function addPerson(){
       try{
         const fn=(document.getElementById('pFirstName').value||'').trim();
@@ -372,18 +371,35 @@
         if(!/^[0-9]{6,15}$/.test(idn)) return showPersonError('Cédula: usar solo dígitos (6–15).');
         if(!asg) return showPersonError('Selecciona una asignación.');
         const [assignType,assignId]=asg.split(':');
-        const doc={firstName:fn,lastName:ln,idNumber:idn,assignType,assignId};
-        try{ await db.collection('personnel').add(doc); }
-        catch{ const c=loadPeople(); c.push({id:'localp-'+Date.now(),...doc}); savePeople(c); }
-        // limpiar
+
+        const tempId = 'localp-'+Date.now();
+        const newDoc = {id: tempId, firstName: fn, lastName: ln, idNumber: idn, assignType, assignId};
+
+        // 1) Optimistic update
+        let cache = loadPeople(); cache.push(newDoc); savePeople(cache);
+        currentPersonnel = cache.slice(); renderPersonnelList();
+
+        // 2) Intento en Firestore
+        try{
+          const ref = await db.collection('personnel').add({
+            firstName: fn, lastName: ln, idNumber: idn, assignType, assignId
+          });
+          // Reemplazar tempId por id real
+          cache = loadPeople().map(p => p.id === tempId ? ({...p, id: ref.id}) : p);
+          savePeople(cache);
+          currentPersonnel = cache.slice(); renderPersonnelList();
+        }catch{
+          // Si falla, se queda con tempId y luego se sincroniza
+          waitAuthThen(syncLocalPendingToFirestore);
+        }
+
+        // Limpiar form
         document.getElementById('pFirstName').value='';
         document.getElementById('pLastName').value='';
         document.getElementById('pIdNumber').value='';
         document.getElementById('pAssignSelect').selectedIndex=0;
-        currentPersonnel=loadPeople(); renderPersonnelList(); waitAuthThen(syncLocalPendingToFirestore);
       }catch(e){ console.error(e); showPersonError('No se pudo agregar.'); }
     }
-    // importante: disponible en el ámbito global (si alguna parte lo invoca)
     window.addPerson = addPerson;
 
     function renderPersonnelList(){
@@ -451,7 +467,7 @@
     }
     window.openEditPerson=openEditPerson;
 
-    /* ---------- Listeners mínimos ---------- */
+    /* ---------- Listeners ---------- */
     document.addEventListener('DOMContentLoaded',()=>{
       document.getElementById('adminModal').classList.remove('hidden');
       document.getElementById('adminLoginBtn').addEventListener('click',()=>{
@@ -462,7 +478,7 @@
         setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80);
       });
 
-      // Mapa: acciones
+      // Mapa
       document.getElementById('farmSelect').addEventListener('change',updateDeleteButtonState);
       document.getElementById('startFenceBtn').addEventListener('click',startFenceDraw);
       document.getElementById('finishFenceBtn').addEventListener('click',finishFenceDraw);
@@ -474,12 +490,10 @@
 
       // Listas dblclick
       document.getElementById('farmList').addEventListener('dblclick',e=>{const n=e.target.closest('[data-type="farm"][data-id]'); if(n) zoomToFarm(n.dataset.id);});
-      document.getElementById('fenceList').addEventListener('dblclick',e=>{const n=e.target.closest('[data-type="fence"][data-id]'); if(n) zoomToFence(n.dataset.id);});
+      document.getElementById('fenceList').addEventListener('dblclick',e=>{const n=e.target.closest('[data-type="fence'][data-id]'); if(n) zoomToFence(n.dataset.id);});
 
-      // ==== FIX: conectar botón Agregar vía JS (evita CSP) ====
+      // Botón Agregar + Enter en inputs
       document.getElementById('addPersonBtn').addEventListener('click', addPerson);
-
-      // ==== FIX: Enter en campos sin handlers inline ====
       ['pFirstName','pLastName','pIdNumber'].forEach(id=>{
         const el=document.getElementById(id);
         el.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter'){ addPerson(); }});
