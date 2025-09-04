@@ -21,6 +21,9 @@
     .badge{font-size:.75rem;padding:.125rem .5rem;border-radius:.375rem;display:inline-block}
     .badge-green{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
     .badge-gray{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb}
+    /* Reportes */
+    .multiselect{min-height:42px}
+    .scrollbox{max-height:12rem;overflow:auto}
   </style>
 </head>
 <body class="p-4 sm:p-8">
@@ -346,9 +349,95 @@
         </table>
       </div>
     </div>
+
+    <!-- ===== Reportes ===== -->
+    <div class="bg-white p-6 rounded-2xl shadow-lg" id="reportsModule">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-semibold text-gray-700">Reportes</h2>
+        <span class="text-xs text-gray-500">Tablas descargables y gráficos por persona, entidad, actividad y fechas</span>
+      </div>
+
+      <div class="grid md:grid-cols-6 gap-4">
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700">Personas (Ctrl/Cmd para multi)</label>
+          <select id="repPersons" class="mt-1 w-full border rounded-md p-2 multiselect" multiple size="6"></select>
+          <label class="inline-flex items-center gap-2 mt-2">
+            <input id="repOnlyActive" type="checkbox" class="rounded" checked>
+            <span class="text-sm text-gray-700">Solo activas</span>
+          </label>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700">Fincas/Geocercas</label>
+          <select id="repEntities" class="mt-1 w-full border rounded-md p-2 multiselect" multiple size="6"></select>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700">Actividades</label>
+          <select id="repActivities" class="mt-1 w-full border rounded-md p-2 multiselect" multiple size="6"></select>
+
+          <div class="grid grid-cols-2 gap-2 mt-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Desde</label>
+              <input id="repFrom" type="date" class="mt-1 w-full border rounded-md p-2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Hasta</label>
+              <input id="repTo" type="date" class="mt-1 w-full border rounded-md p-2">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-5 gap-4 mt-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Agrupar por</label>
+          <select id="repGroupBy" class="mt-1 w-full border rounded-md p-2">
+            <option value="detalle">Detalle</option>
+            <option value="persona">Persona</option>
+            <option value="entidad">Entidad</option>
+            <option value="actividad">Actividad</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Métrica (para gráficos)</label>
+          <select id="repMetric" class="mt-1 w-full border rounded-md p-2">
+            <option value="count">Actividades</option>
+            <option value="days">Días</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Tipo de gráfico</label>
+          <select id="repChartType" class="mt-1 w-full border rounded-md p-2">
+            <option value="bar">Barras</option>
+            <option value="line">Líneas</option>
+            <option value="doughnut">Pastel</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button id="repGenerateBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Generar</button>
+        </div>
+        <div class="flex items-end">
+          <button id="repDownloadBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">Descargar CSV (Excel)</button>
+        </div>
+      </div>
+
+      <!-- Tabla -->
+      <div class="mt-4 overflow-auto">
+        <table class="min-w-full text-left" id="repTable">
+          <thead id="repTableHead"></thead>
+          <tbody id="repTableBody" class="text-sm"></tbody>
+        </table>
+      </div>
+
+      <!-- Gráfico -->
+      <div class="mt-6 bg-white rounded-xl border border-gray-200 p-4">
+        <canvas id="repChart" height="120"></canvas>
+      </div>
+    </div>
   </div>
 
-  <!-- Modal: elegir persona activa -->
+  <!-- Modal: elegir persona activa (costos) -->
   <div id="lcPersonModal" class="fixed inset-0 bg-gray-900/75 hidden items-center justify-center z-50 p-4">
     <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-5">
       <div class="flex items-center justify-between mb-3">
@@ -371,6 +460,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+
+  <!-- Chart.js (para los reportes) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <script>
     /* ---------- Firebase ---------- */
@@ -439,14 +531,14 @@
       Object.values(fincaMarkers).forEach(m=>map.removeLayer(m)); for(const k in fincaMarkers) delete fincaMarkers[k];
       farms.forEach(f=>{ if(!f?.id||!f?.fincaLocation) return; const m=L.marker([f.fincaLocation.lat,f.fincaLocation.lng]).addTo(map); m.bindTooltip(f.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'}); fincaMarkers[f.id]=m;});
       const sel=document.getElementById('farmSelect'); if(sel){ sel.innerHTML=''; farms.forEach(f=>{const o=document.createElement('option'); o.value=f.id; o.textContent=f.name||'Finca'; sel.appendChild(o);}); }
-      updateDeleteButtonState(); currentFarms=farms||[]; buildIndexList(); buildAssignOptions(); buildActivityFormOptions();
+      updateDeleteButtonState(); currentFarms=farms||[]; buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
     }
     function renderGeofencesFromCache(){
       Object.values(geofenceLayers).forEach(p=>map.removeLayer(p)); for(const k in geofenceLayers) delete geofenceLayers[k];
       const fences=loadFences();
       fences.forEach(g=>{ if(!g?.id||!Array.isArray(g.path)||g.path.length<3) return; const latlngs=g.path.map(p=>[p.lat,p.lng]); const poly=L.polygon(latlngs,GEOFENCE_STYLE).addTo(map); poly.bindTooltip(g.name||'Geocerca',{permanent:true,direction:'center',className:'farm-label'}); geofenceLayers[g.id]=poly; poly.on('click',()=>selectFence(g.id)); if(selectedFenceId===g.id) poly.setStyle(GEOFENCE_SELECTED_STYLE); });
       if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null;
-      updateDeleteFenceButtonState(); updateEditButtonsState(); currentFences=fences||[]; buildIndexList(); buildAssignOptions(); buildActivityFormOptions();
+      updateDeleteFenceButtonState(); updateEditButtonsState(); currentFences=fences||[]; buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
     }
 
     /* ---------- Suscripciones ---------- */
@@ -459,7 +551,7 @@
         if(farms.length){ currentFarms=farms.slice(); saveFarms(farms); }
         else { currentFarms=loadFarms(); renderFarmsFromCache(); return; }
         const sel=document.getElementById('farmSelect'); if(sel){ sel.innerHTML=''; farms.forEach(f=>{const o=document.createElement('option'); o.value=f.id; o.textContent=f.name||'Finca'; sel.appendChild(o);}); }
-        updateDeleteButtonState(); buildIndexList(); buildAssignOptions(); buildActivityFormOptions();
+        updateDeleteButtonState(); buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
       },()=>renderFarmsFromCache());
 
       unsubGeofences=db.collection('geofences').onSnapshot(s=>{
@@ -470,15 +562,15 @@
         if(fences.length){ currentFences=fences.slice(); saveFences(fences); }
         else { currentFences=loadFences(); renderGeofencesFromCache(); return; }
         if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null;
-        updateDeleteFenceButtonState(); updateEditButtonsState(); buildIndexList(); buildAssignOptions(); buildActivityFormOptions();
+        updateDeleteFenceButtonState(); updateEditButtonsState(); buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
       },()=>renderGeofencesFromCache());
 
       unsubPersonnel=db.collection('personnel').onSnapshot(s=>{
         const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,firstName:d.firstName||'',lastName:d.lastName||'',idNumber:d.idNumber||'',assignType:d.assignType||'',assignId:d.assignId||'',active:(d.active!==false)});});
         if(list.length){ currentPersonnel=list.slice(); savePeople(list); }
         else { currentPersonnel=loadPeople(); }
-        renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache();
-      },()=>{ currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache(); });
+        renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache(); buildReportFilterOptions();
+      },()=>{ currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache(); buildReportFilterOptions(); });
 
       unsubActivities=db.collection('activities').onSnapshot(s=>{
         const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({
@@ -488,8 +580,8 @@
         });});
         if(list.length){ currentActivities=list.slice(); saveActs(list); }
         else { currentActivities=loadActs(); }
-        renderActivityList(); buildActivityFilterOptions();
-      },()=>{ currentActivities=loadActs(); renderActivityList(); buildActivityFilterOptions(); });
+        renderActivityList(); buildActivityFilterOptions(); buildReportFilterOptions();
+      },()=>{ currentActivities=loadActs(); renderActivityList(); buildActivityFilterOptions(); buildReportFilterOptions(); });
 
       unsubLaborCosts=db.collection('labor_costs').onSnapshot(s=>{
         const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,personId:d.personId||'',personName:d.personName||'',dailyCost:+(d.dailyCost||0),startDate:d.startDate||'',endDate:d.endDate||''});});
@@ -652,7 +744,7 @@
       const doc={firstName:fn,lastName:ln,idNumber:idn,assignType,assignId,active};
       (async()=>{ try{ await db.collection('personnel').doc(id).update(doc); }
         catch{ const cache=loadPeople(); const i=cache.findIndex(x=>x.id===id); if(i>=0){ cache[i]={...cache[i],...doc}; savePeople(cache);} }
-        currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache();
+        currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache(); buildReportFilterOptions();
       })();
     }
 
@@ -691,7 +783,7 @@
         activityDefs.push(name);
         activityDefs.sort((a,b)=>a.localeCompare(b));
         saveActivityDefs(activityDefs);
-        buildActivityFormOptions();
+        buildActivityFormOptions(); buildReportFilterOptions();
         alert('Actividad agregada.');
       }else if(op==='2'){
         if(!activityDefs.length){ alert('No hay actividades para eliminar.'); return; }
@@ -701,7 +793,7 @@
         if(idx<0 || idx>=activityDefs.length){ alert('Selección inválida.'); return; }
         const removed = activityDefs.splice(idx,1)[0];
         saveActivityDefs(activityDefs);
-        buildActivityFormOptions();
+        buildActivityFormOptions(); buildReportFilterOptions();
         alert('Eliminada: '+removed);
       }
     }
@@ -909,6 +1001,192 @@
     }
     window.deleteLaborCost=deleteLaborCost;
 
+    /* ---------- Reportes ---------- */
+    let reportChart = null;
+    let lastReportHeader = [];
+    let lastReportRows = [];
+
+    function setDefaultReportDates(){
+      const today = new Date();
+      const toY = today.getFullYear(), toM = String(today.getMonth()+1).padStart(2,'0'), toD = String(today.getDate()).padStart(2,'0');
+      const to = `${toY}-${toM}-${toD}`;
+      const past = new Date(today); past.setDate(past.getDate()-30);
+      const fromY=past.getFullYear(), fromM=String(past.getMonth()+1).padStart(2,'0'), fromD=String(past.getDate()).padStart(2,'0');
+      const from = `${fromY}-${fromM}-${fromD}`;
+      if(document.getElementById('repFrom') && !document.getElementById('repFrom').value) document.getElementById('repFrom').value = from;
+      if(document.getElementById('repTo') && !document.getElementById('repTo').value) document.getElementById('repTo').value = to;
+    }
+
+    function buildReportFilterOptions(){
+      // Personas
+      const people=currentPersonnel?.length?currentPersonnel:loadPeople();
+      const pSel=document.getElementById('repPersons');
+      if(pSel){
+        pSel.innerHTML = people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}${(p.active===false)?' (inactivo)':''}</option>`).join('');
+      }
+      // Entidades
+      const farms=currentFarms?.length?currentFarms:loadFarms();
+      const fences=currentFences?.length?currentFences:loadFences();
+      const eSel=document.getElementById('repEntities');
+      if(eSel){
+        const items=[...farms.map(f=>({v:`farm:${f.id}`,l:`Finca: ${f.name||'Finca'}`})), ...fences.map(g=>({v:`fence:${g.id}`,l:`Geocerca: ${g.name||'Geocerca'}`}))];
+        eSel.innerHTML = items.map(i=>`<option value="${i.v}">${i.l}</option>`).join('');
+      }
+      // Actividades
+      const aSel=document.getElementById('repActivities');
+      if(aSel){
+        aSel.innerHTML = activityDefs.map(a=>`<option value="${a}">${a}</option>`).join('');
+      }
+      setDefaultReportDates();
+    }
+
+    function getMultiValues(selectEl){
+      if(!selectEl) return [];
+      return Array.from(selectEl.selectedOptions||[]).map(o=>o.value);
+    }
+    function overlap(aStart, aEnd, bStart, bEnd){
+      return (!bStart || aEnd>=bStart) && (!bEnd || aStart<=bEnd);
+    }
+    function dateDiffDays(a,b){ // inclusivo
+      const d1=new Date(a+"T00:00:00"), d2=new Date(b+"T00:00:00");
+      return Math.max(0, Math.floor((d2 - d1)/(24*3600*1000)) + 1);
+    }
+    function entityLabel(assignType, assignId){
+      const farms=currentFarms?.length?currentFarms:loadFarms();
+      const fences=currentFences?.length?currentFences:loadFences();
+      if(assignType==='farm'){
+        const n = farms.find(f=>f.id===assignId)?.name||'Finca';
+        return `Finca: ${n}`;
+      }
+      if(assignType==='fence'){
+        const n = fences.find(g=>g.id===assignId)?.name||'Geocerca';
+        return `Geocerca: ${n}`;
+      }
+      return '—';
+    }
+
+    function renderReportTable(header, rows){
+      lastReportHeader = header.slice();
+      lastReportRows = rows.slice();
+
+      const thead=document.getElementById('repTableHead');
+      const tbody=document.getElementById('repTableBody');
+      thead.innerHTML = `<tr class="text-gray-600 text-sm">${header.map(h=>`<th class="px-3 py-2">${h}</th>`).join('')}</tr>`;
+      tbody.innerHTML = rows.length ? rows.map(r=>`<tr class="border-t hover:bg-gray-50">${r.map(c=>`<td class="px-3 py-2">${c}</td>`).join('')}</tr>`).join('')
+                                    : `<tr><td colspan="${header.length}" class="px-3 py-4 text-center text-gray-500">Sin resultados para los filtros seleccionados.</td></tr>`;
+    }
+
+    function exportReportCSV(){
+      if(!lastReportHeader.length){ alert('Primero genera un reporte.'); return; }
+      const lines = [];
+      const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
+      lines.push(lastReportHeader.map(esc).join(','));
+      lastReportRows.forEach(r=>lines.push(r.map(esc).join(',')));
+      const blob = new Blob(["\uFEFF"+lines.join("\r\n")], {type:"text/csv;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `reporte_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function renderReportChart(labels, data, chartType, labelText){
+      const ctx = document.getElementById('repChart').getContext('2d');
+      if(reportChart){ reportChart.destroy(); reportChart=null; }
+      reportChart = new Chart(ctx, {
+        type: chartType,
+        data: { labels, datasets: [{ label: labelText, data }] },
+        options: { responsive:true, maintainAspectRatio:false }
+      });
+    }
+
+    function generateReport(){
+      const people=currentPersonnel?.length?currentPersonnel:loadPeople();
+      const onlyActive = document.getElementById('repOnlyActive').checked;
+      const selPeople = getMultiValues(document.getElementById('repPersons'));
+      const selEntities = getMultiValues(document.getElementById('repEntities'));
+      const selActs = getMultiValues(document.getElementById('repActivities'));
+      const from = (document.getElementById('repFrom').value||'');
+      const to   = (document.getElementById('repTo').value||'');
+      const groupBy = document.getElementById('repGroupBy').value;
+      const metric = document.getElementById('repMetric').value;
+      const chartType = document.getElementById('repChartType').value;
+
+      // Filtro datos
+      let list=currentActivities?.length?currentActivities.slice():loadActs();
+
+      list=list.filter(a=>{
+        const p = people.find(x=>x.id===a.personId);
+        if(onlyActive && p && p.active===false) return false;
+
+        if(selPeople.length && !selPeople.includes(a.personId)) return false;
+        if(selEntities.length && !selEntities.includes(`${a.assignType}:${a.assignId}`)) return false;
+        if(selActs.length && !selActs.includes(a.activity)) return false;
+        if(!overlap(a.startDate, a.endDate, from, to)) return false;
+        return true;
+      });
+
+      // Cálculo días intersecando con el filtro (para métrica "días")
+      const calcDays = (a)=> {
+        const s = from && a.startDate<from ? from : a.startDate;
+        const e = to   && a.endDate>to   ? to   : a.endDate;
+        return dateDiffDays(s,e);
+      };
+
+      if(groupBy==='detalle'){
+        const header=['Actividad','Persona','Entidad','Fecha inicio','Fecha fin','Días'];
+        const rows=list.map(a=>[a.activity, a.personName||'—', entityLabel(a.assignType,a.assignId), a.startDate, a.endDate, calcDays(a)]);
+        renderReportTable(header, rows);
+
+        // Para gráfico, agregamos por actividad (métrica elegida)
+        const map = new Map();
+        list.forEach(a=>{
+          const key=a.activity;
+          const inc = (metric==='days'?calcDays(a):1);
+          map.set(key, (map.get(key)||0)+inc);
+        });
+        const labels=[...map.keys()], data=[...map.values()];
+        renderReportChart(labels, data, chartType, metric==='days'?'Días':'Actividades');
+        return;
+      }
+
+      // Agrupaciones
+      let keyFn, title, labelFn;
+      if(groupBy==='persona'){
+        keyFn=a=>a.personName||'—';
+        title='Persona';
+        labelFn=keyFn;
+      }else if(groupBy==='entidad'){
+        keyFn=a=>entityLabel(a.assignType,a.assignId);
+        title='Entidad';
+        labelFn=keyFn;
+      }else{ // actividad
+        keyFn=a=>a.activity||'—';
+        title='Actividad';
+        labelFn=keyFn;
+      }
+
+      const agg = new Map();
+      list.forEach(a=>{
+        const k=keyFn(a);
+        const cur = agg.get(k) || {count:0, days:0};
+        cur.count += 1;
+        cur.days  += calcDays(a);
+        agg.set(k, cur);
+      });
+
+      const header=[title,'Actividades','Días'];
+      const rows=[...agg.entries()].sort((x,y)=>String(x[0]).localeCompare(String(y[0]))).map(([k,v])=>[k, v.count, v.days]);
+      renderReportTable(header, rows);
+
+      const labels = rows.map(r=>r[0]);
+      const data   = rows.map(r=> metric==='days' ? r[2] : r[1]);
+      renderReportChart(labels, data, chartType, metric==='days'?'Días':'Actividades');
+    }
+
     /* ---------- Entrada (LOGIN) ---------- */
     function handleAdminLogin(){
       const val = (document.getElementById('adminCodeInput').value || '').trim().toLowerCase();
@@ -923,7 +1201,7 @@
       setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80);
     }
 
-    // Fechas por defecto
+    // Fechas por defecto (actividades / costos) 
     function setDefaultActivityDates(){
       const today = new Date();
       const y = today.getFullYear();
@@ -1000,6 +1278,11 @@
       document.getElementById('lcModalSearch').addEventListener('input', renderLcModalList);
       document.getElementById('lcAddCostBtn').addEventListener('click', addLaborCost);
       setDefaultLaborCostDates();
+
+      // Reportes
+      buildReportFilterOptions();
+      document.getElementById('repGenerateBtn').addEventListener('click', generateReport);
+      document.getElementById('repDownloadBtn').addEventListener('click', exportReportCSV);
 
       // Primer pintado
       buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildActivityFilterOptions();
