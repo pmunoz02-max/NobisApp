@@ -331,7 +331,7 @@
             <tr class="text-gray-600 text-sm">
               <th class="px-3 py-2">ACTIVIDAD</th>
               <th class="px-3 py-2">PERSONA</th>
-              <th class="px-3 py-2">ENTidad</th>
+              <th class="px-3 py-2">ENTIDAD</th>
               <th class="px-3 py-2">FECHA INICIO</th>
               <th class="px-3 py-2">FECHA FIN</th>
               <th class="px-3 py-2">ACCIONES</th>
@@ -498,9 +498,987 @@
     <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl p-6">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-semibold">Administración de la App</h2>
-        <button id="adminCloseBtn" class="text-gray-600 hover:bg-gray-900">✕</button>
+        <button id="adminCloseBtn" class="text-gray-600 hover:text-gray-900">✕</button>
       </div>
 
       <div class="grid md:grid-cols-2 gap-6">
         <!-- Usuarios -->
-        <div class="
+        <div class="border rounded-xl p-4">
+          <h3 class="font-semibold mb-3">Usuarios</h3>
+          <div id="adminUsersList" class="max-h-96 overflow-auto divide-y divide-gray-100 text-sm"></div>
+        </div>
+
+        <!-- Códigos de invitación -->
+        <div class="border rounded-xl p-4">
+          <h3 class="font-semibold mb-3">Códigos de invitación</h3>
+          <div class="flex gap-2 mb-3">
+            <input id="adminNewCodeUses" type="number" min="1" step="1" value="1" class="w-32 border rounded-md p-2" placeholder="Usos">
+            <button id="adminGenCodeBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-2 rounded-lg">Crear código</button>
+          </div>
+          <div id="adminCodesList" class="max-h-96 overflow-auto divide-y divide-gray-100 text-sm"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <script>
+    /* ================= Firebase ================= */
+    const firebaseConfig = {
+      apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
+      authDomain: "demo-finca-app.firebaseapp.com",
+      projectId: "demo-finca-app",
+      storageBucket: "demo-finca-app.appspot.com",
+      messagingSenderId: "123456789012",
+      appId: "1:123456789012:web:abcdef1234567890"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    try { db.settings({ experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: true, useFetchStreams: false }); } catch {}
+    const auth = firebase.auth();
+
+    /* ============ Multi-tenant: helpers ============ */
+    const OWNER_EMAIL = "cambia_esto@tu-dominio.com"; // <— CAMBIA ESTO
+    let currentUser = null;
+    let currentUserDoc = null;
+    let LS_PREFIX = "u_anon_";
+
+    const lsKey = (base)=> `${LS_PREFIX}${base}`;
+    const save = (k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+    const load = (k)=>{try{return JSON.parse(localStorage.getItem(k)||'[]')}catch{return []}};
+    const wipeUserCache = ()=>{
+      save(lsKey('fincas_v1'), []);
+      save(lsKey('geofences_v1'), []);
+      save(lsKey('personnel_v1'), []);
+      save(lsKey('activities_v1'), []);
+      save(lsKey('labor_costs_v1'), []);
+    };
+
+    const saveFarms=(v)=>save(lsKey('fincas_v1'),v),         loadFarms=()=>load(lsKey('fincas_v1'));
+    const saveFences=(v)=>save(lsKey('geofences_v1'),v),     loadFences=()=>load(lsKey('geofences_v1'));
+    const savePeople=(v)=>save(lsKey('personnel_v1'),v),     loadPeople=()=>load(lsKey('personnel_v1'));
+    const saveActs=(v)=>save(lsKey('activities_v1'),v),      loadActs=()=>load(lsKey('activities_v1'));
+    const saveLaborCosts=(v)=>save(lsKey('labor_costs_v1'),v), loadLaborCosts=()=>load(lsKey('labor_costs_v1'));
+
+    const LS_AD = ()=>lsKey('activity_defs_v1');
+    const DEFAULT_ACTIVITY_OPTIONS = ['Siembra','Riego','Cosecha','Poda','Fertilización','Fumigación','Mantenimiento','Limpieza','Transporte','Supervisión'];
+    const loadActivityDefs = () => { try{ const arr=JSON.parse(localStorage.getItem(LS_AD())||'null'); if(Array.isArray(arr)&&arr.length) return arr; }catch{} return DEFAULT_ACTIVITY_OPTIONS.slice(); };
+    const saveActivityDefs = (arr)=>{ try{ localStorage.setItem(LS_AD(), JSON.stringify(arr)); }catch{} };
+    let activityDefs = loadActivityDefs();
+
+    const tenantDoc = ()=> db.collection('tenants').doc(currentUser.uid);
+    const col = (name)=> tenantDoc().collection(name);
+
+    /* =================== Estado general =================== */
+    let map;
+    const fincaMarkers = {}, geofenceLayers = {};
+    const GEOFENCE_STYLE={weight:2,fillOpacity:.15}, GEOFENCE_SELECTED_STYLE={weight:3,color:'#ef4444',fillOpacity:.2};
+    let isDrawingFence=false, drawingCoords=[], drawingPolyline=null, drawingMarkers=[], pendingFenceCoords=null;
+    let selectedFenceId=null, editGroup=null, isEditingFence=false;
+    let currentFarms=[], currentFences=[], currentPersonnel=[], currentActivities=[], currentLaborCosts=[];
+
+    /* =================== Autenticación =================== */
+    async function createUserDocIfMissing(u){
+      const ref = db.collection('users').doc(u.uid);
+      const snap = await ref.get();
+      if(!snap.exists){
+        const role = (u.email && u.email.toLowerCase()===OWNER_EMAIL.toLowerCase()) ? 'owner' : 'user';
+        await ref.set({ email: u.email||'', role, active: true, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+      const doc = (await ref.get()).data();
+      return doc;
+    }
+    async function isFirstUser(){
+      const s = await db.collection('users').limit(1).get();
+      return s.empty;
+    }
+    function setUiAfterLogin(){
+      document.getElementById('authModal').classList.add('hidden');
+      document.getElementById('topBar').classList.remove('hidden');
+      document.getElementById('appContent').classList.remove('hidden');
+      document.getElementById('currentUserEmail').textContent = currentUser.email || '(sin email)';
+      const roleBadge = document.getElementById('roleBadge');
+      roleBadge.textContent = currentUserDoc?.role || 'usuario';
+      const isAdmin = ['owner','admin'].includes(currentUserDoc?.role);
+      document.getElementById('openAdminBtn').classList.toggle('hidden', !isAdmin);
+      LS_PREFIX = `u_${currentUser.uid}_`;
+    }
+    function setUiLoggedOut(){
+      document.getElementById('authModal').classList.remove('hidden');
+      document.getElementById('topBar').classList.add('hidden');
+      document.getElementById('appContent').classList.add('hidden');
+      currentUser=null; currentUserDoc=null; LS_PREFIX='u_anon_';
+    }
+    function switchTab(which){
+      const loginPanel = document.getElementById('loginPanel');
+      const registerPanel = document.getElementById('registerPanel');
+      const tabLogin = document.getElementById('tabLogin');
+      const tabRegister = document.getElementById('tabRegister');
+      if(which==='login'){
+        loginPanel.classList.remove('hidden');
+        registerPanel.classList.add('hidden');
+        tabLogin.classList.add('tab-active');
+        tabRegister.classList.remove('tab-active');
+      }else{
+        registerPanel.classList.remove('hidden');
+        loginPanel.classList.add('hidden');
+        tabRegister.classList.add('tab-active');
+        tabLogin.classList.remove('tab-active');
+      }
+    }
+    function mapAuthError(e, fallback='Ocurrió un error'){
+      const code = e?.code || '';
+      if(code==='auth/invalid-email') return 'Correo inválido.';
+      if(code==='auth/user-not-found') return 'No existe una cuenta con ese correo. Ve a "Crear cuenta".';
+      if(code==='auth/wrong-password' || code==='auth/invalid-credential') return 'Contraseña incorrecta.';
+      if(code==='auth/too-many-requests') return 'Demasiados intentos. Intenta de nuevo más tarde.';
+      if(code==='auth/email-already-in-use') return 'Ese correo ya está registrado.';
+      if(code==='auth/network-request-failed') return 'Problema de red. Revisa tu conexión.';
+      return fallback;
+    }
+    async function doLogin(){
+      const email = (document.getElementById('loginEmail').value||'').trim().toLowerCase();
+      const pass  = (document.getElementById('loginPassword').value||'').trim();
+      const err = document.getElementById('loginError'); err.classList.add('hidden'); err.textContent='';
+      if(!email || !pass){ err.textContent='Ingresa correo y contraseña.'; err.classList.remove('hidden'); return; }
+      try{
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        const cred = await auth.signInWithEmailAndPassword(email, pass);
+        currentUser = cred.user;
+        currentUserDoc = await createUserDocIfMissing(currentUser);
+        if(currentUserDoc.active === false){
+          await auth.signOut();
+          err.textContent='Tu cuenta está deshabilitada por el administrador.'; err.classList.remove('hidden'); return;
+        }
+        wipeUserCache();
+        setUiAfterLogin();
+        bootAfterAuth();
+      }catch(e){
+        const msg = mapAuthError(e, 'No se pudo iniciar sesión.');
+        err.textContent = msg; err.classList.remove('hidden');
+        if(e?.code==='auth/user-not-found'){ switchTab('register'); document.getElementById('regEmail').value=email; }
+        console.error(e);
+      }
+    }
+    async function doRegister(){
+      const email = (document.getElementById('regEmail').value||'').trim().toLowerCase();
+      const pass  = (document.getElementById('regPassword').value||'').trim();
+      const code  = (document.getElementById('regCode').value||'').trim();
+      const err = document.getElementById('registerError'); err.classList.add('hidden'); err.textContent='';
+      if(!email || !pass){ err.textContent='Correo y contraseña son obligatorios.'; err.classList.remove('hidden'); return; }
+
+      try{
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+        const first = await isFirstUser();
+        const isOwner = first || email===OWNER_EMAIL.toLowerCase();
+
+        if(!isOwner){
+          if(!code){ err.textContent='Ingresa un código de invitación.'; err.classList.remove('hidden'); return; }
+          const codeRef = db.collection('access_keys').doc(code);
+          await db.runTransaction(async tx=>{
+            const snap = await tx.get(codeRef);
+            if(!snap.exists) throw new Error('Código inválido.');
+            const d = snap.data();
+            if(d.active===false) throw new Error('Código deshabilitado.');
+            const used = d.used||0, max = d.maxUses||1;
+            if(used>=max) throw new Error('Código sin cupos disponibles.');
+            tx.update(codeRef, { used: used+1 });
+          });
+        }
+
+        const cred = await auth.createUserWithEmailAndPassword(email, pass);
+        currentUser = cred.user;
+
+        const role = isOwner ? 'owner' : 'user';
+        await db.collection('users').doc(currentUser.uid).set({
+          email, role, active:true, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, {merge:true});
+
+        currentUserDoc = await createUserDocIfMissing(currentUser);
+
+        wipeUserCache();
+        setUiAfterLogin();
+        bootAfterAuth();
+      }catch(e){
+        const msg = e.message || mapAuthError(e, 'No se pudo registrar.');
+        err.textContent = msg; err.classList.remove('hidden'); console.error(e);
+      }
+    }
+    async function doLogout(){
+      try{ await auth.signOut(); }catch{}
+      setUiLoggedOut();
+      stopSubscriptions();
+    }
+
+    /* =================== App (todo lo demás) =================== */
+    function bootAfterAuth(){ setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80); }
+    function addMousePositionControl(){
+      const MousePos=L.Control.extend({options:{position:'bottomleft'},onAdd:function(){const d=L.DomUtil.create('div','mousepos-control');d.innerHTML='Lat: — Lng: —';this._div=d;return d;},update:function(lat,lng){this._div.innerHTML=(lat!=null&&lng!=null)?`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`:'Lat: — Lng: —';}});
+      const ctrl=new MousePos(); ctrl.addTo(map);
+      map.on('mousemove',e=>ctrl.update(e.latlng.lat,e.latlng.lng));
+      map.on('mouseout',()=>ctrl.update(null,null));
+    }
+    function initMap(center){ center=center||{lat:-0.1807,lng:-78.4678};
+      map=L.map('map',{center:[center.lat,center.lng],zoom:6});
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+      editGroup=new L.FeatureGroup(); map.addLayer(editGroup);
+      addMousePositionControl();
+      renderFarmsFromCache(); renderGeofencesFromCache();
+      map.on('click', async e=>{
+        if(isDrawingFence){ addFenceVertex(e.latlng); return; }
+        const name=prompt('Nombre de la nueva finca:'); if(!name) return;
+        try{ await col('farms').add({name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}}); }
+        catch{ const farms=loadFarms(); farms.push({id:'local-'+Date.now(),name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}}); saveFarms(farms); renderFarmsFromCache(); }
+      });
+      startSubscriptions();
+      initialFetchAll();
+    }
+
+    function renderFarmsFromCache(){
+      const farms=loadFarms();
+      Object.values(fincaMarkers).forEach(m=>map.removeLayer(m)); for(const k in fincaMarkers) delete fincaMarkers[k];
+      farms.forEach(f=>{ if(!f?.id||!f?.fincaLocation) return; const m=L.marker([f.fincaLocation.lat,f.fincaLocation.lng]).addTo(map); m.bindTooltip(f.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'}); fincaMarkers[f.id]=m;});
+      const sel=document.getElementById('farmSelect'); if(sel){ sel.innerHTML=''; farms.forEach(f=>{const o=document.createElement('option'); o.value=f.id; o.textContent=f.name||'Finca'; sel.appendChild(o);}); }
+      updateDeleteButtonState(); currentFarms=farms||[]; buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
+    }
+    function renderGeofencesFromCache(){
+      Object.values(geofenceLayers).forEach(p=>map.removeLayer(p)); for(const k in geofenceLayers) delete geofenceLayers[k];
+      const fences=loadFences();
+      fences.forEach(g=>{ if(!g?.id||!Array.isArray(g.path)||g.path.length<3) return; const latlngs=g.path.map(p=>[p.lat,p.lng]); const poly=L.polygon(latlngs,GEOFENCE_STYLE).addTo(map); poly.bindTooltip(g.name||'Geocerca',{permanent:true,direction:'center',className:'farm-label'}); geofenceLayers[g.id]=poly; poly.on('click',()=>selectFence(g.id)); if(selectedFenceId===g.id) poly.setStyle(GEOFENCE_SELECTED_STYLE); });
+      if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null;
+      updateDeleteFenceButtonState(); updateEditButtonsState(); currentFences=fences||[]; buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
+    }
+
+    /* ======== Suscripciones Firestore ======== */
+    let unsubFarms=null,unsubGeofences=null,unsubPersonnel=null,unsubActivities=null,unsubLaborCosts=null;
+    function stopSubscriptions(){
+      [unsubFarms,unsubGeofences,unsubPersonnel,unsubActivities,unsubLaborCosts].forEach(fn=>{try{fn&&fn()}catch{}});
+      unsubFarms=unsubGeofences=unsubPersonnel=unsubActivities=unsubLaborCosts=null;
+    }
+    function startSubscriptions(){
+      stopSubscriptions();
+      unsubFarms=col('farms').onSnapshot(s=>{
+        const farms=[]; Object.values(fincaMarkers).forEach(m=>map.removeLayer(m)); for(const k in fincaMarkers) delete fincaMarkers[k];
+        s.forEach(doc=>{const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); if(d.fincaLocation){const m=L.marker([d.fincaLocation.lat,d.fincaLocation.lng]).addTo(map); m.bindTooltip(d.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'}); fincaMarkers[doc.id]=m; }});
+        currentFarms=farms.slice(); saveFarms(farms);
+        const sel=document.getElementById('farmSelect'); if(sel){ sel.innerHTML=''; farms.forEach(f=>{const o=document.createElement('option'); o.value=f.id; o.textContent=f.name||'Finca'; sel.appendChild(o);}); }
+        updateDeleteButtonState(); buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
+      });
+
+      unsubGeofences=col('geofences').onSnapshot(s=>{
+        const fences=[]; Object.values(geofenceLayers).forEach(p=>map.removeLayer(p)); for(const k in geofenceLayers) delete geofenceLayers[k];
+        s.forEach(doc=>{const d=doc.data(); const g={id:doc.id,name:d.name,path:d.path||[]}; fences.push(g);
+          if(Array.isArray(g.path)&&g.path.length>=3){ const latlngs=g.path.map(p=>[p.lat,p.lng]); const poly=L.polygon(latlngs,GEOFENCE_STYLE).addTo(map); poly.bindTooltip(g.name||'Geocerca',{permanent:true,direction:'center',className:'farm-label'}); geofenceLayers[doc.id]=poly; poly.on('click',()=>selectFence(doc.id)); if(selectedFenceId===doc.id) poly.setStyle(GEOFENCE_SELECTED_STYLE); }
+        });
+        currentFences=fences.slice(); saveFences(fences);
+        if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null;
+        updateDeleteFenceButtonState(); updateEditButtonsState(); buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildReportFilterOptions();
+      });
+
+      unsubPersonnel=col('personnel').onSnapshot(s=>{
+        const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,firstName:d.firstName||'',lastName:d.lastName||'',idNumber:d.idNumber||'',assignType:d.assignType||'',assignId:d.assignId||'',active:(d.active!==false)});});
+        currentPersonnel=list.slice(); savePeople(list); renderPersonnelList(); buildActivityFormOptions(); buildReportFilterOptions();
+      });
+
+      unsubActivities=col('activities').onSnapshot(s=>{
+        const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,activity:d.activity||'',personId:d.personId||'',personName:d.personName||'',assignType:d.assignType||'',assignId:d.assignId||'',entityName:d.entityName||'',startDate:d.startDate||'',endDate:d.endDate||''});});
+        currentActivities=list.slice(); saveActs(list); renderActivityList(); buildReportFilterOptions();
+      });
+
+      unsubLaborCosts=col('labor_costs').onSnapshot(s=>{
+        const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,personId:d.personId||'',personName:d.personName||'',dailyCost:+(d.dailyCost||0),startDate:d.startDate||'',endDate:d.endDate||''});});
+        currentLaborCosts=list.slice(); saveLaborCosts(list); renderLaborCostList();
+      });
+    }
+
+    async function initialFetchAll(){
+      try{
+        const [fs,gs,ps,as,cs] = await Promise.all([
+          col('farms').get(), col('geofences').get(), col('personnel').get(), col('activities').get(), col('labor_costs').get()
+        ]);
+        const arrF=[],arrG=[],arrP=[],arrA=[],arrC=[];
+        fs.forEach(doc=>{const d=doc.data(); arrF.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation});});
+        gs.forEach(doc=>{const d=doc.data(); arrG.push({id:doc.id,name:d.name,path:d.path||[]});});
+        ps.forEach(doc=>{const d=doc.data(); arrP.push({id:doc.id,firstName:d.firstName||'',lastName:d.lastName||'',idNumber:d.idNumber||'',assignType:d.assignType||'',assignId:d.assignId||'',active:(d.active!==false)});});
+        as.forEach(doc=>{const d=doc.data(); arrA.push({id:doc.id,activity:d.activity||'',personId:d.personId||'',personName:d.personName||'',assignType:d.assignType||'',assignId:d.assignId||'',entityName:d.entityName||'',startDate:d.startDate||'',endDate:d.endDate||''});});
+        cs.forEach(doc=>{const d=doc.data(); arrC.push({id:doc.id,personId:d.personId||'',personName:d.personName||'',dailyCost:+(d.dailyCost||0),startDate:d.startDate||'',endDate:d.endDate||''});});
+        saveFarms(arrF); saveFences(arrG); savePeople(arrP); saveActs(arrA); saveLaborCosts(arrC);
+        currentFarms=arrF; currentFences=arrG; currentPersonnel=arrP; currentActivities=arrA; currentLaborCosts=arrC;
+        renderFarmsFromCache(); renderGeofencesFromCache(); renderPersonnelList(); renderActivityList(); renderLaborCostList(); buildReportFilterOptions();
+      }catch(e){ console.warn('Carga inicial falló, usando caché'); renderFarmsFromCache(); renderGeofencesFromCache(); renderPersonnelList(); renderActivityList(); renderLaborCostList(); buildReportFilterOptions(); }
+    }
+
+    /* ======= Geocercas ======= */
+    function selectFence(id){ if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes.'); return; } if(selectedFenceId&&geofenceLayers[selectedFenceId]) geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE); selectedFenceId=id; if(geofenceLayers[id]) geofenceLayers[id].setStyle(GEOFENCE_SELECTED_STYLE); updateDeleteFenceButtonState(); updateEditButtonsState(); }
+    function updateDeleteButtonState(){ const sel=document.getElementById('farmSelect'), btn=document.getElementById('deleteFarmBtn'); if(btn) btn.disabled=!(sel&&sel.value); }
+    function updateDeleteFenceButtonState(){ const btn=document.getElementById('deleteFenceBtn'); if(btn) btn.disabled=!selectedFenceId; }
+    function updateEditButtonsState(){ const btn=document.getElementById('editFenceBtn'); if(btn) btn.disabled=!(selectedFenceId&&geofenceLayers[selectedFenceId]&&!isEditingFence); document.getElementById('saveFenceEditBtn')?.classList.toggle('hidden',!isEditingFence); document.getElementById('cancelFenceEditBtn')?.classList.toggle('hidden',!isEditingFence); }
+    function addFenceVertex(latlng){ drawingCoords.push({lat:latlng.lat,lng:latlng.lng}); const m=L.circleMarker(latlng,{radius:4,weight:2}).addTo(map); drawingMarkers.push(m); const latlngs=drawingCoords.map(p=>[p.lat,p.lng]); if(drawingPolyline){map.removeLayer(drawingPolyline);drawingPolyline=null;} if(latlngs.length>=3) drawingPolyline=L.polygon(latlngs,{dashArray:'4,4',weight:2,fillOpacity:.1}).addTo(map); else if(latlngs.length>=2) drawingPolyline=L.polyline(latlngs,{dashArray:'4,4',weight:2}).addTo(map); }
+    function startFenceDraw(){ if(isDrawingFence) return; isDrawingFence=true; drawingCoords=[]; drawingMarkers.forEach(m=>map.removeLayer(m)); drawingMarkers=[]; if(drawingPolyline){map.removeLayer(drawingPolyline);drawingPolyline=null;} document.getElementById('startFenceBtn').classList.add('hidden'); document.getElementById('finishFenceBtn').classList.remove('hidden'); document.getElementById('cancelFenceBtn').classList.remove('hidden'); }
+    function finishFenceDraw(){ if(!isDrawingFence) return; if(drawingCoords.length<3){alert('La geocerca necesita al menos 3 puntos.');return;} pendingFenceCoords=drawingCoords.slice(); document.getElementById('fenceNameHint').textContent=`Vértices: ${pendingFenceCoords.length} puntos`; const input=document.getElementById('fenceNameInput'); input.value=`Geocerca ${new Date().toLocaleDateString()}`; document.getElementById('fenceNamePanel').classList.remove('hidden'); input.focus(); input.select(); }
+    function cancelFenceDraw(){ isDrawingFence=false; drawingCoords=[]; drawingMarkers.forEach(m=>map.removeLayer(m)); drawingMarkers=[]; if(drawingPolyline){map.removeLayer(drawingPolyline);drawingPolyline=null;} document.getElementById('startFenceBtn').classList.remove('hidden'); document.getElementById('finishFenceBtn').classList.add('hidden'); document.getElementById('cancelFenceBtn').classList.add('hidden'); document.getElementById('fenceNamePanel').classList.add('hidden'); pendingFenceCoords=null; }
+    async function saveFenceName(){ const input=document.getElementById('fenceNameInput'); const name=(input.value||'').trim()||'Geocerca'; if(!pendingFenceCoords||pendingFenceCoords.length<3){alert('No hay geocerca lista.');return;} try{ await col('geofences').add({name,path:pendingFenceCoords}); }catch{ const fences=loadFences(); fences.push({id:'localgf-'+Date.now(),name,path:pendingFenceCoords}); saveFences(fences); renderGeofencesFromCache(); } input.value=''; pendingFenceCoords=null; document.getElementById('fenceNamePanel').classList.add('hidden'); cancelFenceDraw(); }
+
+    /* ======= Explorador ======= */
+    function buildIndexList(){
+      const farmUl=document.getElementById('farmList'), fenceUl=document.getElementById('fenceList'); if(!farmUl||!fenceUl) return;
+      const farms=(currentFarms?.length?currentFarms:loadFarms()).slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
+      const fences=(currentFences?.length?currentFences:loadFences()).slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
+      farmUl.innerHTML = farms.length? farms.map(f=>`<li class="py-2"><div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer" data-type="farm" data-id="${f.id}"><div class="text-sm font-medium text-gray-800">${f.name||'Finca'}</div><div class="text-xs text-gray-500">${f?.fincaLocation?`Lat ${(+f.fincaLocation.lat).toFixed(5)}, Lng ${(+f.fincaLocation.lng).toFixed(5)}`:'—'}</div></div></li>`).join('') : `<li class="py-2 text-sm text-gray-500">No hay fincas registradas.</li>`;
+      fenceUl.innerHTML = fences.length? fences.map(g=>`<li class="py-2"><div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer" data-type="fence" data-id="${g.id}"><div class="text-sm font-medium text-gray-800">${g.name||'Geocerca'}</div><div class="text-xs text-gray-500">${Array.isArray(g.path)?`${g.path.length} puntos`:'—'}</div></div></li>`).join('') : `<li class="py-2 text-sm text-gray-500">No hay geocercas registradas.</li>`;
+    }
+    function zoomToFarm(id){ if(fincaMarkers[id]){ map.setView(fincaMarkers[id].getLatLng(),Math.max(map.getZoom(),16)); try{fincaMarkers[id].openTooltip();}catch{} return; } const f=loadFarms().find(x=>x.id===id); if(f?.fincaLocation) map.setView([f.fincaLocation.lat,f.fincaLocation.lng],Math.max(map.getZoom(),16)); else alert('No se pudo localizar esa finca.'); }
+    function zoomToFence(id){ if(geofenceLayers[id]){ map.fitBounds(geofenceLayers[id].getBounds(),{padding:[20,20]}); selectFence(id); return; } const g=loadFences().find(x=>x.id===id); if(g?.path?.length>=3){ map.fitBounds(L.latLngBounds(g.path.map(p=>[p.lat,p.lng])),{padding:[20,20]}); selectFence(id); } else alert('No se pudo localizar esa geocerca.'); }
+
+    /* ======= Personal ======= */
+    function buildAssignOptions(){
+      const sel=document.getElementById('pAssignSelect'); if(!sel) return;
+      const farms=currentFarms?.length?currentFarms:loadFarms();
+      const fences=currentFences?.length?currentFences:loadFences();
+      const opts=[];
+      if(farms.length){ opts.push({value:'',label:'— Selecciona —'}); farms.forEach(f=>opts.push({value:`farm:${f.id}`,label:`Finca: ${f.name||'Finca'}`})); }
+      if(fences.length){ if(!opts.length) opts.push({value:'',label:'— Selecciona —'}); fences.forEach(g=>opts.push({value:`fence:${g.id}`,label:`Geocerca: ${g.name||'Geocerca'}`})); }
+      if(!opts.length) opts.push({value:'',label:'No hay fincas/geocercas'});
+      sel.innerHTML = opts.map(o=>`<option value="${o.value}">${o.label}</option>`).join('');
+
+      const filter=document.getElementById('pEntityFilter');
+      if(filter){
+        const items=[{value:'all',label:'Todas'}];
+        farms.forEach(f=>items.push({value:`farm:${f.id}`,label:`Finca: ${f.name||'Finca'}`}));
+        fences.forEach(g=>items.push({value:`fence:${g.id}`,label:`Geocerca: ${g.name||'Geocerca'}`}));
+        filter.innerHTML = items.map(o=>`<option value="${o.value}">${o.label}</option>`).join('');
+      }
+    }
+    function showPersonError(msg){ const e=document.getElementById('pFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
+
+    async function addPerson(){
+      try{
+        const fn=(document.getElementById('pFirstName').value||'').trim();
+        const ln=(document.getElementById('pLastName').value||'').trim();
+        const idn=(document.getElementById('pIdNumber').value||'').trim();
+        const asg=document.getElementById('pAssignSelect').value||'';
+        const active=document.getElementById('pActive').checked;
+        showPersonError('');
+        if(!fn||!ln) return showPersonError('Nombre y apellido son obligatorios.');
+        if(!/^[0-9]{6,15}$/.test(idn)) return showPersonError('Cédula: usar solo dígitos (6–15).');
+        if(!asg) return showPersonError('Selecciona una asignación.');
+        const [assignType,assignId]=asg.split(':');
+
+        const tempId = 'localp-'+Date.now();
+        const newDoc = {id: tempId, firstName: fn, lastName: ln, idNumber: idn, assignType, assignId, active};
+
+        let cache = loadPeople(); cache.push(newDoc); savePeople(cache);
+        currentPersonnel = cache.slice(); renderPersonnelList();
+
+        try{
+          const ref = await col('personnel').add({firstName: fn, lastName: ln, idNumber: idn, assignType, assignId, active});
+          cache = loadPeople().map(p => p.id === tempId ? ({...p, id: ref.id}) : p);
+          savePeople(cache); currentPersonnel = cache.slice(); renderPersonnelList();
+        }catch{}
+
+        document.getElementById('pFirstName').value='';
+        document.getElementById('pLastName').value='';
+        document.getElementById('pIdNumber').value='';
+        document.getElementById('pAssignSelect').selectedIndex=0;
+        document.getElementById('pActive').checked=true;
+      }catch(e){ console.error(e); showPersonError('No se pudo agregar.'); }
+    }
+    window.addPerson = addPerson;
+
+    function renderPersonnelList(){
+      const tbody=document.getElementById('personnelTableBody'); if(!tbody) return;
+      const q=(document.getElementById('pSearchInput').value||'').trim().toLowerCase();
+      const t=(document.getElementById('pTypeFilter').value||'all');
+      const e=(document.getElementById('pEntityFilter').value||'all');
+      let list=currentPersonnel?.length?currentPersonnel.slice():loadPeople();
+      list=list.filter(p=>{
+        let ok=true;
+        if(q){ ok=(`${p.firstName||''} ${p.lastName||''} ${p.idNumber||''}`.toLowerCase().includes(q)); }
+        if(ok&&t!=='all') ok=(p.assignType===t);
+        if(ok&&e!=='all'){ const [kind,id]=e.split(':'); ok=(p.assignType===kind && p.assignId===id); }
+        return ok;
+      });
+      const farms=currentFarms?.length?currentFarms:loadFarms();
+      const fences=currentFences?.length?currentFences:loadFences();
+      const nameOf=p=> p.assignType==='farm' ? (farms.find(f=>f.id===p.assignId)?.name||'Finca') :
+                        p.assignType==='fence' ? (fences.find(g=>g.id===p.assignId)?.name||'Geocerca') : '—';
+      tbody.innerHTML='';
+      if(!list.length){ tbody.innerHTML=`<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">No hay personal registrado.</td></tr>`; return; }
+      list.forEach(p=>{
+        const tr=document.createElement('tr'); tr.className='border-t hover:bg-gray-50 person-row';
+        const badge = p.active!==false ? `<span class="badge badge-green">Activo</span>` : `<span class="badge badge-gray">Inactivo</span>`;
+        tr.innerHTML=`<td class="px-3 py-2">${p.firstName||''}</td>
+                      <td class="px-3 py-2">${p.lastName||''}</td>
+                      <td class="px-3 py-2">${p.idNumber||''}</td>
+                      <td class="px-3 py-2">${badge}</td>
+                      <td class="px-3 py-2">${p.assignType==='farm'?'Finca':'Geocerca'}: ${nameOf(p)}</td>
+                      <td class="px-3 py-2">
+                        <button class="text-indigo-600 hover:underline" onclick="openEditPerson('${p.id}')">Editar</button>
+                        <span class="mx-1 text-gray-300">|</span>
+                        <button class="text-rose-600 hover:underline" onclick="deletePerson('${p.id}')">Eliminar</button>
+                      </td>`;
+        tr.addEventListener('dblclick',()=>{ if(p.assignType==='farm') zoomToFarm(p.assignId); if(p.assignType==='fence') zoomToFence(p.assignId); });
+        tbody.appendChild(tr);
+      });
+    }
+    async function deletePerson(id){
+      if(!id) return; let cache=loadPeople();
+      const it=(currentPersonnel||[]).find(p=>p.id===id)||cache.find(p=>p.id===id);
+      const label=it?`${it.firstName||''} ${it.lastName||''}`.trim():'esta persona';
+      if(!confirm(`¿Eliminar ${label}?`)) return;
+      try{ await col('personnel').doc(id).delete(); }
+      catch{ cache=cache.filter(p=>p.id!==id); savePeople(cache); }
+      currentPersonnel=loadPeople(); renderPersonnelList();
+    }
+    function openEditPerson(id){
+      const src=currentPersonnel?.length?currentPersonnel:(loadPeople()||[]);
+      const p=src.find(x=>x.id===id); if(!p){ alert('No se encontró el registro.'); return; }
+      const fn=prompt('Nombre',p.firstName||''); if(fn===null) return;
+      const ln=prompt('Apellido',p.lastName||''); if(ln===null) return;
+      const idn=prompt('Cédula (solo dígitos 6–15)',p.idNumber||''); if(idn===null||!/^[0-9]{6,15}$/.test(idn)){ alert('Cédula inválida.'); return; }
+      const actAns = prompt('¿Activo? (s/n)', (p.active!==false)?'s':'n'); if(actAns===null) return;
+      const active = String(actAns).toLowerCase().trim()==='s';
+      const farms=currentFarms?.length?currentFarms:loadFarms();
+      const fences=currentFences?.length?currentFences:loadFences();
+      const choices=[...farms.map(f=>({v:`farm:${f.id}`,l:`Finca: ${f.name||'Finca'}`})), ...fences.map(g=>({v:`fence:${g.id}`,l:`Geocerca: ${g.name||'Geocerca'}`}))];
+      let pick=prompt('Asigne escribiendo el número:\n'+choices.map((c,i)=>`${i+1}. ${c.l}`).join('\n'));
+      if(pick===null) return; pick=(+pick)-1; if(pick<0||pick>=choices.length){ alert('Selección inválida.'); return; }
+      const [assignType,assignId]=choices[pick].v.split(':');
+      const doc={firstName:fn,lastName:ln,idNumber:idn,assignType,assignId,active};
+      (async()=>{ try{ await col('personnel').doc(id).update(doc); }
+        catch{ const cache=loadPeople(); const i=cache.findIndex(x=>x.id===id); if(i>=0){ cache[i]={...cache[i],...doc}; savePeople(cache);} }
+        currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildReportFilterOptions();
+      })();
+    }
+
+    /* ======= Actividades ======= */
+    function showActError(msg){ const e=document.getElementById('actFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
+    function buildActivityFormOptions(){
+      const actSel=document.getElementById('actActivitySelect');
+      const actFilter=document.getElementById('actFilterActivity');
+      const arr = loadActivityDefs();
+      if(actSel){ actSel.innerHTML = arr.map(a=>`<option value="${a}">${a}</option>`).join(''); }
+      if(actFilter){ actFilter.innerHTML = `<option value="all">Todas</option>` + arr.map(a=>`<option value="${a}">${a}</option>`).join(''); }
+
+      const people=currentPersonnel?.length?currentPersonnel:loadPeople();
+      const pSel=document.getElementById('actPersonSelect');
+      const pFilter=document.getElementById('actFilterPerson');
+      if(pSel){ pSel.innerHTML = people.length? people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}${(p.active===false)?' (inactivo)':''}</option>`).join('') : `<option value="">No hay personal</option>`; }
+      if(pFilter){ pFilter.innerHTML = `<option value="all">Todas</option>` + (people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}${(p.active===false)?' (inactivo)':''}</option>`).join('')); }
+
+      const farms=currentFarms?.length?currentFarms:loadFarms();
+      const fences=currentFences?.length?currentFences:loadFences();
+      const eSel=document.getElementById('actEntitySelect');
+      if(eSel){
+        const items=[...farms.map(f=>({v:`farm:${f.id}`,l:`Finca: ${f.name||'Finca'}`})), ...fences.map(g=>({v:`fence:${g.id}`,l:`Geocerca: ${g.name||'Geocerca'}`}))];
+        eSel.innerHTML = items.length? items.map(i=>`<option value="${i.v}">${i.l}</option>`).join('') : `<option value="">No hay entidades</option>`;
+      }
+    }
+    function buildReportFilterOptions(){
+      const people=currentPersonnel?.length?currentPersonnel:loadPeople();
+      const pSel=document.getElementById('repPersons'); if(pSel){ pSel.innerHTML = people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}${(p.active===false)?' (inactivo)':''}</option>`).join(''); }
+      const farms=currentFarms?.length?currentFarms:loadFarms();
+      const fences=currentFences?.length?currentFences:loadFences();
+      const eSel=document.getElementById('repEntities'); if(eSel){ const items=[...farms.map(f=>({v:`farm:${f.id}`,l:`Finca: ${f.name||'Finca'}`})), ...fences.map(g=>({v:`fence:${g.id}`,l:`Geocerca: ${g.name||'Geocerca'}`}))]; eSel.innerHTML = items.map(i=>`<option value="${i.v}">${i.l}</option>`).join(''); }
+      const aSel=document.getElementById('repActivities'); if(aSel){ aSel.innerHTML = loadActivityDefs().map(a=>`<option value="${a}">${a}</option>`).join(''); }
+      setDefaultReportDates();
+    }
+    function setDefaultActivityDates(){
+      const today = new Date(), y=today.getFullYear(), m=String(today.getMonth()+1).padStart(2,'0'), d=String(today.getDate()).padStart(2,'0'), v=`${y}-${m}-${d}`;
+      const s = document.getElementById('actStartDate'); const e = document.getElementById('actEndDate');
+      if(s && !s.value) s.value=v; if(e && !e.value) e.value=v;
+    }
+    function setDefaultReportDates(){
+      const today = new Date();
+      const toY = today.getFullYear(), toM = String(today.getMonth()+1).padStart(2,'0'), toD = String(today.getDate()).padStart(2,'0');
+      const to = `${toY}-${toM}-${toD}`;
+      const past = new Date(today); past.setDate(past.getDate()-30);
+      const fromY=past.getFullYear(), fromM=String(past.getMonth()+1).padStart(2,'0'), fromD=String(past.getDate()).padStart(2,'0');
+      const from = `${fromY}-${fromM}-${fromD}`;
+      if(document.getElementById('repFrom') && !document.getElementById('repFrom').value) document.getElementById('repFrom').value = from;
+      if(document.getElementById('repTo') && !document.getElementById('repTo').value) document.getElementById('repTo').value = to;
+    }
+    function manageActivityList(){
+      const op = prompt('Gestionar actividades:\n1) Agregar\n2) Eliminar\n\nEscribe 1 o 2');
+      if(op===null) return;
+      if(op==='1'){
+        const name = (prompt('Nombre de la nueva actividad:')||'').trim();
+        if(!name) return;
+        const arr = loadActivityDefs();
+        if(arr.some(a=>a.toLowerCase()===name.toLowerCase())){ alert('Ya existe esa actividad.'); return; }
+        arr.push(name); arr.sort((a,b)=>a.localeCompare(b)); saveActivityDefs(arr);
+        buildActivityFormOptions(); buildReportFilterOptions(); alert('Actividad agregada.');
+      }else if(op==='2'){
+        const arr = loadActivityDefs(); if(!arr.length){ alert('No hay actividades para eliminar.'); return; }
+        const pick = prompt('Escribe el número a eliminar:\n' + arr.map((a,i)=>`${i+1}. ${a}`).join('\n'));
+        if(pick===null) return;
+        const idx=(+pick)-1; if(idx<0 || idx>=arr.length){ alert('Selección inválida.'); return; }
+        const removed = arr.splice(idx,1)[0]; saveActivityDefs(arr);
+        buildActivityFormOptions(); buildReportFilterOptions(); alert('Eliminada: '+removed);
+      }
+    }
+    async function addActivity(){
+      try{
+        const activity=(document.getElementById('actActivitySelect').value||'').trim();
+        const personId=(document.getElementById('actPersonSelect').value||'').trim();
+        const entity=(document.getElementById('actEntitySelect').value||'').trim();
+        const start=(document.getElementById('actStartDate').value||'').trim();
+        const end=(document.getElementById('actEndDate').value||'').trim();
+        showActError('');
+
+        if(!activity) return showActError('Selecciona una actividad.');
+        if(!personId) return showActError('Selecciona una persona.');
+        if(!entity) return showActError('Selecciona una finca/geocerca.');
+        if(!start||!end) return showActError('Selecciona el rango de fechas.');
+        if(start>end) return showActError('La fecha inicio no puede ser mayor a la fecha fin.');
+
+        const people=currentPersonnel?.length?currentPersonnel:loadPeople();
+        const p=people.find(x=>x.id===personId);
+        const personName = p ? `${p.firstName||''} ${p.lastName||''}`.trim() : '—';
+
+        const [assignType,assignId]=entity.split(':');
+        const farms=currentFarms?.length?currentFarms:loadFarms();
+        const fences=currentFences?.length?currentFences:loadFences();
+        const entityName = assignType==='farm' ? (farms.find(f=>f.id===assignId)?.name||'Finca')
+                         : assignType==='fence' ? (fences.find(g=>g.id===assignId)?.name||'Geocerca') : '—';
+
+        const tempId='locala-'+Date.now();
+        const record={ id:tempId, activity, personId, personName, assignType, assignId, entityName, startDate:start, endDate:end };
+
+        let cache=loadActs(); cache.push(record); saveActs(cache);
+        currentActivities=cache.slice(); renderActivityList();
+
+        try{
+          const ref=await col('activities').add({activity, personId, personName, assignType, assignId, entityName, startDate:start, endDate:end});
+          cache = loadActs().map(a=>a.id===tempId?({...a,id:ref.id}):a);
+          saveActs(cache); currentActivities=cache.slice(); renderActivityList();
+        }catch{ }
+
+        document.getElementById('actStartDate').value='';
+        document.getElementById('actEndDate').value='';
+      }catch(e){ console.error(e); showActError('No se pudo agregar la actividad.'); }
+    }
+    window.addActivity = addActivity;
+
+    function renderActivityList(){
+      const tbody=document.getElementById('activityTableBody'); if(!tbody) return;
+      const fPerson=(document.getElementById('actFilterPerson').value||'all');
+      const fAct=(document.getElementById('actFilterActivity').value||'all');
+      const fFrom=(document.getElementById('actFilterFrom').value||'');
+      const fTo=(document.getElementById('actFilterTo').value||'');
+
+      let list=currentActivities?.length?currentActivities.slice():loadActs();
+      list=list.filter(a=>{
+        let ok=true;
+        if(fPerson!=='all') ok=ok&&(a.personId===fPerson);
+        if(ok&&fAct!=='all') ok=(a.activity===fAct);
+        if(ok&&fFrom) ok=ok&&(a.endDate>=fFrom);
+        if(ok&&fTo)   ok=ok&&(a.startDate<=fTo);
+        return ok;
+      });
+
+      tbody.innerHTML='';
+      if(!list.length){ tbody.innerHTML=`<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">No hay actividades registradas.</td></tr>`; return; }
+
+      list.sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
+      list.forEach(a=>{
+        const entityLabel = (a.assignType==='farm'?'Finca':'Geocerca')+': '+(a.entityName||'—');
+        const tr=document.createElement('tr'); tr.className='border-t hover:bg-gray-50';
+        tr.innerHTML=`<td class="px-3 py-2">${a.activity}</td>
+                      <td class="px-3 py-2">${a.personName||'—'}</td>
+                      <td class="px-3 py-2">${entityLabel}</td>
+                      <td class="px-3 py-2">${a.startDate}</td>
+                      <td class="px-3 py-2">${a.endDate}</td>
+                      <td class="px-3 py-2">
+                        <button class="text-rose-600 hover:underline" onclick="deleteActivity('${a.id}')">Eliminar</button>
+                      </td>`;
+        tr.addEventListener('dblclick',()=>{ if(a.assignType==='farm') zoomToFarm(a.assignId); if(a.assignType==='fence') zoomToFence(a.assignId); });
+        tbody.appendChild(tr);
+      });
+    }
+    async function deleteActivity(id){
+      if(!id) return;
+      try{ await col('activities').doc(id).delete(); }
+      catch{ const cache=loadActs().filter(a=>a.id!==id); saveActs(cache); }
+      currentActivities=loadActs(); renderActivityList();
+    }
+    window.deleteActivity=deleteActivity;
+
+    /* ======= Costos ======= */
+    function showLcError(msg){ const e=document.getElementById('lcFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
+    function openLcModal(){ const m=document.getElementById('lcPersonModal'); m.classList.remove('hidden'); m.classList.add('flex'); renderLcModalList(); document.getElementById('lcModalSearch').value=''; document.getElementById('lcModalSearch').focus(); }
+    function closeLcModal(){ const m=document.getElementById('lcPersonModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
+    function renderLcModalList(){
+      const cont=document.getElementById('lcModalList');
+      const q=(document.getElementById('lcModalSearch').value||'').trim().toLowerCase();
+      const people=(currentPersonnel?.length?currentPersonnel:loadPeople()).filter(p=>p.active!==false);
+      let list=people;
+      if(q){ list = people.filter(p=>(`${p.firstName||''} ${p.lastName||''} ${p.idNumber||''}`.toLowerCase().includes(q))); }
+      cont.innerHTML='';
+      if(!list.length){ cont.innerHTML='<div class="py-6 text-center text-gray-500">No hay personas activas.</div>'; return; }
+      list.forEach(p=>{
+        const btn=document.createElement('button');
+        btn.className='w-full text-left px-3 py-2 hover:bg-gray-100';
+        btn.innerHTML=`<div class="font-medium text-gray-800">${p.firstName||''} ${p.lastName||''}</div><div class="text-xs text-gray-500">Cédula: ${p.idNumber||''}</div>`;
+        btn.addEventListener('click', ()=>{
+          const display=document.getElementById('lcPersonDisplay');
+          display.value=`${p.firstName||''} ${p.lastName||''}`.trim();
+          display.dataset.personId = p.id;
+          closeLcModal();
+        });
+        cont.appendChild(btn);
+      });
+    }
+    async function addLaborCost(){
+      try{
+        showLcError('');
+        const display=document.getElementById('lcPersonDisplay');
+        const personId = display.dataset.personId || '';
+        const personName = display.value || '';
+        const dailyCost = parseFloat(document.getElementById('lcDailyCost').value);
+        const start = (document.getElementById('lcStartDate').value||'').trim();
+        const end   = (document.getElementById('lcEndDate').value||'').trim();
+
+        if(!personId) return showLcError('Elige una persona activa.');
+        if(!(dailyCost>=0)) return showLcError('Ingresa un costo válido.');
+        if(!start || !end) return showLcError('Selecciona el rango de fechas.');
+        if(start>end) return showLcError('La fecha inicio no puede ser mayor a la fecha fin.');
+
+        const tempId='localc-'+Date.now();
+        const rec={ id:tempId, personId, personName, dailyCost:+dailyCost, startDate:start, endDate:end };
+
+        let cache=loadLaborCosts(); cache.push(rec); saveLaborCosts(cache);
+        currentLaborCosts = cache.slice(); renderLaborCostList();
+
+        try{
+          const ref = await col('labor_costs').add({personId, personName, dailyCost:+dailyCost, startDate:start, endDate:end});
+          cache = loadLaborCosts().map(x=>x.id===tempId?({...x,id:ref.id}):x);
+          saveLaborCosts(cache); currentLaborCosts=cache.slice(); renderLaborCostList();
+        }catch{ }
+
+        document.getElementById('lcPersonDisplay').value='';
+        document.getElementById('lcPersonDisplay').dataset.personId='';
+        document.getElementById('lcDailyCost').value='';
+        document.getElementById('lcStartDate').value='';
+        document.getElementById('lcEndDate').value='';
+      }catch(e){ console.error(e); showLcError('No se pudo guardar el costo.'); }
+    }
+    window.addLaborCost = addLaborCost;
+    function renderLaborCostList(){
+      const tbody=document.getElementById('laborCostTableBody'); if(!tbody) return;
+      let list=currentLaborCosts?.length?currentLaborCosts.slice():loadLaborCosts();
+      list.sort((a,b)=> (a.personName||'').localeCompare(b.personName||'') || (a.startDate||'').localeCompare(b.startDate||'') );
+      tbody.innerHTML='';
+      if(!list.length){ tbody.innerHTML=`<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">No hay costos registrados.</td></tr>`; return; }
+      list.forEach(c=>{
+        const tr=document.createElement('tr'); tr.className='border-t hover:bg-gray-50';
+        tr.innerHTML=`<td class="px-3 py-2">${c.personName||'—'}</td>
+                      <td class="px-3 py-2">$${(c.dailyCost||0).toFixed(2)}</td>
+                      <td class="px-3 py-2">${c.startDate}</td>
+                      <td class="px-3 py-2">${c.endDate}</td>
+                      <td class="px-3 py-2">
+                        <button class="text-rose-600 hover:underline" onclick="deleteLaborCost('${c.id}')">Eliminar</button>
+                      </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+    async function deleteLaborCost(id){
+      if(!id) return;
+      try{ await col('labor_costs').doc(id).delete(); }
+      catch{ const cache=loadLaborCosts().filter(x=>x.id!==id); saveLaborCosts(cache); }
+      currentLaborCosts=loadLaborCosts(); renderLaborCostList();
+    }
+    window.deleteLaborCost=deleteLaborCost;
+
+    /* ======= Reportes ======= */
+    let reportChart = null, lastReportHeader = [], lastReportRows = [];
+    function exportReportCSV(){
+      if(!lastReportHeader.length){ alert('Primero genera un reporte.'); return; }
+      const lines = [];
+      const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
+      lines.push(lastReportHeader.map(esc).join(','));
+      lastReportRows.forEach(r=>lines.push(r.map(esc).join(',')));
+      const blob = new Blob(["\uFEFF"+lines.join("\r\n")], {type:"text/csv;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `reporte_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+    function renderReportTable(header, rows){
+      lastReportHeader = header.slice(); lastReportRows = rows.slice();
+      const thead=document.getElementById('repTableHead'), tbody=document.getElementById('repTableBody');
+      thead.innerHTML = `<tr class="text-gray-600 text-sm">${header.map(h=>`<th class="px-3 py-2">${h}</th>`).join('')}</tr>`;
+      tbody.innerHTML = rows.length ? rows.map(r=>`<tr class="border-t hover:bg-gray-50">${r.map(c=>`<td class="px-3 py-2">${c}</td>`).join('')}</tr>`).join('')
+                                    : `<tr><td colspan="${header.length}" class="px-3 py-4 text-center text-gray-500">Sin resultados para los filtros seleccionados.</td></tr>`;
+    }
+    function renderReportChart(labels, data, chartType, labelText){
+      const ctx = document.getElementById('repChart').getContext('2d');
+      try{
+        if(reportChart){ reportChart.destroy(); reportChart=null; }
+        reportChart = new Chart(ctx, {
+          type: chartType,
+          data: { labels, datasets: [{ label: labelText, data }] },
+          options: { responsive:true, maintainAspectRatio:false }
+        });
+      }catch{}
+    }
+    function getMultiValues(selectEl){ return Array.from((selectEl?.selectedOptions)||[]).map(o=>o.value); }
+    function overlap(aStart, aEnd, bStart, bEnd){ return (!bStart || aEnd>=bStart) && (!bEnd || aStart<=bEnd); }
+    function dateDiffDays(a,b){ const d1=new Date(a+"T00:00:00"), d2=new Date(b+"T00:00:00"); return Math.max(0, Math.floor((d2 - d1)/(24*3600*1000)) + 1); }
+    function entityLabel(assignType, assignId){
+      const farms=currentFarms?.length?currentFarms:loadFarms();
+      const fences=currentFences?.length?currentFences:loadFences();
+      if(assignType==='farm'){ const n = farms.find(f=>f.id===assignId)?.name||'Finca'; return `Finca: ${n}`; }
+      if(assignType==='fence'){ const n = fences.find(g=>g.id===assignId)?.name||'Geocerca'; return `Geocerca: ${n}`; }
+      return '—';
+    }
+    function generateReport(){
+      const people=currentPersonnel?.length?currentPersonnel:loadPeople();
+      const onlyActive = document.getElementById('repOnlyActive').checked;
+      const selPeople = getMultiValues(document.getElementById('repPersons'));
+      const selEntities = getMultiValues(document.getElementById('repEntities'));
+      const selActs = getMultiValues(document.getElementById('repActivities'));
+      const from = (document.getElementById('repFrom').value||'');
+      const to   = (document.getElementById('repTo').value||'');
+      const groupBy = document.getElementById('repGroupBy').value;
+      const metric = document.getElementById('repMetric').value;
+      const chartType = document.getElementById('repChartType').value;
+
+      let list=currentActivities?.length?currentActivities.slice():loadActs();
+      const calcDays = (a)=>{ const s = from && a.startDate<from ? from : a.startDate; const e = to && a.endDate>to ? to : a.endDate; return dateDiffDays(s,e); };
+
+      list=list.filter(a=>{
+        const p = people.find(x=>x.id===a.personId);
+        if(onlyActive && p && p.active===false) return false;
+        if(selPeople.length && !selPeople.includes(a.personId)) return false;
+        if(selEntities.length && !selEntities.includes(`${a.assignType}:${a.assignId}`)) return false;
+        if(selActs.length && !selActs.includes(a.activity)) return false;
+        if(!overlap(a.startDate, a.endDate, from, to)) return false;
+        return true;
+      });
+
+      if(groupBy==='detalle'){
+        const header=['Actividad','Persona','Entidad','Fecha inicio','Fecha fin','Días'];
+        const rows=list.map(a=>[a.activity, a.personName||'—', entityLabel(a.assignType,a.assignId), a.startDate, a.endDate, calcDays(a)]);
+        renderReportTable(header, rows);
+        const map = new Map();
+        list.forEach(a=>{ map.set(a.activity, (map.get(a.activity)||0) + (metric==='days'?calcDays(a):1)); });
+        const labels=[...map.keys()], data=[...map.values()];
+        renderReportChart(labels, data, chartType, metric==='days'?'Días':'Actividades');
+        return;
+      }
+
+      let keyFn, title;
+      if(groupBy==='persona'){ keyFn=a=>a.personName||'—'; title='Persona'; }
+      else if(groupBy==='entidad'){ keyFn=a=>entityLabel(a.assignType,a.assignId); title='Entidad'; }
+      else { keyFn=a=>a.activity||'—'; title='Actividad'; }
+
+      const agg = new Map();
+      list.forEach(a=>{
+        const k=keyFn(a);
+        const cur = agg.get(k) || {count:0, days:0};
+        cur.count += 1;
+        cur.days  += calcDays(a);
+        agg.set(k, cur);
+      });
+
+      const header=[title,'Actividades','Días'];
+      const rows=[...agg.entries()].sort((x,y)=>String(x[0]).localeCompare(String(y[0]))).map(([k,v])=>[k, v.count, v.days]);
+      renderReportTable(header, rows);
+      const labels = rows.map(r=>r[0]);
+      const data   = rows.map(r=> metric==='days' ? r[2] : r[1]);
+      renderReportChart(labels, data, chartType, metric==='days'?'Días':'Actividades');
+    }
+
+    /* =================== Admin de la App =================== */
+    function randCode(n=8){
+      const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let s=''; for(let i=0;i<n;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+      return s;
+    }
+    let unsubUsersAdmin=null, unsubCodesAdmin=null;
+    function openAdminModal(){
+      document.getElementById('adminAppModal').classList.remove('hidden');
+      document.getElementById('adminAppModal').classList.add('flex');
+      unsubUsersAdmin = db.collection('users').orderBy('email').onSnapshot(s=>{
+        const box=document.getElementById('adminUsersList'); box.innerHTML='';
+        s.forEach(doc=>{
+          const d=doc.data(); const id=doc.id;
+          const row=document.createElement('div');
+          row.className='py-2 flex items-center justify-between';
+          const role = d.role||'user';
+          const active = d.active!==false;
+          row.innerHTML=`
+            <div>
+              <div class="font-medium text-gray-800">${d.email||'—'}</div>
+              <div class="text-xs text-gray-500">Rol: ${role} · Estado: ${active?'activo':'deshabilitado'}</div>
+            </div>
+            <div class="flex gap-2">
+              <button class="text-xs px-2 py-1 rounded bg-gray-100 border hover:bg-gray-200" data-action="toggle" data-id="${id}">${active?'Deshabilitar':'Habilitar'}</button>
+              <button class="text-xs px-2 py-1 rounded bg-gray-100 border hover:bg-gray-200" data-action="role" data-id="${id}">${role==='admin'?'Quitar admin':'Hacer admin'}</button>
+            </div>`;
+          box.appendChild(row);
+        });
+        box.querySelectorAll('button').forEach(b=>{
+          b.addEventListener('click', async (ev)=>{
+            const action = ev.currentTarget.dataset.action;
+            const uid = ev.currentTarget.dataset.id;
+            const ref = db.collection('users').doc(uid);
+            const snap = await ref.get(); if(!snap.exists) return;
+            const d = snap.data();
+            if(action==='toggle'){
+              await ref.update({ active: !(d.active!==false) });
+            }else if(action==='role'){
+              const newRole = (d.role==='admin') ? 'user' : 'admin';
+              await ref.update({ role: newRole });
+            }
+          });
+        });
+      });
+
+      unsubCodesAdmin = db.collection('access_keys').orderBy('createdAt','desc').onSnapshot(s=>{
+        const box=document.getElementById('adminCodesList'); box.innerHTML='';
+        s.forEach(doc=>{
+          const d=doc.data(); const code=doc.id;
+          const active = d.active!==false;
+          const used = d.used||0, max=d.maxUses||1;
+          const row=document.createElement('div');
+          row.className='py-2 flex items-center justify-between';
+          row.innerHTML=`
+            <div>
+              <div class="font-medium">${code} ${active?'':'<span class="text-xs text-rose-600">(deshabilitado)</span>'}</div>
+              <div class="text-xs text-gray-500">Usos: ${used}/${max} · Creado: ${d.createdAt?.toDate? d.createdAt.toDate().toLocaleString() : '—'}</div>
+            </div>
+            <div class="flex gap-2">
+              <button class="text-xs px-2 py-1 rounded bg-gray-100 border hover:bg-gray-200" data-action="toggle" data-id="${code}">${active?'Deshabilitar':'Habilitar'}</button>
+              <button class="text-xs px-2 py-1 rounded bg-gray-100 border hover:bg-gray-200" data-action="delete" data-id="${code}">Eliminar</button>
+            </div>`;
+          box.appendChild(row);
+        });
+        box.querySelectorAll('button').forEach(b=>{
+          b.addEventListener('click', async (ev)=>{
+            const action=ev.currentTarget.dataset.action;
+            const code=ev.currentTarget.dataset.id;
+            const ref=db.collection('access_keys').doc(code);
+            if(action==='toggle'){
+              const snap=await ref.get(); if(!snap.exists) return;
+              const d=snap.data(); await ref.update({ active: !(d.active!==false) });
+            }else if(action==='delete'){
+              if(confirm('¿Eliminar código '+code+'?')) await ref.delete();
+            }
+          });
+        });
+      });
+    }
+    function closeAdminModal(){
+      document.getElementById('adminAppModal').classList.add('hidden');
+      document.getElementById('adminAppModal').classList.remove('flex');
+      try{unsubUsersAdmin&&unsubUsersAdmin()}catch{}; unsubUsersAdmin=null;
+      try{unsubCodesAdmin&&unsubCodesAdmin()}catch{}; unsubCodesAdmin=null;
+    }
+    async function adminGenerateCode(){
+      const uses = Math.max(1, parseInt(document.getElementById('adminNewCodeUses').value||'1',10));
+      const code = randCode(8);
+      await db.collection('access_keys').doc(code).set({
+        active:true, used:0, maxUses:uses, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid
+      });
+      alert('Código creado: '+code);
+    }
+
+    /* =================== Listeners =================== */
+    document.addEventListener('DOMContentLoaded',()=>{
+      document.getElementById('tabLogin').addEventListener('click', ()=>switchTab('login'));
+      document.getElementById('tabRegister').addEventListener('click', ()=>switchTab('register'));
+      document.getElementById('loginBtn').addEventListener('click', doLogin);
+      document.getElementById('registerBtn').addEventListener('click', doRegister);
+
+      // Enter en login/registro
+      ['loginEmail','loginPassword','regEmail','regPassword','regCode'].forEach(id=>{
+        const el=document.getElementById(id);
+        el.addEventListener('keydown',(e)=>{
+          if(e.key==='Enter'){
+            if(id.startsWith('login')) doLogin(); else doRegister();
+          }
+        });
+      });
+
+      document.getElementById('logoutBtn').addEventListener('click', doLogout);
+
+      // Admin modal
+      document.getElementById('openAdminBtn').addEventListener('click', openAdminModal);
+      document.getElementById('adminCloseBtn').addEventListener('click', closeAdminModal);
+      document.getElementById('adminGenCodeBtn').addEventListener('click', adminGenerateCode);
+
+      // Mapa
+      document.getElementById('farmSelect').addEventListener('change',updateDeleteButtonState);
+      document.getElementById('startFenceBtn').addEventListener('click',startFenceDraw);
+      document.getElementById('finishFenceBtn').addEventListener('click',finishFenceDraw);
+      document.getElementById('cancelFenceBtn').addEventListener('click',cancelFenceDraw);
+      document.getElementById('fenceNameSaveBtn').addEventListener('click',saveFenceName);
+      document.getElementById('fenceNameCancelBtn').addEventListener('click',()=>document.getElementById('fenceNamePanel').classList.add('hidden'));
+      document.getElementById('editFenceBtn').addEventListener('click',()=>{ /* opcional edición */ });
+      document.getElementById('exportGeoJSONBtn').addEventListener('click',()=>{ /* opcional export */ });
+
+      // Listas dblclick
+      document.getElementById('farmList').addEventListener('dblclick',e=>{const n=e.target.closest('[data-type="farm"][data-id]'); if(n) zoomToFarm(n.dataset.id);});
+      document.getElementById('fenceList').addEventListener('dblclick',e=>{const n=e.target.closest('[data-type="fence"][data-id]'); if(n) zoomToFence(n.dataset.id);});
+
+      // Personal
+      document.getElementById('addPersonBtn').addEventListener('click', addPerson);
+      ['pFirstName','pLastName','pIdNumber'].forEach(id=>{
+        const el=document.getElementById(id);
+        el.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter'){ addPerson(); }});
+      });
+      document.getElementById('pSearchInput').addEventListener('input',renderPersonnelList);
+      document.getElementById('pTypeFilter').addEventListener('change',renderPersonnelList);
+      document.getElementById('pEntityFilter').addEventListener('change',renderPersonnelList);
+
+      // Actividades
+      document.getElementById('addActivityBtn').addEventListener('click', addActivity);
+      document.getElementById('actManageBtn').addEventListener('click', manageActivityList);
+      document.getElementById('actFilterPerson').addEventListener('change', renderActivityList);
+      document.getElementById('actFilterActivity').addEventListener('change', renderActivityList);
+      document.getElementById('actFilterFrom').addEventListener('change', renderActivityList);
+      document.getElementById('actFilterTo').addEventListener('change', renderActivityList);
+      setDefaultActivityDates();
+
+      // Costos
+      document.getElementById('lcChoosePersonBtn').addEventListener('click', openLcModal);
+      document.getElementById('lcModalClose').addEventListener('click', closeLcModal);
+      document.getElementById('lcModalCancel').addEventListener('click', closeLcModal);
+      document.getElementById('lcModalSearch').addEventListener('input', renderLcModalList);
+      document.getElementById('lcAddCostBtn').addEventListener('click', addLaborCost);
+
+      // Reportes
+      document.getElementById('repGenerateBtn').addEventListener('click', generateReport);
+      document.getElementById('repDownloadBtn').addEventListener('click', exportReportCSV);
+
+      // Observa cambios de sesión
+      auth.onAuthStateChanged(async (u)=>{
+        if(u){
+          currentUser=u;
+          try{
+            currentUserDoc = await createUserDocIfMissing(u);
+            if(currentUserDoc.active===false){ await auth.signOut(); setUiLoggedOut(); return; }
+          }catch(e){ console.error(e); }
+          setUiAfterLogin();
+          bootAfterAuth();
+        }else{
+          setUiLoggedOut();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
