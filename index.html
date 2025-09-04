@@ -33,7 +33,6 @@
              class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2"
              autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text">
       <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
-      <!-- CORRECCIÓN: este botón es para acceder (antes tenía id duplicado de Agregar) -->
       <button id="adminLoginBtn"
               class="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition font-bold">
         Acceder
@@ -62,7 +61,6 @@
         <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
         <div class="ml-auto flex flex-wrap gap-2">
 
-          <!-- Geocerca (dibujo) -->
           <button id="startFenceBtn"
             class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">
             Nueva geocerca
@@ -76,13 +74,11 @@
             Cancelar
           </button>
 
-          <!-- Geocerca por coordenadas -->
           <button id="createFenceByCoordsBtn"
             class="inline-flex items-center gap-2 bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg">
             Geocerca (Lat/Lngs)
           </button>
 
-          <!-- Fincas -->
           <button id="createFarmBtn"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">
             Crear finca
@@ -96,14 +92,12 @@
             Eliminar finca
           </button>
 
-          <!-- Eliminar geocerca -->
           <button id="deleteFenceBtn"
             class="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             disabled>
             Eliminar geocerca
           </button>
 
-          <!-- Edición & GeoJSON -->
           <button id="editFenceBtn"
             class="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             disabled>
@@ -129,7 +123,6 @@
         </div>
       </div>
 
-      <!-- Panel nombre finca (Lat/Lng) -->
       <div id="coordsNamePanel" class="hidden mb-3">
         <div class="rounded-xl border border-gray-200 p-3">
           <label for="coordsNameInput" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la nueva finca</label>
@@ -142,7 +135,6 @@
         </div>
       </div>
 
-      <!-- Panel nombre geocerca -->
       <div id="fenceNamePanel" class="hidden mb-3">
         <div class="rounded-xl border border-gray-200 p-3">
           <label for="fenceNameInput" class="block text-sm font-medium text-gray-700 mb-1">Nombre de la geocerca</label>
@@ -157,7 +149,6 @@
 
       <div id="map"></div>
 
-      <!-- Explorador -->
       <div id="indexPanel" class="mt-4">
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-gray-800">Explorador de elementos</h3>
@@ -176,7 +167,7 @@
       </div>
 
       <p id="statusMessage" class="mt-3 text-sm text-gray-600">
-        Haz clic en el mapa para crear una nueva finca… Para geocercas: <strong>Nueva geocerca</strong> → <strong>Finalizar geocerca</strong> → guarda.
+        Haz clic en el mapa para crear una nueva finca…
       </p>
     </div>
 
@@ -187,33 +178,35 @@
         <span class="text-xs text-gray-500">Doble clic sobre una fila para ir a su asignación</span>
       </div>
 
-      <div class="grid md:grid-cols-4 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Nombre</label>
-          <input id="pFirstName" type="text" class="mt-1 w-full border rounded-md p-2" />
+      <!-- FORM: método robusto -->
+      <form id="personForm" class="grid gap-4">
+        <div class="grid md:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Nombre</label>
+            <input id="pFirstName" type="text" class="mt-1 w-full border rounded-md p-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Apellido</label>
+            <input id="pLastName" type="text" class="mt-1 w-full border rounded-md p-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Cédula</label>
+            <input id="pIdNumber" type="text" class="mt-1 w-full border rounded-md p-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Asignación</label>
+            <select id="pAssignSelect" class="mt-1 w-full border rounded-md p-2"></select>
+          </div>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Apellido</label>
-          <input id="pLastName" type="text" class="mt-1 w-full border rounded-md p-2" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Cédula</label>
-          <input id="pIdNumber" type="text" class="mt-1 w-full border rounded-md p-2" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Asignación</label>
-          <select id="pAssignSelect" class="mt-1 w-full border rounded-md p-2"></select>
-        </div>
-      </div>
 
-      <div class="mt-3">
-        <!-- ÚNICO botón Agregar -->
-        <button id="addPersonBtn" type="button" onclick="addPerson()"
-          class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
-          Agregar
-        </button>
-        <span id="pFormError" class="text-sm text-red-600 ml-3 hidden"></span>
-      </div>
+        <div class="mt-1">
+          <button id="addPersonBtn" data-action="add-person" type="submit"
+            class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
+            Agregar
+          </button>
+          <span id="pFormError" class="text-sm text-red-600 ml-3 hidden"></span>
+        </div>
+      </form>
 
       <!-- Filtros -->
       <div class="mt-6 grid md:grid-cols-3 gap-4">
@@ -292,12 +285,10 @@
       db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
     }
 
-    // Auth anónima
     let authReady = false;
     firebase.auth().signInAnonymously().catch(console.error);
     firebase.auth().onAuthStateChanged((user)=>{ authReady = !!user; });
 
-    // ===== Estado =====
     let map;
     const fincaMarkers = {};
     const geofenceLayers = {};
@@ -317,18 +308,15 @@
     const GEOFENCE_STYLE = {weight:2, fillOpacity:0.15};
     const GEOFENCE_SELECTED_STYLE = {weight:3, color:'#ef4444', fillOpacity:0.2};
 
-    // Estado “vivo”
     let currentFarms = [];
     let currentFences = [];
     let currentPersonnel = [];
 
-    // ===== Edición (Leaflet.Draw) =====
     let isEditingFence = false;
     let editBackupCoords = null;
     let editGroup = null;
     let editToolbar = null;
 
-    // Caché
     const saveCache      = farms   => { try{ localStorage.setItem(LS_KEY, JSON.stringify(farms)); }catch{} };
     const loadCache      = ()      => { try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } };
     const saveFenceCache = fences  => { try{ localStorage.setItem(LS_GF, JSON.stringify(fences)); }catch{} };
@@ -336,7 +324,6 @@
     const savePersonnelCache = list=> { try{ localStorage.setItem(LS_PE, JSON.stringify(list)); }catch{} };
     const loadPersonnelCache = ()  => { try{ return JSON.parse(localStorage.getItem(LS_PE)||'[]'); }catch{ return []; } };
 
-    // Render Fincas
     function renderFarmsFromCache(){
       const farms = loadCache();
       Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
@@ -365,7 +352,6 @@
       buildAssignOptions();
     }
 
-    // Render Geocercas
     function renderGeofencesFromCache(){
       Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
       for(const k in geofenceLayers) delete geofenceLayers[k];
@@ -390,13 +376,11 @@
       buildAssignOptions();
     }
 
-    // Mapa
     function initMap(center){
       center = center || {lat:-0.1807, lng:-78.4678};
       map = L.map('map',{center:[center.lat,center.lng],zoom:6});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
-      // Grupo para edición
       editGroup = new L.FeatureGroup();
       map.addLayer(editGroup);
 
@@ -423,12 +407,10 @@
       });
     }
 
-    // Suscripciones
     let unsubFarms = null, unsubGeofences = null, unsubPersonnel = null, subsStarted=false;
     function startSubscriptions(){
       if (subsStarted) return; subsStarted=true;
 
-      // Fincas
       unsubFarms = db.collection('farms').onSnapshot(snap=>{
         const farms = [];
         Object.values(fincaMarkers).forEach(m=> map.removeLayer(m));
@@ -457,7 +439,6 @@
         buildAssignOptions();
       }, err => { console.warn('onSnapshot farms error', err); renderFarmsFromCache(); });
 
-      // Geocercas
       unsubGeofences = db.collection('geofences').onSnapshot(snap=>{
         const fences = [];
         Object.values(geofenceLayers).forEach(p=> map.removeLayer(p));
@@ -487,7 +468,6 @@
         buildAssignOptions();
       }, err => { console.warn('onSnapshot geofences error', err); renderGeofencesFromCache(); });
 
-      // Personal
       unsubPersonnel = db.collection('personnel').onSnapshot(snap=>{
         const list = [];
         snap.forEach(doc=>{
@@ -511,47 +491,27 @@
       });
     }
 
-    // Carga inicial
     async function initialFetchAll(){ await Promise.all([initialFetchFarms(), initialFetchGeofences(), initialFetchPersonnel()]); }
-    async function initialFetchFarms(){
-      try{
-        const snap = await db.collection('farms').get();
-        const farms=[]; snap.forEach(doc=>{ const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); });
-        if (farms.length){
-          currentFarms = farms.slice(); saveCache(farms); renderFarmsFromCache();
-        } else {
-          buildIndexList(); buildAssignOptions();
-        }
-      }catch(e){ console.warn('get farms failed', e); buildIndexList(); buildAssignOptions(); }
-    }
-    async function initialFetchGeofences(){
-      try{
-        const snap = await db.collection('geofences').get();
-        const fences=[]; snap.forEach(doc=>{ const d=doc.data(); fences.push({id:doc.id,name:d.name,path:d.path||[]}); });
-        if (fences.length){
-          currentFences = fences.slice(); saveFenceCache(fences); renderGeofencesFromCache();
-        } else {
-          buildIndexList(); buildAssignOptions();
-        }
-      }catch(e){ console.warn('get geofences failed', e); buildIndexList(); buildAssignOptions(); }
-    }
-    async function initialFetchPersonnel(){
-      try{
-        const snap = await db.collection('personnel').get();
-        const list=[]; snap.forEach(doc=>{ const d=doc.data(); list.push({id:doc.id,firstName:d.firstName||'',lastName:d.lastName||'',idNumber:d.idNumber||'',assignType:d.assignType||'',assignId:d.assignId||''}); });
-        if (list.length){
-          currentPersonnel = list.slice(); savePersonnelCache(list);
-        } else {
-          currentPersonnel = loadPersonnelCache();
-        }
-        renderPersonnelList();
-      }catch(e){
-        console.warn('get personnel failed', e);
-        currentPersonnel = loadPersonnelCache(); renderPersonnelList();
-      }
-    }
+    async function initialFetchFarms(){ try{
+      const snap = await db.collection('farms').get();
+      const farms=[]; snap.forEach(doc=>{ const d=doc.data(); farms.push({id:doc.id,name:d.name,fincaLocation:d.fincaLocation}); });
+      if (farms.length){ currentFarms = farms.slice(); saveCache(farms); renderFarmsFromCache(); }
+      else { buildIndexList(); buildAssignOptions(); }
+    }catch(e){ console.warn('get farms failed', e); buildIndexList(); buildAssignOptions(); } }
+    async function initialFetchGeofences(){ try{
+      const snap = await db.collection('geofences').get();
+      const fences=[]; snap.forEach(doc=>{ const d=doc.data(); fences.push({id:doc.id,name:d.name,path:d.path||[]}); });
+      if (fences.length){ currentFences = fences.slice(); saveFenceCache(fences); renderGeofencesFromCache(); }
+      else { buildIndexList(); buildAssignOptions(); }
+    }catch(e){ console.warn('get geofences failed', e); buildIndexList(); buildAssignOptions(); } }
+    async function initialFetchPersonnel(){ try{
+      const snap = await db.collection('personnel').get();
+      const list=[]; snap.forEach(doc=>{ const d=doc.data(); list.push({id:doc.id,firstName:d.firstName||'',lastName:d.lastName||'',idNumber:d.idNumber||'',assignType:d.assignType||'',assignId:d.assignId||''}); });
+      if (list.length){ currentPersonnel = list.slice(); savePersonnelCache(list); }
+      else { currentPersonnel = loadPersonnelCache(); }
+      renderPersonnelList();
+    }catch(e){ console.warn('get personnel failed', e); currentPersonnel = loadPersonnelCache(); renderPersonnelList(); } }
 
-    // Sync local -> Firestore
     let syncRan = false;
     async function syncLocalPendingToFirestore(){
       if (syncRan) return; syncRan = true;
@@ -601,9 +561,8 @@
       }catch(e){ console.warn('sync personnel error', e); }
     }
 
-    // ==================== Selección & utilidades ====================
     function selectFence(id){
-      if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes de seleccionar otra.'); return; }
+      if(isEditingFence){ alert('Estás editando una geocerca.'); return; }
       if(selectedFenceId && geofenceLayers[selectedFenceId]){
         geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE);
       }
@@ -620,7 +579,6 @@
     const validLat = v => v>=-90 && v<=90;
     const validLng = v => v>=-180 && v<=180;
 
-    let pendingLat = null, pendingLng = null;
     async function createFarmAtCenter(){
       if(!map){ alert('Mapa no listo aún.'); return; }
       const name = prompt("Nombre de la nueva finca:"); if(!name) return;
@@ -629,7 +587,6 @@
       catch{ const farms=loadCache(); farms.push({ id:'local-'+Date.now(), name, fincaLocation:{lat:c.lat, lng:c.lng} }); saveCache(farms); renderFarmsFromCache(); }
     }
 
-    // Geocercas (dibujo)
     function addFenceVertex(latlng){
       drawingCoords.push({lat: latlng.lat, lng: latlng.lng});
       const m = L.circleMarker(latlng, {radius:4, weight:2}).addTo(map);
@@ -708,7 +665,6 @@
       }
     }
 
-    // ===== EDICIÓN DE GEOCERCAS (Leaflet.Draw) =====
     function updateEditButtonsState(){
       const canEdit = !!selectedFenceId && !!geofenceLayers[selectedFenceId] && !isEditingFence;
       const eBtn = document.getElementById('editFenceBtn');
@@ -773,7 +729,6 @@
       updateEditButtonsState();
     }
 
-    // ======================= GEOJSON EXPORT/IMPORT ======================
     function fenceToFeature(id){
       const gf = (loadFenceCache()||[]).find(g => g.id === id);
       const layer = geofenceLayers[id];
@@ -841,7 +796,6 @@
       catch{ const fences = loadFenceCache(); fences.push({ id: 'localgf-'+Date.now(), name: name || 'Geocerca', path: outer }); saveFenceCache(fences); }
     }
 
-    // Explorador
     function buildIndexList(){
       const farmUl = document.getElementById('farmList');
       const fenceUl = document.getElementById('fenceList');
@@ -918,7 +872,6 @@
       }catch(e){ console.warn(e); }
     }
 
-    // Borrados
     async function deleteSelectedFarm(){
       const sel=document.getElementById('farmSelect'); const id= sel ? sel.value : '';
       if(!id){ alert('No hay finca seleccionada.'); return; }
@@ -969,7 +922,6 @@
       if(!btn) return; btn.disabled = !selectedFenceId;
     }
 
-    // Mouse coords
     function addMousePositionControl(){
       const MousePos=L.Control.extend({
         options:{position:'bottomleft'},
@@ -981,7 +933,6 @@
       map.on('mouseout', ()=>ctrl.update(null,null));
     }
 
-    // Utilidades
     function waitAuthThen(fn){
       if (authReady) { fn(); return; }
       const iv = setInterval(()=>{ if(authReady){ clearInterval(iv); fn(); } }, 150);
@@ -1003,7 +954,6 @@
       }catch(e){ console.error(e); }
     }
 
-    // ======================= Gestión de Personal (lógica) =======================
     function buildAssignOptions(){
       const sel = document.getElementById('pAssignSelect');
       if(!sel) return;
@@ -1102,7 +1052,6 @@
       err.classList.toggle('hidden', !msg);
     }
 
-    // === AGREGAR PERSONA ===
     async function addPerson(){
       try{
         const fn  = document.getElementById('pFirstName')?.value.trim() || '';
@@ -1140,7 +1089,7 @@
         showPersonError('No se pudo agregar. Revisa los datos.');
       }
     }
-    window.addPerson = addPerson; // expuesta para onclick
+    window.addPerson = addPerson;
 
     async function deletePerson(id){
       if(!id) return;
@@ -1201,7 +1150,6 @@
     }
     window.openEditPerson = openEditPerson;
 
-    // ======================= Listeners =======================
     document.addEventListener("DOMContentLoaded",function(){
       document.getElementById('adminModal')?.classList.remove("hidden");
 
@@ -1227,7 +1175,6 @@
 
       document.getElementById('createFenceByCoordsBtn')?.addEventListener('click', createFenceByCoords);
 
-      // Doble clic listas
       document.getElementById('farmList')?.addEventListener('dblclick', (e)=>{
         const box = e.target.closest('[data-type="farm"][data-id]'); if (!box) return; zoomToFarm(box.dataset.id);
       });
@@ -1235,7 +1182,6 @@
         const box = e.target.closest('[data-type="fence"][data-id]'); if (!box) return; zoomToFence(box.dataset.id);
       });
 
-      // Edición y GeoJSON
       document.getElementById('editFenceBtn')?.addEventListener('click', startFenceEdit);
       document.getElementById('saveFenceEditBtn')?.addEventListener('click', saveFenceEdit);
       document.getElementById('cancelFenceEditBtn')?.addEventListener('click', cancelFenceEdit);
@@ -1245,15 +1191,18 @@
         const text = await file.text(); await importGeoJSONFromText(text); e.target.value = '';
       });
 
-      // Gestión de personal – filtros
       document.getElementById('pSearchInput')?.addEventListener('input', renderPersonnelList);
       document.getElementById('pTypeFilter')?.addEventListener('change', renderPersonnelList);
       document.getElementById('pEntityFilter')?.addEventListener('change', renderPersonnelList);
 
-      // Binding robusto del botón Agregar (además del onclick)
-      document.getElementById('addPersonBtn')?.addEventListener('click', (ev)=>{
-        ev.preventDefault(); ev.stopPropagation();
-        try { addPerson(); } catch(e){ console.error(e); }
+      // (A) submit del form
+      document.getElementById('personForm')?.addEventListener('submit', (ev)=>{
+        ev.preventDefault(); ev.stopPropagation(); try { addPerson(); } catch(e){ console.error(e); }
+      });
+      // (B) delegación global (clic)
+      document.addEventListener('click', (ev)=>{
+        const el = ev.target.closest('[data-action="add-person"]');
+        if (el) { ev.preventDefault(); ev.stopPropagation(); try { addPerson(); } catch(e){ console.error(e); } }
       });
 
       buildIndexList();
@@ -1265,3 +1214,4 @@
   </script>
 </body>
 </html>
+
