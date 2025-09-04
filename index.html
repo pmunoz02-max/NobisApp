@@ -21,9 +21,7 @@
     .badge{font-size:.75rem;padding:.125rem .5rem;border-radius:.375rem;display:inline-block}
     .badge-green{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
     .badge-gray{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb}
-    /* Reportes */
     .multiselect{min-height:42px}
-    .scrollbox{max-height:12rem;overflow:auto}
   </style>
 </head>
 <body class="p-4 sm:p-8">
@@ -45,6 +43,8 @@
 
   <!-- Contenido -->
   <div id="appContent" class="max-w-7xl mx-auto flex flex-col space-y-6 hidden">
+
+    <!-- Header -->
     <header class="text-center my-4">
       <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
       <p class="text-md sm:text-lg text-gray-600 mt-2">Leaflet + Firestore (con caché local)</p>
@@ -400,7 +400,7 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700">Métrica (para gráficos)</label>
+          <label class="block text-sm font-medium text-gray-700">Métrica (gráfico)</label>
           <select id="repMetric" class="mt-1 w-full border rounded-md p-2">
             <option value="count">Actividades</option>
             <option value="days">Días</option>
@@ -435,7 +435,8 @@
         <canvas id="repChart" height="120"></canvas>
       </div>
     </div>
-  </div>
+
+  </div><!-- /#appContent -->
 
   <!-- Modal: elegir persona activa (costos) -->
   <div id="lcPersonModal" class="fixed inset-0 bg-gray-900/75 hidden items-center justify-center z-50 p-4">
@@ -461,7 +462,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 
-  <!-- Chart.js (para los reportes) -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <script>
@@ -569,8 +570,8 @@
         const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,firstName:d.firstName||'',lastName:d.lastName||'',idNumber:d.idNumber||'',assignType:d.assignType||'',assignId:d.assignId||'',active:(d.active!==false)});});
         if(list.length){ currentPersonnel=list.slice(); savePeople(list); }
         else { currentPersonnel=loadPeople(); }
-        renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache(); buildReportFilterOptions();
-      },()=>{ currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache(); buildReportFilterOptions(); });
+        renderPersonnelList(); buildActivityFormOptions(); buildReportFilterOptions();
+      },()=>{ currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildReportFilterOptions(); });
 
       unsubActivities=db.collection('activities').onSnapshot(s=>{
         const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({
@@ -580,8 +581,8 @@
         });});
         if(list.length){ currentActivities=list.slice(); saveActs(list); }
         else { currentActivities=loadActs(); }
-        renderActivityList(); buildActivityFilterOptions(); buildReportFilterOptions();
-      },()=>{ currentActivities=loadActs(); renderActivityList(); buildActivityFilterOptions(); buildReportFilterOptions(); });
+        renderActivityList(); buildReportFilterOptions();
+      },()=>{ currentActivities=loadActs(); renderActivityList(); buildReportFilterOptions(); });
 
       unsubLaborCosts=db.collection('labor_costs').onSnapshot(s=>{
         const list=[]; s.forEach(doc=>{const d=doc.data(); list.push({id:doc.id,personId:d.personId||'',personName:d.personName||'',dailyCost:+(d.dailyCost||0),startDate:d.startDate||'',endDate:d.endDate||''});});
@@ -605,7 +606,7 @@
       try{ const lcs=loadLaborCosts().filter(c=>String(c.id||'').startsWith('localc-')); for(const c of lcs){ try{await db.collection('labor_costs').add({personId:c.personId,personName:c.personName,dailyCost:c.dailyCost,startDate:c.startDate,endDate:c.endDate});}catch{} saveLaborCosts(loadLaborCosts().filter(x=>x.id!==c.id)); } }catch{}
     }
 
-    /* ---------- Geocercas (igual) ---------- */
+    /* ---------- Geocercas ---------- */
     function selectFence(id){ if(isEditingFence){ alert('Estás editando una geocerca. Guarda o cancela antes.'); return; } if(selectedFenceId&&geofenceLayers[selectedFenceId]) geofenceLayers[selectedFenceId].setStyle(GEOFENCE_STYLE); selectedFenceId=id; if(geofenceLayers[id]) geofenceLayers[id].setStyle(GEOFENCE_SELECTED_STYLE); updateDeleteFenceButtonState(); updateEditButtonsState(); }
     function updateDeleteButtonState(){ const sel=document.getElementById('farmSelect'), btn=document.getElementById('deleteFarmBtn'); if(btn) btn.disabled=!(sel&&sel.value); }
     function updateDeleteFenceButtonState(){ const btn=document.getElementById('deleteFenceBtn'); if(btn) btn.disabled=!selectedFenceId; }
@@ -744,7 +745,7 @@
       const doc={firstName:fn,lastName:ln,idNumber:idn,assignType,assignId,active};
       (async()=>{ try{ await db.collection('personnel').doc(id).update(doc); }
         catch{ const cache=loadPeople(); const i=cache.findIndex(x=>x.id===id); if(i>=0){ cache[i]={...cache[i],...doc}; savePeople(cache);} }
-        currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildLaborCostPersonCache(); buildReportFilterOptions();
+        currentPersonnel=loadPeople(); renderPersonnelList(); buildActivityFormOptions(); buildReportFilterOptions();
       })();
     }
 
@@ -771,7 +772,25 @@
         eSel.innerHTML = items.length? items.map(i=>`<option value="${i.v}">${i.l}</option>`).join('') : `<option value="">No hay entidades</option>`;
       }
     }
-    function buildActivityFilterOptions(){ buildActivityFormOptions(); }
+    function buildReportFilterOptions(){
+      const people=currentPersonnel?.length?currentPersonnel:loadPeople();
+      const pSel=document.getElementById('repPersons'); if(pSel){ pSel.innerHTML = people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}${(p.active===false)?' (inactivo)':''}</option>`).join(''); }
+      const farms=currentFarms?.length?currentFarms:loadFarms();
+      const fences=currentFences?.length?currentFences:loadFences();
+      const eSel=document.getElementById('repEntities'); if(eSel){ const items=[...farms.map(f=>({v:`farm:${f.id}`,l:`Finca: ${f.name||'Finca'}`})), ...fences.map(g=>({v:`fence:${g.id}`,l:`Geocerca: ${g.name||'Geocerca'}`}))]; eSel.innerHTML = items.map(i=>`<option value="${i.v}">${i.l}</option>`).join(''); }
+      const aSel=document.getElementById('repActivities'); if(aSel){ aSel.innerHTML = activityDefs.map(a=>`<option value="${a}">${a}</option>`).join(''); }
+      setDefaultReportDates();
+    }
+    function setDefaultReportDates(){
+      const today = new Date();
+      const toY = today.getFullYear(), toM = String(today.getMonth()+1).padStart(2,'0'), toD = String(today.getDate()).padStart(2,'0');
+      const to = `${toY}-${toM}-${toD}`;
+      const past = new Date(today); past.setDate(past.getDate()-30);
+      const fromY=past.getFullYear(), fromM=String(past.getMonth()+1).padStart(2,'0'), fromD=String(past.getDate()).padStart(2,'0');
+      const from = `${fromY}-${fromM}-${fromD}`;
+      if(document.getElementById('repFrom') && !document.getElementById('repFrom').value) document.getElementById('repFrom').value = from;
+      if(document.getElementById('repTo') && !document.getElementById('repTo').value) document.getElementById('repTo').value = to;
+    }
 
     function manageActivityList(){
       const op = prompt('Gestionar actividades:\n1) Agregar\n2) Eliminar\n\nEscribe 1 o 2');
@@ -879,38 +898,18 @@
         tbody.appendChild(tr);
       });
     }
-
     async function deleteActivity(id){
       if(!id) return;
-      const it=(currentActivities||[]).find(x=>x.id===id)||(loadActs().find(x=>x.id===id));
-      const label = it ? `${it.activity} - ${it.personName}` : 'esta actividad';
-      if(!confirm(`¿Eliminar ${label}?`)) return;
       try{ await db.collection('activities').doc(id).delete(); }
       catch{ const cache=loadActs().filter(a=>a.id!==id); saveActs(cache); }
       currentActivities=loadActs(); renderActivityList();
     }
     window.deleteActivity=deleteActivity;
 
-    /* ---------- COSTOS DE MANO DE OBRA ---------- */
-    let lcChosenPerson = { id:'', name:'' };
-
+    /* ---------- COSTOS ---------- */
     function showLcError(msg){ const e=document.getElementById('lcFormError'); e.textContent=msg||''; e.classList.toggle('hidden',!msg); }
-
-    function openLcModal(){
-      const modal=document.getElementById('lcPersonModal');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-      renderLcModalList();
-      document.getElementById('lcModalSearch').value='';
-      document.getElementById('lcModalSearch').focus();
-    }
-    function closeLcModal(){
-      const modal=document.getElementById('lcPersonModal');
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
-    function buildLaborCostPersonCache(){ /* no-op */ }
-
+    function openLcModal(){ const m=document.getElementById('lcPersonModal'); m.classList.remove('hidden'); m.classList.add('flex'); renderLcModalList(); document.getElementById('lcModalSearch').value=''; document.getElementById('lcModalSearch').focus(); }
+    function closeLcModal(){ const m=document.getElementById('lcPersonModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
     function renderLcModalList(){
       const cont=document.getElementById('lcModalList');
       const q=(document.getElementById('lcModalSearch').value||'').trim().toLowerCase();
@@ -924,16 +923,14 @@
         btn.className='w-full text-left px-3 py-2 hover:bg-gray-100';
         btn.innerHTML=`<div class="font-medium text-gray-800">${p.firstName||''} ${p.lastName||''}</div><div class="text-xs text-gray-500">Cédula: ${p.idNumber||''}</div>`;
         btn.addEventListener('click', ()=>{
-          lcChosenPerson={ id:p.id, name:`${p.firstName||''} ${p.lastName||''}`.trim() };
           const display=document.getElementById('lcPersonDisplay');
-          display.value=lcChosenPerson.name;
-          display.dataset.personId = lcChosenPerson.id;
+          display.value=`${p.firstName||''} ${p.lastName||''}`.trim();
+          display.dataset.personId = p.id;
           closeLcModal();
         });
         cont.appendChild(btn);
       });
     }
-
     async function addLaborCost(){
       try{
         showLcError('');
@@ -961,7 +958,6 @@
           saveLaborCosts(cache); currentLaborCosts=cache.slice(); renderLaborCostList();
         }catch{ waitAuthThen(syncLocalPendingToFirestore); }
 
-        // limpiar
         document.getElementById('lcPersonDisplay').value='';
         document.getElementById('lcPersonDisplay').dataset.personId='';
         document.getElementById('lcDailyCost').value='';
@@ -970,7 +966,6 @@
       }catch(e){ console.error(e); showLcError('No se pudo guardar el costo.'); }
     }
     window.addLaborCost = addLaborCost;
-
     function renderLaborCostList(){
       const tbody=document.getElementById('laborCostTableBody'); if(!tbody) return;
       let list=currentLaborCosts?.length?currentLaborCosts.slice():loadLaborCosts();
@@ -989,12 +984,8 @@
         tbody.appendChild(tr);
       });
     }
-
     async function deleteLaborCost(id){
       if(!id) return;
-      const it=(currentLaborCosts||[]).find(x=>x.id===id)||(loadLaborCosts().find(x=>x.id===id));
-      const label = it ? `${it.personName} ($${(it.dailyCost||0).toFixed(2)})` : 'este registro';
-      if(!confirm(`¿Eliminar ${label}?`)) return;
       try{ await db.collection('labor_costs').doc(id).delete(); }
       catch{ const cache=loadLaborCosts().filter(x=>x.id!==id); saveLaborCosts(cache); }
       currentLaborCosts=loadLaborCosts(); renderLaborCostList();
@@ -1002,80 +993,7 @@
     window.deleteLaborCost=deleteLaborCost;
 
     /* ---------- Reportes ---------- */
-    let reportChart = null;
-    let lastReportHeader = [];
-    let lastReportRows = [];
-
-    function setDefaultReportDates(){
-      const today = new Date();
-      const toY = today.getFullYear(), toM = String(today.getMonth()+1).padStart(2,'0'), toD = String(today.getDate()).padStart(2,'0');
-      const to = `${toY}-${toM}-${toD}`;
-      const past = new Date(today); past.setDate(past.getDate()-30);
-      const fromY=past.getFullYear(), fromM=String(past.getMonth()+1).padStart(2,'0'), fromD=String(past.getDate()).padStart(2,'0');
-      const from = `${fromY}-${fromM}-${fromD}`;
-      if(document.getElementById('repFrom') && !document.getElementById('repFrom').value) document.getElementById('repFrom').value = from;
-      if(document.getElementById('repTo') && !document.getElementById('repTo').value) document.getElementById('repTo').value = to;
-    }
-
-    function buildReportFilterOptions(){
-      // Personas
-      const people=currentPersonnel?.length?currentPersonnel:loadPeople();
-      const pSel=document.getElementById('repPersons');
-      if(pSel){
-        pSel.innerHTML = people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}${(p.active===false)?' (inactivo)':''}</option>`).join('');
-      }
-      // Entidades
-      const farms=currentFarms?.length?currentFarms:loadFarms();
-      const fences=currentFences?.length?currentFences:loadFences();
-      const eSel=document.getElementById('repEntities');
-      if(eSel){
-        const items=[...farms.map(f=>({v:`farm:${f.id}`,l:`Finca: ${f.name||'Finca'}`})), ...fences.map(g=>({v:`fence:${g.id}`,l:`Geocerca: ${g.name||'Geocerca'}`}))];
-        eSel.innerHTML = items.map(i=>`<option value="${i.v}">${i.l}</option>`).join('');
-      }
-      // Actividades
-      const aSel=document.getElementById('repActivities');
-      if(aSel){
-        aSel.innerHTML = activityDefs.map(a=>`<option value="${a}">${a}</option>`).join('');
-      }
-      setDefaultReportDates();
-    }
-
-    function getMultiValues(selectEl){
-      if(!selectEl) return [];
-      return Array.from(selectEl.selectedOptions||[]).map(o=>o.value);
-    }
-    function overlap(aStart, aEnd, bStart, bEnd){
-      return (!bStart || aEnd>=bStart) && (!bEnd || aStart<=bEnd);
-    }
-    function dateDiffDays(a,b){ // inclusivo
-      const d1=new Date(a+"T00:00:00"), d2=new Date(b+"T00:00:00");
-      return Math.max(0, Math.floor((d2 - d1)/(24*3600*1000)) + 1);
-    }
-    function entityLabel(assignType, assignId){
-      const farms=currentFarms?.length?currentFarms:loadFarms();
-      const fences=currentFences?.length?currentFences:loadFences();
-      if(assignType==='farm'){
-        const n = farms.find(f=>f.id===assignId)?.name||'Finca';
-        return `Finca: ${n}`;
-      }
-      if(assignType==='fence'){
-        const n = fences.find(g=>g.id===assignId)?.name||'Geocerca';
-        return `Geocerca: ${n}`;
-      }
-      return '—';
-    }
-
-    function renderReportTable(header, rows){
-      lastReportHeader = header.slice();
-      lastReportRows = rows.slice();
-
-      const thead=document.getElementById('repTableHead');
-      const tbody=document.getElementById('repTableBody');
-      thead.innerHTML = `<tr class="text-gray-600 text-sm">${header.map(h=>`<th class="px-3 py-2">${h}</th>`).join('')}</tr>`;
-      tbody.innerHTML = rows.length ? rows.map(r=>`<tr class="border-t hover:bg-gray-50">${r.map(c=>`<td class="px-3 py-2">${c}</td>`).join('')}</tr>`).join('')
-                                    : `<tr><td colspan="${header.length}" class="px-3 py-4 text-center text-gray-500">Sin resultados para los filtros seleccionados.</td></tr>`;
-    }
-
+    let reportChart = null, lastReportHeader = [], lastReportRows = [];
     function exportReportCSV(){
       if(!lastReportHeader.length){ alert('Primero genera un reporte.'); return; }
       const lines = [];
@@ -1084,25 +1002,37 @@
       lastReportRows.forEach(r=>lines.push(r.map(esc).join(',')));
       const blob = new Blob(["\uFEFF"+lines.join("\r\n")], {type:"text/csv;charset=utf-8"});
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `reporte_${new Date().toISOString().slice(0,10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      const a = document.createElement('a'); a.href = url; a.download = `reporte_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
-
+    function renderReportTable(header, rows){
+      lastReportHeader = header.slice(); lastReportRows = rows.slice();
+      const thead=document.getElementById('repTableHead'), tbody=document.getElementById('repTableBody');
+      thead.innerHTML = `<tr class="text-gray-600 text-sm">${header.map(h=>`<th class="px-3 py-2">${h}</th>`).join('')}</tr>`;
+      tbody.innerHTML = rows.length ? rows.map(r=>`<tr class="border-t hover:bg-gray-50">${r.map(c=>`<td class="px-3 py-2">${c}</td>`).join('')}</tr>`).join('')
+                                    : `<tr><td colspan="${header.length}" class="px-3 py-4 text-center text-gray-500">Sin resultados para los filtros seleccionados.</td></tr>`;
+    }
     function renderReportChart(labels, data, chartType, labelText){
       const ctx = document.getElementById('repChart').getContext('2d');
-      if(reportChart){ reportChart.destroy(); reportChart=null; }
-      reportChart = new Chart(ctx, {
-        type: chartType,
-        data: { labels, datasets: [{ label: labelText, data }] },
-        options: { responsive:true, maintainAspectRatio:false }
-      });
+      try{
+        if(reportChart){ reportChart.destroy(); reportChart=null; }
+        reportChart = new Chart(ctx, {
+          type: chartType,
+          data: { labels, datasets: [{ label: labelText, data }] },
+          options: { responsive:true, maintainAspectRatio:false }
+        });
+      }catch{ /* si Chart.js no cargó, omitimos el gráfico */ }
     }
-
+    function getMultiValues(selectEl){ return Array.from((selectEl?.selectedOptions)||[]).map(o=>o.value); }
+    function overlap(aStart, aEnd, bStart, bEnd){ return (!bStart || aEnd>=bStart) && (!bEnd || aStart<=bEnd); }
+    function dateDiffDays(a,b){ const d1=new Date(a+"T00:00:00"), d2=new Date(b+"T00:00:00"); return Math.max(0, Math.floor((d2 - d1)/(24*3600*1000)) + 1); }
+    function entityLabel(assignType, assignId){
+      const farms=currentFarms?.length?currentFarms:loadFarms();
+      const fences=currentFences?.length?currentFences:loadFences();
+      if(assignType==='farm'){ const n = farms.find(f=>f.id===assignId)?.name||'Finca'; return `Finca: ${n}`; }
+      if(assignType==='fence'){ const n = fences.find(g=>g.id===assignId)?.name||'Geocerca'; return `Geocerca: ${n}`; }
+      return '—';
+    }
     function generateReport(){
       const people=currentPersonnel?.length?currentPersonnel:loadPeople();
       const onlyActive = document.getElementById('repOnlyActive').checked;
@@ -1115,13 +1045,12 @@
       const metric = document.getElementById('repMetric').value;
       const chartType = document.getElementById('repChartType').value;
 
-      // Filtro datos
       let list=currentActivities?.length?currentActivities.slice():loadActs();
+      const calcDays = (a)=>{ const s = from && a.startDate<from ? from : a.startDate; const e = to && a.endDate>to ? to : a.endDate; return dateDiffDays(s,e); };
 
       list=list.filter(a=>{
         const p = people.find(x=>x.id===a.personId);
         if(onlyActive && p && p.active===false) return false;
-
         if(selPeople.length && !selPeople.includes(a.personId)) return false;
         if(selEntities.length && !selEntities.includes(`${a.assignType}:${a.assignId}`)) return false;
         if(selActs.length && !selActs.includes(a.activity)) return false;
@@ -1129,45 +1058,21 @@
         return true;
       });
 
-      // Cálculo días intersecando con el filtro (para métrica "días")
-      const calcDays = (a)=> {
-        const s = from && a.startDate<from ? from : a.startDate;
-        const e = to   && a.endDate>to   ? to   : a.endDate;
-        return dateDiffDays(s,e);
-      };
-
       if(groupBy==='detalle'){
         const header=['Actividad','Persona','Entidad','Fecha inicio','Fecha fin','Días'];
         const rows=list.map(a=>[a.activity, a.personName||'—', entityLabel(a.assignType,a.assignId), a.startDate, a.endDate, calcDays(a)]);
         renderReportTable(header, rows);
-
-        // Para gráfico, agregamos por actividad (métrica elegida)
         const map = new Map();
-        list.forEach(a=>{
-          const key=a.activity;
-          const inc = (metric==='days'?calcDays(a):1);
-          map.set(key, (map.get(key)||0)+inc);
-        });
+        list.forEach(a=>{ map.set(a.activity, (map.get(a.activity)||0) + (metric==='days'?calcDays(a):1)); });
         const labels=[...map.keys()], data=[...map.values()];
         renderReportChart(labels, data, chartType, metric==='days'?'Días':'Actividades');
         return;
       }
 
-      // Agrupaciones
-      let keyFn, title, labelFn;
-      if(groupBy==='persona'){
-        keyFn=a=>a.personName||'—';
-        title='Persona';
-        labelFn=keyFn;
-      }else if(groupBy==='entidad'){
-        keyFn=a=>entityLabel(a.assignType,a.assignId);
-        title='Entidad';
-        labelFn=keyFn;
-      }else{ // actividad
-        keyFn=a=>a.activity||'—';
-        title='Actividad';
-        labelFn=keyFn;
-      }
+      let keyFn, title;
+      if(groupBy==='persona'){ keyFn=a=>a.personName||'—'; title='Persona'; }
+      else if(groupBy==='entidad'){ keyFn=a=>entityLabel(a.assignType,a.assignId); title='Entidad'; }
+      else { keyFn=a=>a.activity||'—'; title='Actividad'; }
 
       const agg = new Map();
       list.forEach(a=>{
@@ -1181,7 +1086,6 @@
       const header=[title,'Actividades','Días'];
       const rows=[...agg.entries()].sort((x,y)=>String(x[0]).localeCompare(String(y[0]))).map(([k,v])=>[k, v.count, v.days]);
       renderReportTable(header, rows);
-
       const labels = rows.map(r=>r[0]);
       const data   = rows.map(r=> metric==='days' ? r[2] : r[1]);
       renderReportChart(labels, data, chartType, metric==='days'?'Días':'Actividades');
@@ -1200,29 +1104,15 @@
       document.getElementById('appContent').classList.remove('hidden');
       setTimeout(()=>{ initMap(); setTimeout(()=>map&&map.invalidateSize(),80); },80);
     }
-
-    // Fechas por defecto (actividades / costos) 
     function setDefaultActivityDates(){
-      const today = new Date();
-      const y = today.getFullYear();
-      const m = String(today.getMonth()+1).padStart(2,'0');
-      const d = String(today.getDate()).padStart(2,'0');
-      const val = `${y}-${m}-${d}`;
-      const s = document.getElementById('actStartDate');
-      const e = document.getElementById('actEndDate');
-      if(s && !s.value) s.value = val;
-      if(e && !e.value) e.value = val;
+      const today = new Date(), y=today.getFullYear(), m=String(today.getMonth()+1).padStart(2,'0'), d=String(today.getDate()).padStart(2,'0'), v=`${y}-${m}-${d}`;
+      const s = document.getElementById('actStartDate'); const e = document.getElementById('actEndDate');
+      if(s && !s.value) s.value=v; if(e && !e.value) e.value=v;
     }
     function setDefaultLaborCostDates(){
-      const today = new Date();
-      const y = today.getFullYear();
-      const m = String(today.getMonth()+1).padStart(2,'0');
-      const d = String(today.getDate()).padStart(2,'0');
-      const val = `${y}-${m}-${d}`;
-      const s = document.getElementById('lcStartDate');
-      const e = document.getElementById('lcEndDate');
-      if(s && !s.value) s.value = val;
-      if(e && !e.value) e.value = val;
+      const today = new Date(), y=today.getFullYear(), m=String(today.getMonth()+1).padStart(2,'0'), d=String(today.getDate()).padStart(2,'0'), v=`${y}-${m}-${d}`;
+      if(document.getElementById('lcStartDate') && !document.getElementById('lcStartDate').value) document.getElementById('lcStartDate').value=v;
+      if(document.getElementById('lcEndDate') && !document.getElementById('lcEndDate').value) document.getElementById('lcEndDate').value=v;
     }
 
     /* ---------- Listeners ---------- */
@@ -1245,8 +1135,8 @@
       document.getElementById('cancelFenceBtn').addEventListener('click',cancelFenceDraw);
       document.getElementById('fenceNameSaveBtn').addEventListener('click',saveFenceName);
       document.getElementById('fenceNameCancelBtn').addEventListener('click',()=>document.getElementById('fenceNamePanel').classList.add('hidden'));
-      document.getElementById('editFenceBtn').addEventListener('click',()=>{ /* enable edit si lo usas */ });
-      document.getElementById('exportGeoJSONBtn').addEventListener('click',()=>{ /* export */ });
+      document.getElementById('editFenceBtn').addEventListener('click',()=>{ /* opcional */ });
+      document.getElementById('exportGeoJSONBtn').addEventListener('click',()=>{ /* opcional */ });
 
       // Listas dblclick
       document.getElementById('farmList').addEventListener('dblclick',e=>{const n=e.target.closest('[data-type="farm"][data-id]'); if(n) zoomToFarm(n.dataset.id);});
@@ -1285,7 +1175,7 @@
       document.getElementById('repDownloadBtn').addEventListener('click', exportReportCSV);
 
       // Primer pintado
-      buildIndexList(); buildAssignOptions(); buildActivityFormOptions(); buildActivityFilterOptions();
+      buildIndexList(); buildAssignOptions(); buildActivityFormOptions();
       updateDeleteButtonState(); updateDeleteFenceButtonState(); updateEditButtonsState();
       renderLaborCostList();
     });
