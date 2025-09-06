@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gestión de Personal de Finca (Leaflet + Firebase)</title>
+  <title>NobisApp – Geocercas y Puntos</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -14,627 +14,220 @@
 
   <style>
     body{font-family:Inter,system-ui,Arial,sans-serif;background:#f3f4f6;overflow-x:hidden}
-    #map{height:55vh;border-radius:1rem;box-shadow:0 4px 6px rgba(0,0,0,.1)}
-    @media(max-width:768px){#map{height:45vh}}
-    .farm-label{background:#fff;border:1px solid rgba(0,0,0,.2);padding:2px 6px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.15);font-size:12px}
+    #map{height:60vh;border-radius:1rem;box-shadow:0 4px 6px rgba(0,0,0,.1)}
+    @media(max-width:768px){#map{height:50vh}}
+    .tag{font-size:.75rem;padding:.125rem .5rem;border-radius:.375rem;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe}
     .mousepos-control{background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:.5rem;padding:.25rem .5rem;font-size:12px;box-shadow:0 1px 2px rgba(0,0,0,.1)}
-    .error-message{color:#dc2626;font-size:14px;margin-top:6px;display:none}
-    button,input,select{font-size:16px}
-    .person-row:hover{background-color:#f9fafb;}
-    .badge{font-size:.75rem;padding:.125rem .5rem;border-radius:.375rem;display:inline-block}
-    .badge-green{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
-    .badge-gray{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb}
-    .multiselect{min-height:42px}
-    .scrollbox{max-height:12rem;overflow:auto}
-    .hidden{display:none !important;}
+    .hidden{display:none !important}
   </style>
 </head>
-
 <body class="p-4 sm:p-8">
-  <!-- ===== Modal de Acceso (ÚNICO) ===== -->
-  <div id="adminModal" class="fixed inset-0 bg-gray-900/75 flex items-center justify-center z-50 p-4">
+
+  <!-- ===== Acceso ===== -->
+  <div id="adminModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-[99999] p-4">
     <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
       <h1 class="text-3xl font-bold mb-4">Acceso de Administrador</h1>
       <p class="text-gray-600 mb-6">Introduce tu código de administrador.</p>
-      <input id="adminCodeInput" type="password" placeholder="Código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
-      <div id="errorMessage" class="error-message">Código incorrecto.</div>
-      <button id="adminLoginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-lg">Acceder</button>
+      <input id="adminCodeInput" type="password" placeholder="Código de acceso" class="w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
+      <p id="errorMessage" class="text-red-600 text-sm hidden">Código incorrecto. Usa <b>admin123</b>.</p>
+      <button id="adminLoginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-lg">
+        Acceder
+      </button>
     </div>
   </div>
 
-  <!-- ===== CONTENIDO DE LA APP ===== -->
+  <!-- ===== APP ===== -->
   <div id="appContent" class="max-w-7xl mx-auto flex flex-col space-y-6 hidden">
+
     <header class="text-center my-4">
-      <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
-      <p class="text-md sm:text-lg text-gray-600 mt-2">Leaflet + Firestore (con caché local)</p>
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Geocercas y Puntos Geo-referenciados</h1>
+      <p class="text-md sm:text-lg text-gray-600 mt-2">Leaflet + Firestore (caché local). <span class="tag">sin fincas</span></p>
     </header>
 
-    <!-- Finca activa -->
-    <div class="bg-white p-4 rounded-2xl shadow-lg">
-      <label class="block text-sm font-medium text-gray-700">Finca activa</label>
-      <select id="farmSelect" class="mt-1 w-full border rounded-md p-2"></select>
-    </div>
-
-    <!-- Mapa + barra -->
     <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <div class="flex flex-wrap gap-2 items-center mb-2">
-        <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
+      <div class="flex flex-wrap gap-2 items-center mb-3">
+        <h2 class="text-2xl font-semibold text-gray-700">Mapa</h2>
         <div class="ml-auto flex flex-wrap gap-2">
+          <!-- Geocercas -->
           <button id="startFenceBtn" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">Nueva geocerca</button>
           <button id="finishFenceBtn" class="hidden bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg">Finalizar geocerca</button>
           <button id="cancelFenceBtn" class="hidden bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
-          <button id="createFenceByCoordsBtn" class="bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg">Geocerca (Lat/Lngs)</button>
-          <button id="createFarmBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">Crear finca</button>
-          <button id="createByCoordsBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Crear finca (Lat/Lng)</button>
-          <button id="deleteFarmBtn" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50" disabled>Eliminar finca</button>
-          <button id="deleteFenceBtn" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50" disabled>Eliminar geocerca</button>
-          <button id="editFenceBtn" class="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50" disabled>Editar geocerca</button>
-          <button id="saveFenceEditBtn" class="hidden bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar cambios</button>
-          <button id="cancelFenceEditBtn" class="hidden bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar edición</button>
-          <button id="exportGeoJSONBtn" class="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg">Exportar GeoJSON</button>
-          <label class="inline-flex items-center gap-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold px-4 py-2 rounded-lg cursor-pointer">
-            Importar GeoJSON
-            <input id="importGeoJSONInput" type="file" accept=".geojson,application/geo+json,application/json" class="hidden">
-          </label>
+
+          <!-- Puntos -->
+          <button id="newPointModeBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Nuevo punto</button>
+          <button id="deletePointBtn" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50" disabled>Eliminar punto</button>
         </div>
       </div>
 
-      <!-- Panel nombre finca (Lat/Lng) -->
-      <div id="coordsNamePanel" class="hidden mb-3">
-        <div class="rounded-xl border border-gray-200 p-3">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la nueva finca</label>
-          <div class="flex gap-2">
-            <input id="coordsNameInput" type="text" class="border rounded-md p-2 w-full" placeholder="Ej.: Finca Palora Norte" />
-            <button id="coordsNameSaveBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
-            <button id="coordsNameCancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
+      <!-- Panel de nombre para Puntos con datalist editable -->
+      <div id="pointPanel" class="hidden mb-3">
+        <div class="rounded-xl border border-gray-200 p-3 bg-white">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del punto</label>
+          <div class="flex gap-2 flex-wrap items-center">
+            <input id="pointNameInput" list="pointNamesList" class="border rounded-md p-2 w-full sm:flex-1" placeholder="Ej.: Pozo N°1, Control 3, Oficina" />
+            <datalist id="pointNamesList"></datalist>
+            <button id="pointSaveBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
+            <button id="pointCancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
           </div>
-          <p id="coordsNameHint" class="text-xs text-gray-500 mt-2"></p>
-        </div>
-      </div>
-
-      <!-- Panel nombre geocerca -->
-      <div id="fenceNamePanel" class="hidden mb-3">
-        <div class="rounded-xl border border-gray-200 p-3">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la geocerca</label>
-          <div class="flex gap-2">
-            <input id="fenceNameInput" type="text" class="border rounded-md p-2 w-full" placeholder="Ej.: Geocerca Lote 1" />
-            <button id="fenceNameSaveBtn" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
-            <button id="fenceNameCancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
-          </div>
-          <p id="fenceNameHint" class="text-xs text-gray-500 mt-2"></p>
+          <p class="text-xs text-gray-500 mt-2">La lista es editable: escribe un nombre nuevo y quedará guardado para próximas veces.</p>
         </div>
       </div>
 
       <div id="map"></div>
 
       <!-- Explorador -->
-      <div id="indexPanel" class="mt-4">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold text-gray-800">Explorador de elementos</h3>
-          <span class="text-xs text-gray-500">Doble clic en un nombre para centrar/ajustar el mapa</span>
+      <div id="indexPanel" class="mt-4 grid md:grid-cols-2 gap-4">
+        <div class="bg-white/60 border border-gray-200 rounded-xl p-3 max-h-64 overflow-auto">
+          <div class="font-medium text-gray-700 mb-2">Puntos</div>
+          <ul id="pointsList" class="divide-y divide-gray-100"></ul>
         </div>
-        <div class="grid md:grid-cols-2 gap-4 mt-2">
-          <div class="bg-white/60 border border-gray-200 rounded-xl p-3 max-h-64 overflow-auto">
-            <div class="font-medium text-gray-700 mb-2">Fincas</div>
-            <ul id="farmList" class="divide-y divide-gray-100"></ul>
-          </div>
-          <div class="bg-white/60 border border-gray-200 rounded-xl p-3 max-h-64 overflow-auto">
-            <div class="font-medium text-gray-700 mb-2">Geocercas</div>
-            <ul id="fenceList" class="divide-y divide-gray-100"></ul>
-          </div>
+        <div class="bg-white/60 border border-gray-200 rounded-xl p-3 max-h-64 overflow-auto">
+          <div class="font-medium text-gray-700 mb-2">Geocercas</div>
+          <ul id="fenceList" class="divide-y divide-gray-100"></ul>
         </div>
-      </div>
-      <p id="statusMessage" class="mt-3 text-sm text-gray-600">
-        Para geocercas: Nueva geocerca → clics en el mapa → Finalizar geocerca → asigna nombre y guarda.
-      </p>
-    </div>
-
-    <!-- ===== Gestión de Personal ===== -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-semibold text-gray-700">Gestión de Personal</h2>
-        <span class="text-xs text-gray-500">Doble clic sobre una fila para ir a su asignación</span>
-      </div>
-      <div class="grid md:grid-cols-5 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Nombre</label>
-          <input id="pFirstName" type="text" class="mt-1 w-full border rounded-md p-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Apellido</label>
-          <input id="pLastName" type="text" class="mt-1 w-full border rounded-md p-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Cédula</label>
-          <input id="pIdNumber" type="text" class="mt-1 w-full border rounded-md p-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Asignación</label>
-          <select id="pAssignSelect" class="mt-1 w-full border rounded-md p-2"></select>
-        </div>
-        <div class="flex items-end">
-          <label class="inline-flex items-center gap-2 mb-1">
-            <input id="pActive" type="checkbox" class="rounded" checked>
-            <span class="text-sm font-medium text-gray-700">Activo</span>
-          </label>
-        </div>
-      </div>
-      <div class="mt-3">
-        <button id="addPersonBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Agregar</button>
-        <span id="pFormError" class="text-sm text-red-600 ml-3 hidden"></span>
-      </div>
-
-      <!-- Filtros -->
-      <div class="mt-6 grid md:grid-cols-3 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Buscar</label>
-          <input id="pSearchInput" type="text" placeholder="Nombre, apellido o cédula" class="mt-1 w-full border rounded-md p-2" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Tipo asignación</label>
-          <select id="pTypeFilter" class="mt-1 w-full border rounded-md p-2">
-            <option value="all">Todas</option>
-            <option value="farm">Fincas</option>
-            <option value="fence">Geocercas</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Finca/Geocerca</label>
-          <select id="pEntityFilter" class="mt-1 w-full border rounded-md p-2">
-            <option value="all">Todas</option>
-          </select>
-        </div>
-      </div>
-      <div class="mt-4 overflow-auto">
-        <table class="min-w-full text-left">
-          <thead>
-            <tr class="text-gray-600 text-sm">
-              <th class="px-3 py-2">NOMBRE</th>
-              <th class="px-3 py-2">APELLIDO</th>
-              <th class="px-3 py-2">CÉDULA</th>
-              <th class="px-3 py-2">ESTADO</th>
-              <th class="px-3 py-2">ASIGNADO A</th>
-              <th class="px-3 py-2">ACCIONES</th>
-            </tr>
-          </thead>
-          <tbody id="personnelTableBody" class="text-sm"></tbody>
-        </table>
       </div>
     </div>
 
-    <!-- ===== Gestión de Actividades ===== -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-semibold text-gray-700">Gestión de Actividades</h2>
-        <span class="text-xs text-gray-500">Doble clic en una fila para ir a su finca/geocerca</span>
-      </div>
-
-      <div class="grid md:grid-cols-5 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">
-            Actividad
-            <button id="actManageBtn" type="button" class="ml-2 text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded">Editar lista</button>
-          </label>
-          <select id="actActivitySelect" class="mt-1 w-full border rounded-md p-2"></select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Persona</label>
-          <select id="actPersonSelect" class="mt-1 w-full border rounded-md p-2"></select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Finca/Geocerca</label>
-          <select id="actEntitySelect" class="mt-1 w-full border rounded-md p-2"></select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Fecha inicio</label>
-          <input id="actStartDate" type="date" class="mt-1 w-full border rounded-md p-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Fecha fin</label>
-          <input id="actEndDate" type="date" class="mt-1 w-full border rounded-md p-2">
-        </div>
-      </div>
-
-      <div class="mt-3">
-        <button id="addActivityBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Agregar actividad</button>
-        <span id="actFormError" class="text-sm text-red-600 ml-3 hidden"></span>
-      </div>
-
-      <!-- Filtros -->
-      <div class="mt-6 grid md:grid-cols-4 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Persona</label>
-          <select id="actFilterPerson" class="mt-1 w-full border rounded-md p-2">
-            <option value="all">Todas</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Actividad</label>
-          <select id="actFilterActivity" class="mt-1 w-full border rounded-md p-2">
-            <option value="all">Todas</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Desde</label>
-          <input id="actFilterFrom" type="date" class="mt-1 w-full border rounded-md p-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Hasta</label>
-          <input id="actFilterTo" type="date" class="mt-1 w-full border rounded-md p-2">
-        </div>
-      </div>
-
-      <div class="mt-4 overflow-auto">
-        <table class="min-w-full text-left">
-          <thead>
-            <tr class="text-gray-600 text-sm">
-              <th class="px-3 py-2">ACTIVIDAD</th>
-              <th class="px-3 py-2">PERSONA</th>
-              <th class="px-3 py-2">ENTIDAD</th>
-              <th class="px-3 py-2">FECHA INICIO</th>
-              <th class="px-3 py-2">FECHA FIN</th>
-              <th class="px-3 py-2">ACCIONES</th>
-            </tr>
-          </thead>
-          <tbody id="activityTableBody" class="text-sm"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ===== Costos de mano de obra ===== -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg" id="laborCostsModule">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-semibold text-gray-700">Costos de mano de obra</h2>
-        <span class="text-xs text-gray-500">Define el costo diario por persona y su rango de vigencia</span>
-      </div>
-      <div class="grid md:grid-cols-4 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Persona (activa)</label>
-          <div class="flex gap-2">
-            <input id="lcPersonDisplay" type="text" class="mt-1 w-full border rounded-md p-2" placeholder="Sin seleccionar" readonly>
-            <button id="lcChoosePersonBtn" type="button" class="mt-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-2 rounded-lg">Elegir</button>
-          </div>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Costo por día</label>
-          <input id="lcDailyCost" type="number" step="0.01" min="0" class="mt-1 w-full border rounded-md p-2" placeholder="0.00">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Desde</label>
-          <input id="lcStartDate" type="date" class="mt-1 w-full border rounded-md p-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Hasta</label>
-          <input id="lcEndDate" type="date" class="mt-1 w-full border rounded-md p-2">
-        </div>
-      </div>
-      <div class="mt-3">
-        <button id="lcAddCostBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar costo</button>
-        <span id="lcFormError" class="text-sm text-red-600 ml-3 hidden"></span>
-      </div>
-      <div class="mt-4 overflow-auto">
-        <table class="min-w-full text-left">
-          <thead>
-            <tr class="text-gray-600 text-sm">
-              <th class="px-3 py-2">PERSONA</th>
-              <th class="px-3 py-2">COSTO/DÍA</th>
-              <th class="px-3 py-2">DESDE</th>
-              <th class="px-3 py-2">HASTA</th>
-              <th class="px-3 py-2">ACCIONES</th>
-            </tr>
-          </thead>
-          <tbody id="laborCostTableBody" class="text-sm"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ===== Reportes ===== -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg" id="reportsModule">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-semibold text-gray-700">Reportes</h2>
-        <span class="text-xs text-gray-500">Tablas descargables y gráficos por persona, entidad, actividad y fechas</span>
-      </div>
-      <div class="grid md:grid-cols-6 gap-4">
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700">Personas (Ctrl/Cmd para multi)</label>
-          <select id="repPersons" class="mt-1 w-full border rounded-md p-2 multiselect" multiple size="6"></select>
-          <label class="inline-flex items-center gap-2 mt-2">
-            <input id="repOnlyActive" type="checkbox" class="rounded" checked>
-            <span class="text-sm text-gray-700">Solo activas</span>
-          </label>
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700">Fincas/Geocercas</label>
-          <select id="repEntities" class="mt-1 w-full border rounded-md p-2 multiselect" multiple size="6"></select>
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700">Actividades</label>
-          <select id="repActivities" class="mt-1 w-full border rounded-md p-2 multiselect" multiple size="6"></select>
-          <div class="grid grid-cols-2 gap-2 mt-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Desde</label>
-              <input id="repFrom" type="date" class="mt-1 w-full border rounded-md p-2">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Hasta</label>
-              <input id="repTo" type="date" class="mt-1 w-full border rounded-md p-2">
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="grid md:grid-cols-5 gap-4 mt-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Agrupar por</label>
-          <select id="repGroupBy" class="mt-1 w-full border rounded-md p-2">
-            <option value="detalle">Detalle</option>
-            <option value="persona">Persona</option>
-            <option value="entidad">Entidad</option>
-            <option value="actividad">Actividad</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Métrica (para gráficos)</label>
-          <select id="repMetric" class="mt-1 w-full border rounded-md p-2">
-            <option value="count">Actividades</option>
-            <option value="days">Días</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Tipo de gráfico</label>
-          <select id="repChartType" class="mt-1 w-full border rounded-md p-2">
-            <option value="bar">Barras</option>
-            <option value="line">Líneas</option>
-            <option value="doughnut">Pastel</option>
-          </select>
-        </div>
-        <div class="flex items-end">
-          <button id="repGenerateBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Generar</button>
-        </div>
-        <div class="flex items-end">
-          <button id="repDownloadBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">Descargar CSV (Excel)</button>
-        </div>
-      </div>
-      <div class="mt-4 overflow-auto">
-        <table class="min-w-full text-left" id="repTable">
-          <thead id="repTableHead"></thead>
-          <tbody id="repTableBody" class="text-sm"></tbody>
-        </table>
-      </div>
-      <div class="mt-6 bg-white rounded-xl border border-gray-200 p-4">
-        <canvas id="repChart" height="120"></canvas>
-      </div>
-    </div>
   </div>
 
-  <!-- ===== Modal: elegir persona activa (costos) ===== -->
-  <div id="lcPersonModal" class="fixed inset-0 bg-gray-900/75 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-5">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-lg font-semibold">Seleccionar persona (activa)</h3>
-        <button id="lcModalClose" class="text-gray-600 hover:text-gray-900">✕</button>
-      </div>
-      <input id="lcModalSearch" type="text" placeholder="Buscar por nombre o cédula" class="w-full border rounded-md p-2 mb-3">
-      <div id="lcModalList" class="max-h-80 overflow-auto divide-y divide-gray-100"></div>
-      <div class="mt-4 text-right">
-        <button id="lcModalCancel" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ======= Librerías ======= -->
+  <!-- ===== Libs ===== -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-
-  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 
-  <!-- Chart.js (para los reportes) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
   <script>
-    /* ======================= ACCESO ======================= */
-    const ACCESS_CODE = "admin123"; // <-- cambia aquí tu código real
+    /* ===== Acceso ===== */
+    (function () {
+      const ADMIN_CODE = "admin123";
+      const $m = document.getElementById("adminModal");
+      const $c = document.getElementById("appContent");
+      const $i = document.getElementById("adminCodeInput");
+      const $b = document.getElementById("adminLoginBtn");
+      const $e = document.getElementById("errorMessage");
+      function openApp(){ $m.classList.add("hidden"); $c.classList.remove("hidden"); if(!window.__map_initialized__) { window.__map_initialized__=true; setTimeout(()=>initMap(), 0);} }
+      function check(){ if(($i.value||'').trim()===ADMIN_CODE){ sessionStorage.setItem('admin_ok','1'); openApp(); } else { $e.classList.remove('hidden'); $i.focus(); $i.select(); } }
+      if(sessionStorage.getItem('admin_ok')==='1') openApp();
+      $b.addEventListener('click', check); $i.addEventListener('keydown', ev=>{ if(ev.key==='Enter') check(); });
+    })();
 
-    const adminModal = document.getElementById('adminModal');
-    const appContent = document.getElementById('appContent');
-    const adminCodeInput = document.getElementById('adminCodeInput');
-    const adminLoginBtn = document.getElementById('adminLoginBtn');
-    const errorMessage = document.getElementById('errorMessage');
-
-    function showApp() {
-      adminModal.classList.add('hidden');
-      appContent.classList.remove('hidden');
-      // Inicializar mapa SOLO cuando se muestra la app
-      setTimeout(() => initMap({lat:-0.1807, lng:-78.4678}), 0);
-    }
-
-    function handleLogin() {
-      const code = (adminCodeInput.value || '').trim();
-      if (code === ACCESS_CODE) {
-        errorMessage.style.display = 'none';
-        showApp();
-      } else {
-        errorMessage.textContent = 'Código incorrecto.';
-        errorMessage.style.display = 'block';
-        adminCodeInput.focus();
-        adminCodeInput.select();
-      }
-    }
-
-    adminLoginBtn.addEventListener('click', handleLogin);
-    adminCodeInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') handleLogin();
-    });
-
-    /* ======================= Firebase ======================= */
-    const firebaseConfig = {
-      apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
-      authDomain: "demo-finca-app.firebaseapp.com",
-      projectId: "demo-finca-app",
-      storageBucket: "demo-finca-app.appspot.com",
-      messagingSenderId: "123456789012",
-      appId: "1:123456789012:web:abcdef1234567890"
-    };
+    /* ===== Firebase (demo) ===== */
+    const firebaseConfig = { apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE", authDomain: "demo-finca-app.firebaseapp.com", projectId: "demo-finca-app", storageBucket: "demo-finca-app.appspot.com", messagingSenderId: "123456789012", appId: "1:123456789012:web:abcdef1234567890" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    try{
-      db.settings({
-        experimentalForceLongPolling: true,
-        experimentalAutoDetectLongPolling: true,
-        useFetchStreams: false
-      });
-    }catch{}
-    let authReady = false;
-    firebase.auth().signInAnonymously().catch(console.error);
-    firebase.auth().onAuthStateChanged(u => authReady = !!u);
+    firebase.auth().signInAnonymously();
 
-    /* ======================= Estado y caché ======================= */
+    /* ===== Estado ===== */
     let map;
-    const fincaMarkers = {}, geofenceLayers = {};
-    const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1', LS_PE='personnel_cache_v1', LS_AC='activities_cache_v1', LS_AD='activity_defs_v1', LS_LC='labor_costs_cache_v1';
-    const save = (k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)) }catch{} };
-    const load = (k)=>{ try{ return JSON.parse(localStorage.getItem(k)||'[]') }catch{ return [] } };
-    const saveFarms=(v)=>save(LS_KEY,v), loadFarms=()=>load(LS_KEY);
-    const saveFences=(v)=>save(LS_GF,v), loadFences=()=>load(LS_GF);
+    const pointsMarkers={}, geofenceLayers={};
+    let currentPoints=[], currentFences=[];
+    let selectedPointId=null;
 
-    const GEOFENCE_STYLE={weight:2,fillOpacity:.15},
-          GEOFENCE_SELECTED_STYLE={weight:3,color:'#ef4444',fillOpacity:.2};
+    const LS_POINTS='points_cache_v1';
+    const LS_POINT_NAMES='point_names_v1';
+    const LS_GF='geofences_cache_v1';
+    const save=(k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
+    const load=(k,def=[])=>{ try{ const v=JSON.parse(localStorage.getItem(k)||'null'); return v??def; }catch{ return def; } };
 
-    let isDrawingFence=false, drawingCoords=[], drawingPolyline=null, drawingMarkers=[], pendingFenceCoords=null;
-    let selectedFenceId=null, editGroup=null, isEditingFence=false;
-
-    function waitAuthThen(fn){
-      if(authReady) return fn();
-      const t=setInterval(()=>{ if(authReady){ clearInterval(t); fn(); } },120);
-    }
-
-    /* ======================= Mapa ======================= */
-    function initMap(center){
-      center = center || {lat:-0.1807,lng:-78.4678};
-      const mapContainer = document.getElementById('map');
-      if (!mapContainer) { console.error('El contenedor del mapa no existe'); return; }
-
-      map = L.map('map',{center:[center.lat,center.lng],zoom:6});
+    /* ===== Mapa ===== */
+    function initMap(){ 
+      map=L.map('map',{center:[-1.83,-78.18],zoom:6});
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
-      // Control posición del mouse
+      addMousePos();
+      currentPoints=load(LS_POINTS,[]);
+      currentFences=load(LS_GF,[]);
+      refreshPointNameOptions();
+      renderPoints();
+      renderGeofences();
+      hookPointUI();
+      hookFenceUI();
+    }
+
+    function addMousePos(){
       const MousePos=L.Control.extend({options:{position:'bottomleft'},onAdd:function(){const d=L.DomUtil.create('div','mousepos-control');d.innerHTML='Lat: — Lng: —';this._div=d;return d;},update:function(lat,lng){this._div.innerHTML=(lat!=null&&lng!=null)?`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`:'Lat: — Lng: —';}});
-      const ctrl=new MousePos();
-      ctrl.addTo(map);
+      const ctrl=new MousePos(); ctrl.addTo(map);
       map.on('mousemove',e=>ctrl.update(e.latlng.lat,e.latlng.lng));
       map.on('mouseout',()=>ctrl.update(null,null));
-
-      // Render inicial desde caché
-      renderFarmsFromCache();
-      renderGeofencesFromCache();
-
-      // Click para crear finca rápida
-      map.on('click', async e=>{
-        if(isDrawingFence){ addFenceVertex(e.latlng); return; }
-        const name=prompt('Nombre de la nueva finca:');
-        if(!name) return;
-        try{
-          await db.collection('farms').add({name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}});
-        }catch{
-          const farms=loadFarms();
-          farms.push({id:'local-'+Date.now(),name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}});
-          saveFarms(farms);
-          renderFarmsFromCache();
-        }
-      });
-
-      // Suscripciones y sincronización
-      waitAuthThen(async()=>{
-        // Aquí puedes volver a activar tus suscripciones y fetch iniciales si los usabas.
-        // He dejado la estructura preparada para que tu lógica existente funcione igual.
-      });
     }
 
-    function renderFarmsFromCache(){
-      const farms=loadFarms();
-      Object.values(fincaMarkers).forEach(m=>map && map.removeLayer(m));
-      for(const k in fincaMarkers) delete fincaMarkers[k];
-      farms.forEach(f=>{
-        if(!f?.id||!f?.fincaLocation) return;
-        const m=L.marker([f.fincaLocation.lat,f.fincaLocation.lng]).addTo(map);
-        m.bindTooltip(f.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'});
-        fincaMarkers[f.id]=m;
-      });
-      const sel=document.getElementById('farmSelect');
-      if(sel){
-        sel.innerHTML='';
-        farms.forEach(f=>{const o=document.createElement('option');o.value=f.id;o.textContent=f.name||'Finca';sel.appendChild(o);});
-      }
-    }
+    /* ===== Puntos ===== */
+    function hookPointUI(){
+      let newPointMode=false, pendingLatLng=null;
+      const pointPanel=document.getElementById('pointPanel');
+      const pointNameInput=document.getElementById('pointNameInput');
 
-    function renderGeofencesFromCache(){
-      Object.values(geofenceLayers).forEach(p=>map && map.removeLayer(p));
-      for(const k in geofenceLayers) delete geofenceLayers[k];
-      const fences=loadFences();
-      fences.forEach(g=>{
-        if(!g?.id||!Array.isArray(g.path)||g.path.length<3) return;
-        const latlngs=g.path.map(p=>[p.lat,p.lng]);
-        const poly=L.polygon(latlngs,GEOFENCE_STYLE).addTo(map);
-        poly.bindTooltip(g.name||'Geocerca',{permanent:true,direction:'center',className:'farm-label'});
-        geofenceLayers[g.id]=poly;
+      document.getElementById('newPointModeBtn').addEventListener('click',()=>{ 
+        newPointMode=true; pointPanel.classList.remove('hidden'); 
+      });
+      map.on('click',e=>{ if(newPointMode){ pendingLatLng=e.latlng; pointNameInput.focus(); }});
+      document.getElementById('pointCancelBtn').addEventListener('click',()=>{ newPointMode=false; pendingLatLng=null; pointPanel.classList.add('hidden'); });
+      document.getElementById('pointSaveBtn').addEventListener('click',()=>{ 
+        const name=(pointNameInput.value||'').trim();
+        if(!newPointMode||!pendingLatLng||!name) return alert('Selecciona ubicación (clic en el mapa) y escribe/elige un nombre.');
+        const id='pt-'+Date.now();
+        currentPoints.push({id,name,location:{lat:pendingLatLng.lat,lng:pendingLatLng.lng}});
+        save(LS_POINTS,currentPoints);
+        renderPoints();
+        newPointMode=false; pendingLatLng=null; pointPanel.classList.add('hidden'); pointNameInput.value='';
+      });
+
+      document.getElementById('deletePointBtn').addEventListener('click',()=>{ 
+        if(!selectedPointId) return;
+        currentPoints=currentPoints.filter(p=>p.id!==selectedPointId);
+        save(LS_POINTS,currentPoints);
+        renderPoints(); selectedPointId=null;
+        document.getElementById('deletePointBtn').disabled=true;
       });
     }
 
-    function addFenceVertex(latlng){
-      drawingCoords.push({lat:latlng.lat,lng:latlng.lng});
-      const m=L.circleMarker(latlng,{radius:4,weight:2}).addTo(map);
-      drawingMarkers.push(m);
-      const latlngs=drawingCoords.map(p=>[p.lat,p.lng]);
-      if(drawingPolyline){map.removeLayer(drawingPolyline);drawingPolyline=null;}
-      if(latlngs.length>=3) drawingPolyline=L.polygon(latlngs,{dashArray:'4,4',weight:2,fillOpacity:.1}).addTo(map);
-      else if(latlngs.length>=2) drawingPolyline=L.polyline(latlngs,{dashArray:'4,4',weight:2}).addTo(map);
+    function refreshPointNameOptions(){
+      const list=document.getElementById('pointNamesList');
+      const names=load(LS_POINT_NAMES,["Pozo","Bodega","Punto de Control","Toma de agua","Oficina"]);
+      list.innerHTML = names.map(n=>`<option value="${n}"></option>`).join('');
     }
 
-    // Botones de dibujo (enganches básicos)
-    document.getElementById('startFenceBtn').addEventListener('click', ()=>{
-      if(isDrawingFence) return;
-      isDrawingFence=true;
-      drawingCoords=[]; drawingMarkers.forEach(m=>map.removeLayer(m)); drawingMarkers=[];
-      if(drawingPolyline){map.removeLayer(drawingPolyline);drawingPolyline=null;}
-      document.getElementById('startFenceBtn').classList.add('hidden');
-      document.getElementById('finishFenceBtn').classList.remove('hidden');
-      document.getElementById('cancelFenceBtn').classList.remove('hidden');
-    });
-    document.getElementById('finishFenceBtn').addEventListener('click', ()=>{
-      if(!isDrawingFence) return;
-      if(drawingCoords.length<3){alert('La geocerca necesita al menos 3 puntos.');return;}
-      pendingFenceCoords=drawingCoords.slice();
-      document.getElementById('fenceNameHint').textContent=`Vértices: ${pendingFenceCoords.length} puntos`;
-      const input=document.getElementById('fenceNameInput');
-      input.value=`Geocerca ${new Date().toLocaleDateString()}`;
-      document.getElementById('fenceNamePanel').classList.remove('hidden');
-      input.focus(); input.select();
-    });
-    document.getElementById('cancelFenceBtn').addEventListener('click', ()=>{
-      isDrawingFence=false; drawingCoords=[]; drawingMarkers.forEach(m=>map.removeLayer(m)); drawingMarkers=[];
-      if(drawingPolyline){map.removeLayer(drawingPolyline);drawingPolyline=null;}
-      document.getElementById('startFenceBtn').classList.remove('hidden');
-      document.getElementById('finishFenceBtn').classList.add('hidden');
-      document.getElementById('cancelFenceBtn').classList.add('hidden');
-      document.getElementById('fenceNamePanel').classList.add('hidden');
-      pendingFenceCoords=null;
-    });
-    document.getElementById('fenceNameSaveBtn').addEventListener('click', async ()=>{
-      const input=document.getElementById('fenceNameInput');
-      const name=(input.value||'').trim()||'Geocerca';
-      if(!pendingFenceCoords||pendingFenceCoords.length<3){alert('No hay geocerca lista.');return;}
-      try{ await db.collection('geofences').add({name,path:pendingFenceCoords}); }catch{}
-      input.value=''; pendingFenceCoords=null;
-      document.getElementById('fenceNamePanel').classList.add('hidden');
-      document.getElementById('cancelFenceBtn').click();
-    });
-    document.getElementById('fenceNameCancelBtn').addEventListener('click', ()=>{
-      document.getElementById('fenceNamePanel').classList.add('hidden');
-    });
+    function renderPoints(){
+      Object.values(pointsMarkers).forEach(m=>map.removeLayer(m));
+      for(const k in pointsMarkers) delete pointsMarkers[k];
+      currentPoints.forEach(p=>{
+        const m=L.marker([p.location.lat,p.location.lng]).addTo(map);
+        m.bindTooltip(p.name||'Punto',{permanent:true,direction:'right'});
+        m.on('click',()=>{ selectedPointId=p.id; document.getElementById('deletePointBtn').disabled=false; });
+        pointsMarkers[p.id]=m;
+      });
+      const ul=document.getElementById('pointsList');
+      ul.innerHTML=currentPoints.length
+        ? currentPoints.map(p=>`<li class="py-2">${p.name} <span class="text-xs text-gray-500">(${p.location.lat.toFixed(3)}, ${p.location.lng.toFixed(3)})</span></li>`).join('')
+        : '<li class="py-2 text-sm text-gray-500">No hay puntos.</li>';
+    }
 
-    // (Aquí puedes seguir conectando el resto de tu lógica de personal, actividades, costos y reportes)
+    /* ===== Geocercas ===== */
+    const GEOFENCE_STYLE={weight:2,fillOpacity:.15};
+    let isDrawingFence=false, drawingCoords=[], drawingPolyline=null, drawingMarkers=[];
+
+    function hookFenceUI(){
+      document.getElementById('startFenceBtn').addEventListener('click', startFenceDraw);
+      document.getElementById('finishFenceBtn').addEventListener('click', finishFenceDraw);
+      document.getElementById('cancelFenceBtn').addEventListener('click', cancelFenceDraw);
+      map.on('click', e=>{ if(isDrawingFence) addFenceVertex(e.latlng); });
+    }
+
+    function startFenceDraw(){ if(isDrawingFence) return; isDrawingFence=true; drawingCoords=[]; drawingMarkers.forEach(m=>map.removeLayer(m)); drawingMarkers=[]; if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; } document.getElementById('startFenceBtn').classList.add('hidden'); document.getElementById('finishFenceBtn').classList.remove('hidden'); document.getElementById('cancelFenceBtn').classList.remove('hidden'); }
+    function finishFenceDraw(){ if(!isDrawingFence) return; if(drawingCoords.length<3){ alert('La geocerca necesita al menos 3 puntos.'); return; } const name=prompt('Nombre de la geocerca:'); if(!name) return; const id='gf-'+Date.now(); const fences=load(LS_GF,[]); fences.push({id,name,path:drawingCoords.slice()}); save(LS_GF,fences); currentFences=fences; renderGeofences(); cancelFenceDraw(); }
+    function cancelFenceDraw(){ isDrawingFence=false; drawingCoords=[]; drawingMarkers.forEach(m=>map.removeLayer(m)); drawingMarkers=[]; if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; } document.getElementById('startFenceBtn').classList.remove('hidden'); document.getElementById('finishFenceBtn').classList.add('hidden'); document.getElementById('cancelFenceBtn').classList.add('hidden'); }
+    function addFenceVertex(latlng){ drawingCoords.push({lat:latlng.lat,lng:latlng.lng}); const m=L.circleMarker(latlng,{radius:4,weight:2}).addTo(map); drawingMarkers.push(m); const latlngs=drawingCoords.map(p=>[p.lat,p.lng]); if(drawingPolyline){ map.removeLayer(drawingPolyline); drawingPolyline=null; } if(latlngs.length>=3) drawingPolyline=L.polygon(latlngs,{dashArray:'4,4',weight:2,fillOpacity:.1}).addTo(map); else if(latlngs.length>=2) drawingPolyline=L.polyline(latlngs,{dashArray:'4,4',weight:2}).addTo(map); }
+
+    function renderGeofences(){
+      Object.values(geofenceLayers).forEach(p=>map.removeLayer(p)); for(const k in geofenceLayers) delete geofenceLayers[k];
+      const fences=load(LS_GF,[]);
+      const ul=document.getElementById('fenceList');
+      ul.innerHTML = fences.length
+        ? fences.map(g=>`<li class="py-2">${g.name||'Geocerca'} <span class="text-xs text-gray-500">(${(g.path||[]).length} pts)</span></li>`).join('')
+        : '<li class="py-2 text-sm text-gray-500">No hay geocercas.</li>';
+      fences.forEach(g=>{ if(!Array.isArray(g.path)||g.path.length<3) return; const latlngs=g.path.map(p=>[p.lat,p.lng]); const poly=L.polygon(latlngs,GEOFENCE_STYLE).addTo(map); geofenceLayers[g.id]=poly; });
+    }
   </script>
 </body>
 </html>
