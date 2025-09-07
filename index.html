@@ -213,6 +213,9 @@
 
     /************* Renombrar *************/
     function showRenameBar(){
+      if(!selectedId){ // sincroniza por si el usuario solo miró el select
+        const v=$('geofenceSelect')?.value; if(v) selectFence(v);
+      }
       if(!selectedId){ alert('Selecciona una geocerca.'); return; }
       if(editing){ alert('Termina/cancela la edición antes de renombrar.'); return; }
       const f=loadF().find(x=>x.id===selectedId);
@@ -243,7 +246,13 @@
         poly.on('click',()=>selectFence(f.id));
         layers[f.id]=poly;
       });
-      if(selectedId && !layers[selectedId]) selectedId=null;
+
+      // << NUEVO: autoselección si no hay selección todavía
+      if(!selectedId && fences.length){
+        selectedId = fences[0].id;
+        const s=$('geofenceSelect'); if(s) s.value=selectedId;
+      }
+
       paintSel(); rebuildList(); fillSelect(); updateEditBtns();
     }
     function selectFence(id){ selectedId=id; paintSel(); updateEditBtns(); const s=$('geofenceSelect'); if(s) s.value=id||''; S('geocerca seleccionada'); }
@@ -265,23 +274,29 @@
     function fillSelect(){
       const fences=loadF(); const s=$('geofenceSelect'); const cur=s.value;
       s.innerHTML=fences.map(f=>`<option value="${f.id}">${f.name||'Geocerca'}</option>`).join('');
-      if(cur && fences.some(f=>f.id===cur)) s.value=cur;
+      if(!cur && fences.length){ s.value = selectedId || fences[0].id; }
+      else if(cur && fences.some(f=>f.id===cur)) s.value=cur;
       s.onchange=e=>zoomTo(e.target.value);
     }
 
     /************* Edición con Geoman *************/
     function beginEdit(){
-      if(!selectedId) return alert('Selecciona una geocerca.');
+      // << NUEVO: sincroniza con el select si selectedId está vacío
+      if(!selectedId){
+        const v=$('geofenceSelect')?.value;
+        if(v) selectFence(v);
+      }
+      if(!selectedId){ alert('Selecciona una geocerca.'); return; }
       if(drawing){ alert('Termina/cancela el dibujo.'); return; }
 
       const layer=layers[selectedId];
       if(!layer){ alert('No se encontró la capa.'); return; }
       if(!layer.pm){ alert('Leaflet-Geoman no está cargado.'); return; }
 
-      // Guardamos backup para cancelar
+      // Backup para cancelar
       backup = layer.getLatLngs().map(r=> r.map(p=>L.latLng(p.lat,p.lng)));
 
-      // Cambiamos estilo de edición y habilitamos los manejadores
+      // Estilo de edición y habilitar handlers
       layer.setStyle(STYLEEDIT);
       layer.pm.enable({
         allowSelfIntersection: false,
@@ -290,33 +305,27 @@
         cursorMarker: true,
       });
 
-      // Feedback en estado
       layer.on('pm:vertexadded pm:vertexremoved pm:drag', _=>{
         const n = (layer.getLatLngs()[0]||[]).length;
         S(`editando — vértices: ${n}`);
       });
 
-      // Ajuste de botones
       editing=true; updateEditBtns();
-      // Evitamos interferencias al editar
       map.doubleClickZoom.disable();
       S('modo edición');
     }
 
     function saveEdit(){
       if(!selectedId) return;
-      const layer=layers[selectedId];
-      if(!layer||!layer.pm) return;
+      const layer=layers[selectedId]; if(!layer||!layer.pm) return;
 
       const latlngs = layer.getLatLngs()[0]||[];
       if(latlngs.length<3){ alert('Mínimo 3 puntos'); return; }
 
-      const fences=loadF();
-      const i=fences.findIndex(x=>x.id===selectedId); if(i<0) return;
+      const fences=loadF(); const i=fences.findIndex(x=>x.id===selectedId); if(i<0) return;
       fences[i].path = latlngs.map(p=>({lat:p.lat,lng:p.lng}));
       saveF(fences);
 
-      // Desactivar edición
       layer.pm.disable();
       layer.off('pm:vertexadded pm:vertexremoved pm:drag');
       editing=false; backup=null;
@@ -328,8 +337,7 @@
 
     function cancelEdit(){
       if(!selectedId) return;
-      const layer=layers[selectedId];
-      if(!layer||!layer.pm) return;
+      const layer=layers[selectedId]; if(!layer||!layer.pm) return;
 
       if(backup) layer.setLatLngs(backup);
       layer.pm.disable();
@@ -405,7 +413,7 @@
       fences.push({id,name,path:pts}); saveF(fences); renderAll(); zoomTo(id); S('creada por Lat/Lng');
     }
 
-    // Exponer por si hiciera falta
+    // Exponer (por si el entorno lo requiere)
     window.beginEdit=beginEdit; window.saveEdit=saveEdit; window.cancelEdit=cancelEdit;
 
     window.addEventListener('load', init);
