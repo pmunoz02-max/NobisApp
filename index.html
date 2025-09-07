@@ -29,8 +29,19 @@
     </div>
 
     <div class="grid md:grid-cols-3 gap-4 controls-layer">
-      <!-- Geocerca activa -->
+      <!-- Columna izquierda: USUARIO + Geocerca activa -->
       <div class="bg-white p-4 rounded-2xl shadow">
+        <!-- Usuario actual -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700">Usuario</label>
+          <div class="mt-1 flex gap-2 items-stretch">
+            <select id="userSelect" class="min-w-0 flex-1 border rounded-md p-2"></select>
+            <button id="newUserBtn"    class="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Nuevo</button>
+            <button id="renameUserBtn" class="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">Renombrar</button>
+            <button id="deleteUserBtn" class="px-3 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700">Eliminar</button>
+          </div>
+        </div>
+        <!-- Geocerca activa -->
         <label class="block text-sm font-medium text-gray-700">Geocerca activa</label>
         <select id="geofenceSelect" class="mt-1 w-full border rounded-md p-2"></select>
       </div>
@@ -64,7 +75,7 @@
           <button id="renameFenceBtn"         type="button" class="btn px-3 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700" disabled>Renombrar</button>
         </div>
 
-        <!-- Panel renombrar -->
+        <!-- Panel renombrar geocerca -->
         <div id="renameBar" class="hidden mt-3 p-3 border rounded-xl bg-sky-50 z-10">
           <label class="block text-sm font-medium text-gray-700 mb-1">Nuevo nombre</label>
           <div class="flex flex-wrap gap-2 items-stretch">
@@ -106,13 +117,128 @@
   </div>
 
   <script>
-    /* ---------- Persistencia robusta ---------- */
-    const KEY='geofences'; let __mem=[];
-    const loadF=()=>{try{const t=localStorage.getItem(KEY); if(!t) return __mem.slice(); const a=JSON.parse(t); return Array.isArray(a)?a:__mem.slice();}catch{return __mem.slice();}};
-    const saveF=(a)=>{try{localStorage.setItem(KEY,JSON.stringify(a||[]));}catch{__mem=JSON.parse(JSON.stringify(a||[]));}};
-    const nextDefaultName=()=>{const fs=loadF(); let maxN=0; for(const f of fs){const m=String(f?.name??'').match(/geocerca\s+(\d+)/i); const n=m?parseInt(m[1],10):0; if(n>maxN) maxN=n;} return 'Geocerca '+(maxN?maxN+1:fs.length+1);};
+    /* ========= MÓDULO DE USUARIOS (multiusuario local) ========= */
+    const APP = 'NobisApp';
+    const USERS_KEY = `${APP}_users`;
+    const CURR_USER_KEY = `${APP}_current_user`;
+    const GEOFENCE_PREFIX = `${APP}_geofences_`;
+    const LEGACY_KEY = 'geofences'; // para migración automática
 
-    /* ---------- Estado global ---------- */
+    const uid = () => 'u_' + Math.random().toString(36).slice(2,10);
+
+    const getUsers = () => {
+      try { const raw = localStorage.getItem(USERS_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch { return []; }
+    };
+    const saveUsers = (arr) => localStorage.setItem(USERS_KEY, JSON.stringify(arr || []));
+    const getCurrentUser = () => localStorage.getItem(CURR_USER_KEY) || '';
+    const setCurrentUser = (id) => localStorage.setItem(CURR_USER_KEY, id || '');
+
+    const userKey = (id) => `${GEOFENCE_PREFIX}${id}`;
+
+    // Migración: si existía "geofences" global, lo pasamos a "Usuario 1".
+    function ensureUsersBootstrap() {
+      let users = getUsers();
+      let current = getCurrentUser();
+
+      if (users.length === 0) {
+        const firstId = uid();
+        const firstName = 'Usuario 1';
+        users = [{ id: firstId, name: firstName }];
+        saveUsers(users);
+        setCurrentUser(firstId);
+
+        // Migrar datos previos (si los había)
+        try {
+          const legacyRaw = localStorage.getItem(LEGACY_KEY);
+          if (legacyRaw) {
+            localStorage.setItem(userKey(firstId), legacyRaw);
+            localStorage.removeItem(LEGACY_KEY);
+          } else {
+            localStorage.setItem(userKey(firstId), JSON.stringify([]));
+          }
+        } catch { localStorage.setItem(userKey(firstId), JSON.stringify([])); }
+        return;
+      }
+
+      // Si había usuarios pero no current, selecciona el primero
+      if (!current) setCurrentUser(users[0].id);
+      // Garantiza que el user actual tenga su array
+      current = getCurrentUser();
+      if (!localStorage.getItem(userKey(current))) {
+        localStorage.setItem(userKey(current), JSON.stringify([]));
+      }
+    }
+
+    function createUser(name) {
+      const users = getUsers();
+      const id = uid();
+      const clean = String(name || '').trim() || `Usuario ${users.length + 1}`;
+      users.push({ id, name: clean });
+      saveUsers(users);
+      localStorage.setItem(userKey(id), JSON.stringify([])); // NUEVO usuario => DB vacía
+      setCurrentUser(id);
+      return id;
+    }
+
+    function renameUser(id, newName) {
+      const users = getUsers();
+      const i = users.findIndex(u => u.id === id);
+      if (i >= 0) {
+        users[i].name = String(newName || '').trim() || users[i].name;
+        saveUsers(users);
+      }
+    }
+
+    function deleteUser(id) {
+      let users = getUsers();
+      const i = users.findIndex(u => u.id === id);
+      if (i < 0) return;
+
+      // Borra su base
+      localStorage.removeItem(userKey(id));
+      // Quita usuario
+      users.splice(i, 1);
+      saveUsers(users);
+
+      // Reasigna current
+      if (users.length === 0) {
+        const newId = createUser('Usuario 1'); // arranca vacío
+        setCurrentUser(newId);
+      } else {
+        setCurrentUser(users[0].id);
+      }
+    }
+
+    /* ========= Persistencia por usuario ========= */
+    let CURRENT_USER_ID = ''; // se establece en init()
+
+    const loadF = () => {
+      const key = userKey(CURRENT_USER_ID);
+      try {
+        const t = localStorage.getItem(key);
+        if (!t) return [];
+        const a = JSON.parse(t);
+        return Array.isArray(a) ? a : [];
+      } catch { return []; }
+    };
+    const saveF = (arr) => {
+      const key = userKey(CURRENT_USER_ID);
+      localStorage.setItem(key, JSON.stringify(arr || []));
+    };
+    const nextDefaultName = () => {
+      const fs = loadF(); let maxN = 0;
+      for (const f of fs) {
+        const m = String(f?.name ?? '').match(/geocerca\s+(\d+)/i);
+        const n = m ? parseInt(m[1], 10) : 0;
+        if (n > maxN) maxN = n;
+      }
+      return 'Geocerca ' + (maxN ? maxN + 1 : fs.length + 1);
+    };
+
+    /* ========= APP (igual que antes, sin tocar flujos) ========= */
     const $=id=>document.getElementById(id);
     const S=t=>{const s=$('statusDot'); if(s) s.textContent=t;};
     let map, selectedId=null; const layers={};
@@ -120,18 +246,26 @@
     const STYLESEL={color:'#7c3aed',weight:4,fillColor:'#c4b5fd',fillOpacity:.26};
     const STYLEEDIT={color:'#0ea5e9',weight:3,fillColor:'#7dd3fc',fillOpacity:.18};
 
-    /* Dibujo temporal */
+    // Dibujo temporal
     let drawing=false, temp=[], tempPoly=null, firstPt=null, onClick=null, onDbl=null, pendingCoords=null;
-    /* Edición manual */
+    // Edición manual de vértices
     let editing=false, backup=null, editHandles=[];
     const handleIcon=L.divIcon({className:'vertex-handle',iconSize:[12,12]});
 
-    /* ---------- Init ---------- */
     function init(){
+      // Multiusuario
+      ensureUsersBootstrap();
+      CURRENT_USER_ID = getCurrentUser();
+
+      // UI usuarios
+      renderUserUI();
+
+      // Mapa
       map=L.map('map');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
       map.setView([-1.5,-78.5],9);
 
+      // Botones
       $('newFenceBtn').onclick=startDraw;
       $('finishFenceBtn').onclick=finishDraw;
       $('cancelFenceBtn').onclick=cancelDraw;
@@ -155,7 +289,61 @@
       renderAll(); S('mapa listo');
     }
 
-    /* ---------- Dibujo ---------- */
+    /* ======= UI de usuarios ======= */
+    function renderUserUI(){
+      const users = getUsers();
+      const sel = $('userSelect');
+      const cur = getCurrentUser();
+      sel.innerHTML = users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
+      if (users.length) sel.value = cur || users[0].id;
+
+      $('newUserBtn').onclick = () => {
+        const name = prompt('Nombre del nuevo usuario:');
+        const id = createUser(name || '');
+        CURRENT_USER_ID = id;
+        selectedId = null; // no geocerca seleccionada
+        clearHandles();
+        renderUserUI();
+        renderAll();
+        S('usuario creado (base vacía)');
+      };
+
+      $('renameUserBtn').onclick = () => {
+        const id = sel.value;
+        const u = getUsers().find(x=>x.id===id);
+        if (!u) return;
+        const name = prompt('Nuevo nombre del usuario:', u.name);
+        if (name===null) return;
+        renameUser(id, name);
+        renderUserUI();
+        S('usuario renombrado');
+      };
+
+      $('deleteUserBtn').onclick = () => {
+        const id = sel.value;
+        const u = getUsers().find(x=>x.id===id);
+        if (!u) return;
+        if (!confirm(`Eliminar usuario "${u.name}" y TODAS sus geocercas?`)) return;
+        deleteUser(id);
+        CURRENT_USER_ID = getCurrentUser();
+        selectedId = null;
+        clearHandles();
+        renderUserUI();
+        renderAll();
+        S('usuario eliminado');
+      };
+
+      sel.onchange = (e) => {
+        setCurrentUser(e.target.value);
+        CURRENT_USER_ID = e.target.value;
+        selectedId = null; // reset selección al cambiar usuario
+        clearHandles();
+        renderAll();
+        S('usuario cambiado');
+      };
+    }
+
+    /* ======= Dibujo ======= */
     const disableMap=()=>{map.dragging.disable(); map.scrollWheelZoom.disable(); map.doubleClickZoom.disable(); map.boxZoom.disable(); map.touchZoom.disable(); map.keyboard.disable();};
     const enableMap =()=>{map.dragging.enable();  map.scrollWheelZoom.enable();  map.doubleClickZoom.enable();  map.boxZoom.enable();  map.touchZoom.enable();  map.keyboard.enable();};
 
@@ -193,7 +381,7 @@
       hideNameBar();
     }
 
-    /* ---------- Panel nombre ---------- */
+    /* ======= Panel nombre ======= */
     function showNameBar(def){ $('nameBar').classList.remove('hidden'); $('nameField').value=String(def||'').trim()||nextDefaultName(); $('nameField').focus(); }
     function hideNameBar(){ $('nameBar').classList.add('hidden'); }
     function saveNameFromBar(){
@@ -205,7 +393,7 @@
       clearTemp(); enableMap(); renderAll(); zoomTo(id); S(`geocerca creada: ${name}`);
     }
 
-    /* ---------- Renombrar ---------- */
+    /* ======= Renombrar geocerca ======= */
     function showRenameBar(){
       if(!selectedId){ const v=$('geofenceSelect')?.value; if(v) selectFence(v); }
       if(!selectedId){ alert('Selecciona una geocerca.'); return; }
@@ -225,7 +413,7 @@
       S('nombre actualizado');
     }
 
-    /* ---------- Render / selección ---------- */
+    /* ======= Render / selección ======= */
     function renderAll(){
       Object.values(layers).forEach(l=>map.removeLayer(l)); for(const k in layers) delete layers[k];
       const fences=loadF();
@@ -263,8 +451,10 @@
       s.onchange=e=>zoomTo(e.target.value);
     }
 
-    /* ---------- Edición manual (sin plugins) ---------- */
-    function getRing(layer){ const ll=layer.getLatLngs(); return Array.isArray(ll[0])?ll[0]:ll; }
+    /* ======= Edición manual (sin plugins) ======= */
+    let editHandles=[];
+    const handleIcon=L.divIcon({className:'vertex-handle',iconSize:[12,12]});
+    const getRing=layer=>{const ll=layer.getLatLngs(); return Array.isArray(ll[0])?ll[0]:ll;};
     function createHandles(layer){
       clearHandles();
       const ring=getRing(layer);
@@ -289,14 +479,13 @@
       const layer=layers[selectedId];
       if(!layer){ alert('No se encontró la capa.'); return; }
 
-      backup=getRing(layer).map(p=>L.latLng(p.lat,p.lng)); // copia
+      backup=getRing(layer).map(p=>L.latLng(p.lat,p.lng));
       layer.setStyle(STYLEEDIT);
       createHandles(layer);
 
       editing=true; updateEditBtns();
       S('modo edición — arrastra los puntos');
     }
-
     function saveEdit(){
       if(!selectedId) return;
       const layer=layers[selectedId]; if(!layer) return;
@@ -306,14 +495,12 @@
       fences[i].path=ring.map(p=>({lat:p.lat,lng:p.lng})); saveF(fences);
       clearHandles(); editing=false; backup=null; renderAll(); selectFence(selectedId); S('edición guardada');
     }
-
     function cancelEdit(){
       if(!selectedId) return;
       const layer=layers[selectedId]; if(!layer) return;
       if(backup) layer.setLatLngs([backup]);
       clearHandles(); editing=false; backup=null; paintSel(); updateEditBtns(); S('edición cancelada');
     }
-
     function updateEditBtns(){
       $('editFenceBtn').disabled   = !selectedId || editing;
       $('deleteFenceBtn').disabled = !selectedId || editing;
@@ -325,7 +512,7 @@
       $('cancelFenceBtn').disabled = true;
     }
 
-    /* ---------- Utilidades ---------- */
+    /* ======= Otras utilidades ======= */
     function removeFence(){ if(!selectedId) return; if(!confirm('¿Eliminar esta geocerca?')) return;
       saveF(loadF().filter(f=>f.id!==selectedId)); selectedId=null; renderAll(); S('geocerca eliminada'); }
 
@@ -340,7 +527,6 @@
       const url=URL.createObjectURL(blob); const a=document.createElement('a');
       a.href=url; a.download='geocercas.geojson'; a.click(); URL.revokeObjectURL(url);
     }
-
     function importGeoJSON(file){
       const r=new FileReader();
       r.onload=()=>{
@@ -361,21 +547,7 @@
       r.readAsText(file);
     }
 
-    function createByLatLng(){
-      const raw=prompt('Ingresa coordenadas lat,lng por línea (o separadas con ;)');
-      if(!raw) return;
-      let name=prompt('Nombre de la geocerca:')||'';
-      name=(name||'').trim()||nextDefaultName();
-      const lines=raw.split(/\n|;/).map(s=>s.trim()).filter(Boolean);
-      const pts=[]; for(const line of lines){
-        const m=line.match(/(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)/); if(!m) continue;
-        const lat=parseFloat(m[1]), lng=parseFloat(m[2]); if(Number.isFinite(lat)&&Number.isFinite(lng)) pts.push({lat,lng});
-      }
-      if(pts.length<3){ alert('Se requieren al menos 3 puntos.'); return; }
-      const fences=loadF(); const id='f_'+Math.random().toString(36).slice(2,10);
-      fences.push({id,name,path:pts}); saveF(fences); renderAll(); zoomTo(id); S('creada por Lat/Lng');
-    }
-
+    /* ---------- GO ---------- */
     window.addEventListener('load', init);
   </script>
 </body>
