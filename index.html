@@ -17,8 +17,12 @@
     .btn:disabled{opacity:.45;cursor:not-allowed}
     .controls-layer{position:relative; z-index:1000; pointer-events:auto;}
     #map{touch-action:none;}
-    /* Manijas de edición (vértices) */
     .vertex-handle{width:12px;height:12px;background:#fff;border:2px solid #2563eb;border-radius:50%;box-shadow:0 0 0 2px #ffffffa8}
+    .role-badge{font-size:.72rem;padding:.15rem .4rem;border-radius:.5rem}
+    .role-owner{background:#1e293b;color:#fff}
+    .role-admin{background:#0ea5e9;color:#fff}
+    .role-staff{background:#10b981;color:#0b3b2e}
+    .card{background:#fff;border-radius:1rem;box-shadow:0 8px 24px rgba(15,23,42,.06)}
   </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
@@ -30,7 +34,7 @@
 
     <div class="grid md:grid-cols-3 gap-4 controls-layer">
       <!-- Columna izquierda: USUARIO + Geocerca activa -->
-      <div class="bg-white p-4 rounded-2xl shadow">
+      <div class="card p-4">
         <!-- Usuario actual -->
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700">Usuario</label>
@@ -40,21 +44,22 @@
             <button id="renameUserBtn" class="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">Renombrar</button>
             <button id="deleteUserBtn" class="px-3 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700">Eliminar</button>
           </div>
+          <p class="text-xs text-gray-500 mt-1">El primer usuario está marcado como <span class="role-badge role-owner">owner</span>.</p>
         </div>
         <!-- Geocerca activa -->
         <label class="block text-sm font-medium text-gray-700">Geocerca activa</label>
         <select id="geofenceSelect" class="mt-1 w-full border rounded-md p-2"></select>
       </div>
 
-      <!-- Acciones -->
-      <div class="bg-white p-4 rounded-2xl shadow relative">
+      <!-- Acciones geocercas -->
+      <div class="card p-4 relative">
         <div class="flex flex-wrap gap-2">
           <button id="newFenceBtn"    type="button" class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
           <button id="finishFenceBtn" type="button" class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
           <button id="cancelFenceBtn" type="button" class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
         </div>
 
-        <!-- Panel nombre al crear -->
+        <!-- Panel nombre -->
         <div id="nameBar" class="hidden mt-3 p-3 border rounded-xl bg-indigo-50 z-10">
           <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la geocerca</label>
           <div class="flex flex-wrap gap-2 items-stretch">
@@ -75,16 +80,6 @@
           <button id="renameFenceBtn"         type="button" class="btn px-3 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700" disabled>Renombrar</button>
         </div>
 
-        <!-- Panel renombrar geocerca -->
-        <div id="renameBar" class="hidden mt-3 p-3 border rounded-xl bg-sky-50 z-10">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nuevo nombre</label>
-          <div class="flex flex-wrap gap-2 items-stretch">
-            <input id="renameField" class="min-w-0 flex-1 border rounded-md p-2" />
-            <button id="renameSaveBtn"   type="button" class="shrink-0 whitespace-nowrap px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">Guardar</button>
-            <button id="renameCancelBtn" type="button" class="shrink-0 whitespace-nowrap px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">Cancelar</button>
-          </div>
-        </div>
-
         <div class="flex flex-wrap gap-2 mt-2">
           <button id="deleteFenceBtn"   type="button" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
           <button id="exportGeoJsonBtn" type="button" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
@@ -96,32 +91,88 @@
       </div>
 
       <!-- Ayuda -->
-      <div class="bg-white p-4 rounded-2xl shadow text-sm text-gray-700">
+      <div class="card p-4 text-sm text-gray-700">
         <p><b>Dibujo:</b> Nueva geocerca → clics/toques para vértices → <i>Finalizar</i> (o doble clic / clic en el 1º punto).</p>
-        <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → <b>Editar</b> (aparecen puntos) → arrastra vértices → <b>Guardar cambios</b> o <b>Cancelar edición</b>.</p>
+        <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → <b>Editar</b> → arrastra vértices → <b>Guardar cambios</b> o <b>Cancelar edición</b>.</p>
         <p class="mt-1">También puedes crear por <b>Lat/Lng</b> (una línea <code>lat,lng</code> por vértice).</p>
+        <div id="staffPanel" class="hidden mt-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+          <div class="font-semibold mb-1">Modo Personal (staff)</div>
+          <div class="text-xs text-gray-700 mb-2" id="staffAssignInfo">Geocerca asignada: —</div>
+          <button id="sendPositionBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Enviar mi posición</button>
+          <div id="staffMsg" class="text-xs mt-2"></div>
+        </div>
       </div>
     </div>
 
     <!-- Mapa -->
-    <div class="mt-4 bg-white rounded-2xl shadow overflow-hidden">
+    <div class="mt-4 card overflow-hidden">
       <div class="px-4 py-3 border-b"><h2 class="text-lg font-semibold">Mapa</h2></div>
-      <div id="map" style="height:480px; position:relative; z-index:0;"></div>
+      <div id="map" style="height:460px; position:relative; z-index:0;"></div>
     </div>
 
     <!-- Explorador -->
-    <div class="mt-4 bg-white rounded-2xl shadow">
+    <div class="mt-4 card">
       <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Geocercas</h3></div>
       <ul id="fenceList" class="p-3 divide-y"></ul>
+    </div>
+
+    <!-- ADMINISTRACIÓN DE USUARIOS -->
+    <div class="mt-6 card">
+      <div class="px-4 py-3 border-b flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Administración de usuarios</h3>
+        <div>
+          <button id="createAdminBtn" class="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 mr-2">Crear administrador</button>
+          <button id="createStaffBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Crear personal</button>
+        </div>
+      </div>
+
+      <div class="p-4 grid md:grid-cols-2 gap-4">
+        <!-- Asignar geocerca a personal -->
+        <div class="border rounded-xl p-3">
+          <div class="font-medium mb-2">Asignar geocerca a personal</div>
+          <div class="grid grid-cols-1 gap-2">
+            <div>
+              <label class="text-sm">Personal</label>
+              <select id="assignStaffSelect" class="w-full border rounded-md p-2"></select>
+            </div>
+            <div>
+              <label class="text-sm">Admin/Owner (fuente de geocercas)</label>
+              <select id="assignAdminSelect" class="w-full border rounded-md p-2"></select>
+            </div>
+            <div>
+              <label class="text-sm">Geocerca</label>
+              <select id="assignFenceSelect" class="w-full border rounded-md p-2"></select>
+            </div>
+            <button id="doAssignBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Asignar</button>
+            <div id="assignMsg" class="text-xs mt-1"></div>
+          </div>
+        </div>
+
+        <!-- Ver check-ins -->
+        <div class="border rounded-xl p-3">
+          <div class="font-medium mb-2">Check-ins de personal</div>
+          <div class="flex gap-2 mb-2">
+            <select id="checkStaffSelect" class="border rounded-md p-2 flex-1"></select>
+            <button id="refreshChecksBtn" class="px-3 py-2 rounded-lg bg-slate-700 text-white hover:bg-slate-800">Actualizar</button>
+          </div>
+          <ul id="checksList" class="text-sm text-gray-700 space-y-1 max-h-56 overflow-auto"></ul>
+        </div>
+      </div>
+
+      <div class="px-4 py-3 border-t">
+        <div id="usersTable" class="text-sm"></div>
+      </div>
     </div>
   </div>
 
   <script>
-    /* ========= MÓDULO DE USUARIOS (multiusuario local) ========= */
+    /* ========= MÓDULO DE USUARIOS / ROLES ========= */
     const APP = 'NobisApp';
     const USERS_KEY = APP + '_users';
     const CURR_USER_KEY = APP + '_current_user';
     const GEOFENCE_PREFIX = APP + '_geofences_';
+    const ASSIGN_PREFIX = APP + '_staff_assign_';   // por staffId -> {adminId,fenceId}
+    const CHECKS_PREFIX = APP + '_checkins_';       // por staffId -> [{ts,lat,lng,ok}]
 
     function getLegacyRaw(){
       try{
@@ -132,8 +183,8 @@
       }catch(e){}
       return null;
     }
-
     function uid(){ return 'u_' + Math.random().toString(36).slice(2,10); }
+    function userKey(id){ return GEOFENCE_PREFIX + id; }
 
     function getUsers(){
       try{
@@ -145,77 +196,87 @@
     function saveUsers(arr){ localStorage.setItem(USERS_KEY, JSON.stringify(arr || [])); }
     function getCurrentUser(){ return localStorage.getItem(CURR_USER_KEY) || ''; }
     function setCurrentUser(id){ localStorage.setItem(CURR_USER_KEY, id || ''); }
-    function userKey(id){ return GEOFENCE_PREFIX + id; }
 
+    // Asegura usuarios + roles (primero = owner)
     function ensureUsersBootstrap(){
       var users = getUsers();
-      var current = getCurrentUser();
+      var changed = false;
 
       if (users.length === 0){
         var firstId = uid();
-        var firstName = 'Usuario 1';
-        users = [{ id:firstId, name:firstName }];
+        users = [{ id:firstId, name:'Usuario 1', role:'owner' }];
         saveUsers(users);
         setCurrentUser(firstId);
 
-        var legacyRaw = getLegacyRaw();
-        if (legacyRaw){
-          localStorage.setItem(userKey(firstId), legacyRaw);
-          try{ localStorage.removeItem('geofences'); }catch(e){}
-          try{ localStorage.removeItem('geocercas'); }catch(e){}
-        }else{
-          localStorage.setItem(userKey(firstId), JSON.stringify([]));
-        }
+        var legacy = getLegacyRaw();
+        if (legacy){ localStorage.setItem(userKey(firstId), legacy); }
+        else{ localStorage.setItem(userKey(firstId), JSON.stringify([])); }
         return;
       }
 
-      if (!current) setCurrentUser(users[0].id);
-      current = getCurrentUser();
-      if (!localStorage.getItem(userKey(current))){
-        localStorage.setItem(userKey(current), JSON.stringify([]));
+      // Rellenar roles faltantes (primero owner, resto admin)
+      for (var i=0;i<users.length;i++){
+        if (!users[i].role){ users[i].role = (i===0)?'owner':'admin'; changed = true; }
+      }
+      if (changed) saveUsers(users);
+
+      var curr = getCurrentUser();
+      if (!curr) setCurrentUser(users[0].id);
+
+      curr = getCurrentUser();
+      if (!localStorage.getItem(userKey(curr))){
+        localStorage.setItem(userKey(curr), JSON.stringify([]));
       }
     }
 
-    function createUser(name){
+    function createUserWithRole(name, role){
       var users = getUsers();
       var id = uid();
-      var clean = String(name || '').trim() || ('Usuario ' + (users.length + 1));
-      users.push({ id:id, name:clean });
+      var clean = String(name || '').trim() || (role==='staff'?'Personal '+(users.length+1): 'Usuario '+(users.length+1));
+      users.push({ id:id, name:clean, role:role||'admin' });
       saveUsers(users);
-      localStorage.setItem(userKey(id), JSON.stringify([])); // NUEVO => DB vacía
+      // Para admins/owner, siempre BD de geocercas; para staff también, pero quedará vacía y no se usará
+      localStorage.setItem(userKey(id), JSON.stringify([]));
       setCurrentUser(id);
       return id;
     }
+    function createUser(name){ return createUserWithRole(name,'admin'); } // compatibilidad
     function renameUser(id, newName){
       var users = getUsers();
-      var i = -1;
-      for (var k=0;k<users.length;k++){ if(users[k].id===id){ i=k; break; } }
-      if (i>=0){
-        users[i].name = String(newName || '').trim() || users[i].name;
-        saveUsers(users);
+      for (var i=0;i<users.length;i++){
+        if (users[i].id===id){
+          users[i].name = String(newName||'').trim() || users[i].name;
+          saveUsers(users); return;
+        }
       }
     }
     function deleteUser(id){
       var users = getUsers();
-      var i = -1;
-      for (var k=0;k<users.length;k++){ if(users[k].id===id){ i=k; break; } }
-      if (i<0) return;
+      var idx = -1, role = 'admin';
+      for (var i=0;i<users.length;i++){ if(users[i].id===id){ idx=i; role=users[i].role||'admin'; break; } }
+      if (idx<0) return;
+      if (role==='owner'){ alert('El dueño (owner) no se puede eliminar.'); return; }
 
+      // borra su base y asignaciones/checadas si fuera staff
       localStorage.removeItem(userKey(id));
-      users.splice(i,1);
-      saveUsers(users);
+      localStorage.removeItem(ASSIGN_PREFIX+id);
+      localStorage.removeItem(CHECKS_PREFIX+id);
 
-      if (users.length===0){
-        var newId = createUser('Usuario 1'); // vacío
-        setCurrentUser(newId);
-      }else{
-        setCurrentUser(users[0].id);
+      users.splice(idx,1); saveUsers(users);
+
+      // Selección
+      var newCurr = getCurrentUser();
+      if (newCurr===id){
+        if (users.length>0) setCurrentUser(users[0].id);
+        else{
+          var nid = createUserWithRole('Usuario 1','owner');
+          setCurrentUser(nid);
+        }
       }
     }
 
-    /* ========= Persistencia por usuario ========= */
-    var CURRENT_USER_ID = '';
-
+    /* ========= Persistencia de geocercas por usuario ========= */
+    var CURRENT_USER_ID = "";
     function loadF(){
       var key = userKey(CURRENT_USER_ID);
       try{
@@ -239,8 +300,18 @@
       }
       return 'Geocerca ' + (maxN ? maxN+1 : fs.length+1);
     }
+    function roleOf(id){
+      var users = getUsers();
+      for (var i=0;i<users.length;i++){ if(users[i].id===id) return users[i].role||'admin'; }
+      return 'admin';
+    }
+    function userById(id){
+      var users = getUsers();
+      for (var i=0;i<users.length;i++){ if(users[i].id===id) return users[i]; }
+      return null;
+    }
 
-    /* ========= APP ========= */
+    /* ========= APP (mapa + geocercas) ========= */
     function $(id){ return document.getElementById(id); }
     function S(t){ var s=$('statusDot'); if(s) s.textContent=t; }
     var map, selectedId=null; var layers={};
@@ -250,24 +321,21 @@
 
     // Dibujo temporal
     var drawing=false, temp=[], tempPoly=null, firstPt=null, onClick=null, onDbl=null, pendingCoords=null;
-    // Edición manual de vértices
+    // Edición manual
     var editing=false, backup=null, editHandles=[];
     var handleIcon = L.divIcon({className:'vertex-handle',iconSize:[12,12]});
 
     function init(){
-      // Multiusuario
       ensureUsersBootstrap();
       CURRENT_USER_ID = getCurrentUser();
 
-      // UI usuarios
       renderUserUI();
 
-      // Mapa
       map=L.map('map');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
       map.setView([-1.5,-78.5],9);
 
-      // Botones
+      // Botones geocercas
       $('newFenceBtn').onclick=startDraw;
       $('finishFenceBtn').onclick=finishDraw;
       $('cancelFenceBtn').onclick=cancelDraw;
@@ -291,54 +359,90 @@
       $('renameSaveBtn').onclick=commitRename;
       $('renameCancelBtn').onclick=function(){ $('renameBar').classList.add('hidden'); };
 
-      renderAll(); S('mapa listo');
+      // Admin Module
+      $('createAdminBtn').onclick=function(){
+        createUserWithRole(prompt('Nombre del administrador')||'', 'admin');
+        renderAll(); renderUserUI(); renderAdminPanel();
+        S('administrador creado (DB vacía)');
+      };
+      $('createStaffBtn').onclick=function(){
+        createUserWithRole(prompt('Nombre del personal')||'', 'staff');
+        renderAll(); renderUserUI(); renderAdminPanel();
+        S('personal creado');
+      };
+      $('doAssignBtn').onclick=assignFenceToStaff;
+      $('refreshChecksBtn').onclick=renderChecksList;
+      $('assignAdminSelect').onchange=populateAssignFences;
+
+      // Staff panel
+      $('sendPositionBtn').onclick=staffSendPosition;
+
+      renderAll();
+      renderAdminPanel();
+      applyRoleUI();
+      S('mapa listo');
     }
 
-    /* ======= UI de usuarios ======= */
+    /* ======= UI de roles/usuarios ======= */
+    function roleChip(role){
+      var cls = role==='owner'?'role-owner':(role==='staff'?'role-staff':'role-admin');
+      return '<span class="role-badge '+cls+'">'+role+'</span>';
+    }
     function renderUserUI(){
       var users = getUsers();
       var sel = $('userSelect');
       var cur = getCurrentUser();
-      sel.innerHTML = users.map(function(u){ return '<option value="'+u.id+'">'+u.name+'</option>'; }).join('');
+      var html='';
+      for (var i=0;i<users.length;i++){
+        var u=users[i];
+        html+='<option value="'+u.id+'">'+u.name+' ['+(u.role||'admin')+']</option>';
+      }
+      sel.innerHTML = html;
       if (users.length) sel.value = cur || users[0].id;
 
       $('newUserBtn').onclick = function(){
-        var name = prompt('Nombre del nuevo usuario:');
-        var id = createUser(name || '');
+        var r = prompt('Rol (admin/staff)? Escribe admin o staff','admin');
+        if (!r) return;
+        r=r.toLowerCase();
+        if (r!=='admin' && r!=='staff'){ alert('Rol inválido'); return; }
+        var name = prompt('Nombre del usuario:') || '';
+        var id = createUserWithRole(name, r);
         CURRENT_USER_ID = id;
         selectedId = null;
         clearHandles();
         renderUserUI();
         renderAll();
-        S('usuario creado (base vacía)');
+        renderAdminPanel();
+        applyRoleUI();
+        S('usuario creado');
       };
 
       $('renameUserBtn').onclick = function(){
         var id = sel.value;
-        var us = getUsers();
-        var u = null;
-        for (var i=0;i<us.length;i++){ if(us[i].id===id){ u=us[i]; break; } }
+        var u = userById(id);
         if (!u) return;
         var name = prompt('Nuevo nombre del usuario:', u.name);
         if (name===null) return;
         renameUser(id, name);
         renderUserUI();
+        renderAdminPanel();
         S('usuario renombrado');
       };
 
       $('deleteUserBtn').onclick = function(){
         var id = sel.value;
-        var us = getUsers();
-        var u = null;
-        for (var i=0;i<us.length;i++){ if(us[i].id===id){ u=us[i]; break; } }
+        var u = userById(id);
         if (!u) return;
-        if (!confirm('Eliminar usuario "'+(u.name)+'" y TODAS sus geocercas?')) return;
+        if (u.role==='owner'){ alert('No puedes eliminar al dueño.'); return; }
+        if (!confirm('Eliminar usuario "'+u.name+'" y sus datos?')) return;
         deleteUser(id);
         CURRENT_USER_ID = getCurrentUser();
         selectedId = null;
         clearHandles();
         renderUserUI();
         renderAll();
+        renderAdminPanel();
+        applyRoleUI();
         S('usuario eliminado');
       };
 
@@ -348,8 +452,31 @@
         selectedId = null;
         clearHandles();
         renderAll();
+        renderAdminPanel();
+        applyRoleUI();
         S('usuario cambiado');
       };
+    }
+
+    function applyRoleUI(){
+      var role = roleOf(CURRENT_USER_ID);
+      var isStaff = (role==='staff');
+
+      // Habilita/Deshabilita edición de geocercas para staff
+      $('newFenceBtn').disabled = isStaff;
+      $('finishFenceBtn').disabled = true;
+      $('cancelFenceBtn').disabled = true;
+      $('createFenceByCoordsBtn').disabled = isStaff;
+      $('editFenceBtn').disabled = isStaff || !selectedId || editing;
+      $('saveFenceEditBtn').disabled = isStaff || !editing;
+      $('cancelFenceEditBtn').disabled = isStaff || !editing;
+      $('renameFenceBtn').disabled = isStaff || !selectedId || editing;
+      $('deleteFenceBtn').disabled = isStaff || !selectedId || editing;
+
+      // Panel staff visible solo para staff
+      var sp = $('staffPanel');
+      if (isStaff){ sp.classList.remove('hidden'); updateStaffAssignInfo(); }
+      else{ sp.classList.add('hidden'); }
     }
 
     /* ======= Dibujo ======= */
@@ -358,6 +485,7 @@
 
     function startDraw(){
       if(editing){ alert('Termina/cancela la edición.'); return; }
+      if (roleOf(CURRENT_USER_ID)==='staff'){ alert('El personal no puede dibujar geocercas.'); return; }
       clearTemp(); drawing=true; temp=[]; disableMap();
       onClick=function(e){ if(!drawing) return; var ll=e.latlng || (e.originalEvent ? map.mouseEventToLatLng(e.originalEvent) : null); if(!ll) return; addVertex(ll); };
       onDbl=function(){ if(drawing && temp.length>=3) finishDraw(); };
@@ -393,7 +521,6 @@
       hideNameBar();
     }
 
-    /* ======= Panel nombre ======= */
     function showNameBar(def){ $('nameBar').classList.remove('hidden'); $('nameField').value = String(def||'').trim() || nextDefaultName(); $('nameField').focus(); }
     function hideNameBar(){ $('nameBar').classList.add('hidden'); }
     function saveNameFromBar(){
@@ -495,7 +622,7 @@
       s.onchange=function(e){ zoomTo(e.target.value); };
     }
 
-    /* ======= Edición manual (sin plugins) ======= */
+    /* ======= Edición manual de vértices ======= */
     function getRing(layer){
       var ll=layer.getLatLngs();
       return Array.isArray(ll[0]) ? ll[0] : ll;
@@ -519,6 +646,7 @@
     function clearHandles(){ for (var i=0;i<editHandles.length;i++){ map.removeLayer(editHandles[i]); } editHandles=[]; }
 
     function beginEdit(){
+      if(roleOf(CURRENT_USER_ID)==='staff'){ alert('El personal no puede editar.'); return; }
       if(!selectedId){
         var sel = $('geofenceSelect'); var v = sel ? sel.value : '';
         if (v) selectFence(v);
@@ -556,24 +684,21 @@
       clearHandles(); editing=false; backup=null; paintSel(); updateEditBtns(); S('edición cancelada');
     }
     function updateEditBtns(){
-      $('editFenceBtn').disabled   = (!selectedId || editing);
-      $('deleteFenceBtn').disabled = (!selectedId || editing);
-      $('saveFenceEditBtn').disabled   = (!editing);
-      $('cancelFenceEditBtn').disabled = (!editing);
-      $('renameFenceBtn').disabled = (!selectedId || editing);
-      $('newFenceBtn').disabled = editing;
-      $('finishFenceBtn').disabled = true;
-      $('cancelFenceBtn').disabled = true;
+      var isStaff = (roleOf(CURRENT_USER_ID)==='staff');
+      $('editFenceBtn').disabled   = isStaff || (!selectedId || editing);
+      $('deleteFenceBtn').disabled = isStaff || (!selectedId || editing);
+      $('saveFenceEditBtn').disabled   = isStaff || (!editing);
+      $('cancelFenceEditBtn').disabled = isStaff || (!editing);
+      $('renameFenceBtn').disabled = isStaff || (!selectedId || editing);
     }
 
-    /* ======= Otras utilidades ======= */
+    /* ======= Import/Export ======= */
     function removeFence(){
       if(!selectedId) return;
       if(!confirm('¿Eliminar esta geocerca?')) return;
       var fs=loadF().filter(function(f){ return f.id!==selectedId; });
       saveF(fs); selectedId=null; renderAll(); S('geocerca eliminada');
     }
-
     function exportGeoJSON(){
       var fences=loadF();
       var features=[];
@@ -581,18 +706,13 @@
         var f=fences[i];
         var coords=f.path.map(function(p){ return [p.lng,p.lat]; });
         coords.push([f.path[0].lng,f.path[0].lat]);
-        features.push({
-          type:'Feature',
-          properties:{id:f.id,name:f.name},
-          geometry:{type:'Polygon',coordinates:[coords]}
-        });
+        features.push({type:'Feature',properties:{id:f.id,name:f.name},geometry:{type:'Polygon',coordinates:[coords]}});
       }
       var fc={type:'FeatureCollection',features:features};
       var blob=new Blob([JSON.stringify(fc,null,2)],{type:'application/geo+json'});
       var url=URL.createObjectURL(blob); var a=document.createElement('a');
       a.href=url; a.download='geocercas.geojson'; a.click(); URL.revokeObjectURL(url);
     }
-
     function importGeoJSON(file){
       var r=new FileReader();
       r.onload=function(){
@@ -614,6 +734,146 @@
         }catch(e){ alert('Archivo inválido: '+e.message); }
       };
       r.readAsText(file);
+    }
+
+    /* ========= ADMINISTRACIÓN (asignaciones y check-ins) ========= */
+    function loadUserFences(adminId){
+      try{
+        var t = localStorage.getItem(userKey(adminId));
+        var a = t ? JSON.parse(t) : [];
+        return Array.isArray(a) ? a : [];
+      }catch(e){ return []; }
+    }
+    function setAssign(staffId, data){ localStorage.setItem(ASSIGN_PREFIX+staffId, JSON.stringify(data||null)); }
+    function getAssign(staffId){
+      try{
+        var t = localStorage.getItem(ASSIGN_PREFIX+staffId);
+        return t ? JSON.parse(t) : null;
+      }catch(e){ return null; }
+    }
+    function pushCheck(staffId, rec){
+      var key = CHECKS_PREFIX+staffId;
+      var arr=[];
+      try{ var t=localStorage.getItem(key); arr=t?JSON.parse(t):[]; if(!Array.isArray(arr)) arr=[]; }catch(e){}
+      arr.unshift(rec);
+      localStorage.setItem(key, JSON.stringify(arr));
+    }
+    function getChecks(staffId){
+      var key=CHECKS_PREFIX+staffId;
+      try{ var t=localStorage.getItem(key); var a=t?JSON.parse(t):[]; return Array.isArray(a)?a:[]; }catch(e){ return []; }
+    }
+
+    function renderAdminPanel(){
+      // Tabla simple de usuarios
+      var users = getUsers();
+      var html = '<div class="overflow-auto"><table class="min-w-full text-left text-sm">'
+        + '<thead><tr class="text-slate-500"><th class="px-2 py-1">Nombre</th><th class="px-2 py-1">Rol</th><th class="px-2 py-1">Acciones</th></tr></thead><tbody>';
+      for (var i=0;i<users.length;i++){
+        var u=users[i];
+        html += '<tr class="border-t"><td class="px-2 py-1">'+u.name+'</td>'
+              + '<td class="px-2 py-1">'+roleChip(u.role||'admin')+'</td>'
+              + '<td class="px-2 py-1 text-slate-600">'+(u.role==='owner'?'—':'<span class="italic">Usa los botones de la parte superior</span>')+'</td></tr>';
+      }
+      html += '</tbody></table></div>';
+      $('usersTable').innerHTML = html;
+
+      // Selects de asignación
+      var staffSel=$('assignStaffSelect'), adminSel=$('assignAdminSelect'), fenceSel=$('assignFenceSelect');
+      var staffList=users.filter(function(u){return (u.role==='staff');});
+      var admins=users.filter(function(u){return (u.role==='admin' || u.role==='owner');});
+
+      var shtml=''; for (var s=0;s<staffList.length;s++){ shtml+='<option value="'+staffList[s].id+'">'+staffList[s].name+'</option>'; }
+      staffSel.innerHTML=shtml;
+
+      var ahtml=''; for (var a=0;a<admins.length;a++){ ahtml+='<option value="'+admins[a].id+'">'+admins[a].name+' ['+(admins[a].role||'admin')+']</option>'; }
+      adminSel.innerHTML=ahtml;
+
+      populateAssignFences(); // llena geocercas según adminSel
+
+      // Select de checkins
+      var csel=$('checkStaffSelect'); csel.innerHTML=shtml;
+      renderChecksList();
+
+      updateStaffAssignInfo();
+    }
+    function populateAssignFences(){
+      var adminId = $('assignAdminSelect').value;
+      var fences = loadUserFences(adminId);
+      var fsel = $('assignFenceSelect');
+      var html = '';
+      for (var i=0;i<fences.length;i++){ html+='<option value="'+fences[i].id+'">'+(fences[i].name||'Geocerca')+'</option>'; }
+      fsel.innerHTML = html;
+    }
+    function assignFenceToStaff(){
+      var staffId = $('assignStaffSelect').value;
+      var adminId = $('assignAdminSelect').value;
+      var fenceId = $('assignFenceSelect').value;
+      if (!staffId || !adminId || !fenceId){ $('assignMsg').textContent='Selecciona personal, admin y geocerca.'; return; }
+      setAssign(staffId,{adminId:adminId,fenceId:fenceId});
+      $('assignMsg').textContent='Asignación guardada ✔';
+      updateStaffAssignInfo();
+    }
+    function renderChecksList(){
+      var staffId = $('checkStaffSelect').value;
+      var ul = $('checksList');
+      var arr = staffId ? getChecks(staffId) : [];
+      if (!arr.length){ ul.innerHTML='<li class="text-gray-500">Sin registros.</li>'; return; }
+      var html='';
+      for (var i=0;i<Math.min(arr.length,50);i++){
+        var r=arr[i];
+        html += '<li>['+(new Date(r.ts).toLocaleString())+'] '
+             +  (r.ok?'<span class="text-emerald-700">DENTRO</span>':'<span class="text-rose-700">FUERA</span>')
+             +  ' ('+r.lat.toFixed(5)+', '+r.lng.toFixed(5)+')</li>';
+      }
+      ul.innerHTML=html;
+    }
+
+    /* ========= STAFF: Enviar posición ========= */
+    function updateStaffAssignInfo(){
+      if (roleOf(CURRENT_USER_ID)!=='staff') return;
+      var a = getAssign(CURRENT_USER_ID);
+      var info = (a ? ('Geocerca asignada: '+((userById(a.adminId)||{}).name || '—')+' → '+(getFenceName(a.adminId,a.fenceId)||'—')) : 'Geocerca asignada: —');
+      $('staffAssignInfo').textContent = info;
+    }
+    function getFenceName(adminId, fenceId){
+      var fs = loadUserFences(adminId);
+      for (var i=0;i<fs.length;i++){ if(fs[i].id===fenceId) return fs[i].name||'Geocerca'; }
+      return null;
+    }
+    function getFencePath(adminId, fenceId){
+      var fs = loadUserFences(adminId);
+      for (var i=0;i<fs.length;i++){ if(fs[i].id===fenceId) return fs[i].path||[]; }
+      return [];
+    }
+    // Punto en polígono (ray casting)
+    function pointInPolygon(lat,lng, ring){
+      var inside=false;
+      for (var i=0,j=ring.length-1;i<ring.length;j=i++){
+        var xi=ring[i].lat, yi=ring[i].lng;
+        var xj=ring[j].lat, yj=ring[j].lng;
+        var intersect = ((yi>lng)!=(yj>lng)) && (lat < (xj - xi)*(lng - yi)/(yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+    function staffSendPosition(){
+      var a = getAssign(CURRENT_USER_ID);
+      var msg = $('staffMsg');
+      if (!a){ msg.textContent='No tienes geocerca asignada.'; return; }
+      if (!navigator.geolocation){
+        msg.textContent='Geolocalización no disponible en este navegador.';
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(function(pos){
+        var lat = pos.coords.latitude, lng = pos.coords.longitude;
+        var ring = getFencePath(a.adminId, a.fenceId);
+        var ok = ring.length>=3 ? pointInPolygon(lat,lng, ring) : false;
+        pushCheck(CURRENT_USER_ID,{ts:Date.now(),lat:lat,lng:lng,ok:ok});
+        msg.textContent = ok ? '✓ Posición enviada (DENTRO de la geocerca).' : '× Estás FUERA de la geocerca asignada.';
+        renderChecksList();
+      }, function(err){
+        msg.textContent='Error/permiso de geolocalización: '+err.message;
+      }, {enableHighAccuracy:true, timeout:10000});
     }
 
     /* ---------- GO ---------- */
