@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 
-  <!-- Leaflet-Geoman (solo para edición; el dibujo es propio) -->
+  <!-- Leaflet-Geoman (edición) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.css" />
   <script src="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.min.js"></script>
 
@@ -40,19 +40,19 @@
       <!-- Acciones -->
       <div id="actions" class="bg-white p-4 rounded-2xl shadow">
         <div class="flex flex-wrap gap-2">
-          <button id="newFenceBtn"    data-action="new"     onclick="startDraw();return false"   class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
-          <button id="finishFenceBtn" data-action="finish"  onclick="finishDraw();return false"  class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
-          <button id="cancelFenceBtn" data-action="cancel"  onclick="cancelDraw();return false"  class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
+          <button id="newFenceBtn"    data-action="new"     type="button" onclick="startDraw()"   class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
+          <button id="finishFenceBtn" data-action="finish"  type="button" onclick="finishDraw()"  class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
+          <button id="cancelFenceBtn" data-action="cancel"  type="button" onclick="cancelDraw()"  class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
         </div>
         <div class="flex flex-wrap gap-2 mt-2">
-          <button id="createFenceByCoordsBtn" data-action="byLatLng" onclick="createByLatLng();return false" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
-          <button id="editFenceBtn"           data-action="edit"    onclick="beginEdit();return false"      class="btn px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600" disabled>Editar geocerca</button>
-          <button id="saveFenceEditBtn"       data-action="saveEd"  onclick="saveEdit();return false"       class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" disabled>Guardar cambios</button>
-          <button id="cancelFenceEditBtn"     data-action="cancelEd"onclick="cancelEdit();return false"     class="btn px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600" disabled>Cancelar edición</button>
+          <button id="createFenceByCoordsBtn" data-action="byLatLng" type="button" onclick="createByLatLng()" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
+          <button id="editFenceBtn"           data-action="edit"     type="button" onclick="beginEdit()"      class="btn px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600" disabled>Editar geocerca</button>
+          <button id="saveFenceEditBtn"       data-action="saveEd"   type="button" onclick="saveEdit()"       class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" disabled>Guardar cambios</button>
+          <button id="cancelFenceEditBtn"     data-action="cancelEd" type="button" onclick="cancelEdit()"     class="btn px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600" disabled>Cancelar edición</button>
         </div>
         <div class="flex flex-wrap gap-2 mt-2">
-          <button id="deleteFenceBtn" data-action="del" onclick="removeFence();return false" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
-          <button id="exportGeoJsonBtn" data-action="export" onclick="exportGeoJSON();return false" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
+          <button id="deleteFenceBtn" data-action="del" type="button" onclick="removeFence()" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
+          <button id="exportGeoJsonBtn" data-action="export" type="button" onclick="exportGeoJSON()" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
           <label class="btn px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 cursor-pointer">
             Importar GeoJSON
             <input id="importGeoJsonInput" type="file" accept=".json,.geojson,application/geo+json,application/json" class="hidden"
@@ -127,10 +127,11 @@
       renderFences();
       setStatus('mapa listo');
 
-      /* Respaldo: delegación global (por si algún onclick fuese bloqueado por CSP/extensiones) */
-      document.addEventListener('click', (ev)=>{
-        const b = ev.target.closest('button');
+      // Delegación global robusta (captura) – asegura reacción del botón aunque algo bloquee listeners
+      document.addEventListener('pointerdown', (ev)=>{
+        const b = ev.target.closest('[data-action]');
         if(!b) return;
+        ev.preventDefault(); ev.stopPropagation();
         const a = b.dataset.action;
         if (a==='new') startDraw();
         else if (a==='finish') finishDraw();
@@ -173,7 +174,9 @@
 
       mapClickHandler = (e)=>{
         if(!isDrawing) return;
-        addVertex(e.latlng || e.latlngs || map.mouseEventToLatLng(e.originalEvent));
+        const ll = e.latlng || (e.originalEvent ? map.mouseEventToLatLng(e.originalEvent) : null);
+        if (!ll) return;
+        addVertex(ll);
       };
       mapDblHandler = ()=>{
         if(isDrawing && tempCoords.length >= 3) finishDraw();
@@ -357,7 +360,7 @@
       s.onchange = e => zoomTo(e.target.value);
     }
 
-    /* ===== Eliminar / Importar / Exportar / LatLng ===== */
+    /* ===== Eliminar / Importar / Exportar / Lat/Lng ===== */
     function removeFence(){
       if (!selectedFenceId) return;
       if (!confirm('¿Eliminar esta geocerca?')) return;
@@ -428,7 +431,7 @@
       setStatus('creada por Lat/Lng');
     }
 
-    /* ===== Exponer globales para onclick inline ===== */
+    /* ===== Exponer globales (para inline) ===== */
     window.startDraw = startDraw;
     window.finishDraw = finishDraw;
     window.cancelDraw = cancelDraw;
@@ -443,8 +446,7 @@
     /* ===== Arranque ===== */
     window.addEventListener('load', ()=>{
       initMap();
-
-      /* Respaldo extra: listeners directos (además del inline/delegación) */
+      // Respaldo extra: listeners directos
       gei('newFenceBtn').addEventListener('click', startDraw);
       gei('finishFenceBtn').addEventListener('click', finishDraw);
       gei('cancelFenceBtn').addEventListener('click', cancelDraw);
