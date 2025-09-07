@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 
-  <!-- Leaflet-Geoman (para edición) -->
+  <!-- Leaflet-Geoman (edición) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.css" />
   <script src="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.min.js"></script>
 
@@ -21,7 +21,6 @@
     .btn:disabled{opacity:.45;cursor:not-allowed}
     .controls-layer{position:relative; z-index:1000; pointer-events:auto;}
     #map{touch-action:none;}
-    /* Asegura que el modal quede por encima de todo */
     #nameModal{ z-index:5000; }
   </style>
 </head>
@@ -33,28 +32,26 @@
     </div>
 
     <div class="grid md:grid-cols-3 gap-4 controls-layer">
-      <!-- Geocerca activa -->
       <div class="bg-white p-4 rounded-2xl shadow">
         <label class="block text-sm font-medium text-gray-700">Geocerca activa</label>
         <select id="geofenceSelect" class="mt-1 w-full border rounded-md p-2"></select>
       </div>
 
-      <!-- Acciones -->
       <div class="bg-white p-4 rounded-2xl shadow">
         <div class="flex flex-wrap gap-2">
-          <button id="newFenceBtn"    onclick="startDraw()"   class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
-          <button id="finishFenceBtn" onclick="finishDraw()"  class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
-          <button id="cancelFenceBtn" onclick="cancelDraw()"  class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
+          <button id="newFenceBtn"    data-action="new"    onclick="startDraw()"   class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
+          <button id="finishFenceBtn" data-action="finish" onclick="finishDraw()"  class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
+          <button id="cancelFenceBtn" data-action="cancel" onclick="cancelDraw()"  class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
         </div>
         <div class="flex flex-wrap gap-2 mt-2">
-          <button id="createFenceByCoordsBtn" onclick="createByLatLng()" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
-          <button id="editFenceBtn"           onclick="beginEdit()"      class="btn px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600" disabled>Editar geocerca</button>
-          <button id="saveFenceEditBtn"       onclick="saveEdit()"       class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" disabled>Guardar cambios</button>
-          <button id="cancelFenceEditBtn"     onclick="cancelEdit()"     class="btn px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600" disabled>Cancelar edición</button>
+          <button id="createFenceByCoordsBtn" data-action="byLatLng" onclick="createByLatLng()" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
+          <button id="editFenceBtn"           data-action="edit"     onclick="beginEdit()"      class="btn px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600" disabled>Editar geocerca</button>
+          <button id="saveFenceEditBtn"       data-action="saveEd"   onclick="saveEdit()"       class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" disabled>Guardar cambios</button>
+          <button id="cancelFenceEditBtn"     data-action="cancelEd" onclick="cancelEdit()"     class="btn px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600" disabled>Cancelar edición</button>
         </div>
         <div class="flex flex-wrap gap-2 mt-2">
-          <button id="deleteFenceBtn" onclick="removeFence()" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
-          <button id="exportGeoJsonBtn" onclick="exportGeoJSON()" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
+          <button id="deleteFenceBtn" data-action="del" onclick="removeFence()" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
+          <button id="exportGeoJsonBtn" data-action="export" onclick="exportGeoJSON()" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
           <label class="btn px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 cursor-pointer">
             Importar GeoJSON
             <input id="importGeoJsonInput" type="file" accept=".json,.geojson,application/geo+json,application/json" class="hidden"
@@ -63,7 +60,6 @@
         </div>
       </div>
 
-      <!-- Ayuda -->
       <div class="bg-white p-4 rounded-2xl shadow text-sm text-gray-700">
         <p><b>Dibujo:</b> Nueva geocerca → clics/toques para vértices → <i>Finalizar</i> (o doble clic / clic en el 1º punto).</p>
         <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → Editar → mueve/añade/elimina vértices → Guardar cambios.</p>
@@ -71,69 +67,68 @@
       </div>
     </div>
 
-    <!-- Mapa -->
     <div class="mt-4 bg-white rounded-2xl shadow overflow-hidden">
       <div class="px-4 py-3 border-b"><h2 class="text-lg font-semibold">Mapa</h2></div>
       <div id="map" style="height:480px; position:relative; z-index:0;"></div>
     </div>
 
-    <!-- Explorador -->
     <div class="mt-4 bg-white rounded-2xl shadow">
       <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Geocercas</h3></div>
       <ul id="fenceList" class="p-3 divide-y"></ul>
     </div>
   </div>
 
-  <!-- Modal para nombre (alta z-index) -->
+  <!-- Prompt nativo (dialog) -->
+  <dialog id="nameDialog" class="rounded-2xl p-0 w-full max-w-md">
+    <form method="dialog" class="p-5">
+      <h3 class="text-lg font-semibold mb-3">Nombre de la geocerca</h3>
+      <input id="nameInputDlg" class="w-full border rounded-md p-2" placeholder="Ej. Lote Norte"/>
+      <div class="flex justify-end gap-2 mt-4">
+        <button id="dlgCancel" class="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300" value="cancel">Cancelar</button>
+        <button id="dlgSave"   class="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700" value="save">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Fallback modal overlay (si dialog no está disponible) -->
   <div id="nameModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl shadow-xl p-5 w-full max-w-md">
       <h3 class="text-lg font-semibold mb-3">Nombre de la geocerca</h3>
       <input id="nameInput" class="w-full border rounded-md p-2" placeholder="Ej. Lote Norte" />
       <div class="flex justify-end gap-2 mt-4">
-        <button id="nameCancel" class="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">Cancelar</button>
-        <button id="nameSave"   class="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Guardar</button>
+        <button id="nameCancel" class="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300" onclick="closeNameModal()">Cancelar</button>
+        <button id="nameSave"   class="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700" onclick="confirmNameSave()">Guardar</button>
       </div>
     </div>
   </div>
 
   <script>
-    /* ===== Utils ===== */
     const gei = (id)=>document.getElementById(id);
     const setStatus = (t)=>{ const s=gei('statusDot'); if(s) s.textContent=t; };
 
-    /* ===== Storage ===== */
     const KEY_FENCES = 'geofences';
     const loadFences = () => { try { return JSON.parse(localStorage.getItem(KEY_FENCES) || '[]'); } catch { return []; } };
     const saveFences = (v) => localStorage.setItem(KEY_FENCES, JSON.stringify(v || []));
 
-    /* ===== Estado ===== */
-    let map, selectedFenceId = null;
+    let map, selectedFenceId=null;
     const layers = {};
     const STYLE     = { color:'#2563eb', weight:2, fillColor:'#60a5fa', fillOpacity:0.2 };
     const STYLE_SEL = { color:'#7c3aed', weight:3, fillColor:'#a78bfa', fillOpacity:0.25 };
 
-    // Dibujo manual
-    let isDrawing = false;
-    let tempCoords = [];   // L.LatLng[]
-    let tempPoly = null;   // polígono temporal
-    let firstMarker = null;
-    let mapClickHandler = null, mapDblHandler = null;
-
-    // Datos a guardar tras modal
-    let pendingSave = null; // { coords: [LatLng] }
+    // Dibujo
+    let isDrawing=false, tempCoords=[], tempPoly=null, firstMarker=null, mapClickHandler=null, mapDblHandler=null;
+    // Para guardar tras pedir nombre
+    let pendingSave=null;
 
     // Edición
-    let editing = false;
-    let backupCoords = null;
+    let editing=false, backupCoords=null;
 
-    /* ===== Mapa ===== */
     function initMap(){
       map = L.map('map');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
-      map.setView([-1.5, -78.5], 9);
+      map.setView([-1.5,-78.5],9);
 
-      // Solo edición con Geoman (dibujamos nosotros)
-      if (map.pm && map.pm.addControls) {
+      if(map.pm && map.pm.addControls){
         map.pm.addControls({
           position:'topleft', drawPolygon:false, drawMarker:false, drawPolyline:false,
           drawRectangle:false, drawCircle:false, drawCircleMarker:false, cutPolygon:false,
@@ -141,246 +136,157 @@
         });
       }
 
-      // Modal listeners
-      gei('nameSave').addEventListener('click', confirmNameSave);
-      gei('nameCancel').addEventListener('click', closeNameModal);
+      // Listeners del <dialog>
+      const dlg = gei('nameDialog');
+      if (dlg && typeof dlg.showModal === 'function') {
+        dlg.addEventListener('close', ()=>{
+          if(dlg.returnValue==='save'){
+            const name = (gei('nameInputDlg').value||'').trim() || ('Geocerca '+(loadFences().length+1));
+            doSaveFence(name);
+          } else {
+            // cancelado -> no guardar, seguir en mapa
+            pendingSave=null;
+          }
+        });
+      } else {
+        // Fallback overlay: listeners extra
+        gei('nameSave')?.addEventListener('click', confirmNameSave);
+        gei('nameCancel')?.addEventListener('click', closeNameModal);
+        // Delegación de respaldo (por si alguna extensión bloquea handlers)
+        document.addEventListener('pointerdown', (ev)=>{
+          const el=ev.target.closest('#nameSave,#nameCancel');
+          if(!el) return;
+          ev.preventDefault(); ev.stopPropagation();
+          if(el.id==='nameSave') confirmNameSave();
+          if(el.id==='nameCancel') closeNameModal();
+        }, true);
+      }
 
       renderFences();
       setStatus('mapa listo');
     }
 
     /* ===== Interacciones mapa ===== */
-    function disableMapInteractions(){
-      map.dragging.disable();
-      map.scrollWheelZoom.disable();
-      map.doubleClickZoom.disable();
-      map.boxZoom.disable();
-      map.touchZoom.disable();
-      map.keyboard.disable();
-    }
-    function enableMapInteractions(){
-      map.dragging.enable();
-      map.scrollWheelZoom.enable();
-      map.doubleClickZoom.enable();
-      map.boxZoom.enable();
-      map.touchZoom.enable();
-      map.keyboard.enable();
-    }
+    function disableMapInteractions(){ map.dragging.disable(); map.scrollWheelZoom.disable(); map.doubleClickZoom.disable(); map.boxZoom.disable(); map.touchZoom.disable(); map.keyboard.disable(); }
+    function enableMapInteractions(){ map.dragging.enable(); map.scrollWheelZoom.enable(); map.doubleClickZoom.enable(); map.boxZoom.enable(); map.touchZoom.enable(); map.keyboard.enable(); }
 
     /* ===== Dibujo ===== */
     function startDraw(){
-      if (editing) { alert('Termina o cancela la edición actual.'); return; }
+      if (editing){ alert('Termina o cancela la edición actual.'); return; }
       clearTempDrawing();
+      isDrawing=true; tempCoords=[]; disableMapInteractions();
 
-      isDrawing = true;
-      tempCoords = [];
-      disableMapInteractions();
+      mapClickHandler=(e)=>{ if(!isDrawing) return; const ll=e.latlng||(e.originalEvent?map.mouseEventToLatLng(e.originalEvent):null); if(!ll) return; addVertex(ll); };
+      mapDblHandler = ()=>{ if(isDrawing && tempCoords.length>=3) finishDraw(); };
+      map.on('mousedown',mapClickHandler); map.on('touchstart',mapClickHandler,{passive:false}); map.on('dblclick',mapDblHandler);
 
-      mapClickHandler = (e)=>{
-        if(!isDrawing) return;
-        const ll = e.latlng || (e.originalEvent ? map.mouseEventToLatLng(e.originalEvent) : null);
-        if (!ll) return;
-        addVertex(ll);
-      };
-      mapDblHandler = ()=>{
-        if(isDrawing && tempCoords.length >= 3) finishDraw();
-      };
-      map.on('mousedown', mapClickHandler);
-      map.on('touchstart', mapClickHandler, { passive:false });
-      map.on('dblclick', mapDblHandler);
-
-      gei('newFenceBtn').disabled = true;
-      gei('cancelFenceBtn').disabled = false;
-      gei('finishFenceBtn').disabled = true;
+      gei('newFenceBtn').disabled=true; gei('cancelFenceBtn').disabled=false; gei('finishFenceBtn').disabled=true;
       setStatus('modo dibujo');
     }
 
-    function addVertex(latlng){
-      if (!latlng || typeof latlng.lat!=='number') return;
-      tempCoords.push(latlng);
-
-      const ring = tempCoords.length > 1 ? [...tempCoords, tempCoords[0]] : [...tempCoords];
+    function addVertex(ll){
+      tempCoords.push(ll);
+      const ring = tempCoords.length>1 ? [...tempCoords, tempCoords[0]] : [...tempCoords];
       if (tempPoly) map.removeLayer(tempPoly);
-      tempPoly = L.polygon(ring, {color:'#059669', weight:2, fillColor:'#34d399', fillOpacity:0.15, dashArray:'4 6'}).addTo(map);
-
-      if (!firstMarker) {
-        firstMarker = L.circleMarker(latlng, {radius:6, color:'#111827', weight:2, fillColor:'#f59e0b', fillOpacity:0.9})
-          .addTo(map).bindTooltip('Cerrar', {permanent:false});
-        firstMarker.on('click', ()=>{ if(isDrawing && tempCoords.length>=3) finishDraw(); });
+      tempPoly = L.polygon(ring,{color:'#059669',weight:2,fillColor:'#34d399',fillOpacity:.15,dashArray:'4 6'}).addTo(map);
+      if(!firstMarker){
+        firstMarker=L.circleMarker(ll,{radius:6,color:'#111827',weight:2,fillColor:'#f59e0b',fillOpacity:.9}).addTo(map).bindTooltip('Cerrar');
+        firstMarker.on('click',()=>{ if(isDrawing && tempCoords.length>=3) finishDraw(); });
       }
-
-      gei('finishFenceBtn').disabled = tempCoords.length < 3;
+      gei('finishFenceBtn').disabled = tempCoords.length<3;
       setStatus(`vértices: ${tempCoords.length}`);
     }
 
     function finishDraw(){
-      if (tempCoords.length < 3) { alert('Agrega al menos 3 puntos.'); return; }
-
-      // Preferimos modal; si algo lo impide, guardamos con nombre por defecto
-      pendingSave = { coords: [...tempCoords] };
-      const defName = 'Geocerca ' + (loadFences().length + 1);
-      const opened = openNameModal(defName);
-      if (!opened) {
-        // Fallback duro
-        saveNewFence(defName, pendingSave.coords);
-        pendingSave = null;
+      if (tempCoords.length<3){ alert('Agrega al menos 3 puntos.'); return; }
+      pendingSave = { coords:[...tempCoords] };
+      // Preferir <dialog>
+      const dlg=gei('nameDialog');
+      const def='Geocerca '+(loadFences().length+1);
+      if (dlg && typeof dlg.showModal==='function'){
+        gei('nameInputDlg').value=def;
+        dlg.showModal();
+        setTimeout(()=>gei('nameInputDlg').focus(),0);
+      } else {
+        // Fallback overlay
+        openNameModal(def);
       }
     }
 
-    function cancelDraw(){
-      clearTempDrawing();
-      enableMapInteractions();
-      setStatus('dibujo cancelado');
-    }
+    function cancelDraw(){ clearTempDrawing(); enableMapInteractions(); setStatus('dibujo cancelado'); }
 
     function clearTempDrawing(){
-      isDrawing=false;
-      tempCoords=[];
-      if (tempPoly)   { map.removeLayer(tempPoly);   tempPoly=null; }
-      if (firstMarker){ map.removeLayer(firstMarker); firstMarker=null; }
-      if (mapClickHandler){ map.off('mousedown', mapClickHandler); map.off('touchstart', mapClickHandler); mapClickHandler=null; }
-      if (mapDblHandler)  { map.off('dblclick', mapDblHandler); mapDblHandler=null; }
-      gei('newFenceBtn').disabled = false;
-      gei('finishFenceBtn').disabled = true;
-      gei('cancelFenceBtn').disabled = true;
+      isDrawing=false; tempCoords=[];
+      if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
+      if(firstMarker){ map.removeLayer(firstMarker); firstMarker=null; }
+      if(mapClickHandler){ map.off('mousedown',mapClickHandler); map.off('touchstart',mapClickHandler); mapClickHandler=null; }
+      if(mapDblHandler){ map.off('dblclick',mapDblHandler); mapDblHandler=null; }
+      gei('newFenceBtn').disabled=false; gei('finishFenceBtn').disabled=true; gei('cancelFenceBtn').disabled=true;
     }
 
-    /* ===== Modal nombre ===== */
+    /* ===== Modal overlay (fallback) ===== */
     function openNameModal(defaultName){
       try{
-        const m = gei('nameModal');
-        const i = gei('nameInput');
-        i.value = defaultName || '';
-        m.classList.remove('hidden');
-        m.classList.add('flex');
-        setTimeout(()=> i.focus(), 0);
-        // Enter/Escape
-        i.onkeydown = (ev)=>{
-          if(ev.key==='Enter'){ confirmNameSave(); }
-          if(ev.key==='Escape'){ closeNameModal(); }
-        };
+        const m=gei('nameModal'), i=gei('nameInput');
+        i.value=defaultName||''; m.classList.remove('hidden'); m.classList.add('flex'); setTimeout(()=>i.focus(),0);
+        i.onkeydown=(ev)=>{ if(ev.key==='Enter') confirmNameSave(); if(ev.key==='Escape') closeNameModal(); };
         return true;
       }catch(_){ return false; }
     }
-    function closeNameModal(){
-      const m = gei('nameModal');
-      m.classList.add('hidden');
-      m.classList.remove('flex');
-      // no limpiamos pendingSave aquí; solo al confirmar o al cancelar dibujo
-    }
+    function closeNameModal(){ const m=gei('nameModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
     function confirmNameSave(){
-      const i = gei('nameInput');
-      let name = (i.value || '').trim();
-      if(!name){
-        name = 'Geocerca ' + (loadFences().length + 1);
-      }
-      const coords = pendingSave ? pendingSave.coords : null;
-      closeNameModal();
-      if (!coords){ return; } // nada que guardar
-      saveNewFence(name, coords);
-      pendingSave = null;
+      let name=(gei('nameInput').value||'').trim(); if(!name) name='Geocerca '+(loadFences().length+1);
+      closeNameModal(); doSaveFence(name);
     }
 
-    function saveNewFence(name, coords){
-      const id   = 'f_' + Math.random().toString(36).slice(2,10);
-      const path = coords.map(p=>({lat:p.lat,lng:p.lng}));
-      const fences = loadFences(); fences.push({id, name, path}); saveFences(fences);
+    function doSaveFence(name){
+      const coords = pendingSave?.coords;
+      if(!coords){ // fallback duro si algo raro pasó
+        name = name || ('Geocerca '+(loadFences().length+1));
+        pendingSave=null; return;
+      }
+      const id='f_'+Math.random().toString(36).slice(2,10);
+      const path=coords.map(p=>({lat:p.lat,lng:p.lng}));
+      const fences=loadFences(); fences.push({id,name,path}); saveFences(fences);
 
-      clearTempDrawing();
-      enableMapInteractions();
+      pendingSave=null;
+      clearTempDrawing(); enableMapInteractions();
       renderFences(); zoomTo(id);
       setStatus(`geocerca creada: ${name}`);
     }
 
-    /* ===== Render / Selección ===== */
+    /* ===== Render / selección ===== */
     function renderFences(){
-      Object.values(layers).forEach(l=>map.removeLayer(l)); for (const k in layers) delete layers[k];
-
-      const fences = loadFences();
+      Object.values(layers).forEach(l=>map.removeLayer(l)); for(const k in layers) delete layers[k];
+      const fences=loadFences();
       fences.forEach(f=>{
-        if (!Array.isArray(f.path) || f.path.length<3) return;
-        const latlngs = f.path.map(p=>[p.lat,p.lng]);
-        const poly = L.polygon(latlngs, STYLE).addTo(map);
+        if(!Array.isArray(f.path)||f.path.length<3) return;
+        const latlngs=f.path.map(p=>[p.lat,p.lng]);
+        const poly=L.polygon(latlngs,STYLE).addTo(map);
         poly.bindTooltip(f.name||'Geocerca',{permanent:true,direction:'center',className:'label-in-map'});
-        poly.on('click', ()=>selectFence(f.id));
-        layers[f.id] = poly;
+        poly.on('click',()=>selectFence(f.id));
+        layers[f.id]=poly;
       });
-
-      if (selectedFenceId && !layers[selectedFenceId]) selectedFenceId = null;
-      refreshSelectionStyle();
-      rebuildUILists();
-      fillSelect();
-      updateEditButtons();
+      if(selectedFenceId && !layers[selectedFenceId]) selectedFenceId=null;
+      refreshSelectionStyle(); rebuildUILists(); fillSelect(); updateEditButtons();
     }
-
-    function selectFence(id){
-      selectedFenceId = id;
-      refreshSelectionStyle();
-      updateEditButtons();
-      const sel = gei('geofenceSelect'); if (sel) sel.value = id || '';
-      setStatus('geocerca seleccionada');
-    }
-
-    function refreshSelectionStyle(){
-      Object.entries(layers).forEach(([id,poly])=>{
-        poly.setStyle(id===selectedFenceId ? STYLE_SEL : STYLE);
-      });
-    }
-
-    function zoomTo(id){
-      const f = loadFences().find(x=>x.id===id); if(!f) return;
-      const poly = L.polygon(f.path.map(p=>[p.lat,p.lng])); map.fitBounds(poly.getBounds(),{padding:[20,20]});
-      selectFence(id);
-    }
+    function selectFence(id){ selectedFenceId=id; refreshSelectionStyle(); updateEditButtons(); const s=gei('geofenceSelect'); if(s) s.value=id||''; setStatus('geocerca seleccionada'); }
+    function refreshSelectionStyle(){ Object.entries(layers).forEach(([id,poly])=>poly.setStyle(id===selectedFenceId?STYLE_SEL:STYLE)); }
+    function zoomTo(id){ const f=loadFences().find(x=>x.id===id); if(!f) return; const poly=L.polygon(f.path.map(p=>[p.lat,p.lng])); map.fitBounds(poly.getBounds(),{padding:[20,20]}); selectFence(id); }
 
     /* ===== Edición (Geoman) ===== */
-    function beginEdit(){
-      if (!selectedFenceId) return;
-      if (isDrawing) { alert('Termina o cancela el dibujo actual.'); return; }
-      const layer = layers[selectedFenceId]; if (!layer || !layer.pm) return;
-
-      backupCoords = layer.getLatLngs().map(ring=> ring.map(p=> L.latLng(p.lat,p.lng)));
-      layer.pm.enable({ allowSelfIntersection:true, snappable:true, snapDistance:20 });
-
-      editing = true; updateEditButtons();
-      setStatus('modo edición');
-    }
-
-    function saveEdit(){
-      if (!selectedFenceId) return;
-      const layer = layers[selectedFenceId]; if (!layer || !layer.pm) return;
-      const latlngs = layer.getLatLngs()[0] || [];
-      if (latlngs.length < 3) { alert('La geocerca debe tener al menos 3 puntos'); return; }
-
-      const fences = loadFences();
-      const i = fences.findIndex(x=>x.id===selectedFenceId); if (i<0) return;
-      fences[i].path = latlngs.map(p=>({lat:p.lat,lng:p.lng}));
-      saveFences(fences);
-
-      layer.pm.disable(); editing=false; backupCoords=null;
-      renderFences(); selectFence(selectedFenceId);
-      setStatus('edición guardada');
-    }
-
-    function cancelEdit(){
-      const layer = layers[selectedFenceId]; if (!layer || !layer.pm) return;
-      if (backupCoords) layer.setLatLngs(backupCoords);
-      layer.pm.disable(); editing=false; backupCoords=null;
-      updateEditButtons();
-      setStatus('edición cancelada');
-    }
-
-    function updateEditButtons(){
-      gei('editFenceBtn').disabled       = !selectedFenceId || editing;
-      gei('deleteFenceBtn').disabled     = !selectedFenceId || editing;
-      gei('saveFenceEditBtn').disabled   = !editing;
-      gei('cancelFenceEditBtn').disabled = !editing;
-    }
+    function beginEdit(){ if(!selectedFenceId) return; if(isDrawing){ alert('Termina o cancela el dibujo actual.'); return; } const layer=layers[selectedFenceId]; if(!layer||!layer.pm) return;
+      backupCoords=layer.getLatLngs().map(r=>r.map(p=>L.latLng(p.lat,p.lng))); layer.pm.enable({allowSelfIntersection:true,snappable:true,snapDistance:20});
+      editing=true; updateEditButtons(); setStatus('modo edición'); }
+    function saveEdit(){ if(!selectedFenceId) return; const layer=layers[selectedFenceId]; if(!layer||!layer.pm) return; const latlngs=layer.getLatLngs()[0]||[]; if(latlngs.length<3){ alert('La geocerca debe tener al menos 3 puntos'); return; }
+      const fences=loadFences(); const i=fences.findIndex(x=>x.id===selectedFenceId); if(i<0) return; fences[i].path=latlngs.map(p=>({lat:p.lat,lng:p.lng})); saveFences(fences);
+      layer.pm.disable(); editing=false; backupCoords=null; renderFences(); selectFence(selectedFenceId); setStatus('edición guardada'); }
+    function cancelEdit(){ const layer=layers[selectedFenceId]; if(!layer||!layer.pm) return; if(backupCoords) layer.setLatLngs(backupCoords); layer.pm.disable(); editing=false; backupCoords=null; updateEditButtons(); setStatus('edición cancelada'); }
+    function updateEditButtons(){ gei('editFenceBtn').disabled=!selectedFenceId||editing; gei('deleteFenceBtn').disabled=!selectedFenceId||editing; gei('saveFenceEditBtn').disabled=!editing; gei('cancelFenceEditBtn').disabled=!editing; }
 
     /* ===== Lista / Select ===== */
     function rebuildUILists(){
-      const ul = gei('fenceList');
-      const fences = loadFences().slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
+      const ul=gei('fenceList'); const fences=loadFences().slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||'')); 
       ul.innerHTML = fences.length ? fences.map(f=>`
         <li class="py-2">
           <div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer" data-id="${f.id}">
@@ -388,107 +294,30 @@
             <div class="text-xs text-gray-500">${f.path?.length||0} puntos</div>
           </div>
         </li>`).join('') : '<li class="py-6 text-center text-gray-500">No hay geocercas.</li>';
-
-      ul.querySelectorAll('[data-id]').forEach(n=>{
-        n.addEventListener('click', ()=>selectFence(n.dataset.id));
-        n.addEventListener('dblclick',()=>zoomTo(n.dataset.id));
-      });
+      ul.querySelectorAll('[data-id]').forEach(n=>{ n.addEventListener('click',()=>selectFence(n.dataset.id)); n.addEventListener('dblclick',()=>zoomTo(n.dataset.id)); });
     }
+    function fillSelect(){ const fences=loadFences(); const s=gei('geofenceSelect'); const cur=s.value; s.innerHTML=fences.map(f=>`<option value="${f.id}">${f.name||'Geocerca'}</option>`).join(''); if(cur && fences.some(f=>f.id===cur)) s.value=cur; s.onchange=e=>zoomTo(e.target.value); }
 
-    function fillSelect(){
-      const fences = loadFences();
-      const s = gei('geofenceSelect');
-      const cur = s.value;
-      s.innerHTML = fences.map(f=>`<option value="${f.id}">${f.name||'Geocerca'}</option>`).join('');
-      if (cur && fences.some(f=>f.id===cur)) s.value = cur;
-      s.onchange = e => zoomTo(e.target.value);
-    }
+    /* ===== Otras acciones ===== */
+    function removeFence(){ if(!selectedFenceId) return; if(!confirm('¿Eliminar esta geocerca?')) return; saveFences(loadFences().filter(f=>f.id!==selectedFenceId)); selectedFenceId=null; renderFences(); setStatus('geocerca eliminada'); }
+    function exportGeoJSON(){ const fences=loadFences(); const fc={type:'FeatureCollection',features:fences.map(f=>({type:'Feature',properties:{id:f.id,name:f.name},geometry:{type:'Polygon',coordinates:[[...f.path.map(p=>[p.lng,p.lat]),[f.path[0].lng,f.path[0].lat]]]}}))};
+      const blob=new Blob([JSON.stringify(fc,null,2)],{type:'application/geo+json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='geocercas.geojson'; a.click(); URL.revokeObjectURL(url); }
+    function importGeoJSON(file){ const reader=new FileReader(); reader.onload=()=>{ try{ const fc=JSON.parse(reader.result); if(fc.type!=='FeatureCollection') throw new Error('No es FeatureCollection'); const fences=loadFences();
+          (fc.features||[]).forEach(ft=>{ const name=ft.properties?.name||'Geocerca'; const id=ft.properties?.id||('f_'+Math.random().toString(36).slice(2,10)); const ring=ft.geometry?.coordinates?.[0]||[]; const path=ring.slice(0,-1).map(([lng,lat])=>({lat,lng})); if(path.length>=3) fences.push({id,name,path}); });
+          saveFences(fences); renderFences(); setStatus('geojson importado'); }catch(e){ alert('Archivo inválido: '+e.message); } }; reader.readAsText(file); }
+    function createByLatLng(){ const raw=prompt('Ingresa coordenadas lat,lng por línea (o separadas con ;)'); if(!raw) return; let name=prompt('Nombre de la geocerca:')||''; name=(name||'').trim()||('Geocerca '+(loadFences().length+1));
+      const lines=raw.split(/\n|;/).map(s=>s.trim()).filter(Boolean); const pts=[]; for(const line of lines){ const m=line.match(/(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)/); if(!m) continue; const lat=parseFloat(m[1]),lng=parseFloat(m[2]); if(Number.isFinite(lat)&&Number.isFinite(lng)) pts.push({lat,lng}); }
+      if(pts.length<3){ alert('Se requieren al menos 3 puntos.'); return; } const fences=loadFences(); const id='f_'+Math.random().toString(36).slice(2,10); fences.push({id,name,path:pts}); saveFences(fences); renderFences(); zoomTo(id); setStatus('creada por Lat/Lng'); }
 
-    /* ===== Eliminar / Importar / Exportar / Lat/Lng ===== */
-    function removeFence(){
-      if (!selectedFenceId) return;
-      if (!confirm('¿Eliminar esta geocerca?')) return;
-      saveFences(loadFences().filter(f=>f.id!==selectedFenceId));
-      selectedFenceId = null; renderFences();
-      setStatus('geocerca eliminada');
-    }
+    /* Exponer para onclick inline */
+    window.startDraw=startDraw; window.finishDraw=finishDraw; window.cancelDraw=cancelDraw;
+    window.beginEdit=beginEdit; window.saveEdit=saveEdit; window.cancelEdit=cancelEdit;
+    window.removeFence=removeFence; window.exportGeoJSON=exportGeoJSON;
+    window.importGeoJSON=importGeoJSON; window.createByLatLng=createByLatLng;
+    window.openNameModal=openNameModal; window.closeNameModal=closeNameModal; window.confirmNameSave=confirmNameSave;
 
-    function exportGeoJSON(){
-      const fences = loadFences();
-      const fc = {
-        type:'FeatureCollection',
-        features: fences.map(f=>({
-          type:'Feature',
-          properties:{ id:f.id, name:f.name },
-          geometry:{ type:'Polygon', coordinates:[[...f.path.map(p=>[p.lng,p.lat]), [f.path[0].lng,f.path[0].lat]]] }
-        }))
-      };
-      const blob = new Blob([JSON.stringify(fc,null,2)],{type:'application/geo+json'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href=url; a.download='geocercas.geojson'; a.click(); URL.revokeObjectURL(url);
-    }
-
-    function importGeoJSON(file){
-      const reader = new FileReader();
-      reader.onload = ()=>{
-        try{
-          const fc = JSON.parse(reader.result);
-          if (fc.type!=='FeatureCollection') throw new Error('No es FeatureCollection');
-          const fences = loadFences();
-          (fc.features||[]).forEach(ft=>{
-            const name = ft.properties?.name || 'Geocerca';
-            const id   = ft.properties?.id   || ('f_'+Math.random().toString(36).slice(2,10));
-            const ring = ft.geometry?.coordinates?.[0] || [];
-            const path = ring.slice(0, -1).map(([lng,lat])=>({lat,lng}));
-            if (path.length >= 3) fences.push({id,name,path});
-          });
-          saveFences(fences); renderFences();
-          setStatus('geojson importado');
-        }catch(e){ alert('Archivo inválido: '+e.message); }
-      };
-      reader.readAsText(file);
-    }
-
-    function createByLatLng(){
-      const raw = prompt('Ingresa coordenadas en formato lat,lng (una por línea o separadas con ;)\\n\\nEjemplo:\\n-2.1500,-79.8800\\n-2.1600,-79.8700\\n-2.1400,-79.8600');
-      if (!raw) return;
-      let name = prompt('Nombre de la geocerca:') || '';
-      name = (name||'').trim() || ('Geocerca ' + (loadFences().length + 1));
-
-      const lines = raw.split(/\\n|;/).map(s=>s.trim()).filter(Boolean);
-      const pts = [];
-      for (const line of lines){
-        const m = line.match(/(-?\\d+(?:\\.\\d+)?)[,\\s]+(-?\\d+(?:\\.\\d+)?)/);
-        if (!m) continue;
-        const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
-        if (Number.isFinite(lat) && Number.isFinite(lng)) pts.push({lat,lng});
-      }
-      if (pts.length < 3){ alert('Se requieren al menos 3 puntos.'); return; }
-
-      const fences = loadFences();
-      const id = 'f_'+Math.random().toString(36).slice(2,10);
-      fences.push({ id, name, path: pts });
-      saveFences(fences); renderFences(); zoomTo(id);
-      setStatus('creada por Lat/Lng');
-    }
-
-    /* ===== Exponer globales (para inline) ===== */
-    window.startDraw = startDraw;
-    window.finishDraw = finishDraw;
-    window.cancelDraw = cancelDraw;
-    window.beginEdit = beginEdit;
-    window.saveEdit = saveEdit;
-    window.cancelEdit = cancelEdit;
-    window.removeFence = removeFence;
-    window.exportGeoJSON = exportGeoJSON;
-    window.importGeoJSON = importGeoJSON;
-    window.createByLatLng = createByLatLng;
-    window.openNameModal = openNameModal;
-    window.closeNameModal = closeNameModal;
-    window.confirmNameSave = confirmNameSave;
-
-    /* ===== Arranque ===== */
     window.addEventListener('load', initMap);
   </script>
 </body>
 </html>
+
