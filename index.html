@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Gestión de Geocercas</title>
 
-  <!-- Tailwind (estilos) -->
+  <!-- Tailwind (solo estilos) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 
-  <!-- Leaflet-Geoman (Leaflet.PM) para edición -->
+  <!-- Leaflet-Geoman (solo para edición; el dibujo es propio) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.css" />
   <script src="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.min.js"></script>
 
@@ -38,21 +38,21 @@
       </div>
 
       <!-- Acciones -->
-      <div class="bg-white p-4 rounded-2xl shadow">
+      <div id="actions" class="bg-white p-4 rounded-2xl shadow">
         <div class="flex flex-wrap gap-2">
-          <button id="newFenceBtn"    onclick="startDraw()"   class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
-          <button id="finishFenceBtn" onclick="finishDraw()"  class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
-          <button id="cancelFenceBtn" onclick="cancelDraw()"  class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
+          <button id="newFenceBtn"    data-action="new"     onclick="startDraw();return false"   class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
+          <button id="finishFenceBtn" data-action="finish"  onclick="finishDraw();return false"  class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
+          <button id="cancelFenceBtn" data-action="cancel"  onclick="cancelDraw();return false"  class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
         </div>
         <div class="flex flex-wrap gap-2 mt-2">
-          <button id="createFenceByCoordsBtn" onclick="createByLatLng()" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
-          <button id="editFenceBtn"           onclick="beginEdit()"      class="btn px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600" disabled>Editar geocerca</button>
-          <button id="saveFenceEditBtn"       onclick="saveEdit()"       class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" disabled>Guardar cambios</button>
-          <button id="cancelFenceEditBtn"     onclick="cancelEdit()"     class="btn px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600" disabled>Cancelar edición</button>
+          <button id="createFenceByCoordsBtn" data-action="byLatLng" onclick="createByLatLng();return false" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
+          <button id="editFenceBtn"           data-action="edit"    onclick="beginEdit();return false"      class="btn px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600" disabled>Editar geocerca</button>
+          <button id="saveFenceEditBtn"       data-action="saveEd"  onclick="saveEdit();return false"       class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" disabled>Guardar cambios</button>
+          <button id="cancelFenceEditBtn"     data-action="cancelEd"onclick="cancelEdit();return false"     class="btn px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600" disabled>Cancelar edición</button>
         </div>
         <div class="flex flex-wrap gap-2 mt-2">
-          <button id="deleteFenceBtn" onclick="removeFence()" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
-          <button id="exportGeoJsonBtn" onclick="exportGeoJSON()" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
+          <button id="deleteFenceBtn" data-action="del" onclick="removeFence();return false" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
+          <button id="exportGeoJsonBtn" data-action="export" onclick="exportGeoJSON();return false" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
           <label class="btn px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 cursor-pointer">
             Importar GeoJSON
             <input id="importGeoJsonInput" type="file" accept=".json,.geojson,application/geo+json,application/json" class="hidden"
@@ -83,7 +83,7 @@
   </div>
 
   <script>
-    /* ===== Util ===== */
+    /* ===== Utils ===== */
     const gei = (id)=>document.getElementById(id);
     const setStatus = (t)=>{ const s=gei('statusDot'); if(s) s.textContent=t; };
 
@@ -126,6 +126,22 @@
 
       renderFences();
       setStatus('mapa listo');
+
+      /* Respaldo: delegación global (por si algún onclick fuese bloqueado por CSP/extensiones) */
+      document.addEventListener('click', (ev)=>{
+        const b = ev.target.closest('button');
+        if(!b) return;
+        const a = b.dataset.action;
+        if (a==='new') startDraw();
+        else if (a==='finish') finishDraw();
+        else if (a==='cancel') cancelDraw();
+        else if (a==='byLatLng') createByLatLng();
+        else if (a==='edit') beginEdit();
+        else if (a==='saveEd') saveEdit();
+        else if (a==='cancelEd') cancelEdit();
+        else if (a==='del') removeFence();
+        else if (a==='export') exportGeoJSON();
+      }, true);
     }
 
     /* ===== Interacciones del mapa ===== */
@@ -149,17 +165,15 @@
     /* ===== Dibujo manual ===== */
     function startDraw(){
       if (editing) { alert('Termina o cancela la edición actual.'); return; }
-      // limpiar temporales si había algo
       clearTempDrawing();
 
       isDrawing = true;
       tempCoords = [];
       disableMapInteractions();
 
-      // Manejadores robustos
       mapClickHandler = (e)=>{
         if(!isDrawing) return;
-        addVertex(e.latlng);
+        addVertex(e.latlng || e.latlngs || map.mouseEventToLatLng(e.originalEvent));
       };
       mapDblHandler = ()=>{
         if(isDrawing && tempCoords.length >= 3) finishDraw();
@@ -168,34 +182,32 @@
       map.on('touchstart', mapClickHandler, { passive:false });
       map.on('dblclick', mapDblHandler);
 
-      updateDrawButtons();
-      setStatus('modo dibujo');
+      gei('newFenceBtn').disabled = true;
+      gei('cancelFenceBtn').disabled = false;
+      gei('finishFenceBtn').disabled = true;
+
+      setStatus('modo dibujo (clic/touch para añadir puntos)');
     }
 
     function addVertex(latlng){
+      if (!latlng || typeof latlng.lat!=='number') return;
       tempCoords.push(latlng);
 
-      // Polígono temporal cerrado
       const ring = tempCoords.length > 1 ? [...tempCoords, tempCoords[0]] : [...tempCoords];
       if (tempPoly) map.removeLayer(tempPoly);
       tempPoly = L.polygon(ring, {color:'#059669', weight:2, fillColor:'#34d399', fillOpacity:0.15, dashArray:'4 6'}).addTo(map);
 
-      // Primer vértice clicable para cerrar
       if (!firstMarker) {
         firstMarker = L.circleMarker(latlng, {radius:6, color:'#111827', weight:2, fillColor:'#f59e0b', fillOpacity:0.9})
           .addTo(map).bindTooltip('Cerrar', {permanent:false});
         firstMarker.on('click', ()=>{ if(isDrawing && tempCoords.length>=3) finishDraw(); });
       }
 
-      // Habilitar Finalizar/Cancelar
       gei('finishFenceBtn').disabled = tempCoords.length < 3;
-      gei('cancelFenceBtn').disabled = false;
-
       setStatus(`vértices: ${tempCoords.length}`);
     }
 
     function finishDraw(){
-      // Permite finalizar siempre que haya 3+ puntos, aunque por alguna razón isDrawing estuviera false
       if (tempCoords.length < 3) { alert('Agrega al menos 3 puntos.'); return; }
 
       let name = prompt('Nombre de la geocerca:') || '';
@@ -212,14 +224,12 @@
       clearTempDrawing();
       enableMapInteractions();
       renderFences(); zoomTo(id);
-      updateDrawButtons();
       setStatus(`geocerca creada: ${name}`);
     }
 
     function cancelDraw(){
       clearTempDrawing();
       enableMapInteractions();
-      updateDrawButtons();
       setStatus('dibujo cancelado');
     }
 
@@ -230,18 +240,13 @@
       if (firstMarker){ map.removeLayer(firstMarker); firstMarker=null; }
       if (mapClickHandler){ map.off('mousedown', mapClickHandler); map.off('touchstart', mapClickHandler); mapClickHandler=null; }
       if (mapDblHandler)  { map.off('dblclick', mapDblHandler); mapDblHandler=null; }
+      gei('newFenceBtn').disabled = false;
       gei('finishFenceBtn').disabled = true;
       gei('cancelFenceBtn').disabled = true;
     }
 
-    function updateDrawButtons(){
-      gei('newFenceBtn').disabled = isDrawing;
-      // finish/cancel se setean en addVertex/clearTempDrawing
-    }
-
     /* ===== Render / Selección ===== */
     function renderFences(){
-      // limpiar
       Object.values(layers).forEach(l=>map.removeLayer(l)); for (const k in layers) delete layers[k];
 
       const fences = loadFences();
@@ -307,7 +312,7 @@
 
       layer.pm.disable(); editing=false; backupCoords=null;
       renderFences(); selectFence(selectedFenceId);
-      setStatus('Edición guardada');
+      setStatus('edición guardada');
     }
 
     function cancelEdit(){
@@ -315,7 +320,7 @@
       if (backupCoords) layer.setLatLngs(backupCoords);
       layer.pm.disable(); editing=false; backupCoords=null;
       updateEditButtons();
-      setStatus('Edición cancelada');
+      setStatus('edición cancelada');
     }
 
     function updateEditButtons(){
@@ -325,7 +330,7 @@
       gei('cancelFenceEditBtn').disabled = !editing;
     }
 
-    /* ===== Listas / Select ===== */
+    /* ===== Lista / Select ===== */
     function rebuildUILists(){
       const ul = gei('fenceList');
       const fences = loadFences().slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
@@ -342,6 +347,7 @@
         n.addEventListener('dblclick',()=>zoomTo(n.dataset.id));
       });
     }
+
     function fillSelect(){
       const fences = loadFences();
       const s = gei('geofenceSelect');
@@ -422,7 +428,7 @@
       setStatus('creada por Lat/Lng');
     }
 
-    /* ===== Exponer funciones para onclick inline ===== */
+    /* ===== Exponer globales para onclick inline ===== */
     window.startDraw = startDraw;
     window.finishDraw = finishDraw;
     window.cancelDraw = cancelDraw;
@@ -435,7 +441,20 @@
     window.createByLatLng = createByLatLng;
 
     /* ===== Arranque ===== */
-    window.addEventListener('load', initMap);
+    window.addEventListener('load', ()=>{
+      initMap();
+
+      /* Respaldo extra: listeners directos (además del inline/delegación) */
+      gei('newFenceBtn').addEventListener('click', startDraw);
+      gei('finishFenceBtn').addEventListener('click', finishDraw);
+      gei('cancelFenceBtn').addEventListener('click', cancelDraw);
+      gei('createFenceByCoordsBtn').addEventListener('click', createByLatLng);
+      gei('editFenceBtn').addEventListener('click', beginEdit);
+      gei('saveFenceEditBtn').addEventListener('click', saveEdit);
+      gei('cancelFenceEditBtn').addEventListener('click', cancelEdit);
+      gei('deleteFenceBtn').addEventListener('click', removeFence);
+      gei('exportGeoJsonBtn').addEventListener('click', exportGeoJSON);
+    });
   </script>
 </body>
 </html>
