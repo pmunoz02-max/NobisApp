@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Gestión de Geocercas</title>
 
-  <!-- Tailwind (solo estilos) -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 
-  <!-- Leaflet-Geoman (edición) -->
+  <!-- Leaflet-Geoman (para edición) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.css" />
   <script src="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.min.js"></script>
 
@@ -21,6 +21,8 @@
     .btn:disabled{opacity:.45;cursor:not-allowed}
     .controls-layer{position:relative; z-index:1000; pointer-events:auto;}
     #map{touch-action:none;}
+    /* Asegura que el modal quede por encima de todo */
+    #nameModal{ z-index:5000; }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
@@ -82,14 +84,14 @@
     </div>
   </div>
 
-  <!-- Modal para nombre -->
-  <div id="nameModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center">
+  <!-- Modal para nombre (alta z-index) -->
+  <div id="nameModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center" role="dialog" aria-modal="true">
     <div class="bg-white rounded-2xl shadow-xl p-5 w-full max-w-md">
       <h3 class="text-lg font-semibold mb-3">Nombre de la geocerca</h3>
       <input id="nameInput" class="w-full border rounded-md p-2" placeholder="Ej. Lote Norte" />
       <div class="flex justify-end gap-2 mt-4">
-        <button class="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300" onclick="closeNameModal()">Cancelar</button>
-        <button class="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700" onclick="confirmNameSave()">Guardar</button>
+        <button id="nameCancel" class="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">Cancelar</button>
+        <button id="nameSave"   class="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Guardar</button>
       </div>
     </div>
   </div>
@@ -110,18 +112,17 @@
     const STYLE     = { color:'#2563eb', weight:2, fillColor:'#60a5fa', fillOpacity:0.2 };
     const STYLE_SEL = { color:'#7c3aed', weight:3, fillColor:'#a78bfa', fillOpacity:0.25 };
 
-    // Dibujo manual (propio)
+    // Dibujo manual
     let isDrawing = false;
-    let tempCoords = [];           // L.LatLng[]
-    let tempPoly = null;           // L.Polygon (cerrado)
-    let firstMarker = null;        // marcador para cerrar
-    let mapClickHandler = null;    // refs para remover
-    let mapDblHandler = null;
+    let tempCoords = [];   // L.LatLng[]
+    let tempPoly = null;   // polígono temporal
+    let firstMarker = null;
+    let mapClickHandler = null, mapDblHandler = null;
 
-    // Para guardar después del modal
-    let pendingSave = null; // {coords: L.LatLng[]}
+    // Datos a guardar tras modal
+    let pendingSave = null; // { coords: [LatLng] }
 
-    // Edición (Geoman)
+    // Edición
     let editing = false;
     let backupCoords = null;
 
@@ -131,6 +132,7 @@
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
       map.setView([-1.5, -78.5], 9);
 
+      // Solo edición con Geoman (dibujamos nosotros)
       if (map.pm && map.pm.addControls) {
         map.pm.addControls({
           position:'topleft', drawPolygon:false, drawMarker:false, drawPolyline:false,
@@ -139,11 +141,15 @@
         });
       }
 
+      // Modal listeners
+      gei('nameSave').addEventListener('click', confirmNameSave);
+      gei('nameCancel').addEventListener('click', closeNameModal);
+
       renderFences();
       setStatus('mapa listo');
     }
 
-    /* ===== Interacciones del mapa ===== */
+    /* ===== Interacciones mapa ===== */
     function disableMapInteractions(){
       map.dragging.disable();
       map.scrollWheelZoom.disable();
@@ -161,7 +167,7 @@
       map.keyboard.enable();
     }
 
-    /* ===== Dibujo manual ===== */
+    /* ===== Dibujo ===== */
     function startDraw(){
       if (editing) { alert('Termina o cancela la edición actual.'); return; }
       clearTempDrawing();
@@ -186,8 +192,7 @@
       gei('newFenceBtn').disabled = true;
       gei('cancelFenceBtn').disabled = false;
       gei('finishFenceBtn').disabled = true;
-
-      setStatus('modo dibujo (clic/touch para añadir puntos)');
+      setStatus('modo dibujo');
     }
 
     function addVertex(latlng){
@@ -210,11 +215,16 @@
 
     function finishDraw(){
       if (tempCoords.length < 3) { alert('Agrega al menos 3 puntos.'); return; }
-      // Pasamos por modal (evita bloqueos de prompt)
-      const fences = loadFences();
-      const defName = 'Geocerca ' + (fences.length + 1);
+
+      // Preferimos modal; si algo lo impide, guardamos con nombre por defecto
       pendingSave = { coords: [...tempCoords] };
-      openNameModal(defName);
+      const defName = 'Geocerca ' + (loadFences().length + 1);
+      const opened = openNameModal(defName);
+      if (!opened) {
+        // Fallback duro
+        saveNewFence(defName, pendingSave.coords);
+        pendingSave = null;
+      }
     }
 
     function cancelDraw(){
@@ -237,36 +247,45 @@
 
     /* ===== Modal nombre ===== */
     function openNameModal(defaultName){
-      const m = gei('nameModal');
-      const i = gei('nameInput');
-      i.value = defaultName || '';
-      m.classList.remove('hidden');
-      m.classList.add('flex');
-      setTimeout(()=> i.focus(), 0);
-      // Enter = guardar, Esc = cancelar
-      i.onkeydown = (ev)=>{
-        if(ev.key==='Enter'){ confirmNameSave(); }
-        if(ev.key==='Escape'){ closeNameModal(); }
-      };
+      try{
+        const m = gei('nameModal');
+        const i = gei('nameInput');
+        i.value = defaultName || '';
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+        setTimeout(()=> i.focus(), 0);
+        // Enter/Escape
+        i.onkeydown = (ev)=>{
+          if(ev.key==='Enter'){ confirmNameSave(); }
+          if(ev.key==='Escape'){ closeNameModal(); }
+        };
+        return true;
+      }catch(_){ return false; }
     }
     function closeNameModal(){
       const m = gei('nameModal');
       m.classList.add('hidden');
       m.classList.remove('flex');
-      pendingSave = null;
+      // no limpiamos pendingSave aquí; solo al confirmar o al cancelar dibujo
     }
     function confirmNameSave(){
-      if(!pendingSave){ closeNameModal(); return; }
-      let name = gei('nameInput').value.trim();
+      const i = gei('nameInput');
+      let name = (i.value || '').trim();
       if(!name){
-        const n = loadFences().length + 1;
-        name = 'Geocerca ' + n;
+        name = 'Geocerca ' + (loadFences().length + 1);
       }
+      const coords = pendingSave ? pendingSave.coords : null;
+      closeNameModal();
+      if (!coords){ return; } // nada que guardar
+      saveNewFence(name, coords);
+      pendingSave = null;
+    }
+
+    function saveNewFence(name, coords){
       const id   = 'f_' + Math.random().toString(36).slice(2,10);
-      const path = pendingSave.coords.map(p=>({lat:p.lat,lng:p.lng}));
+      const path = coords.map(p=>({lat:p.lat,lng:p.lng}));
       const fences = loadFences(); fences.push({id, name, path}); saveFences(fences);
 
-      closeNameModal();
       clearTempDrawing();
       enableMapInteractions();
       renderFences(); zoomTo(id);
@@ -431,8 +450,7 @@
     }
 
     function createByLatLng(){
-      setStatus('abrir modal Lat/Lng');
-      let raw = prompt('Ingresa coordenadas en formato lat,lng (una por línea o separadas con ;)\\n\\nEjemplo:\\n-2.1500,-79.8800\\n-2.1600,-79.8700\\n-2.1400,-79.8600');
+      const raw = prompt('Ingresa coordenadas en formato lat,lng (una por línea o separadas con ;)\\n\\nEjemplo:\\n-2.1500,-79.8800\\n-2.1600,-79.8700\\n-2.1400,-79.8600');
       if (!raw) return;
       let name = prompt('Nombre de la geocerca:') || '';
       name = (name||'').trim() || ('Geocerca ' + (loadFences().length + 1));
@@ -446,6 +464,7 @@
         if (Number.isFinite(lat) && Number.isFinite(lng)) pts.push({lat,lng});
       }
       if (pts.length < 3){ alert('Se requieren al menos 3 puntos.'); return; }
+
       const fences = loadFences();
       const id = 'f_'+Math.random().toString(36).slice(2,10);
       fences.push({ id, name, path: pts });
@@ -453,7 +472,7 @@
       setStatus('creada por Lat/Lng');
     }
 
-    /* ===== Exponer globales (onclick inline) ===== */
+    /* ===== Exponer globales (para inline) ===== */
     window.startDraw = startDraw;
     window.finishDraw = finishDraw;
     window.cancelDraw = cancelDraw;
