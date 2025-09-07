@@ -3,709 +3,299 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Gestión de Personal y Geocercas</title>
+  <title>Gestión de Geocercas</title>
 
-  <!-- Tailwind (CDN) -->
+  <!-- Tailwind (estilos) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <!-- Leaflet-Geoman (Leaflet.PM) para edición interactiva -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.css" />
   <script src="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.min.js"></script>
 
   <style>
-    .farm-label{background:transparent;border:none;box-shadow:none;color:#1f2937;font-weight:600;text-shadow:0 0 3px #ffffffc7}
-    .badge{padding:.125rem .5rem;border-radius:9999px;font-size:.75rem;font-weight:600}
-    .badge-green{background:#dcfce7;color:#166534}
-    .badge-gray{background:#e5e7eb;color:#374151}
+    .label-in-map{background:transparent;border:none;box-shadow:none;color:#1f2937;font-weight:600;text-shadow:0 0 3px #ffffffc7}
+    .btn:disabled{opacity:.4;cursor:not-allowed}
   </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
-  <div class="max-w-7xl mx-auto p-4">
-    <!-- Encabezado -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-      <h1 class="text-2xl font-bold">Gestión de Personal y Geocercas</h1>
+  <div class="max-w-6xl mx-auto p-4">
+    <h1 class="text-2xl font-bold mb-4">Gestión de Geocercas</h1>
 
-      <div class="grid md:grid-cols-3 gap-3 w-full md:w-auto">
-        <!-- Geocerca activa -->
-        <div class="bg-white p-4 rounded-2xl shadow-lg">
-          <label class="block text-sm font-medium text-gray-700">Geocerca activa</label>
-          <select id="geofenceSelect" class="mt-1 w-full border rounded-md p-2"></select>
-        </div>
+    <div class="grid md:grid-cols-3 gap-4">
+      <!-- Geocerca activa -->
+      <div class="bg-white p-4 rounded-2xl shadow">
+        <label class="block text-sm font-medium text-gray-700">Geocerca activa</label>
+        <select id="geofenceSelect" class="mt-1 w-full border rounded-md p-2"></select>
+      </div>
 
-        <!-- Botonera principal -->
-        <div class="bg-white p-4 rounded-2xl shadow-lg">
-          <div class="flex flex-wrap gap-2">
-            <button id="newFenceBtn" class="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
-            <button id="finishFenceBtn" class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40" disabled>Finalizar</button>
-            <button id="cancelFenceBtn" class="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40" disabled>Cancelar</button>
-          </div>
-          <div class="flex flex-wrap gap-2 mt-2">
-            <button id="createFenceByCoordsBtn" class="px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
-            <button id="editFenceBtn" class="px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-40" disabled>Editar geocerca</button>
-            <button id="saveFenceEditBtn" class="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-40" disabled>Guardar cambios</button>
-            <button id="cancelFenceEditBtn" class="px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600 disabled:opacity-40" disabled>Cancelar edición</button>
-          </div>
-          <div class="flex flex-wrap gap-2 mt-2">
-            <button id="deleteFenceBtn" class="px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 disabled:opacity-40" disabled>Eliminar geocerca</button>
-            <button id="exportGeoJsonBtn" class="px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
-            <label class="px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 cursor-pointer">
-              Importar GeoJSON
-              <input id="importGeoJsonInput" type="file" accept=".json,.geojson,application/geo+json,application/json" class="hidden" />
-            </label>
-          </div>
+      <!-- Acciones -->
+      <div class="bg-white p-4 rounded-2xl shadow">
+        <div class="flex flex-wrap gap-2">
+          <button id="newFenceBtn"    class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
+          <button id="finishFenceBtn" class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
+          <button id="cancelFenceBtn" class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
         </div>
+        <div class="flex flex-wrap gap-2 mt-2">
+          <button id="createFenceByCoordsBtn" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
+          <button id="editFenceBtn"           class="btn px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600" disabled>Editar geocerca</button>
+          <button id="saveFenceEditBtn"       class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" disabled>Guardar cambios</button>
+          <button id="cancelFenceEditBtn"     class="btn px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600" disabled>Cancelar edición</button>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-2">
+          <button id="deleteFenceBtn" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
+          <button id="exportGeoJsonBtn" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
+          <label class="btn px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 cursor-pointer">
+            Importar GeoJSON
+            <input id="importGeoJsonInput" type="file" accept=".json,.geojson,application/geo+json,application/json" class="hidden" />
+          </label>
+        </div>
+      </div>
 
-        <!-- Ayuda -->
-        <div class="bg-white p-4 rounded-2xl shadow-lg">
-          <div class="text-sm text-gray-700">
-            <div><strong>Flujo:</strong> Nueva geocerca → clic en mapa para vértices → Finalizar.</div>
-            <div>Haz clic sobre una geocerca para seleccionarla. Doble clic en filas de tablas para centrar el mapa.</div>
-          </div>
-        </div>
+      <!-- Ayuda -->
+      <div class="bg-white p-4 rounded-2xl shadow text-sm text-gray-700">
+        <p><b>Flujo (dibujo manual):</b> Nueva geocerca → clics en el mapa para vértices → Finalizar.</p>
+        <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → Editar geocerca → mueve/añade/elimina vértices → Guardar cambios.</p>
+        <p class="mt-1">Para crear por coordenadas usa <b>Geocerca (Lat/Lng)</b> con líneas <code>lat,lng</code>.</p>
       </div>
     </div>
 
     <!-- Mapa -->
-    <div class="mt-4 bg-white rounded-2xl shadow-lg overflow-hidden">
-      <div class="px-4 py-3 border-b">
-        <h2 class="text-lg font-semibold">Mapa de Geocercas</h2>
-      </div>
-      <div id="map" style="height: 480px;"></div>
+    <div class="mt-4 bg-white rounded-2xl shadow overflow-hidden">
+      <div class="px-4 py-3 border-b"><h2 class="text-lg font-semibold">Mapa</h2></div>
+      <div id="map" style="height:480px"></div>
     </div>
 
     <!-- Explorador -->
-    <div id="indexPanel" class="mt-4">
-      <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-gray-800">Explorador</h3>
-        <span class="text-xs text-gray-500">Doble clic en una geocerca para centrar/ajustar el mapa</span>
-      </div>
-      <div class="grid md:grid-cols-1 gap-4 mt-2">
-        <div class="bg-white/60 border border-gray-200 rounded-xl p-3">
-          <div class="font-medium text-gray-700">Geocercas</div>
-          <ul id="fenceList" class="mt-2 divide-y"></ul>
-        </div>
-      </div>
-    </div>
-
-    <!-- Gestión de Personal -->
-    <div class="mt-6 bg-white rounded-2xl shadow-lg">
-      <div class="px-4 py-3 border-b flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Gestión de Personal</h3>
-        <div class="flex gap-2">
-          <input id="pSearchInput" type="text" class="border rounded-md px-3 py-2" placeholder="Buscar por nombre o cédula" />
-          <select id="pEntityFilter" class="border rounded-md px-3 py-2"></select>
-          <button id="pNewBtn" class="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nuevo</button>
-        </div>
-      </div>
-      <div class="p-4">
-        <div class="grid md:grid-cols-5 gap-3">
-          <div>
-            <label class="text-sm text-gray-600">Nombres</label>
-            <input id="pFirstName" class="border rounded-md px-3 py-2 w-full" />
-          </div>
-          <div>
-            <label class="text-sm text-gray-600">Apellidos</label>
-            <input id="pLastName" class="border rounded-md px-3 py-2 w-full" />
-          </div>
-          <div>
-            <label class="text-sm text-gray-600">Cédula</label>
-            <input id="pIdNumber" class="border rounded-md px-3 py-2 w-full" />
-          </div>
-          <div>
-            <label class="text-sm text-gray-600">Estado</label>
-            <select id="pActive" class="border rounded-md px-3 py-2 w-full">
-              <option value="true">Activo</option>
-              <option value="false">Inactivo</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-sm text-gray-600">Geocerca</label>
-            <select id="pAssignSelect" class="border rounded-md px-3 py-2 w-full"></select>
-          </div>
-        </div>
-        <div class="mt-3 flex gap-2">
-          <button id="pSaveBtn" class="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Guardar</button>
-          <button id="pClearBtn" class="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">Limpiar</button>
-        </div>
-
-        <div class="mt-4 overflow-x-auto">
-          <table class="min-w-full text-sm">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">NOMBRES</th>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">APELLIDOS</th>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">CÉDULA</th>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">ESTADO</th>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">GEOCERCA</th>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">ACCIONES</th>
-              </tr>
-            </thead>
-            <tbody id="personnelTableBody" class="bg-white divide-y"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Gestión de Actividades -->
-    <div class="mt-6 bg-white rounded-2xl shadow-lg">
-      <div class="px-4 py-3 border-b flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Gestión de Actividades</h3>
-        <span class="text-xs text-gray-500">Doble clic en una fila para ir a su geocerca</span>
-      </div>
-      <div class="p-4">
-        <div class="grid md:grid-cols-5 gap-3">
-          <div>
-            <label class="text-sm text-gray-600">Fecha</label>
-            <input id="actDate" type="date" class="border rounded-md px-3 py-2 w-full" />
-          </div>
-          <div>
-            <label class="text-sm text-gray-600">Personal</label>
-            <select id="actPersonSelect" class="border rounded-md px-3 py-2 w-full"></select>
-          </div>
-          <div>
-            <label class="text-sm text-gray-600">Actividad</label>
-            <input id="actTask" class="border rounded-md px-3 py-2 w-full" placeholder="Ej. Siembra, Riego..." />
-          </div>
-          <div>
-            <label class="text-sm text-gray-600">Horas</label>
-            <input id="actHours" type="number" step="0.1" class="border rounded-md px-3 py-2 w-full" />
-          </div>
-          <div>
-            <label class="text-sm text-gray-600">Geocerca</label>
-            <select id="actEntitySelect" class="border rounded-md px-3 py-2 w-full"></select>
-          </div>
-        </div>
-        <div class="mt-3 flex gap-2">
-          <button id="actAddBtn" class="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Agregar</button>
-          <button id="actClearBtn" class="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">Limpiar</button>
-        </div>
-
-        <div class="mt-4 overflow-x-auto">
-          <table class="min-w-full text-sm">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">FECHA</th>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">PERSONAL</th>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">ACTIVIDAD</th>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">HORAS</th>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">GEOCERCA</th>
-                <th class="text-left px-3 py-2 font-medium text-gray-600">ACCIONES</th>
-              </tr>
-            </thead>
-            <tbody id="actTableBody" class="bg-white divide-y"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Reportes -->
-    <div class="mt-6 bg-white rounded-2xl shadow-lg">
-      <div class="px-4 py-3 border-b">
-        <h3 class="text-lg font-semibold">Reportes</h3>
-      </div>
-      <div class="p-4">
-        <div class="grid md:grid-cols-5 gap-3">
-          <div>
-            <label class="text-sm text-gray-600">Desde</label>
-            <input id="repFrom" type="date" class="border rounded-md px-3 py-2 w-full" />
-          </div>
-          <div>
-            <label class="text-sm text-gray-600">Hasta</label>
-            <input id="repTo" type="date" class="border rounded-md px-3 py-2 w-full" />
-          </div>
-          <div class="md:col-span-2">
-            <label class="text-sm text-gray-600">Geocercas</label>
-            <select id="repEntities" class="border rounded-md px-3 py-2 w-full" multiple></select>
-            <p class="text-xs text-gray-500 mt-1">Mantén Ctrl/⌘ para seleccionar varias</p>
-          </div>
-          <div>
-            <label class="text-sm text-gray-600">Agrupar por</label>
-            <select id="repGroupBy" class="border rounded-md px-3 py-2 w-full">
-              <option value="persona">Persona</option>
-              <option value="entidad">Entidad</option>
-              <option value="actividad">Actividad</option>
-              <option value="fecha">Fecha</option>
-            </select>
-          </div>
-        </div>
-        <div class="mt-3">
-          <button id="repRunBtn" class="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Generar</button>
-        </div>
-        <div id="repResults" class="mt-4"></div>
-      </div>
+    <div class="mt-4 bg-white rounded-2xl shadow">
+      <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Geocercas</h3></div>
+      <ul id="fenceList" class="p-3 divide-y"></ul>
     </div>
   </div>
 
   <script>
-    // ======= Utilidades de almacenamiento (LocalStorage) =======
-    const KEYS = { fences:'geofences', people:'people', acts:'activities' };
-    const save = (k, v) => localStorage.setItem(k, JSON.stringify(v||[]));
-    const load = (k) => { try { return JSON.parse(localStorage.getItem(k)||'[]'); } catch { return []; } };
-    const saveFences = (v)=>save(KEYS.fences,v), loadFences = ()=>load(KEYS.fences);
-    const savePeople = (v)=>save(KEYS.people,v), loadPeople = ()=>load(KEYS.people);
-    const saveActs   = (v)=>save(KEYS.acts,v),   loadActs   = ()=>load(KEYS.acts);
+    /* ===================== Storage ===================== */
+    const KEY_FENCES = 'geofences';
+    const loadFences = () => { try { return JSON.parse(localStorage.getItem(KEY_FENCES) || '[]'); } catch { return []; } };
+    const saveFences = (v) => localStorage.setItem(KEY_FENCES, JSON.stringify(v || []));
 
-    // ======= Estado y estilos =======
-    let map;
-    const geofenceLayers = {};
-    const GEOFENCE_STYLE = { color:'#2563eb', weight:2, fillColor:'#60a5fa', fillOpacity:0.2 };
-    const GEOFENCE_SELECTED_STYLE = { color:'#7c3aed', weight:3, fillColor:'#a78bfa', fillOpacity:0.25 };
-    let drawTempLayer = null, drawCoords = [], isDrawingFence = false;
-    let selectedFenceId = null;
+    /* ===================== Estado ===================== */
+    let map, selectedFenceId = null;
+    const layers = {}; // id -> L.Polygon
+    const STYLE     = { color:'#2563eb', weight:2, fillColor:'#60a5fa', fillOpacity:0.2 };
+    const STYLE_SEL = { color:'#7c3aed', weight:3, fillColor:'#a78bfa', fillOpacity:0.25 };
 
-    // Edición interactiva (Geoman)
+    // Dibujo manual
+    let isDrawing = false;
+    let tempLine = null;
+    let tempCoords = [];
+
+    // Edición (Geoman)
     let editing = false;
-    let editBackup = null;  // copia de latlngs para cancelar
+    let backupCoords = null;
 
-    // ======= Mapa =======
+    /* ===================== Mapa ===================== */
     function initMap(){
       map = L.map('map');
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap'
-      }).addTo(map);
-      map.setView([0.5, -78.5], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+      map.setView([0, -78], 5);
 
-      // Ocultamos la barra de Geoman; controlaremos todo por botones
+      // Ocultamos barra Geoman; control con botones
       if (map.pm && map.pm.addControls) {
-        map.pm.addControls({ position:'topleft', drawMarker:false, drawPolyline:false, drawRectangle:false, drawCircle:false, drawCircleMarker:false, drawPolygon:false, editMode:false, dragMode:false, cutPolygon:false, removalMode:false });
+        map.pm.addControls({
+          position:'topleft', drawPolygon:false, drawMarker:false, drawPolyline:false,
+          drawRectangle:false, drawCircle:false, drawCircleMarker:false, cutPolygon:false,
+          editMode:false, dragMode:false, removalMode:false
+        });
       }
 
-      // Clics en mapa: solo agregan vértices si estamos en modo dibujo manual
-      map.on('click', (e)=>{ if (isDrawingFence) addFenceVertex(e.latlng); });
+      // Solo agregar vértices cuando estamos dibujando
+      map.on('click', (e)=>{ if(isDrawing) addVertex(e.latlng); });
 
-      renderGeofencesFromCache();
+      renderFences();
     }
 
-    // ======= Dibujo manual (por clics) =======
-    function addFenceVertex(latlng){
-      drawCoords.push(latlng);
-      if (drawTempLayer) map.removeLayer(drawTempLayer);
-      drawTempLayer = L.polyline(drawCoords, { color:'#10b981', weight:3, dashArray:'4 4' }).addTo(map);
+    /* ===================== Dibujo por clics ===================== */
+    function addVertex(latlng){
+      tempCoords.push(latlng);
+      if (tempLine) map.removeLayer(tempLine);
+      tempLine = L.polyline(tempCoords,{color:'#10b981',weight:3,dashArray:'4 4'}).addTo(map);
     }
-    function startFence(){
+    function startDraw(){
       if (editing) { alert('Termina o cancela la edición actual.'); return; }
-      isDrawingFence = true;
-      drawCoords = [];
-      if (drawTempLayer) { map.removeLayer(drawTempLayer); drawTempLayer=null; }
-      toggleDrawButtons();
+      isDrawing = true;
+      tempCoords = [];
+      if (tempLine) { map.removeLayer(tempLine); tempLine = null; }
+      updateDrawButtons();
     }
-    function finishFence(){
-      if (!isDrawingFence || drawCoords.length < 3) return;
-      const name = prompt('Nombre de la geocerca:');
-      if (!name) return;
-      const id = 'f_'+Math.random().toString(36).slice(2,10);
-      const path = drawCoords.map(p=>({lat:p.lat,lng:p.lng}));
-      const fences = loadFences();
-      fences.push({ id, name, path });
-      saveFences(fences);
-      isDrawingFence = false;
-      drawCoords = [];
-      if (drawTempLayer) { map.removeLayer(drawTempLayer); drawTempLayer=null; }
-      renderGeofencesFromCache();
-      zoomToFence(id);
-      toggleDrawButtons();
+    function finishDraw(){
+      if (!isDrawing || tempCoords.length < 3) { alert('Agrega al menos 3 puntos.'); return; }
+      const name = prompt('Nombre de la geocerca:'); if(!name) return;
+      const id = 'f_' + Math.random().toString(36).slice(2,10);
+      const path = tempCoords.map(p=>({lat:p.lat,lng:p.lng}));
+      const fences = loadFences(); fences.push({id,name,path}); saveFences(fences);
+
+      isDrawing=false; tempCoords=[]; if (tempLine){map.removeLayer(tempLine); tempLine=null;}
+      renderFences(); zoomTo(id); updateDrawButtons();
     }
-    function cancelFence(){
-      isDrawingFence = false;
-      drawCoords = [];
-      if (drawTempLayer) { map.removeLayer(drawTempLayer); drawTempLayer=null; }
-      toggleDrawButtons();
+    function cancelDraw(){
+      isDrawing=false; tempCoords=[]; if (tempLine){map.removeLayer(tempLine); tempLine=null;}
+      updateDrawButtons();
     }
-    function toggleDrawButtons(){
-      document.getElementById('finishFenceBtn').disabled = !isDrawingFence;
-      document.getElementById('cancelFenceBtn').disabled = !isDrawingFence;
-      document.getElementById('newFenceBtn').disabled    =  isDrawingFence;
+    function updateDrawButtons(){
+      byId('newFenceBtn').disabled    = isDrawing;
+      byId('finishFenceBtn').disabled = !isDrawing;
+      byId('cancelFenceBtn').disabled = !isDrawing;
     }
 
-    // ======= Selección y render =======
+    /* ===================== Render / Selección ===================== */
+    function renderFences(){
+      // limpiar
+      Object.values(layers).forEach(l=>map.removeLayer(l)); for (const k in layers) delete layers[k];
+
+      const fences = loadFences();
+      fences.forEach(f=>{
+        if (!Array.isArray(f.path) || f.path.length<3) return;
+        const latlngs = f.path.map(p=>[p.lat,p.lng]);
+        const poly = L.polygon(latlngs, STYLE).addTo(map);
+        poly.bindTooltip(f.name||'Geocerca',{permanent:true,direction:'center',className:'label-in-map'});
+        poly.on('click', ()=>selectFence(f.id));
+        layers[f.id] = poly;
+      });
+
+      if (selectedFenceId && !layers[selectedFenceId]) selectedFenceId = null;
+      refreshSelectionStyle();
+      rebuildUILists();
+      fillSelect();
+      updateEditButtons();
+    }
+
     function selectFence(id){
       selectedFenceId = id;
-      Object.entries(geofenceLayers).forEach(([fid, poly])=>{
-        poly.setStyle(fid===id ? GEOFENCE_SELECTED_STYLE : GEOFENCE_STYLE);
-      });
-      updateFenceButtons();
-      const sel = document.getElementById('geofenceSelect');
-      if (sel) sel.value = id || '';
+      refreshSelectionStyle();
+      updateEditButtons();
+      const sel = byId('geofenceSelect'); if (sel) sel.value = id || '';
     }
-    function zoomToFence(id){
-      const fences = loadFences();
-      const f = fences.find(x=>x.id===id);
-      if (!f) return;
-      const latlngs = f.path.map(p=>[p.lat,p.lng]);
-      const poly = L.polygon(latlngs);
-      map.fitBounds(poly.getBounds(), { padding:[20,20] });
+    function refreshSelectionStyle(){
+      Object.entries(layers).forEach(([id,poly])=>{
+        poly.setStyle(id===selectedFenceId ? STYLE_SEL : STYLE);
+      });
+    }
+    function zoomTo(id){
+      const f = loadFences().find(x=>x.id===id); if(!f) return;
+      const poly = L.polygon(f.path.map(p=>[p.lat,p.lng])); map.fitBounds(poly.getBounds(),{padding:[20,20]});
       selectFence(id);
     }
 
-    function renderGeofencesFromCache(){
-      Object.values(geofenceLayers).forEach(p=>map.removeLayer(p));
-      for (const k in geofenceLayers) delete geofenceLayers[k];
-
-      const fences = loadFences();
-      fences.forEach(g=>{
-        if(!g?.id || !Array.isArray(g.path) || g.path.length<3) return;
-        const latlngs = g.path.map(p=>[p.lat,p.lng]);
-        const poly = L.polygon(latlngs, GEOFENCE_STYLE).addTo(map);
-        poly.bindTooltip(g.name||'Geocerca', {permanent:true,direction:'center',className:'farm-label'});
-        geofenceLayers[g.id] = poly;
-        poly.on('click', ()=>selectFence(g.id));
-        if (selectedFenceId === g.id) poly.setStyle(GEOFENCE_SELECTED_STYLE);
-      });
-      if (selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null;
-
-      updateFenceButtons();
-      buildIndexList();
-      populateGeofenceSelectsEverywhere();
-      renderPersonnelList();
-      renderActivityList();
-      buildReportFilterOptions();
-    }
-
-    function updateFenceButtons(){
-      const hasSel = !!selectedFenceId;
-      document.getElementById('editFenceBtn').disabled = !hasSel || editing;
-      document.getElementById('deleteFenceBtn').disabled = !hasSel || editing;
-      document.getElementById('saveFenceEditBtn').disabled = !editing;
-      document.getElementById('cancelFenceEditBtn').disabled = !editing;
-    }
-
-    // ======= Edición interactiva con Leaflet-Geoman =======
-    function beginFenceEdit(){
+    /* ===================== Edición (Geoman) ===================== */
+    function beginEdit(){
       if (!selectedFenceId) return;
-      if (isDrawingFence) { alert('Termina o cancela el dibujo actual.'); return; }
-      const layer = geofenceLayers[selectedFenceId];
-      if (!layer || !layer.pm) return;
+      if (isDrawing) { alert('Termina o cancela el dibujo actual.'); return; }
+      const layer = layers[selectedFenceId]; if (!layer || !layer.pm) return;
 
-      // respaldo para cancelar
-      const rings = layer.getLatLngs();
-      editBackup = rings.map(r=> r.map(p=> L.latLng(p.lat, p.lng)));
-
-      // activar edición de vértices
+      backupCoords = layer.getLatLngs().map(ring=> ring.map(p=> L.latLng(p.lat,p.lng)));
       layer.pm.enable({ allowSelfIntersection:false, snappable:true, snapDistance:20 });
-      editing = true;
-      updateFenceButtons();
-    }
-    function saveFenceEdit(){
-      if (!selectedFenceId) return;
-      const layer = geofenceLayers[selectedFenceId];
-      if (!layer || !layer.pm) return;
 
+      editing = true; updateEditButtons();
+    }
+    function saveEdit(){
+      if (!selectedFenceId) return;
+      const layer = layers[selectedFenceId]; if (!layer || !layer.pm) return;
       const latlngs = layer.getLatLngs()[0] || [];
       if (latlngs.length < 3) { alert('La geocerca debe tener al menos 3 puntos'); return; }
 
       const fences = loadFences();
-      const i = fences.findIndex(x=>x.id===selectedFenceId);
-      if (i<0) return;
+      const i = fences.findIndex(x=>x.id===selectedFenceId); if (i<0) return;
       fences[i].path = latlngs.map(p=>({lat:p.lat,lng:p.lng}));
       saveFences(fences);
 
-      layer.pm.disable();
-      editing = false;
-      editBackup = null;
-      renderGeofencesFromCache();
-      selectFence(selectedFenceId);
+      layer.pm.disable(); editing=false; backupCoords=null;
+      renderFences(); selectFence(selectedFenceId);
     }
-    function cancelFenceEdit(){
-      if (!selectedFenceId) return;
-      const layer = geofenceLayers[selectedFenceId];
-      if (!layer || !layer.pm) return;
-
-      if (editBackup) layer.setLatLngs(editBackup);
-      layer.pm.disable();
-      editing = false;
-      editBackup = null;
-      updateFenceButtons();
+    function cancelEdit(){
+      const layer = layers[selectedFenceId]; if (!layer || !layer.pm) return;
+      if (backupCoords) layer.setLatLngs(backupCoords);
+      layer.pm.disable(); editing=false; backupCoords=null;
+      updateEditButtons();
+    }
+    function updateEditButtons(){
+      byId('editFenceBtn').disabled       = !selectedFenceId || editing;
+      byId('deleteFenceBtn').disabled     = !selectedFenceId || editing;
+      byId('saveFenceEditBtn').disabled   = !editing;
+      byId('cancelFenceEditBtn').disabled = !editing;
     }
 
-    // ======= Explorador =======
-    function buildIndexList(){
-      const ul = document.getElementById('fenceList');
+    /* ===================== Listas / Select ===================== */
+    function rebuildUILists(){
+      const ul = byId('fenceList');
       const fences = loadFences().slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
-      ul.innerHTML = fences.length
-        ? fences.map(g=>`
-            <li class="py-2">
-              <div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer" data-id="${g.id}">
-                <div class="text-sm font-medium text-gray-800">${g.name||'Geocerca'}</div>
-                <div class="text-xs text-gray-500">${Array.isArray(g.path)?`${g.path.length} puntos`:'—'}</div>
-              </div>
-            </li>`).join('')
-        : `<li class="py-6 text-center text-sm text-gray-500">No hay geocercas registradas.</li>`;
+      ul.innerHTML = fences.length ? fences.map(f=>`
+        <li class="py-2">
+          <div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer" data-id="${f.id}">
+            <div class="text-sm font-medium">${f.name||'Geocerca'}</div>
+            <div class="text-xs text-gray-500">${f.path?.length||0} puntos</div>
+          </div>
+        </li>`).join('') : '<li class="py-6 text-center text-gray-500">No hay geocercas.</li>';
+
       ul.querySelectorAll('[data-id]').forEach(n=>{
-        n.addEventListener('dblclick', ()=>zoomToFence(n.dataset.id));
-        n.addEventListener('click',     ()=>selectFence(n.dataset.id));
+        n.addEventListener('click', ()=>selectFence(n.dataset.id));
+        n.addEventListener('dblclick',()=>zoomTo(n.dataset.id));
       });
     }
-
-    function populateGeofenceSelectsEverywhere(){
+    function fillSelect(){
       const fences = loadFences();
-      // Geocerca activa
-      const gfSel = document.getElementById('geofenceSelect');
-      gfSel.innerHTML = fences.map(f=>`<option value="${f.id}">${f.name||'Geocerca'}</option>`).join('');
-      gfSel.addEventListener('change', e=>{ const id = e.target.value; if (id) zoomToFence(id); });
-
-      // Personal - asignación
-      const pAssign = document.getElementById('pAssignSelect');
-      pAssign.innerHTML = fences.length
-        ? ['<option value="">— Selecciona —</option>'].concat(
-            fences.map(g=>`<option value="${g.id}">Geocerca: ${g.name||'Geocerca'}</option>`)
-          ).join('')
-        : '<option value="">No hay geocercas</option>';
-
-      // Filtro de personal por geocerca
-      const pFilter = document.getElementById('pEntityFilter');
-      pFilter.innerHTML = ['<option value="all">Todas</option>'].concat(
-        fences.map(g=>`<option value="${g.id}">Geocerca: ${g.name||'Geocerca'}</option>`)
-      ).join('');
-
-      // Actividades - entidad
-      const aEnt = document.getElementById('actEntitySelect');
-      aEnt.innerHTML = fences.length
-        ? fences.map(g=>`<option value="${g.id}">${g.name||'Geocerca'}</option>`).join('')
-        : '<option value="">No hay geocercas</option>';
-
-      // Reportes - entidades
-      const repEnt = document.getElementById('repEntities');
-      repEnt.innerHTML = fences.map(g=>`<option value="${g.id}">${g.name||'Geocerca'}</option>`).join('');
+      const s = byId('geofenceSelect');
+      const cur = s.value;
+      s.innerHTML = fences.map(f=>`<option value="${f.id}">${f.name||'Geocerca'}</option>`).join('');
+      if (cur && fences.some(f=>f.id===cur)) s.value = cur;
+      s.onchange = e => zoomTo(e.target.value);
     }
 
-    // ======= Personal =======
-    let editPersonId = null;
-    function renderPersonnelList(){
-      const tbody = document.getElementById('personnelTableBody');
-      const q = (document.getElementById('pSearchInput').value||'').trim().toLowerCase();
-      const f = (document.getElementById('pEntityFilter').value||'all');
-      const fences = loadFences();
-      const nameOf = id => fences.find(g=>g.id===id)?.name || 'Geocerca';
-
-      let list = loadPeople();
-      if (q) list = list.filter(p => (`${p.firstName||''} ${p.lastName||''} ${p.idNumber||''}`).toLowerCase().includes(q));
-      if (f!=='all') list = list.filter(p=>p.assignId===f);
-
-      tbody.innerHTML = list.length ? '' : '<tr><td colspan="6" class="px-3 py-6 text-center text-gray-500">No hay personal registrado.</td></tr>';
-      list.forEach(p=>{
-        const tr = document.createElement('tr');
-        tr.className='border-t hover:bg-gray-50';
-        const badge = p.active!==false ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>';
-        tr.innerHTML = `
-          <td class="px-3 py-2">${p.firstName||''}</td>
-          <td class="px-3 py-2">${p.lastName||''}</td>
-          <td class="px-3 py-2">${p.idNumber||''}</td>
-          <td class="px-3 py-2">${badge}</td>
-          <td class="px-3 py-2">Geocerca: ${nameOf(p.assignId)}</td>
-          <td class="px-3 py-2">
-            <button class="text-indigo-600 hover:underline" onclick="openEditPerson('${p.id}')">Editar</button>
-            <span class="mx-1 text-gray-300">|</span>
-            <button class="text-rose-600 hover:underline" onclick="deletePerson('${p.id}')">Eliminar</button>
-          </td>`;
-        tr.addEventListener('dblclick', ()=> zoomToFence(p.assignId));
-        tbody.appendChild(tr);
-      });
+    /* ===================== Eliminar / Importar / Exportar / LatLng ===================== */
+    function removeFence(){
+      if (!selectedFenceId) return;
+      if (!confirm('¿Eliminar esta geocerca?')) return;
+      saveFences(loadFences().filter(f=>f.id!==selectedFenceId));
+      selectedFenceId = null; renderFences();
     }
-    function clearPersonForm(){
-      editPersonId = null;
-      document.getElementById('pFirstName').value='';
-      document.getElementById('pLastName').value='';
-      document.getElementById('pIdNumber').value='';
-      document.getElementById('pActive').value='true';
-      document.getElementById('pAssignSelect').value='';
-    }
-    function savePerson(){
-      const firstName = document.getElementById('pFirstName').value.trim();
-      const lastName  = document.getElementById('pLastName').value.trim();
-      const idNumber  = document.getElementById('pIdNumber').value.trim();
-      const active    = document.getElementById('pActive').value==='true';
-      const assignId  = document.getElementById('pAssignSelect').value;
-      if (!firstName || !lastName || !idNumber || !assignId){ alert('Completa nombres, apellidos, cédula y geocerca.'); return; }
-
-      const people = loadPeople();
-      if (editPersonId){
-        const i = people.findIndex(p=>p.id===editPersonId);
-        if (i>=0) people[i] = { ...people[i], firstName, lastName, idNumber, active, assignId };
-      } else {
-        const id = 'p_'+Math.random().toString(36).slice(2,10);
-        people.push({ id, firstName, lastName, idNumber, active, assignId });
-      }
-      savePeople(people);
-      clearPersonForm();
-      renderPersonnelList();
-      populateActivitiesPeople();
-    }
-    function openEditPerson(id){
-      const p = loadPeople().find(x=>x.id===id);
-      if (!p) return;
-      editPersonId = id;
-      document.getElementById('pFirstName').value = p.firstName||'';
-      document.getElementById('pLastName').value  = p.lastName||'';
-      document.getElementById('pIdNumber').value  = p.idNumber||'';
-      document.getElementById('pActive').value    = (p.active!==false)?'true':'false';
-      document.getElementById('pAssignSelect').value = p.assignId||'';
-      window.scrollTo({ top: document.querySelector('#pFirstName').getBoundingClientRect().top + window.scrollY - 140, behavior:'smooth' });
-    }
-    function deletePerson(id){
-      if (!confirm('¿Eliminar este registro de personal?')) return;
-      savePeople(loadPeople().filter(p=>p.id!==id));
-      renderPersonnelList();
-      populateActivitiesPeople();
-    }
-
-    // ======= Actividades =======
-    function populateActivitiesPeople(){
-      const sel = document.getElementById('actPersonSelect');
-      const people = loadPeople().filter(p=>p.active!==false).sort((a,b)=>(a.firstName||'').localeCompare(b.firstName||''));
-      sel.innerHTML = people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}</option>`).join('');
-    }
-    function clearActivityForm(){
-      document.getElementById('actDate').value='';
-      document.getElementById('actPersonSelect').value='';
-      document.getElementById('actTask').value='';
-      document.getElementById('actHours').value='';
-      document.getElementById('actEntitySelect').value='';
-    }
-    function addActivity(){
-      const date = document.getElementById('actDate').value;
-      const personId = document.getElementById('actPersonSelect').value;
-      const task = document.getElementById('actTask').value.trim();
-      const hours = parseFloat(document.getElementById('actHours').value||'0');
-      const assignId = document.getElementById('actEntitySelect').value;
-      if (!date || !personId || !task || !hours || !assignId){ alert('Completa fecha, personal, actividad, horas y geocerca.'); return; }
-
-      const fences = loadFences();
-      const people = loadPeople();
-      const entityName = fences.find(g=>g.id===assignId)?.name || 'Geocerca';
-      const person = people.find(p=>p.id===personId);
-      const id = 'a_'+Math.random().toString(36).slice(2,10);
-
-      const acts = loadActs();
-      acts.push({ id, date, personId, personName:`${person?.firstName||''} ${person?.lastName||''}`, task, hours, assignId, entityName });
-      saveActs(acts);
-      clearActivityForm();
-      renderActivityList();
-    }
-    function renderActivityList(){
-      const tbody = document.getElementById('actTableBody');
-      const fences = loadFences();
-      const nameOf = id => fences.find(g=>g.id===id)?.name || 'Geocerca';
-      const acts = loadActs().slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-      tbody.innerHTML = acts.length ? '' : '<tr><td colspan="6" class="px-3 py-6 text-center text-gray-500">No hay actividades.</td></tr>';
-      acts.forEach(a=>{
-        const tr = document.createElement('tr');
-        tr.className='border-t hover:bg-gray-50';
-        tr.innerHTML = `
-          <td class="px-3 py-2">${a.date||''}</td>
-          <td class="px-3 py-2">${a.personName||''}</td>
-          <td class="px-3 py-2">${a.task||''}</td>
-          <td class="px-3 py-2">${a.hours||0}</td>
-          <td class="px-3 py-2">Geocerca: ${nameOf(a.assignId)}</td>
-          <td class="px-3 py-2">
-            <button class="text-rose-600 hover:underline" onclick="deleteActivity('${a.id}')">Eliminar</button>
-          </td>`;
-        tr.addEventListener('dblclick', ()=> zoomToFence(a.assignId));
-        tbody.appendChild(tr);
-      });
-    }
-    function deleteActivity(id){
-      if (!confirm('¿Eliminar esta actividad?')) return;
-      saveActs(loadActs().filter(a=>a.id!==id));
-      renderActivityList();
-    }
-
-    // ======= Reportes =======
-    function buildReportFilterOptions(){ /* se llena en populateGeofenceSelectsEverywhere */ }
-    function runReport(){
-      const from = document.getElementById('repFrom').value;
-      const to   = document.getElementById('repTo').value;
-      const groupBy = document.getElementById('repGroupBy').value;
-      const selected = Array.from(document.getElementById('repEntities').selectedOptions).map(o=>o.value);
-      const acts = loadActs().filter(a=>{
-        const okDate = (!from || a.date>=from) && (!to || a.date<=to);
-        const okEnt  = (!selected.length) || selected.includes(a.assignId);
-        return okDate && okEnt;
-      });
-      const keyFns = { persona:a=>a.personName||'—', entidad:a=>a.entityName||'—', actividad:a=>a.task||'—', fecha:a=>a.date||'—' };
-      const kf = keyFns[groupBy]||keyFns.persona;
-      const groups = {};
-      acts.forEach(a=>{
-        const k = kf(a);
-        if (!groups[k]) groups[k] = { horas:0, count:0 };
-        groups[k].horas += Number(a.hours||0);
-        groups[k].count += 1;
-      });
-      const container = document.getElementById('repResults');
-      const keys = Object.keys(groups).sort();
-      container.innerHTML = keys.length ? '' : '<div class="text-gray-500">Sin resultados.</div>';
-      keys.forEach(k=>{
-        const g = groups[k];
-        const card = document.createElement('div');
-        card.className='border rounded-xl p-3 mb-2';
-        card.innerHTML = `
-          <div class="flex items-center justify-between">
-            <div class="font-semibold">${k}</div>
-            <div class="text-sm text-gray-600">${g.count} registros • ${g.horas.toFixed(2)} h</div>
-          </div>`;
-        container.appendChild(card);
-      });
-    }
-
-    // ======= Exportar / Importar =======
-    function exportGeoJson(){
+    function exportGeoJSON(){
       const fences = loadFences();
       const fc = {
-        type: "FeatureCollection",
+        type:'FeatureCollection',
         features: fences.map(f=>({
-          type: "Feature",
-          properties: { id: f.id, name: f.name },
-          geometry: {
-            type: "Polygon",
-            coordinates: [[...f.path.map(p=>[p.lng,p.lat]), [f.path[0].lng, f.path[0].lat]]]
-          }
+          type:'Feature',
+          properties:{ id:f.id, name:f.name },
+          geometry:{ type:'Polygon', coordinates:[[...f.path.map(p=>[p.lng,p.lat]), [f.path[0].lng,f.path[0].lat]]] }
         }))
       };
-      const blob = new Blob([JSON.stringify(fc, null, 2)], {type:'application/geo+json'});
+      const blob = new Blob([JSON.stringify(fc,null,2)],{type:'application/geo+json'});
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href=url; a.download='geocercas.geojson';
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
+      const a = document.createElement('a'); a.href=url; a.download='geocercas.geojson'; a.click(); URL.revokeObjectURL(url);
     }
-    function importGeoJson(file){
+    function importGeoJSON(file){
       const reader = new FileReader();
       reader.onload = ()=>{
         try{
           const fc = JSON.parse(reader.result);
-          if (fc.type!=='FeatureCollection') throw new Error('No es un FeatureCollection');
-          const imported = [];
+          if (fc.type!=='FeatureCollection') throw new Error('No es FeatureCollection');
+          const fences = loadFences();
           (fc.features||[]).forEach(ft=>{
             const name = ft.properties?.name || 'Geocerca';
             const id   = ft.properties?.id   || ('f_'+Math.random().toString(36).slice(2,10));
-            const ring = (ft.geometry?.coordinates?.[0]||[]).map(([lng,lat])=>({lat,lng}));
-            if (ring.length >= 3) imported.push({ id, name, path: ring });
+            const ring = ft.geometry?.coordinates?.[0] || [];
+            const path = ring.slice(0, -1).map(([lng,lat])=>({lat,lng}));
+            if (path.length >= 3) fences.push({id,name,path});
           });
-          if (!imported.length){ alert('No se encontraron polígonos válidos.'); return; }
-          saveFences(imported);
-          renderGeofencesFromCache();
-          alert(`Importadas ${imported.length} geocercas.`);
+          saveFences(fences); renderFences();
         }catch(e){ alert('Archivo inválido: '+e.message); }
       };
       reader.readAsText(file);
     }
-
-    // ======= Crear por Lat/Lng =======
-    function createFenceByCoords(){
-      const name = prompt('Nombre de la geocerca:');
-      if (!name) return;
+    function createByLatLng(){
+      const name = prompt('Nombre de la geocerca:'); if(!name) return;
       const raw = prompt('Ingresa coordenadas en formato lat,lng (una por línea o separadas con ;)\\n\\nEjemplo:\\n-2.1500,-79.8800\\n-2.1600,-79.8700\\n-2.1400,-79.8600');
       if (!raw) return;
       const lines = raw.split(/\\n|;/).map(s=>s.trim()).filter(Boolean);
@@ -716,51 +306,33 @@
         const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
         if (Number.isFinite(lat) && Number.isFinite(lng)) pts.push({lat,lng});
       }
-      if (pts.length < 3){ alert('Se requieren al menos 3 puntos (lat,lng)'); return; }
-      const id = 'f_'+Math.random().toString(36).slice(2,10);
+      if (pts.length < 3){ alert('Se requieren al menos 3 puntos.'); return; }
       const fences = loadFences();
+      const id = 'f_'+Math.random().toString(36).slice(2,10);
       fences.push({ id, name, path: pts });
-      saveFences(fences);
-      renderGeofencesFromCache();
-      zoomToFence(id);
+      saveFences(fences); renderFences(); zoomTo(id);
     }
 
-    // ======= Eventos =======
-    document.addEventListener('DOMContentLoaded', ()=>{
+    /* ===================== Util ===================== */
+    const byId = (id)=>document.getElementById(id);
+
+    /* ===================== Bindings (después de cargar DOM) ===================== */
+    window.addEventListener('load', () => {
       initMap();
 
-      // Dibujo
-      document.getElementById('newFenceBtn').addEventListener('click',  startFence);
-      document.getElementById('finishFenceBtn').addEventListener('click',finishFence);
-      document.getElementById('cancelFenceBtn').addEventListener('click',cancelFence);
+      byId('newFenceBtn').addEventListener('click', startDraw);
+      byId('finishFenceBtn').addEventListener('click', finishDraw);
+      byId('cancelFenceBtn').addEventListener('click', cancelDraw);
 
-      // Edición interactiva (Geoman)
-      document.getElementById('editFenceBtn').addEventListener('click', beginFenceEdit);
-      document.getElementById('saveFenceEditBtn').addEventListener('click', saveFenceEdit);
-      document.getElementById('cancelFenceEditBtn').addEventListener('click', cancelFenceEdit);
+      byId('editFenceBtn').addEventListener('click', beginEdit);
+      byId('saveFenceEditBtn').addEventListener('click', saveEdit);
+      byId('cancelFenceEditBtn').addEventListener('click', cancelEdit);
 
-      // CRUD geocercas
-      document.getElementById('deleteFenceBtn').addEventListener('click', deleteFence);
-      document.getElementById('createFenceByCoordsBtn').addEventListener('click', createFenceByCoords);
+      byId('deleteFenceBtn').addEventListener('click', removeFence);
+      byId('exportGeoJsonBtn').addEventListener('click', exportGeoJSON);
+      byId('importGeoJsonInput').addEventListener('change', (e)=>{ if(e.target.files?.[0]) importGeoJSON(e.target.files[0]); });
 
-      // Import/Export
-      document.getElementById('exportGeoJsonBtn').addEventListener('click', exportGeoJson);
-      document.getElementById('importGeoJsonInput').addEventListener('change', (e)=>{ if(e.target.files?.[0]) importGeoJson(e.target.files[0]); });
-
-      // Personal
-      document.getElementById('pNewBtn').addEventListener('click', clearPersonForm);
-      document.getElementById('pSaveBtn').addEventListener('click', savePerson);
-      document.getElementById('pClearBtn').addEventListener('click', clearPersonForm);
-      document.getElementById('pSearchInput').addEventListener('input', renderPersonnelList);
-      document.getElementById('pEntityFilter').addEventListener('change', renderPersonnelList);
-
-      // Actividades
-      populateActivitiesPeople();
-      document.getElementById('actAddBtn').addEventListener('click', addActivity);
-      document.getElementById('actClearBtn').addEventListener('click', clearActivityForm);
-
-      // Reportes
-      document.getElementById('repRunBtn').addEventListener('click', runReport);
+      byId('createFenceByCoordsBtn').addEventListener('click', createByLatLng);
     });
   </script>
 </body>
