@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Gestión de Geocercas</title>
 
-  <!-- Tailwind -->
+  <!-- Tailwind (estilos) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 
-  <!-- Leaflet-Geoman (Leaflet.PM) -->
+  <!-- Leaflet-Geoman (Leaflet.PM) para edición -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.css" />
   <script src="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.min.js"></script>
 
@@ -63,7 +63,7 @@
 
       <!-- Ayuda -->
       <div class="bg-white p-4 rounded-2xl shadow text-sm text-gray-700">
-        <p><b>Dibujo (Geoman):</b> Nueva geocerca → clics/toques → doble clic o <i>Finalizar</i> para cerrar.</p>
+        <p><b>Dibujo:</b> Nueva geocerca → clics/toques para vértices → <i>Finalizar</i> (o doble clic / clic en el 1º punto).</p>
         <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → Editar → mueve/añade/elimina vértices → Guardar cambios.</p>
         <p class="mt-1">También puedes crear por <b>Lat/Lng</b> (una línea <code>lat,lng</code> por vértice).</p>
       </div>
@@ -98,8 +98,13 @@
     const STYLE     = { color:'#2563eb', weight:2, fillColor:'#60a5fa', fillOpacity:0.2 };
     const STYLE_SEL = { color:'#7c3aed', weight:3, fillColor:'#a78bfa', fillOpacity:0.25 };
 
-    // Dibujo con Geoman
-    let drawing = false;
+    // Dibujo manual (propio)
+    let isDrawing = false;
+    let tempCoords = [];           // L.LatLng[]
+    let tempPoly = null;           // L.Polygon (cerrado)
+    let firstMarker = null;        // marcador para cerrar
+    let mapClickHandler = null;    // refs para remover
+    let mapDblHandler = null;
 
     // Edición (Geoman)
     let editing = false;
@@ -111,94 +116,132 @@
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
       map.setView([-1.5, -78.5], 9);
 
-      // Ocultamos toolbar; controlamos con botones
       if (map.pm && map.pm.addControls) {
         map.pm.addControls({
-          position:'topleft',
-          drawPolygon:false, drawMarker:false, drawPolyline:false, drawRectangle:false,
-          drawCircle:false, drawCircleMarker:false, cutPolygon:false, editMode:false,
-          dragMode:false, removalMode:false
+          position:'topleft', drawPolygon:false, drawMarker:false, drawPolyline:false,
+          drawRectangle:false, drawCircle:false, drawCircleMarker:false, cutPolygon:false,
+          editMode:false, dragMode:false, removalMode:false
         });
       }
-
-      // Cuando se crea un polígono con Geoman
-      map.on('pm:create', (e)=>{
-        if (e.shape !== 'Polygon') return;
-        // Quitamos el layer temporal de Geoman (dibujaremos el nuestro)
-        const latlngs = (e.layer.getLatLngs()[0] || []).map(p => ({lat:p.lat, lng:p.lng}));
-        map.removeLayer(e.layer);
-
-        if (latlngs.length < 3) { setStatus('mínimo 3 puntos'); return; }
-
-        // Pedir nombre (con valor por defecto si lo dejan vacío)
-        let name = prompt('Nombre de la geocerca:') || '';
-        name = name.trim();
-        if (!name) {
-          const n = loadFences().length + 1;
-          name = 'Geocerca ' + n;
-        }
-
-        const id = 'f_' + Math.random().toString(36).slice(2,10);
-        const fences = loadFences(); fences.push({id, name, path: latlngs}); saveFences(fences);
-
-        drawing = false;
-        updateDrawButtons();
-        renderFences(); zoomTo(id);
-        setStatus('geocerca creada y guardada');
-      });
-
-      map.on('pm:drawend', ()=>{ drawing = false; updateDrawButtons(); });
 
       renderFences();
       setStatus('mapa listo');
     }
 
-    /* ===== Dibujo (Geoman) ===== */
-    function startDraw(){
-      if (editing) { alert('Termina o cancela la edición actual.'); return; }
-      drawing = true;
-      map.pm.enableDraw('Polygon', {
-        finishOn: 'dblclick',
-        allowSelfIntersection: true,
-        snappable: true,
-        snapDistance: 20,
-        templineStyle: { color:'#10b981', weight:3, dashArray:'4 4' },
-        hintlineStyle: { color:'#10b981', dashArray:'1 6' },
-        pathOptions:  { color:'#059669', weight:2, fillColor:'#34d399', fillOpacity:0.2 }
-      });
-      updateDrawButtons();
-      setStatus('modo dibujo (doble clic o Finalizar para cerrar)');
+    /* ===== Interacciones del mapa ===== */
+    function disableMapInteractions(){
+      map.dragging.disable();
+      map.scrollWheelZoom.disable();
+      map.doubleClickZoom.disable();
+      map.boxZoom.disable();
+      map.touchZoom.disable();
+      map.keyboard.disable();
+    }
+    function enableMapInteractions(){
+      map.dragging.enable();
+      map.scrollWheelZoom.enable();
+      map.doubleClickZoom.enable();
+      map.boxZoom.enable();
+      map.touchZoom.enable();
+      map.keyboard.enable();
     }
 
-    // Botón Finalizar: fuerza el cierre si estamos dibujando
-    function finishDraw(){
-      if (!drawing) return;
-      // Intentamos forzar el cierre usando la API interna si existe:
-      const d = map.pm && map.pm.Draw && map.pm.Draw.Polygon;
-      if (d && typeof d._finishShape === 'function') {
-        d._finishShape();                 // dispara pm:create
-      } else {
-        // Fallback: deshabilitar dibujo e indicar que cierres con doble clic
-        alert('Para finalizar, haz doble clic en el último punto.');
+    /* ===== Dibujo manual ===== */
+    function startDraw(){
+      if (editing) { alert('Termina o cancela la edición actual.'); return; }
+      // limpiar temporales si había algo
+      clearTempDrawing();
+
+      isDrawing = true;
+      tempCoords = [];
+      disableMapInteractions();
+
+      // Manejadores robustos
+      mapClickHandler = (e)=>{
+        if(!isDrawing) return;
+        addVertex(e.latlng);
+      };
+      mapDblHandler = ()=>{
+        if(isDrawing && tempCoords.length >= 3) finishDraw();
+      };
+      map.on('mousedown', mapClickHandler);
+      map.on('touchstart', mapClickHandler, { passive:false });
+      map.on('dblclick', mapDblHandler);
+
+      updateDrawButtons();
+      setStatus('modo dibujo');
+    }
+
+    function addVertex(latlng){
+      tempCoords.push(latlng);
+
+      // Polígono temporal cerrado
+      const ring = tempCoords.length > 1 ? [...tempCoords, tempCoords[0]] : [...tempCoords];
+      if (tempPoly) map.removeLayer(tempPoly);
+      tempPoly = L.polygon(ring, {color:'#059669', weight:2, fillColor:'#34d399', fillOpacity:0.15, dashArray:'4 6'}).addTo(map);
+
+      // Primer vértice clicable para cerrar
+      if (!firstMarker) {
+        firstMarker = L.circleMarker(latlng, {radius:6, color:'#111827', weight:2, fillColor:'#f59e0b', fillOpacity:0.9})
+          .addTo(map).bindTooltip('Cerrar', {permanent:false});
+        firstMarker.on('click', ()=>{ if(isDrawing && tempCoords.length>=3) finishDraw(); });
       }
+
+      // Habilitar Finalizar/Cancelar
+      gei('finishFenceBtn').disabled = tempCoords.length < 3;
+      gei('cancelFenceBtn').disabled = false;
+
+      setStatus(`vértices: ${tempCoords.length}`);
+    }
+
+    function finishDraw(){
+      // Permite finalizar siempre que haya 3+ puntos, aunque por alguna razón isDrawing estuviera false
+      if (tempCoords.length < 3) { alert('Agrega al menos 3 puntos.'); return; }
+
+      let name = prompt('Nombre de la geocerca:') || '';
+      name = name.trim();
+      if (!name) {
+        const n = loadFences().length + 1;
+        name = 'Geocerca ' + n;
+      }
+
+      const id   = 'f_' + Math.random().toString(36).slice(2,10);
+      const path = tempCoords.map(p=>({lat:p.lat,lng:p.lng}));
+      const fences = loadFences(); fences.push({id, name, path}); saveFences(fences);
+
+      clearTempDrawing();
+      enableMapInteractions();
+      renderFences(); zoomTo(id);
+      updateDrawButtons();
+      setStatus(`geocerca creada: ${name}`);
     }
 
     function cancelDraw(){
-      if (!drawing) return;
-      drawing = false;
-      map.pm.disableDraw('Polygon');      // cancela el dibujo actual
+      clearTempDrawing();
+      enableMapInteractions();
       updateDrawButtons();
       setStatus('dibujo cancelado');
     }
 
+    function clearTempDrawing(){
+      isDrawing=false;
+      tempCoords=[];
+      if (tempPoly)   { map.removeLayer(tempPoly);   tempPoly=null; }
+      if (firstMarker){ map.removeLayer(firstMarker); firstMarker=null; }
+      if (mapClickHandler){ map.off('mousedown', mapClickHandler); map.off('touchstart', mapClickHandler); mapClickHandler=null; }
+      if (mapDblHandler)  { map.off('dblclick', mapDblHandler); mapDblHandler=null; }
+      gei('finishFenceBtn').disabled = true;
+      gei('cancelFenceBtn').disabled = true;
+    }
+
     function updateDrawButtons(){
-      gei('newFenceBtn').disabled    = drawing;
-      gei('finishFenceBtn').disabled = !drawing;
-      gei('cancelFenceBtn').disabled = !drawing;
+      gei('newFenceBtn').disabled = isDrawing;
+      // finish/cancel se setean en addVertex/clearTempDrawing
     }
 
     /* ===== Render / Selección ===== */
     function renderFences(){
+      // limpiar
       Object.values(layers).forEach(l=>map.removeLayer(l)); for (const k in layers) delete layers[k];
 
       const fences = loadFences();
@@ -241,7 +284,7 @@
     /* ===== Edición (Geoman) ===== */
     function beginEdit(){
       if (!selectedFenceId) return;
-      if (drawing) { alert('Termina o cancela el dibujo actual.'); return; }
+      if (isDrawing) { alert('Termina o cancela el dibujo actual.'); return; }
       const layer = layers[selectedFenceId]; if (!layer || !layer.pm) return;
 
       backupCoords = layer.getLatLngs().map(ring=> ring.map(p=> L.latLng(p.lat,p.lng)));
@@ -264,7 +307,7 @@
 
       layer.pm.disable(); editing=false; backupCoords=null;
       renderFences(); selectFence(selectedFenceId);
-      setStatus('edición guardada');
+      setStatus('Edición guardada');
     }
 
     function cancelEdit(){
@@ -272,7 +315,7 @@
       if (backupCoords) layer.setLatLngs(backupCoords);
       layer.pm.disable(); editing=false; backupCoords=null;
       updateEditButtons();
-      setStatus('edición cancelada');
+      setStatus('Edición cancelada');
     }
 
     function updateEditButtons(){
@@ -299,7 +342,6 @@
         n.addEventListener('dblclick',()=>zoomTo(n.dataset.id));
       });
     }
-
     function fillSelect(){
       const fences = loadFences();
       const s = gei('geofenceSelect');
@@ -397,4 +439,3 @@
   </script>
 </body>
 </html>
-
