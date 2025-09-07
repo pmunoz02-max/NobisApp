@@ -1,651 +1,814 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gestión de Personal de Finca (Leaflet + Firebase)</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gestión de Personal y Geocercas</title>
+
+  <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
+
   <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
   <style>
-    body{font-family:Inter,system-ui,Arial,sans-serif;background:#f3f4f6;overflow-x:hidden}
-    #map{height:55vh;border-radius:1rem;box-shadow:0 4px 6px rgba(0,0,0,.1)}
-    @media(max-width:768px){#map{height:45vh}}
-    .farm-label{background:#fff;border:1px solid rgba(0,0,0,.2);padding:2px 6px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.15);font-size:12px}
-    .mousepos-control{background:#fff;border:1px solid rgba(0,0,0,.15);border-radius:.5rem;padding:.25rem .5rem;font-size:12px;box-shadow:0 1px 2px rgba(0,0,0,.1)}
-    .error-message{color:#dc2626;font-size:14px;margin-top:6px;display:none}
-    button,input,select{font-size:16px}
-    .person-row:hover{background-color:#f9fafb;}
-    .badge{font-size:.75rem;padding:.125rem .5rem;border-radius:.375rem;display:inline-block}
-    .badge-green{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
-    .badge-gray{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb}
-    /* Reportes */
-    .multiselect{min-height:42px}
-    .scrollbox{max-height:12rem;overflow:auto}
-    /* Mantener utilidad .hidden funcional para mostrar/ocultar modal/contenido */
-    .hidden { display: none !important; }
-    /* Evita superposición/pantalla en blanco al mostrar la app */
-    #appContent:not(.hidden){ display:flex !important; }
+    .farm-label {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      color: #1f2937;
+      font-weight: 600;
+      text-shadow: 0 0 3px #ffffffc7;
+    }
+    .badge {
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-gray { background: #e5e7eb; color: #374151; }
   </style>
 </head>
-<body class="p-4 sm:p-8">
-  <!-- Modal admin -->
-  <div id="adminModal" class="fixed inset-0 bg-gray-900/75 flex items-center justify-center z-50 p-4">
-    <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
-      <h1 class="text-3xl font-bold mb-4">Acceso de Administrador</h1>
-      <p class="text-gray-600 mb-6">Introduce tu código de administrador.</p>
-      <input id="adminCodeInput" type="password" placeholder="Código de acceso" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-center mb-2">
-      <div id="errorMessage" class="error-message">Código incorrecto. Intenta con "admin123"</div>
-      <button id="adminLoginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-lg">
-        Acceder
-      </button>
-    </div>
-  </div>
+<body class="bg-gray-100 text-gray-900">
+  <div class="max-w-7xl mx-auto p-4">
+    <!-- Barra superior -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <h1 class="text-2xl font-bold">Gestión de Personal y Geocercas</h1>
 
-  <!-- Contenido -->
-  <div id="appContent" class="max-w-7xl mx-auto flex flex-col space-y-6 hidden">
-    <header class="text-center my-4">
-      <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Control de Personal y Geocercas</h1>
-      <p class="text-md sm:text-lg text-gray-600 mt-2">Leaflet + Firestore (con caché local)</p>
-    </header>
-    
-    <!-- Finca activa -->
-    <div class="bg-white p-4 rounded-2xl shadow-lg">
-      <label class="block text-sm font-medium text-gray-700">Finca activa</label>
-      <select id="farmSelect" class="mt-1 w-full border rounded-md p-2"></select>
-    </div>
-    
-    <!-- Mapa + barra -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <div class="flex flex-wrap gap-2 items-center mb-2">
-        <h2 class="text-2xl font-semibold text-gray-700">Mapa de Fincas</h2>
-        <div class="ml-auto flex flex-wrap gap-2">
-          <button id="startFenceBtn" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">Nueva geocerca</button>
-          <button id="finishFenceBtn" class="hidden bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg">Finalizar geocerca</button>
-          <button id="cancelFenceBtn" class="hidden bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
-          <button id="createFenceByCoordsBtn" class="bg-sky-700 hover:bg-sky-800 text-white font-semibold px-4 py-2 rounded-lg">Geocerca (Lat/Lngs)</button>
-          <button id="createFarmBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">Crear finca</button>
-          <button id="createByCoordsBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Crear finca (Lat/Lng)</button>
-          <button id="deleteFarmBtn" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50" disabled>Eliminar finca</button>
-          <button id="deleteFenceBtn" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50" disabled>Eliminar geocerca</button>
-          <button id="editFenceBtn" class="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-50" disabled>Editar geocerca</button>
-          <button id="saveFenceEditBtn" class="hidden bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar cambios</button>
-          <button id="cancelFenceEditBtn" class="hidden bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar edición</button>
-          <button id="exportGeoJSONBtn" class="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg">Exportar GeoJSON</button>
-          <label class="inline-flex items-center gap-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold px-4 py-2 rounded-lg cursor-pointer">
-            Importar GeoJSON
-            <input id="importGeoJSONInput" type="file" accept=".geojson,application/geo+json,application/json" class="hidden">
-          </label>
+      <div class="grid md:grid-cols-3 gap-3 w-full md:w-auto">
+        <!-- Geocerca activa -->
+        <div class="bg-white p-4 rounded-2xl shadow-lg">
+          <label class="block text-sm font-medium text-gray-700">Geocerca activa</label>
+          <select id="geofenceSelect" class="mt-1 w-full border rounded-md p-2"></select>
         </div>
-      </div>
 
-      <!-- Panel nombre finca (Lat/Lng) -->
-      <div id="coordsNamePanel" class="hidden mb-3">
-        <div class="rounded-xl border border-gray-200 p-3">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la nueva finca</label>
-          <div class="flex gap-2">
-            <input id="coordsNameInput" type="text" class="border rounded-md p-2 w-full" placeholder="Ej.: Finca Palora Norte" />
-            <button id="coordsNameSaveBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
-            <button id="coordsNameCancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
+        <!-- Botonera principal -->
+        <div class="bg-white p-4 rounded-2xl shadow-lg">
+          <div class="flex flex-wrap gap-2">
+            <button id="newFenceBtn" class="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
+            <button id="finishFenceBtn" class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40" disabled>Finalizar</button>
+            <button id="cancelFenceBtn" class="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40" disabled>Cancelar</button>
           </div>
-          <p id="coordsNameHint" class="text-xs text-gray-500 mt-2"></p>
-        </div>
-      </div>
-
-      <!-- Panel nombre geocerca -->
-      <div id="fenceNamePanel" class="hidden mb-3">
-        <div class="rounded-xl border border-gray-200 p-3">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la geocerca</label>
-          <div class="flex gap-2">
-            <input id="fenceNameInput" type="text" class="border rounded-md p-2 w-full" placeholder="Ej.: Geocerca Lote 1" />
-            <button id="fenceNameSaveBtn" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar</button>
-            <button id="fenceNameCancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-4 py-2 rounded-lg">Cancelar</button>
+          <div class="flex flex-wrap gap-2 mt-2">
+            <button id="editFenceBtn" class="px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-40" disabled>Editar geocerca</button>
+            <button id="saveFenceEditBtn" class="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-40" disabled>Guardar cambios</button>
+            <button id="cancelFenceEditBtn" class="px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600 disabled:opacity-40" disabled>Cancelar edición</button>
           </div>
-          <p id="fenceNameHint" class="text-xs text-gray-500 mt-2"></p>
-        </div>
-      </div>
-
-      <div id="map"></div>
-
-      <!-- Explorador -->
-      <div id="indexPanel" class="mt-4">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold text-gray-800">Explorador de elementos</h3>
-          <span class="text-xs text-gray-500">Doble clic en un nombre para centrar/ajustar el mapa</span>
-        </div>
-        <div class="grid md:grid-cols-2 gap-4 mt-2">
-          <div class="bg-white/60 border border-gray-200 rounded-xl p-3 max-h-64 overflow-auto">
-            <div class="font-medium text-gray-700 mb-2">Fincas</div>
-            <ul id="farmList" class="divide-y divide-gray-100"></ul>
+          <div class="flex flex-wrap gap-2 mt-2">
+            <button id="deleteFenceBtn" class="px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 disabled:opacity-40" disabled>Eliminar geocerca</button>
+            <button id="exportGeoJsonBtn" class="px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
+            <label class="px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 cursor-pointer">
+              Importar GeoJSON
+              <input id="importGeoJsonInput" type="file" accept=".json,.geojson,application/geo+json,application/json" class="hidden" />
+            </label>
           </div>
-          <div class="bg-white/60 border border-gray-200 rounded-xl p-3 max-h-64 overflow-auto">
-            <div class="font-medium text-gray-700 mb-2">Geocercas</div>
-            <ul id="fenceList" class="divide-y divide-gray-100"></ul>
+        </div>
+
+        <!-- Ayuda -->
+        <div class="bg-white p-4 rounded-2xl shadow-lg">
+          <div class="text-sm text-gray-700">
+            <div><strong>Flujo:</strong> Nueva geocerca → clic en mapa para vértices → Finalizar.</div>
+            <div>Haz clic sobre una geocerca para seleccionarla. Doble clic en filas de tablas para centrar el mapa.</div>
           </div>
         </div>
       </div>
-      <p id="statusMessage" class="mt-3 text-sm text-gray-600">
-        Para geocercas: Nueva geocerca → clics en el mapa → Finalizar geocerca → asigna nombre y guarda.
-      </p>
     </div>
 
-    <!-- ===== Gestión de Personal ===== -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-semibold text-gray-700">Gestión de Personal</h2>
-        <span class="text-xs text-gray-500">Doble clic sobre una fila para ir a su asignación</span>
+    <!-- Mapa -->
+    <div class="mt-4 bg-white rounded-2xl shadow-lg overflow-hidden">
+      <div class="px-4 py-3 border-b">
+        <h2 class="text-lg font-semibold">Mapa de Geocercas</h2>
       </div>
-      <div class="grid md:grid-cols-5 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Nombre</label>
-          <input id="pFirstName" type="text" class="mt-1 w-full border rounded-md p-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Apellido</label>
-          <input id="pLastName" type="text" class="mt-1 w-full border rounded-md p-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Cédula</label>
-          <input id="pIdNumber" type="text" class="mt-1 w-full border rounded-md p-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Asignación</label>
-          <select id="pAssignSelect" class="mt-1 w-full border rounded-md p-2"></select>
-        </div>
-        <div class="flex items-end">
-          <label class="inline-flex items-center gap-2 mb-1">
-            <input id="pActive" type="checkbox" class="rounded" checked>
-            <span class="text-sm font-medium text-gray-700">Activo</span>
-          </label>
-        </div>
-      </div>
-      <div class="mt-3">
-        <button id="addPersonBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
-          Agregar
-        </button>
-        <span id="pFormError" class="text-sm text-red-600 ml-3 hidden"></span>
-      </div>
+      <div id="map" style="height: 480px;"></div>
+    </div>
 
-      <!-- Filtros -->
-      <div class="mt-6 grid md:grid-cols-3 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Buscar</label>
-          <input id="pSearchInput" type="text" placeholder="Nombre, apellido o cédula" class="mt-1 w-full border rounded-md p-2" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Tipo asignación</label>
-          <select id="pTypeFilter" class="mt-1 w-full border rounded-md p-2">
-            <option value="all">Todas</option>
-            <option value="farm">Fincas</option>
-            <option value="fence">Geocercas</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Finca/Geocerca</label>
-          <select id="pEntityFilter" class="mt-1 w-full border rounded-md p-2">
-            <option value="all">Todas</option>
-          </select>
-        </div>
+    <!-- Explorador -->
+    <div id="indexPanel" class="mt-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-800">Explorador</h3>
+        <span class="text-xs text-gray-500">Doble clic en una geocerca para centrar/ajustar el mapa</span>
       </div>
-      <div class="mt-4 overflow-auto">
-        <table class="min-w-full text-left">
-          <thead>
-            <tr class="text-gray-600 text-sm">
-              <th class="px-3 py-2">NOMBRE</th>
-              <th class="px-3 py-2">APELLIDO</th>
-              <th class="px-3 py-2">CÉDULA</th>
-              <th class="px-3 py-2">ESTADO</th>
-              <th class="px-3 py-2">ASIGNADO A</th>
-              <th class="px-3 py-2">ACCIONES</th>
-            </tr>
-          </thead>
-          <tbody id="personnelTableBody" class="text-sm"></tbody>
-        </table>
+      <div class="grid md:grid-cols-1 gap-4 mt-2">
+        <div class="bg-white/60 border border-gray-200 rounded-xl p-3">
+          <div class="font-medium text-gray-700">Geocercas</div>
+          <ul id="fenceList" class="mt-2 divide-y">
+            <!-- Rellenado por JS -->
+          </ul>
+        </div>
       </div>
     </div>
 
-    <!-- ===== Gestión de Actividades ===== -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-semibold text-gray-700">Gestión de Actividades</h2>
-        <span class="text-xs text-gray-500">Doble clic en una fila para ir a su finca/geocerca</span>
-      </div>
-      <!-- Form alta -->
-      <div class="grid md:grid-cols-5 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">
-            Actividad
-            <button id="actManageBtn" type="button" class="ml-2 text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded">
-              Editar lista
-            </button>
-          </label>
-          <select id="actActivitySelect" class="mt-1 w-full border rounded-md p-2"></select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Persona</label>
-          <select id="actPersonSelect" class="mt-1 w-full border rounded-md p-2"></select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Finca/Geocerca</label>
-          <select id="actEntitySelect" class="mt-1 w-full border rounded-md p-2"></select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Fecha inicio</label>
-          <input id="actStartDate" type="date" class="mt-1 w-full border rounded-md p-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Fecha fin</label>
-          <input id="actEndDate" type="date" class="mt-1 w-full border rounded-md p-2">
+    <!-- Gestión de Personal -->
+    <div class="mt-6 bg-white rounded-2xl shadow-lg">
+      <div class="px-4 py-3 border-b flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Gestión de Personal</h3>
+        <div class="flex gap-2">
+          <input id="pSearchInput" type="text" class="border rounded-md px-3 py-2" placeholder="Buscar por nombre o cédula" />
+          <select id="pEntityFilter" class="border rounded-md px-3 py-2"></select>
+          <button id="pNewBtn" class="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nuevo</button>
         </div>
       </div>
-      <div class="mt-3">
-        <button id="addActivityBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">
-          Agregar actividad
-        </button>
-        <span id="actFormError" class="text-sm text-red-600 ml-3 hidden"></span>
-      </div>
-
-      <!-- Filtros -->
-      <div class="mt-6 grid md:grid-cols-4 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Persona</label>
-          <select id="actFilterPerson" class="mt-1 w-full border rounded-md p-2">
-            <option value="all">Todas</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Actividad</label>
-          <select id="actFilterActivity" class="mt-1 w-full border rounded-md p-2">
-            <option value="all">Todas</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Desde</label>
-          <input id="actFilterFrom" type="date" class="mt-1 w-full border rounded-md p-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Hasta</label>
-          <input id="actFilterTo" type="date" class="mt-1 w-full border rounded-md p-2">
-        </div>
-      </div>
-      <div class="mt-4 overflow-auto">
-        <table class="min-w-full text-left">
-          <thead>
-            <tr class="text-gray-600 text-sm">
-              <th class="px-3 py-2">ACTIVIDAD</th>
-              <th class="px-3 py-2">PERSONA</th>
-              <th class="px-3 py-2">ENTidad</th>
-              <th class="px-3 py-2">FECHA INICIO</th>
-              <th class="px-3 py-2">FECHA FIN</th>
-              <th class="px-3 py-2">ACCIONES</th>
-            </tr>
-          </thead>
-          <tbody id="activityTableBody" class="text-sm"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ===== Costos de mano de obra ===== -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg" id="laborCostsModule">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-semibold text-gray-700">Costos de mano de obra</h2>
-        <span class="text-xs text-gray-500">Define el costo diario por persona y su rango de vigencia</span>
-      </div>
-      <div class="grid md:grid-cols-4 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Persona (activa)</label>
-          <div class="flex gap-2">
-            <input id="lcPersonDisplay" type="text" class="mt-1 w-full border rounded-md p-2" placeholder="Sin seleccionar" readonly>
-            <button id="lcChoosePersonBtn" type="button" class="mt-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-2 rounded-lg">Elegir</button>
+      <div class="p-4">
+        <div class="grid md:grid-cols-5 gap-3">
+          <div>
+            <label class="text-sm text-gray-600">Nombres</label>
+            <input id="pFirstName" class="border rounded-md px-3 py-2 w-full" />
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Apellidos</label>
+            <input id="pLastName" class="border rounded-md px-3 py-2 w-full" />
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Cédula</label>
+            <input id="pIdNumber" class="border rounded-md px-3 py-2 w-full" />
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Estado</label>
+            <select id="pActive" class="border rounded-md px-3 py-2 w-full">
+              <option value="true">Activo</option>
+              <option value="false">Inactivo</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Geocerca</label>
+            <select id="pAssignSelect" class="border rounded-md px-3 py-2 w-full"></select>
           </div>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Costo por día</label>
-          <input id="lcDailyCost" type="number" step="0.01" min="0" class="mt-1 w-full border rounded-md p-2" placeholder="0.00">
+        <div class="mt-3 flex gap-2">
+          <button id="pSaveBtn" class="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Guardar</button>
+          <button id="pClearBtn" class="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">Limpiar</button>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Desde</label>
-          <input id="lcStartDate" type="date" class="mt-1 w-full border rounded-md p-2">
+
+        <div class="mt-4 overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">NOMBRES</th>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">APELLIDOS</th>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">CÉDULA</th>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">ESTADO</th>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">GEOCERCA</th>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody id="personnelTableBody" class="bg-white divide-y">
+              <!-- Rellenado por JS -->
+            </tbody>
+          </table>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Hasta</label>
-          <input id="lcEndDate" type="date" class="mt-1 w-full border rounded-md p-2">
-        </div>
-      </div>
-      <div class="mt-3">
-        <button id="lcAddCostBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Guardar costo</button>
-        <span id="lcFormError" class="text-sm text-red-600 ml-3 hidden"></span>
-      </div>
-      <div class="mt-4 overflow-auto">
-        <table class="min-w-full text-left">
-          <thead>
-            <tr class="text-gray-600 text-sm">
-              <th class="px-3 py-2">PERSONA</th>
-              <th class="px-3 py-2">COSTO/DÍA</th>
-              <th class="px-3 py-2">DESDE</th>
-              <th class="px-3 py-2">HASTA</th>
-              <th class="px-3 py-2">ACCIONES</th>
-            </tr>
-          </thead>
-          <tbody id="laborCostTableBody" class="text-sm"></tbody>
-        </table>
       </div>
     </div>
 
-    <!-- ===== Reportes ===== -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg" id="reportsModule">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-semibold text-gray-700">Reportes</h2>
-        <span class="text-xs text-gray-500">Tablas descargables y gráficos por persona, entidad, actividad y fechas</span>
+    <!-- Gestión de Actividades -->
+    <div class="mt-6 bg-white rounded-2xl shadow-lg">
+      <div class="px-4 py-3 border-b flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Gestión de Actividades</h3>
+        <span class="text-xs text-gray-500">Doble clic en una fila para ir a su geocerca</span>
       </div>
-      <div class="grid md:grid-cols-6 gap-4">
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700">Personas (Ctrl/Cmd para multi)</label>
-          <select id="repPersons" class="mt-1 w-full border rounded-md p-2 multiselect" multiple size="6"></select>
-          <label class="inline-flex items-center gap-2 mt-2">
-            <input id="repOnlyActive" type="checkbox" class="rounded" checked>
-            <span class="text-sm text-gray-700">Solo activas</span>
-          </label>
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700">Fincas/Geocercas</label>
-          <select id="repEntities" class="mt-1 w-full border rounded-md p-2 multiselect" multiple size="6"></select>
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700">Actividades</label>
-          <select id="repActivities" class="mt-1 w-full border rounded-md p-2 multiselect" multiple size="6"></select>
-          <div class="grid grid-cols-2 gap-2 mt-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Desde</label>
-              <input id="repFrom" type="date" class="mt-1 w-full border rounded-md p-2">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Hasta</label>
-              <input id="repTo" type="date" class="mt-1 w-full border rounded-md p-2">
-            </div>
+      <div class="p-4">
+        <div class="grid md:grid-cols-5 gap-3">
+          <div>
+            <label class="text-sm text-gray-600">Fecha</label>
+            <input id="actDate" type="date" class="border rounded-md px-3 py-2 w-full" />
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Personal</label>
+            <select id="actPersonSelect" class="border rounded-md px-3 py-2 w-full"></select>
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Actividad</label>
+            <input id="actTask" class="border rounded-md px-3 py-2 w-full" placeholder="Ej. Siembra, Riego..." />
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Horas</label>
+            <input id="actHours" type="number" step="0.1" class="border rounded-md px-3 py-2 w-full" />
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Geocerca</label>
+            <select id="actEntitySelect" class="border rounded-md px-3 py-2 w-full"></select>
           </div>
         </div>
-      </div>
-      <div class="grid md:grid-cols-5 gap-4 mt-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Agrupar por</label>
-          <select id="repGroupBy" class="mt-1 w-full border rounded-md p-2">
-            <option value="detalle">Detalle</option>
-            <option value="persona">Persona</option>
-            <option value="entidad">Entidad</option>
-            <option value="actividad">Actividad</option>
-          </select>
+        <div class="mt-3 flex gap-2">
+          <button id="actAddBtn" class="px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Agregar</button>
+          <button id="actClearBtn" class="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">Limpiar</button>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Métrica (para gráficos)</label>
-          <select id="repMetric" class="mt-1 w-full border rounded-md p-2">
-            <option value="count">Actividades</option>
-            <option value="days">Días</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Tipo de gráfico</label>
-          <select id="repChartType" class="mt-1 w-full border rounded-md p-2">
-            <option value="bar">Barras</option>
-            <option value="line">Líneas</option>
-            <option value="doughnut">Pastel</option>
-          </select>
-        </div>
-        <div class="flex items-end">
-          <button id="repGenerateBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg">Generar</button>
-        </div>
-        <div class="flex items-end">
-          <button id="repDownloadBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg">Descargar CSV (Excel)</button>
+
+        <div class="mt-4 overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">FECHA</th>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">PERSONAL</th>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">ACTIVIDAD</th>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">HORAS</th>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">GEOCERCA</th>
+                <th class="text-left px-3 py-2 font-medium text-gray-600">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody id="actTableBody" class="bg-white divide-y">
+              <!-- Rellenado por JS -->
+            </tbody>
+          </table>
         </div>
       </div>
-      <div class="mt-4 overflow-auto">
-        <table class="min-w-full text-left" id="repTable">
-          <thead id="repTableHead"></thead>
-          <tbody id="repTableBody" class="text-sm"></tbody>
-        </table>
+    </div>
+
+    <!-- Reportes -->
+    <div class="mt-6 bg-white rounded-2xl shadow-lg">
+      <div class="px-4 py-3 border-b">
+        <h3 class="text-lg font-semibold">Reportes</h3>
       </div>
-      <div class="mt-6 bg-white rounded-xl border border-gray-200 p-4">
-        <canvas id="repChart" height="120"></canvas>
+      <div class="p-4">
+        <div class="grid md:grid-cols-5 gap-3">
+          <div>
+            <label class="text-sm text-gray-600">Desde</label>
+            <input id="repFrom" type="date" class="border rounded-md px-3 py-2 w-full" />
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Hasta</label>
+            <input id="repTo" type="date" class="border rounded-md px-3 py-2 w-full" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-sm text-gray-600">Geocercas</label>
+            <select id="repEntities" class="border rounded-md px-3 py-2 w-full" multiple></select>
+            <p class="text-xs text-gray-500 mt-1">Mantén Ctrl/⌘ para seleccionar varias</p>
+          </div>
+          <div>
+            <label class="text-sm text-gray-600">Agrupar por</label>
+            <select id="repGroupBy" class="border rounded-md px-3 py-2 w-full">
+              <option value="persona">Persona</option>
+              <option value="entidad">Entidad</option>
+              <option value="actividad">Actividad</option>
+              <option value="fecha">Fecha</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-3">
+          <button id="repRunBtn" class="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Generar</button>
+        </div>
+        <div id="repResults" class="mt-4">
+          <!-- Rellenado por JS -->
+        </div>
       </div>
     </div>
   </div>
-
-  <!-- Modal: elegir persona activa (costos) -->
-  <div id="lcPersonModal" class="fixed inset-0 bg-gray-900/75 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-5">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-lg font-semibold">Seleccionar persona (activa)</h3>
-        <button id="lcModalClose" class="text-gray-600 hover:text-gray-900">✕</button>
-      </div>
-      <input id="lcModalSearch" type="text" placeholder="Buscar por nombre o cédula" class="w-full border rounded-md p-2 mb-3">
-      <div id="lcModalList" class="max-h-80 overflow-auto divide-y divide-gray-100"></div>
-      <div class="mt-4 text-right">
-        <button id="lcModalCancel" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scripts Leaflet -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
-  <!-- Chart.js (para los reportes) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <script>
-    /* ---------- Firebase ---------- */
-    const firebaseConfig = {
-      apiKey: "AIzaSyD-0Vq8yG1lCFM3I8fE4FzP3pE5v1j6KqE",
-      authDomain: "demo-finca-app.firebaseapp.com",
-      projectId: "demo-finca-app",
-      storageBucket: "demo-finca-app.appspot.com",
-      messagingSenderId: "123456789012",
-      appId: "1:123456789012:web:abcdef1234567890"
+    // ======= Utilidades de almacenamiento (LocalStorage) =======
+    const KEYS = {
+      fences: 'geofences',
+      people: 'people',
+      acts: 'activities'
     };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    try {
-      db.settings({
-        experimentalForceLongPolling: true,
-        experimentalAutoDetectLongPolling: true,
-        useFetchStreams: false
-      });
-    } catch {}
-    let authReady = false;
-    firebase.auth().signInAnonymously().catch(console.error);
-    firebase.auth().onAuthStateChanged(u => authReady = !!u);
+    const save = (k, v) => localStorage.setItem(k, JSON.stringify(v||[]));
+    const load = (k) => {
+      try { return JSON.parse(localStorage.getItem(k)||'[]'); } catch { return []; }
+    };
 
-    /* ---------- Estado y caché ---------- */
+    // ======= Estado =======
     let map;
-    const fincaMarkers = {}, geofenceLayers = {};
-    const LS_KEY='fincas_cache_v1', LS_GF='geofences_cache_v1', LS_PE='personnel_cache_v1', LS_AC='activities_cache_v1', LS_AD='activity_defs_v1', LS_LC='labor_costs_cache_v1';
-    const save = (k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
-    const load = (k)=>{try{return JSON.parse(localStorage.getItem(k)||'[]')}catch{return []}};
-    const saveFarms=(v)=>save(LS_KEY,v), loadFarms=()=>load(LS_KEY);
-    const saveFences=(v)=>save(LS_GF,v), loadFences=()=>load(LS_GF);
-    const savePeople=(v)=>save(LS_PE,v), loadPeople=()=>load(LS_PE);
-    const saveActs=(v)=>save(LS_AC,v), loadActs=()=>load(LS_AC);
-    const saveLaborCosts=(v)=>save(LS_LC,v), loadLaborCosts=()=>load(LS_LC);
-    const DEFAULT_ACTIVITY_OPTIONS = ['Siembra','Riego','Cosecha','Poda','Fertilización','Fumigación','Mantenimiento','Limpieza','Transporte','Supervisión'];
-    const loadActivityDefs = () => {
-      try {
-        const val = JSON.parse(localStorage.getItem(LS_AD) || 'null');
-        if (Array.isArray(val) && val.length) return val;
-      } catch {}
-      return DEFAULT_ACTIVITY_OPTIONS.slice();
-    };
-    const saveActivityDefs = (arr) => {
-      try{ localStorage.setItem(LS_AD, JSON.stringify(arr)); }catch{}
-    };
-    let activityDefs = loadActivityDefs();
-    let currentFarms=[], currentFences=[], currentPersonnel=[], currentActivities=[], currentLaborCosts=[];
-    const GEOFENCE_STYLE={weight:2,fillOpacity:.15}, GEOFENCE_SELECTED_STYLE={weight:3,color:'#ef4444',fillOpacity:.2};
-    let isDrawingFence=false, drawingCoords=[], drawingPolyline=null, drawingMarkers=[], pendingFenceCoords=null;
-    let selectedFenceId=null, editGroup=null, editToolbar=null, isEditingFence=false, editBackupCoords=null;
-    function waitAuthThen(fn){
-      if(authReady) return fn();
-      const t=setInterval(()=>{
-        if(authReady){clearInterval(t); fn();}},120);
-    }
+    const geofenceLayers = {};
+    const GEOFENCE_STYLE = { color: '#2563eb', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.2 };
+    const GEOFENCE_SELECTED_STYLE = { color: '#7c3aed', weight: 3, fillColor: '#a78bfa', fillOpacity: 0.25 };
+    let drawTempLayer = null;
+    let drawCoords = [];
+    let isDrawingFence = false;
+    let selectedFenceId = null;
 
-    /* ---------- Mapa ---------- */
-    function initMap(center){
-      center=center||{lat:-0.1807,lng:-78.4678};
+    // ======= Mapa =======
+    function initMap() {
+      map = L.map('map');
+      const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+      map.setView([0.5,-78.5], 6);
 
-      const mapContainer = document.getElementById('map');
-      if (!mapContainer) { console.error('El contenedor del mapa no existe'); return; }
-
-      map=L.map('map',{center:[center.lat,center.lng],zoom:6});
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-      editGroup=new L.FeatureGroup();
-      map.addLayer(editGroup);
-      addMousePositionControl();
-      renderFarmsFromCache();
-      renderGeofencesFromCache();
-
-      map.on('click', async e=>{
-        if(isDrawingFence){
+      map.on('click', (e) => {
+        if (isDrawingFence) {
           addFenceVertex(e.latlng);
-          return;
-        }
-        const name=prompt('Nombre de la nueva finca:');
-        if(!name) return;
-        try{
-          await db.collection('farms').add({name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}});
-        } catch{
-          const farms=loadFarms();
-          farms.push({id:'local-'+Date.now(),name,fincaLocation:{lat:e.latlng.lat,lng:e.latlng.lng}});
-          saveFarms(farms);
-          renderFarmsFromCache();
         }
       });
 
-      waitAuthThen(async()=>{
-        startSubscriptions();
-        await Promise.all([initialFetchFarms(),initialFetchGeofences(),initialFetchPersonnel(),initialFetchActivities(),initialFetchLaborCosts()]);
-        syncLocalPendingToFirestore();
-      });
+      renderGeofencesFromCache();
     }
 
-    function addMousePositionControl(){
-      const MousePos=L.Control.extend({
-        options:{position:'bottomleft'},
-        onAdd:function(){const d=L.DomUtil.create('div','mousepos-control');d.innerHTML='Lat: — Lng: —';this._div=d;return d;},
-        update:function(lat,lng){this._div.innerHTML=(lat!=null&&lng!=null)?`Lat: ${lat.toFixed(5)} &nbsp; Lng: ${lng.toFixed(5)}`:'Lat: — Lng: —';}
-      });
-      const ctrl=new MousePos();
-      ctrl.addTo(map);
-      map.on('mousemove',e=>ctrl.update(e.latlng.lat,e.latlng.lng));
-      map.on('mouseout',()=>ctrl.update(null,null));
+    function addFenceVertex(latlng) {
+      drawCoords.push(latlng);
+      if (drawTempLayer) map.removeLayer(drawTempLayer);
+      drawTempLayer = L.polyline(drawCoords, { color:'#10b981', weight:3, dashArray:'4 4' }).addTo(map);
     }
 
-    function renderFarmsFromCache(){
-      const farms=loadFarms();
-      Object.values(fincaMarkers).forEach(m=>map.removeLayer(m));
-      for(const k in fincaMarkers) delete fincaMarkers[k];
-      farms.forEach(f=>{
-        if(!f?.id||!f?.fincaLocation) return;
-        const m=L.marker([f.fincaLocation.lat,f.fincaLocation.lng]).addTo(map);
-        m.bindTooltip(f.name||'Finca',{permanent:true,direction:'right',offset:[10,0],className:'farm-label'});
-        fincaMarkers[f.id]=m;
+    function startFence() {
+      isDrawingFence = true;
+      drawCoords = [];
+      if (drawTempLayer) { map.removeLayer(drawTempLayer); drawTempLayer = null; }
+      toggleDrawButtons();
+    }
+
+    function finishFence() {
+      if (!isDrawingFence || drawCoords.length < 3) return;
+      const name = prompt('Nombre de la geocerca:');
+      if (!name) return;
+
+      const id = 'f_'+Math.random().toString(36).slice(2,10);
+      const path = drawCoords.map(p=>({lat:p.lat,lng:p.lng}));
+      const fences = load(KEYS.fences);
+      fences.push({ id, name, path });
+      save(KEYS.fences, fences);
+
+      isDrawingFence = false;
+      drawCoords = [];
+      if (drawTempLayer) { map.removeLayer(drawTempLayer); drawTempLayer = null; }
+      renderGeofencesFromCache();
+      selectFence(id);
+      toggleDrawButtons();
+    }
+
+    function cancelFence() {
+      isDrawingFence = false;
+      drawCoords = [];
+      if (drawTempLayer) { map.removeLayer(drawTempLayer); drawTempLayer = null; }
+      toggleDrawButtons();
+    }
+
+    function toggleDrawButtons() {
+      document.getElementById('finishFenceBtn').disabled = !isDrawingFence;
+      document.getElementById('cancelFenceBtn').disabled = !isDrawingFence;
+      document.getElementById('newFenceBtn').disabled = isDrawingFence;
+    }
+
+    function selectFence(id) {
+      selectedFenceId = id;
+      Object.entries(geofenceLayers).forEach(([fid, poly])=>{
+        poly.setStyle(fid===id ? GEOFENCE_SELECTED_STYLE : GEOFENCE_STYLE);
       });
-      const sel=document.getElementById('farmSelect');
-      if(sel){
-        sel.innerHTML='';
-        farms.forEach(f=>{const o=document.createElement('option'); o.value=f.id; o.textContent=f.name||'Finca'; sel.appendChild(o);});
-      }
-      updateDeleteButtonState();
-      currentFarms=farms||[];
-      buildIndexList();
-      buildAssignOptions();
-      buildActivityFormOptions();
-      buildReportFilterOptions();
+      updateFenceButtons();
+      // sincroniza selector
+      const sel = document.getElementById('geofenceSelect');
+      if (sel) sel.value = id || '';
+    }
+
+    function zoomToFence(id) {
+      const fences = load(KEYS.fences);
+      const f = fences.find(x=>x.id===id);
+      if (!f) return;
+      const latlngs = f.path.map(p=>[p.lat,p.lng]);
+      const poly = L.polygon(latlngs);
+      map.fitBounds(poly.getBounds(), { padding:[20,20] });
+      selectFence(id);
     }
 
     function renderGeofencesFromCache(){
+      // limpiar
       Object.values(geofenceLayers).forEach(p=>map.removeLayer(p));
-      for(const k in geofenceLayers) delete geofenceLayers[k];
-      const fences=loadFences();
+      for (const k in geofenceLayers) delete geofenceLayers[k];
+
+      const fences = load(KEYS.fences);
       fences.forEach(g=>{
-        if(!g?.id||!Array.isArray(g.path)||g.path.length<3) return;
+        if (!g?.id || !Array.isArray(g.path) || g.path.length<3) return;
         const latlngs=g.path.map(p=>[p.lat,p.lng]);
         const poly=L.polygon(latlngs,GEOFENCE_STYLE).addTo(map);
         poly.bindTooltip(g.name||'Geocerca',{permanent:true,direction:'center',className:'farm-label'});
         geofenceLayers[g.id]=poly;
+        poly.on('click',()=>selectFence(g.id));
+        if(selectedFenceId===g.id) poly.setStyle(GEOFENCE_SELECTED_STYLE);
       });
-      currentFences=fences||[];
+      if(selectedFenceId && !geofenceLayers[selectedFenceId]) selectedFenceId=null;
+
+      updateFenceButtons();
       buildIndexList();
-      buildAssignOptions();
-      buildActivityFormOptions();
+      populateGeofenceSelectsEverywhere();
+      renderPersonnelList();
+      renderActivityList();
       buildReportFilterOptions();
     }
 
-    /* ---------- Entrada (LOGIN) ---------- */
-    function handleAdminLogin(){
-      const err = document.getElementById('errorMessage');
-      if (err) err.style.display = 'none';
-
-      const val = (document.getElementById('adminCodeInput').value || '').trim().toLowerCase();
-      const ok = (val === 'admin123');
-      if(!ok){
-        if (err) err.style.display = 'block';
-        return;
-      }
-      try{ localStorage.setItem('admin_ok','1'); }catch(e){ console.error('localStorage error', e); }
-      const modal = document.getElementById('adminModal');
-      const app = document.getElementById('appContent');
-      if (modal) modal.classList.add('hidden');
-      if (app) { app.classList.remove('hidden'); app.style.display = 'flex'; }
-
-      setTimeout(()=>{
-        try { if (typeof initMap === 'function') initMap(); } catch(e){ console.error(e); }
-        setTimeout(()=>{ try{ if (typeof map !== 'undefined' && map && map.invalidateSize) map.invalidateSize(); }catch(e){} }, 120);
-      }, 120);
+    function updateFenceButtons(){
+      const hasSel = !!selectedFenceId;
+      document.getElementById('editFenceBtn').disabled = !hasSel;
+      document.getElementById('deleteFenceBtn').disabled = !hasSel;
+      document.getElementById('saveFenceEditBtn').disabled = true;
+      document.getElementById('cancelFenceEditBtn').disabled = true;
     }
 
-    // (… aquí seguirían las funciones de geocercas, personal, actividades, reportes, etc.)
-    // Asegúrate de mantener tus funciones existentes: addFenceVertex, startFenceDraw, finishFenceDraw,
-    // cancelFenceDraw, zoomToFarm, zoomToFence, buildIndexList, buildAssignOptions, buildActivityFormOptions,
-    // buildReportFilterOptions, updateDeleteButtonState, updateDeleteFenceButtonState, updateEditButtonsState,
-    // initialFetchFarms, initialFetchGeofences, initialFetchPersonnel, initialFetchActivities, initialFetchLaborCosts,
-    // syncLocalPendingToFirestore, openLcModal, closeLcModal, renderLcModalList, addLaborCost, renderLaborCostList,
-    // generateReport, exportReportCSV, renderReportTable, renderReportChart, etc.
+    // ======= Edición de geocercas =======
+    let editLayer = null;
+    function beginFenceEdit(){
+      if (!selectedFenceId) return;
+      const fences = load(KEYS.fences);
+      const f = fences.find(x=>x.id===selectedFenceId);
+      if (!f) return;
+      // crear capa editable
+      const latlngs = f.path.map(p=>[p.lat,p.lng]);
+      editLayer = L.polygon(latlngs, { color:'#f59e0b', weight:3, fillColor:'#fde68a', fillOpacity:0.2 }).addTo(map);
+      editLayer.pm && editLayer.pm.enable ? editLayer.pm.enable({ allowSelfIntersection:false }) : null;
+      document.getElementById('saveFenceEditBtn').disabled = false;
+      document.getElementById('cancelFenceEditBtn').disabled = false;
+      document.getElementById('editFenceBtn').disabled = true;
+    }
 
-    /* ---------- Listeners ---------- */
-    document.addEventListener('DOMContentLoaded', ()=>{
-      let already = false;
-      try { already = localStorage.getItem('admin_ok') === '1'; } catch(e){ already = false; }
-      const modal = document.getElementById('adminModal');
-      const app = document.getElementById('appContent');
+    function saveFenceEdit(){
+      if (!selectedFenceId || !editLayer) return;
+      const latlngs = editLayer.getLatLngs()[0] || [];
+      if (latlngs.length<3) { alert('La geocerca debe tener al menos 3 puntos'); return; }
 
-      if(already){
-        if (modal) modal.classList.add('hidden');
-        if (app) { app.classList.remove('hidden'); app.style.display = 'flex'; }
-        setTimeout(()=>{
-          try { if (typeof initMap === 'function') initMap(); } catch(e){}
-          setTimeout(()=>{ try{ if (typeof map !== 'undefined' && map && map.invalidateSize) map.invalidateSize(); }catch(e){} }, 120);
-        }, 120);
-      }else{
-        if (modal) modal.classList.remove('hidden');
-        if (app) { app.classList.add('hidden'); app.style.display = ''; }
+      const fences = load(KEYS.fences);
+      const idx = fences.findIndex(x=>x.id===selectedFenceId);
+      if (idx<0) return;
+
+      fences[idx].path = latlngs.map(p=>({lat:p.lat,lng:p.lng}));
+      save(KEYS.fences, fences);
+
+      map.removeLayer(editLayer); editLayer=null;
+      document.getElementById('saveFenceEditBtn').disabled = true;
+      document.getElementById('cancelFenceEditBtn').disabled = true;
+      document.getElementById('editFenceBtn').disabled = false;
+      renderGeofencesFromCache();
+    }
+
+    function cancelFenceEdit(){
+      if (editLayer) { map.removeLayer(editLayer); editLayer=null; }
+      document.getElementById('saveFenceEditBtn').disabled = true;
+      document.getElementById('cancelFenceEditBtn').disabled = true;
+      document.getElementById('editFenceBtn').disabled = false;
+    }
+
+    function deleteFence(){
+      if (!selectedFenceId) return;
+      if (!confirm('¿Eliminar esta geocerca?')) return;
+      // evitar que queden personas/actividades huérfanas
+      const people = load(KEYS.people).filter(p=>p.assignId!==selectedFenceId);
+      save(KEYS.people, people);
+      const acts = load(KEYS.acts).filter(a=>a.assignId!==selectedFenceId);
+      save(KEYS.acts, acts);
+
+      const fences = load(KEYS.fences).filter(f=>f.id!==selectedFenceId);
+      save(KEYS.fences, fences);
+      selectedFenceId = null;
+      renderGeofencesFromCache();
+    }
+
+    // ======= Explorador =======
+    function buildIndexList(){
+      const fenceUl = document.getElementById('fenceList');
+      const fences = load(KEYS.fences)
+        .slice()
+        .sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
+      fenceUl.innerHTML = fences.length
+        ? fences.map(g=>`
+          <li class="py-2">
+            <div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer" data-id="${g.id}">
+              <div class="text-sm font-medium text-gray-800">${g.name||'Geocerca'}</div>
+              <div class="text-xs text-gray-500">${Array.isArray(g.path)?`${g.path.length} puntos`:'—'}</div>
+            </div>
+          </li>`).join('')
+        : `<li class="py-6 text-center text-sm text-gray-500">No hay geocercas registradas.</li>`;
+
+      fenceUl.querySelectorAll('[data-id]').forEach(n=>{
+        n.addEventListener('dblclick', ()=> zoomToFence(n.dataset.id));
+        n.addEventListener('click', ()=> selectFence(n.dataset.id));
+      });
+    }
+
+    function populateGeofenceSelectsEverywhere(){
+      const fences = load(KEYS.fences);
+      // Geocerca activa
+      const gfSel = document.getElementById('geofenceSelect');
+      gfSel.innerHTML = fences.map(f=>`<option value="${f.id}">${f.name||'Geocerca'}</option>`).join('');
+      gfSel.addEventListener('change', e=>{ if(e.target.value) zoomToFence(e.target.value); });
+
+      // Personal - asignación
+      const pAssign = document.getElementById('pAssignSelect');
+      pAssign.innerHTML = fences.length
+        ? ['<option value="">— Selecciona —</option>'].concat(
+            fences.map(g=>`<option value="${g.id}">Geocerca: ${g.name||'Geocerca'}</option>`)
+          ).join('')
+        : '<option value="">No hay geocercas</option>';
+
+      // Filtro personas por geocerca
+      const pFilter = document.getElementById('pEntityFilter');
+      pFilter.innerHTML = ['<option value="all">Todas</option>'].concat(
+        fences.map(g=>`<option value="${g.id}">Geocerca: ${g.name||'Geocerca'}</option>`)
+      ).join('');
+
+      // Actividades - entidad
+      const aEnt = document.getElementById('actEntitySelect');
+      aEnt.innerHTML = fences.length
+        ? fences.map(g=>`<option value="${g.id}">${g.name||'Geocerca'}</option>`).join('')
+        : '<option value="">No hay geocercas</option>';
+
+      // Reportes - entidades
+      const repEnt = document.getElementById('repEntities');
+      repEnt.innerHTML = fences.map(g=>`<option value="${g.id}">${g.name||'Geocerca'}</option>`).join('');
+    }
+
+    // ======= Personal =======
+    let editPersonId = null;
+
+    function renderPersonnelList(){
+      const tbody = document.getElementById('personnelTableBody');
+      const q = (document.getElementById('pSearchInput').value||'').trim().toLowerCase();
+      const filter = document.getElementById('pEntityFilter').value||'all';
+      const fences = load(KEYS.fences);
+      const nameOf = id => fences.find(g=>g.id===id)?.name || 'Geocerca';
+
+      let list = load(KEYS.people);
+      if (q) list = list.filter(p => (`${p.firstName||''} ${p.lastName||''} ${p.idNumber||''}`).toLowerCase().includes(q));
+      if (filter!=='all') list = list.filter(p=>p.assignId===filter);
+
+      tbody.innerHTML = list.length ? '' : '<tr><td colspan="6" class="px-3 py-6 text-center text-gray-500">No hay personal registrado.</td></tr>';
+
+      list.forEach(p=>{
+        const tr = document.createElement('tr');
+        tr.className='border-t hover:bg-gray-50';
+        const badge = p.active!==false ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>';
+        tr.innerHTML = `
+          <td class="px-3 py-2">${p.firstName||''}</td>
+          <td class="px-3 py-2">${p.lastName||''}</td>
+          <td class="px-3 py-2">${p.idNumber||''}</td>
+          <td class="px-3 py-2">${badge}</td>
+          <td class="px-3 py-2">Geocerca: ${nameOf(p.assignId)}</td>
+          <td class="px-3 py-2">
+            <button class="text-indigo-600 hover:underline" onclick="openEditPerson('${p.id}')">Editar</button>
+            <span class="mx-1 text-gray-300">|</span>
+            <button class="text-rose-600 hover:underline" onclick="deletePerson('${p.id}')">Eliminar</button>
+          </td>
+        `;
+        tr.addEventListener('dblclick', ()=> zoomToFence(p.assignId));
+        tbody.appendChild(tr);
+      });
+    }
+
+    function clearPersonForm(){
+      editPersonId = null;
+      document.getElementById('pFirstName').value='';
+      document.getElementById('pLastName').value='';
+      document.getElementById('pIdNumber').value='';
+      document.getElementById('pActive').value='true';
+      document.getElementById('pAssignSelect').value='';
+    }
+
+    function savePerson(){
+      const firstName = document.getElementById('pFirstName').value.trim();
+      const lastName = document.getElementById('pLastName').value.trim();
+      const idNumber = document.getElementById('pIdNumber').value.trim();
+      const active = document.getElementById('pActive').value==='true';
+      const assignId = document.getElementById('pAssignSelect').value;
+
+      if (!firstName || !lastName || !idNumber || !assignId) {
+        alert('Completa nombres, apellidos, cédula y geocerca.');
+        return;
       }
 
-      const loginBtn = document.getElementById('adminLoginBtn');
-      const codeInp = document.getElementById('adminCodeInput');
-      if (loginBtn) loginBtn.addEventListener('click', handleAdminLogin);
-      if (codeInp) codeInp.addEventListener('keydown', (e)=>{ if(e.key==='Enter') handleAdminLogin(); });
+      const people = load(KEYS.people);
+      if (editPersonId){
+        const idx = people.findIndex(p=>p.id===editPersonId);
+        if (idx>=0) {
+          people[idx] = { ...people[idx], firstName, lastName, idNumber, active, assignId };
+        }
+      } else {
+        const id = 'p_'+Math.random().toString(36).slice(2,10);
+        people.push({ id, firstName, lastName, idNumber, active, assignId });
+      }
+      save(KEYS.people, people);
+      clearPersonForm();
+      renderPersonnelList();
+      populateActivitiesPeople();
+    }
 
-      // Aquí van el resto de listeners de tu app (mapa, tablas, filtros, etc)…
-      // Ejemplos:
-      const farmSelect = document.getElementById('farmSelect');
-      if (farmSelect) farmSelect.addEventListener('change', updateDeleteButtonState);
+    function openEditPerson(id){
+      const p = load(KEYS.people).find(x=>x.id===id);
+      if (!p) return;
+      editPersonId = id;
+      document.getElementById('pFirstName').value = p.firstName||'';
+      document.getElementById('pLastName').value = p.lastName||'';
+      document.getElementById('pIdNumber').value = p.idNumber||'';
+      document.getElementById('pActive').value = (p.active!==false)?'true':'false';
+      document.getElementById('pAssignSelect').value = p.assignId||'';
+      window.scrollTo({ top: document.querySelector('#pFirstName').getBoundingClientRect().top + window.scrollY - 140, behavior: 'smooth' });
+    }
+
+    function deletePerson(id){
+      if (!confirm('¿Eliminar este registro de personal?')) return;
+      const people = load(KEYS.people).filter(p=>p.id!==id);
+      save(KEYS.people, people);
+      renderPersonnelList();
+      populateActivitiesPeople();
+    }
+
+    // ======= Actividades =======
+    function populateActivitiesPeople(){
+      const sel = document.getElementById('actPersonSelect');
+      const people = load(KEYS.people)
+        .filter(p=>p.active!==false)
+        .sort((a,b)=>(a.firstName||'').localeCompare(b.firstName||''));
+      sel.innerHTML = people.map(p=>`<option value="${p.id}">${p.firstName||''} ${p.lastName||''}</option>`).join('');
+    }
+
+    function clearActivityForm(){
+      document.getElementById('actDate').value='';
+      document.getElementById('actPersonSelect').value='';
+      document.getElementById('actTask').value='';
+      document.getElementById('actHours').value='';
+      document.getElementById('actEntitySelect').value='';
+    }
+
+    function addActivity(){
+      const date = document.getElementById('actDate').value;
+      const personId = document.getElementById('actPersonSelect').value;
+      const task = document.getElementById('actTask').value.trim();
+      const hours = parseFloat(document.getElementById('actHours').value||'0');
+      const assignId = document.getElementById('actEntitySelect').value;
+
+      if (!date || !personId || !task || !hours || !assignId) {
+        alert('Completa fecha, personal, actividad, horas y geocerca.');
+        return;
+      }
+
+      const fences = load(KEYS.fences);
+      const people = load(KEYS.people);
+      const entityName = fences.find(g=>g.id===assignId)?.name || 'Geocerca';
+      const person = people.find(p=>p.id===personId);
+      const id = 'a_'+Math.random().toString(36).slice(2,10);
+
+      const acts = load(KEYS.acts);
+      acts.push({ id, date, personId, personName: `${person?.firstName||''} ${person?.lastName||''}`, task, hours, assignId, entityName });
+      save(KEYS.acts, acts);
+      clearActivityForm();
+      renderActivityList();
+    }
+
+    function renderActivityList(){
+      const tbody = document.getElementById('actTableBody');
+      const fences = load(KEYS.fences);
+      const nameOf = id => fences.find(g=>g.id===id)?.name || 'Geocerca';
+      const acts = load(KEYS.acts).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+
+      tbody.innerHTML = acts.length ? '' : '<tr><td colspan="6" class="px-3 py-6 text-center text-gray-500">No hay actividades.</td></tr>';
+
+      acts.forEach(a=>{
+        const tr = document.createElement('tr');
+        tr.className='border-t hover:bg-gray-50';
+        tr.innerHTML = `
+          <td class="px-3 py-2">${a.date||''}</td>
+          <td class="px-3 py-2">${a.personName||''}</td>
+          <td class="px-3 py-2">${a.task||''}</td>
+          <td class="px-3 py-2">${a.hours||0}</td>
+          <td class="px-3 py-2">Geocerca: ${nameOf(a.assignId)}</td>
+          <td class="px-3 py-2">
+            <button class="text-rose-600 hover:underline" onclick="deleteActivity('${a.id}')">Eliminar</button>
+          </td>
+        `;
+        tr.addEventListener('dblclick', ()=> zoomToFence(a.assignId));
+        tbody.appendChild(tr);
+      });
+    }
+
+    function deleteActivity(id){
+      if (!confirm('¿Eliminar esta actividad?')) return;
+      const acts = load(KEYS.acts).filter(a=>a.id!==id);
+      save(KEYS.acts, acts);
+      renderActivityList();
+    }
+
+    // ======= Reportes =======
+    function buildReportFilterOptions(){
+      // ya se actualiza en populateGeofenceSelectsEverywhere()
+    }
+
+    function runReport(){
+      const from = document.getElementById('repFrom').value;
+      const to = document.getElementById('repTo').value;
+      const groupBy = document.getElementById('repGroupBy').value;
+      const selected = Array.from(document.getElementById('repEntities').selectedOptions).map(o=>o.value);
+
+      const acts = load(KEYS.acts).filter(a=>{
+        const okDate = (!from || a.date>=from) && (!to || a.date<=to);
+        const okEnt = (!selected.length) || selected.includes(a.assignId);
+        return okDate && okEnt;
+      });
+
+      const keyFns = {
+        persona: a=>a.personName||'—',
+        entidad: a=>a.entityName||'—',
+        actividad: a=>a.task||'—',
+        fecha: a=>a.date||'—',
+      };
+      const kf = keyFns[groupBy]||keyFns.persona;
+
+      const groups = {};
+      acts.forEach(a=>{
+        const k = kf(a);
+        if (!groups[k]) groups[k] = { horas:0, count:0, items:[] };
+        groups[k].horas += Number(a.hours||0);
+        groups[k].count += 1;
+        groups[k].items.push(a);
+      });
+
+      const container = document.getElementById('repResults');
+      const keys = Object.keys(groups).sort();
+      container.innerHTML = keys.length ? '' : '<div class="text-gray-500">Sin resultados.</div>';
+      keys.forEach(k=>{
+        const g = groups[k];
+        const card = document.createElement('div');
+        card.className='border rounded-xl p-3 mb-2';
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <div class="font-semibold">${k}</div>
+            <div class="text-sm text-gray-600">${g.count} registros • ${g.horas.toFixed(2)} h</div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // ======= Exportar / Importar =======
+    function exportGeoJson(){
+      const fences = load(KEYS.fences);
+      const fc = {
+        type: "FeatureCollection",
+        features: fences.map(f=>({
+          type: "Feature",
+          properties: { id: f.id, name: f.name },
+          geometry: {
+            type: "Polygon",
+            coordinates: [[...f.path.map(p=>[p.lng,p.lat]), [f.path[0].lng, f.path[0].lat]]]
+          }
+        }))
+      };
+      const blob = new Blob([JSON.stringify(fc, null, 2)], {type:'application/geo+json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'geocercas.geojson';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function importGeoJson(file){
+      const reader = new FileReader();
+      reader.onload = () => {
+        try{
+          const fc = JSON.parse(reader.result);
+          if (fc.type!=='FeatureCollection') throw new Error('No es un FeatureCollection');
+          const imported = [];
+          (fc.features||[]).forEach(ft=>{
+            const name = ft.properties?.name || 'Geocerca';
+            const id = ft.properties?.id || ('f_'+Math.random().toString(36).slice(2,10));
+            const ring = (ft.geometry?.coordinates?.[0]||[]).map(([lng,lat])=>({lat,lng}));
+            if (ring.length>=3) imported.push({ id, name, path: ring });
+          });
+          if (!imported.length) { alert('No se encontraron polígonos válidos.'); return; }
+          save(KEYS.fences, imported);
+          renderGeofencesFromCache();
+          alert(`Importadas ${imported.length} geocercas.`);
+        } catch(e){
+          alert('Archivo inválido: '+e.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ======= Eventos de interfaz =======
+    document.addEventListener('DOMContentLoaded', ()=>{
+      initMap();
+
+      document.getElementById('newFenceBtn').addEventListener('click', startFence);
+      document.getElementById('finishFenceBtn').addEventListener('click', finishFence);
+      document.getElementById('cancelFenceBtn').addEventListener('click', cancelFence);
+      document.getElementById('editFenceBtn').addEventListener('click', beginFenceEdit);
+      document.getElementById('saveFenceEditBtn').addEventListener('click', saveFenceEdit);
+      document.getElementById('cancelFenceEditBtn').addEventListener('click', cancelFenceEdit);
+      document.getElementById('deleteFenceBtn').addEventListener('click', deleteFence);
+      document.getElementById('exportGeoJsonBtn').addEventListener('click', exportGeoJson);
+      document.getElementById('importGeoJsonInput').addEventListener('change', (e)=>{ if(e.target.files?.[0]) importGeoJson(e.target.files[0]); });
+
+      // Personal
+      document.getElementById('pNewBtn').addEventListener('click', clearPersonForm);
+      document.getElementById('pSaveBtn').addEventListener('click', savePerson);
+      document.getElementById('pClearBtn').addEventListener('click', clearPersonForm);
+      document.getElementById('pSearchInput').addEventListener('input', renderPersonnelList);
+      document.getElementById('pEntityFilter').addEventListener('change', renderPersonnelList);
+
+      // Actividades
+      populateActivitiesPeople();
+      document.getElementById('actAddBtn').addEventListener('click', addActivity);
+      document.getElementById('actClearBtn').addEventListener('click', clearActivityForm);
+
+      // Reportes
+      document.getElementById('repRunBtn').addEventListener('click', runReport);
     });
   </script>
 </body>
-</html>
-
 </html>
