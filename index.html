@@ -5,22 +5,22 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Gestión de Geocercas</title>
 
-  <!-- Tailwind (estilos) -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 
-  <!-- Leaflet-Geoman (Leaflet.PM) para edición interactiva -->
+  <!-- Leaflet-Geoman (Leaflet.PM) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.css" />
   <script src="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.min.js"></script>
 
   <style>
     .label-in-map{background:transparent;border:none;box-shadow:none;color:#1f2937;font-weight:600;text-shadow:0 0 3px #ffffffc7}
     .btn:disabled{opacity:.45;cursor:not-allowed}
-    .controls-layer{position:relative; z-index:1000; pointer-events:auto;} /* que no tape el mapa */
-    #map{touch-action:none;} /* evita gestos táctiles que “roben” el evento */
+    .controls-layer{position:relative; z-index:1000; pointer-events:auto;}
+    #map{touch-action:none;}
   </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
@@ -63,9 +63,9 @@
 
       <!-- Ayuda -->
       <div class="bg-white p-4 rounded-2xl shadow text-sm text-gray-700">
-        <p><b>Flujo (dibujo manual):</b> Nueva geocerca → clics/toques en el mapa para vértices → Finalizar.</p>
+        <p><b>Dibujo:</b> Nueva geocerca → clics/toques para vértices → <i>doble clic</i> o <i>Finalizar</i> para cerrar.</p>
         <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → Editar → mueve/añade/elimina vértices → Guardar cambios.</p>
-        <p class="mt-1">Para crear por coordenadas usa <b>Geocerca (Lat/Lng)</b> con líneas <code>lat,lng</code>.</p>
+        <p class="mt-1">También puedes crear por <b>Lat/Lng</b> (una línea <code>lat,lng</code> por vértice).</p>
       </div>
     </div>
 
@@ -100,7 +100,9 @@
 
     // Dibujo manual
     let isDrawing = false;
-    let tempLine = null;
+    let tempLine = null;       // línea discontinua entre vértices
+    let tempPoly = null;       // polígono cerrado temporal
+    let firstMarker = null;    // marcador del primer vértice (para cerrar)
     let tempCoords = [];
 
     // Edición (Geoman)
@@ -111,7 +113,7 @@
     function initMap(){
       map = L.map('map');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
-      map.setView([-1.5, -78.5], 8);
+      map.setView([-1.5, -78.5], 9);
 
       if (map.pm && map.pm.addControls) {
         map.pm.addControls({
@@ -121,9 +123,10 @@
         });
       }
 
-      // Capturamos entrada robusta (mouse y touch)
+      // Capturamos entrada robusta (mouse y touch) y doble clic para finalizar
       map.on('mousedown', handleMapInput);
       map.on('touchstart', handleMapInput, { passive:false });
+      map.on('dblclick', ()=>{ if(isDrawing) finishDraw(); });
 
       renderFences();
       setStatus('mapa listo');
@@ -153,39 +156,80 @@
       if(e.originalEvent) { e.originalEvent.preventDefault(); e.originalEvent.stopPropagation(); }
       addVertex(e.latlng);
     }
+
     function addVertex(latlng){
       tempCoords.push(latlng);
+
+      // Línea discontinua de apoyo
       if (tempLine) map.removeLayer(tempLine);
       tempLine = L.polyline(tempCoords,{color:'#10b981',weight:3,dashArray:'4 4'}).addTo(map);
+
+      // Polígono temporal cerrado (si hay >=2 puntos)
+      if (tempPoly) map.removeLayer(tempPoly);
+      if (tempCoords.length >= 2) {
+        const ring = tempCoords.concat([tempCoords[0]]);
+        tempPoly = L.polygon(ring, {color:'#059669', weight:2, fillColor:'#34d399', fillOpacity:0.15, dashArray:'2 6'}).addTo(map);
+      }
+
+      // Marcador del 1er vértice para cerrar haciendo clic
+      if (!firstMarker) {
+        firstMarker = L.circleMarker(latlng, {radius:6, color:'#111827', weight:2, fillColor:'#f59e0b', fillOpacity:0.9});
+        firstMarker.addTo(map).bindTooltip('Cerrar', {permanent:false});
+        firstMarker.on('click', ()=>{ if(isDrawing && tempCoords.length>=3) finishDraw(); });
+      }
+
       setStatus(`vértices: ${tempCoords.length}`);
     }
+
     function startDraw(){
       if (editing) { alert('Termina o cancela la edición actual.'); return; }
       isDrawing = true;
       tempCoords = [];
-      if (tempLine) { map.removeLayer(tempLine); tempLine = null; }
-      disableMapInteractions();              // << clave: evita que el mapa consuma el gesto
+      if (tempLine)  { map.removeLayer(tempLine);  tempLine  = null; }
+      if (tempPoly)  { map.removeLayer(tempPoly);  tempPoly  = null; }
+      if (firstMarker){ map.removeLayer(firstMarker); firstMarker = null; }
+      disableMapInteractions();
       updateDrawButtons();
-      setStatus('modo dibujo (clic/touch para añadir puntos)');
+      setStatus('modo dibujo (clic/touch para añadir puntos; doble clic o clic en 1º punto para cerrar)');
     }
+
     function finishDraw(){
       if (!isDrawing || tempCoords.length < 3) { alert('Agrega al menos 3 puntos.'); return; }
-      const name = prompt('Nombre de la geocerca:'); if(!name) return;
-      const id = 'f_' + Math.random().toString(36).slice(2,10);
+
+      // Nombre (si vacío, asigna Geocerca N)
+      let name = prompt('Nombre de la geocerca:') || '';
+      name = name.trim();
+      if (!name) {
+        const n = (loadFences().length + 1);
+        name = 'Geocerca ' + n;
+      }
+
+      const id   = 'f_' + Math.random().toString(36).slice(2,10);
       const path = tempCoords.map(p=>({lat:p.lat,lng:p.lng}));
       const fences = loadFences(); fences.push({id,name,path}); saveFences(fences);
 
-      isDrawing=false; tempCoords=[]; if (tempLine){map.removeLayer(tempLine); tempLine=null;}
-      enableMapInteractions();               // restaurar
+      // limpiar temporales
+      isDrawing=false;
+      if (tempLine)  { map.removeLayer(tempLine);  tempLine=null; }
+      if (tempPoly)  { map.removeLayer(tempPoly);  tempPoly=null; }
+      if (firstMarker){ map.removeLayer(firstMarker); firstMarker=null; }
+      tempCoords=[];
+
+      enableMapInteractions();
       renderFences(); zoomTo(id); updateDrawButtons();
-      setStatus('geocerca creada');
+      setStatus(`geocerca creada: ${name}`);
     }
+
     function cancelDraw(){
-      isDrawing=false; tempCoords=[]; if (tempLine){map.removeLayer(tempLine); tempLine=null;}
-      enableMapInteractions();               // restaurar
+      isDrawing=false; tempCoords=[];
+      if (tempLine)  { map.removeLayer(tempLine);  tempLine=null; }
+      if (tempPoly)  { map.removeLayer(tempPoly);  tempPoly=null; }
+      if (firstMarker){ map.removeLayer(firstMarker); firstMarker=null; }
+      enableMapInteractions();
       updateDrawButtons();
       setStatus('dibujo cancelado');
     }
+
     function updateDrawButtons(){
       gei('newFenceBtn').disabled    = isDrawing;
       gei('finishFenceBtn').disabled = !isDrawing;
@@ -212,6 +256,7 @@
       fillSelect();
       updateEditButtons();
     }
+
     function selectFence(id){
       selectedFenceId = id;
       refreshSelectionStyle();
@@ -219,11 +264,13 @@
       const sel = gei('geofenceSelect'); if (sel) sel.value = id || '';
       setStatus('geocerca seleccionada');
     }
+
     function refreshSelectionStyle(){
       Object.entries(layers).forEach(([id,poly])=>{
         poly.setStyle(id===selectedFenceId ? STYLE_SEL : STYLE);
       });
     }
+
     function zoomTo(id){
       const f = loadFences().find(x=>x.id===id); if(!f) return;
       const poly = L.polygon(f.path.map(p=>[p.lat,p.lng])); map.fitBounds(poly.getBounds(),{padding:[20,20]});
@@ -242,6 +289,7 @@
       editing = true; updateEditButtons();
       setStatus('modo edición');
     }
+
     function saveEdit(){
       if (!selectedFenceId) return;
       const layer = layers[selectedFenceId]; if (!layer || !layer.pm) return;
@@ -257,6 +305,7 @@
       renderFences(); selectFence(selectedFenceId);
       setStatus('edición guardada');
     }
+
     function cancelEdit(){
       const layer = layers[selectedFenceId]; if (!layer || !layer.pm) return;
       if (backupCoords) layer.setLatLngs(backupCoords);
@@ -264,6 +313,7 @@
       updateEditButtons();
       setStatus('edición cancelada');
     }
+
     function updateEditButtons(){
       gei('editFenceBtn').disabled       = !selectedFenceId || editing;
       gei('deleteFenceBtn').disabled     = !selectedFenceId || editing;
@@ -288,6 +338,7 @@
         n.addEventListener('dblclick',()=>zoomTo(n.dataset.id));
       });
     }
+
     function fillSelect(){
       const fences = loadFences();
       const s = gei('geofenceSelect');
@@ -305,6 +356,7 @@
       selectedFenceId = null; renderFences();
       setStatus('geocerca eliminada');
     }
+
     function exportGeoJSON(){
       const fences = loadFences();
       const fc = {
@@ -319,6 +371,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href=url; a.download='geocercas.geojson'; a.click(); URL.revokeObjectURL(url);
     }
+
     function importGeoJSON(file){
       const reader = new FileReader();
       reader.onload = ()=>{
@@ -339,9 +392,15 @@
       };
       reader.readAsText(file);
     }
+
     function createByLatLng(){
       setStatus('abrir prompt');
-      const name = prompt('Nombre de la geocerca:'); if(!name) return;
+      let name = prompt('Nombre de la geocerca:') || '';
+      name = name.trim();
+      if (!name) {
+        const n = (loadFences().length + 1);
+        name = 'Geocerca ' + n;
+      }
       const raw = prompt('Ingresa coordenadas en formato lat,lng (una por línea o separadas con ;)\\n\\nEjemplo:\\n-2.1500,-79.8800\\n-2.1600,-79.8700\\n-2.1400,-79.8600');
       if (!raw) return;
       const lines = raw.split(/\\n|;/).map(s=>s.trim()).filter(Boolean);
