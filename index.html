@@ -5,22 +5,22 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Gestión de Geocercas</title>
 
-  <!-- Tailwind -->
+  <!-- Tailwind (estilos) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 
-  <!-- Leaflet-Geoman (Leaflet.PM) -->
+  <!-- Leaflet-Geoman (Leaflet.PM) para edición interactiva -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.css" />
   <script src="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.min.js"></script>
 
   <style>
     .label-in-map{background:transparent;border:none;box-shadow:none;color:#1f2937;font-weight:600;text-shadow:0 0 3px #ffffffc7}
     .btn:disabled{opacity:.45;cursor:not-allowed}
-    /* Aseguramos que el panel de botones esté por encima del mapa y reciba clics */
-    .controls-layer{position:relative; z-index:1000; pointer-events:auto;}
+    .controls-layer{position:relative; z-index:1000; pointer-events:auto;} /* que no tape el mapa */
+    #map{touch-action:none;} /* evita gestos táctiles que “roben” el evento */
   </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
@@ -63,7 +63,7 @@
 
       <!-- Ayuda -->
       <div class="bg-white p-4 rounded-2xl shadow text-sm text-gray-700">
-        <p><b>Flujo (dibujo manual):</b> Nueva geocerca → clics en el mapa para vértices → Finalizar.</p>
+        <p><b>Flujo (dibujo manual):</b> Nueva geocerca → clics/toques en el mapa para vértices → Finalizar.</p>
         <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → Editar → mueve/añade/elimina vértices → Guardar cambios.</p>
         <p class="mt-1">Para crear por coordenadas usa <b>Geocerca (Lat/Lng)</b> con líneas <code>lat,lng</code>.</p>
       </div>
@@ -111,7 +111,7 @@
     function initMap(){
       map = L.map('map');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
-      map.setView([0, -78], 5);
+      map.setView([-1.5, -78.5], 8);
 
       if (map.pm && map.pm.addControls) {
         map.pm.addControls({
@@ -121,14 +121,38 @@
         });
       }
 
-      // Solo agregar vértices cuando dibujamos
-      map.on('click', (e)=>{ if(isDrawing) addVertex(e.latlng); });
+      // Capturamos entrada robusta (mouse y touch)
+      map.on('mousedown', handleMapInput);
+      map.on('touchstart', handleMapInput, { passive:false });
 
       renderFences();
       setStatus('mapa listo');
     }
 
+    /* ===== Control de interacciones del mapa ===== */
+    function disableMapInteractions(){
+      map.dragging.disable();
+      map.scrollWheelZoom.disable();
+      map.doubleClickZoom.disable();
+      map.boxZoom.disable();
+      map.touchZoom.disable();
+      map.keyboard.disable();
+    }
+    function enableMapInteractions(){
+      map.dragging.enable();
+      map.scrollWheelZoom.enable();
+      map.doubleClickZoom.enable();
+      map.boxZoom.enable();
+      map.touchZoom.enable();
+      map.keyboard.enable();
+    }
+
     /* ===== Dibujo manual ===== */
+    function handleMapInput(e){
+      if(!isDrawing) return;
+      if(e.originalEvent) { e.originalEvent.preventDefault(); e.originalEvent.stopPropagation(); }
+      addVertex(e.latlng);
+    }
     function addVertex(latlng){
       tempCoords.push(latlng);
       if (tempLine) map.removeLayer(tempLine);
@@ -140,8 +164,9 @@
       isDrawing = true;
       tempCoords = [];
       if (tempLine) { map.removeLayer(tempLine); tempLine = null; }
+      disableMapInteractions();              // << clave: evita que el mapa consuma el gesto
       updateDrawButtons();
-      setStatus('modo dibujo');
+      setStatus('modo dibujo (clic/touch para añadir puntos)');
     }
     function finishDraw(){
       if (!isDrawing || tempCoords.length < 3) { alert('Agrega al menos 3 puntos.'); return; }
@@ -151,11 +176,13 @@
       const fences = loadFences(); fences.push({id,name,path}); saveFences(fences);
 
       isDrawing=false; tempCoords=[]; if (tempLine){map.removeLayer(tempLine); tempLine=null;}
+      enableMapInteractions();               // restaurar
       renderFences(); zoomTo(id); updateDrawButtons();
       setStatus('geocerca creada');
     }
     function cancelDraw(){
       isDrawing=false; tempCoords=[]; if (tempLine){map.removeLayer(tempLine); tempLine=null;}
+      enableMapInteractions();               // restaurar
       updateDrawButtons();
       setStatus('dibujo cancelado');
     }
@@ -333,21 +360,6 @@
       setStatus('creada por Lat/Lng');
     }
 
-    /* ===== Delegación global de clics (respaldo) ===== */
-    document.addEventListener('click', (ev)=>{
-      const el = ev.target.closest('button, input[type="file"]');
-      if(!el) return;
-      if(el.id==='newFenceBtn') startDraw();
-      else if(el.id==='finishFenceBtn') finishDraw();
-      else if(el.id==='cancelFenceBtn') cancelDraw();
-      else if(el.id==='createFenceByCoordsBtn') createByLatLng();
-      else if(el.id==='editFenceBtn') beginEdit();
-      else if(el.id==='saveFenceEditBtn') saveEdit();
-      else if(el.id==='cancelFenceEditBtn') cancelEdit();
-      else if(el.id==='deleteFenceBtn') removeFence();
-      else if(el.id==='exportGeoJsonBtn') exportGeoJSON();
-    }, true);
-
     /* ===== Exponer funciones para onclick inline ===== */
     window.startDraw = startDraw;
     window.finishDraw = finishDraw;
@@ -363,11 +375,5 @@
     /* ===== Arranque ===== */
     window.addEventListener('load', initMap);
   </script>
-
-  <noscript>
-    <div style="padding:1rem;margin:1rem;border:1px solid #ccc;background:#fff;color:#111">
-      Esta aplicación requiere JavaScript habilitado.
-    </div>
-  </noscript>
 </body>
 </html>
