@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Gestión de Geocercas</title>
 
-  <!-- Tailwind (estilos) -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet -->
@@ -19,13 +19,18 @@
   <style>
     .label-in-map{background:transparent;border:none;box-shadow:none;color:#1f2937;font-weight:600;text-shadow:0 0 3px #ffffffc7}
     .btn:disabled{opacity:.45;cursor:not-allowed}
+    /* Aseguramos que el panel de botones esté por encima del mapa y reciba clics */
+    .controls-layer{position:relative; z-index:1000; pointer-events:auto;}
   </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
   <div class="max-w-6xl mx-auto p-4">
-    <h1 class="text-2xl font-bold mb-4">Gestión de Geocercas</h1>
+    <div class="flex items-center justify-between mb-2">
+      <h1 class="text-2xl font-bold">Gestión de Geocercas</h1>
+      <div class="text-xs text-gray-600">Estado: <span id="statusDot" class="font-semibold">inicial</span></div>
+    </div>
 
-    <div class="grid md:grid-cols-3 gap-4 relative z-10">
+    <div class="grid md:grid-cols-3 gap-4 controls-layer">
       <!-- Geocerca activa -->
       <div class="bg-white p-4 rounded-2xl shadow">
         <label class="block text-sm font-medium text-gray-700">Geocerca activa</label>
@@ -35,23 +40,23 @@
       <!-- Acciones -->
       <div class="bg-white p-4 rounded-2xl shadow">
         <div class="flex flex-wrap gap-2">
-          <button id="newFenceBtn"    onclick="window.startDraw()"   class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
-          <button id="finishFenceBtn" onclick="window.finishDraw()"  class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
-          <button id="cancelFenceBtn" onclick="window.cancelDraw()"  class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
+          <button id="newFenceBtn"    onclick="startDraw()"   class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
+          <button id="finishFenceBtn" onclick="finishDraw()"  class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
+          <button id="cancelFenceBtn" onclick="cancelDraw()"  class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
         </div>
         <div class="flex flex-wrap gap-2 mt-2">
-          <button id="createFenceByCoordsBtn" onclick="window.createByLatLng()" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
-          <button id="editFenceBtn"           onclick="window.beginEdit()"      class="btn px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600" disabled>Editar geocerca</button>
-          <button id="saveFenceEditBtn"       onclick="window.saveEdit()"       class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" disabled>Guardar cambios</button>
-          <button id="cancelFenceEditBtn"     onclick="window.cancelEdit()"     class="btn px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600" disabled>Cancelar edición</button>
+          <button id="createFenceByCoordsBtn" onclick="createByLatLng()" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
+          <button id="editFenceBtn"           onclick="beginEdit()"      class="btn px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600" disabled>Editar geocerca</button>
+          <button id="saveFenceEditBtn"       onclick="saveEdit()"       class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" disabled>Guardar cambios</button>
+          <button id="cancelFenceEditBtn"     onclick="cancelEdit()"     class="btn px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600" disabled>Cancelar edición</button>
         </div>
         <div class="flex flex-wrap gap-2 mt-2">
-          <button id="deleteFenceBtn" onclick="window.removeFence()" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
-          <button id="exportGeoJsonBtn" onclick="window.exportGeoJSON()" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
+          <button id="deleteFenceBtn" onclick="removeFence()" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
+          <button id="exportGeoJsonBtn" onclick="exportGeoJSON()" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
           <label class="btn px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 cursor-pointer">
             Importar GeoJSON
             <input id="importGeoJsonInput" type="file" accept=".json,.geojson,application/geo+json,application/json" class="hidden"
-                   oninput="if(this.files&&this.files[0]) window.importGeoJSON(this.files[0])" />
+                   oninput="if(this.files&&this.files[0]) importGeoJSON(this.files[0])" />
           </label>
         </div>
       </div>
@@ -67,7 +72,7 @@
     <!-- Mapa -->
     <div class="mt-4 bg-white rounded-2xl shadow overflow-hidden">
       <div class="px-4 py-3 border-b"><h2 class="text-lg font-semibold">Mapa</h2></div>
-      <div id="map" style="height:480px"></div>
+      <div id="map" style="height:480px; position:relative; z-index:0;"></div>
     </div>
 
     <!-- Explorador -->
@@ -78,6 +83,10 @@
   </div>
 
   <script>
+    /* ===== Util ===== */
+    const gei = (id)=>document.getElementById(id);
+    const setStatus = (t)=>{ const s=gei('statusDot'); if(s) s.textContent=t; };
+
     /* ===== Storage ===== */
     const KEY_FENCES = 'geofences';
     const loadFences = () => { try { return JSON.parse(localStorage.getItem(KEY_FENCES) || '[]'); } catch { return []; } };
@@ -85,7 +94,7 @@
 
     /* ===== Estado ===== */
     let map, selectedFenceId = null;
-    const layers = {}; // id -> L.Polygon
+    const layers = {};
     const STYLE     = { color:'#2563eb', weight:2, fillColor:'#60a5fa', fillOpacity:0.2 };
     const STYLE_SEL = { color:'#7c3aed', weight:3, fillColor:'#a78bfa', fillOpacity:0.25 };
 
@@ -104,7 +113,6 @@
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
       map.setView([0, -78], 5);
 
-      // Ocultar barra Geoman; se controla por botones
       if (map.pm && map.pm.addControls) {
         map.pm.addControls({
           position:'topleft', drawPolygon:false, drawMarker:false, drawPolyline:false,
@@ -113,10 +121,11 @@
         });
       }
 
-      // Solo agregar vértices mientras se dibuja
+      // Solo agregar vértices cuando dibujamos
       map.on('click', (e)=>{ if(isDrawing) addVertex(e.latlng); });
 
       renderFences();
+      setStatus('mapa listo');
     }
 
     /* ===== Dibujo manual ===== */
@@ -124,6 +133,7 @@
       tempCoords.push(latlng);
       if (tempLine) map.removeLayer(tempLine);
       tempLine = L.polyline(tempCoords,{color:'#10b981',weight:3,dashArray:'4 4'}).addTo(map);
+      setStatus(`vértices: ${tempCoords.length}`);
     }
     function startDraw(){
       if (editing) { alert('Termina o cancela la edición actual.'); return; }
@@ -131,7 +141,7 @@
       tempCoords = [];
       if (tempLine) { map.removeLayer(tempLine); tempLine = null; }
       updateDrawButtons();
-      console.log('Dibujo iniciado');
+      setStatus('modo dibujo');
     }
     function finishDraw(){
       if (!isDrawing || tempCoords.length < 3) { alert('Agrega al menos 3 puntos.'); return; }
@@ -142,12 +152,12 @@
 
       isDrawing=false; tempCoords=[]; if (tempLine){map.removeLayer(tempLine); tempLine=null;}
       renderFences(); zoomTo(id); updateDrawButtons();
-      console.log('Geocerca creada:', id);
+      setStatus('geocerca creada');
     }
     function cancelDraw(){
       isDrawing=false; tempCoords=[]; if (tempLine){map.removeLayer(tempLine); tempLine=null;}
       updateDrawButtons();
-      console.log('Dibujo cancelado');
+      setStatus('dibujo cancelado');
     }
     function updateDrawButtons(){
       gei('newFenceBtn').disabled    = isDrawing;
@@ -175,12 +185,12 @@
       fillSelect();
       updateEditButtons();
     }
-
     function selectFence(id){
       selectedFenceId = id;
       refreshSelectionStyle();
       updateEditButtons();
       const sel = gei('geofenceSelect'); if (sel) sel.value = id || '';
+      setStatus('geocerca seleccionada');
     }
     function refreshSelectionStyle(){
       Object.entries(layers).forEach(([id,poly])=>{
@@ -203,7 +213,7 @@
       layer.pm.enable({ allowSelfIntersection:false, snappable:true, snapDistance:20 });
 
       editing = true; updateEditButtons();
-      console.log('Edición iniciada');
+      setStatus('modo edición');
     }
     function saveEdit(){
       if (!selectedFenceId) return;
@@ -218,14 +228,14 @@
 
       layer.pm.disable(); editing=false; backupCoords=null;
       renderFences(); selectFence(selectedFenceId);
-      console.log('Edición guardada');
+      setStatus('edición guardada');
     }
     function cancelEdit(){
       const layer = layers[selectedFenceId]; if (!layer || !layer.pm) return;
       if (backupCoords) layer.setLatLngs(backupCoords);
       layer.pm.disable(); editing=false; backupCoords=null;
       updateEditButtons();
-      console.log('Edición cancelada');
+      setStatus('edición cancelada');
     }
     function updateEditButtons(){
       gei('editFenceBtn').disabled       = !selectedFenceId || editing;
@@ -266,6 +276,7 @@
       if (!confirm('¿Eliminar esta geocerca?')) return;
       saveFences(loadFences().filter(f=>f.id!==selectedFenceId));
       selectedFenceId = null; renderFences();
+      setStatus('geocerca eliminada');
     }
     function exportGeoJSON(){
       const fences = loadFences();
@@ -296,11 +307,13 @@
             if (path.length >= 3) fences.push({id,name,path});
           });
           saveFences(fences); renderFences();
+          setStatus('geojson importado');
         }catch(e){ alert('Archivo inválido: '+e.message); }
       };
       reader.readAsText(file);
     }
     function createByLatLng(){
+      setStatus('abrir prompt');
       const name = prompt('Nombre de la geocerca:'); if(!name) return;
       const raw = prompt('Ingresa coordenadas en formato lat,lng (una por línea o separadas con ;)\\n\\nEjemplo:\\n-2.1500,-79.8800\\n-2.1600,-79.8700\\n-2.1400,-79.8600');
       if (!raw) return;
@@ -317,12 +330,25 @@
       const id = 'f_'+Math.random().toString(36).slice(2,10);
       fences.push({ id, name, path: pts });
       saveFences(fences); renderFences(); zoomTo(id);
+      setStatus('creada por Lat/Lng');
     }
 
-    /* ===== Utils ===== */
-    const gei = (id)=>document.getElementById(id);
+    /* ===== Delegación global de clics (respaldo) ===== */
+    document.addEventListener('click', (ev)=>{
+      const el = ev.target.closest('button, input[type="file"]');
+      if(!el) return;
+      if(el.id==='newFenceBtn') startDraw();
+      else if(el.id==='finishFenceBtn') finishDraw();
+      else if(el.id==='cancelFenceBtn') cancelDraw();
+      else if(el.id==='createFenceByCoordsBtn') createByLatLng();
+      else if(el.id==='editFenceBtn') beginEdit();
+      else if(el.id==='saveFenceEditBtn') saveEdit();
+      else if(el.id==='cancelFenceEditBtn') cancelEdit();
+      else if(el.id==='deleteFenceBtn') removeFence();
+      else if(el.id==='exportGeoJsonBtn') exportGeoJSON();
+    }, true);
 
-    /* ===== Hacer globales (para inline onclick) ===== */
+    /* ===== Exponer funciones para onclick inline ===== */
     window.startDraw = startDraw;
     window.finishDraw = finishDraw;
     window.cancelDraw = cancelDraw;
@@ -337,5 +363,11 @@
     /* ===== Arranque ===== */
     window.addEventListener('load', initMap);
   </script>
+
+  <noscript>
+    <div style="padding:1rem;margin:1rem;border:1px solid #ccc;background:#fff;color:#111">
+      Esta aplicación requiere JavaScript habilitado.
+    </div>
+  </noscript>
 </body>
 </html>
