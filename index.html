@@ -38,21 +38,21 @@
       </div>
 
       <!-- Acciones -->
-      <div id="actions" class="bg-white p-4 rounded-2xl shadow">
+      <div class="bg-white p-4 rounded-2xl shadow">
         <div class="flex flex-wrap gap-2">
-          <button id="newFenceBtn"    data-action="new"     type="button" onclick="startDraw()"   class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
-          <button id="finishFenceBtn" data-action="finish"  type="button" onclick="finishDraw()"  class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
-          <button id="cancelFenceBtn" data-action="cancel"  type="button" onclick="cancelDraw()"  class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
+          <button id="newFenceBtn"    onclick="startDraw()"   class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Nueva geocerca</button>
+          <button id="finishFenceBtn" onclick="finishDraw()"  class="btn px-3 py-2 bg-green-600  text-white rounded-lg hover:bg-green-700" disabled>Finalizar</button>
+          <button id="cancelFenceBtn" onclick="cancelDraw()"  class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
         </div>
         <div class="flex flex-wrap gap-2 mt-2">
-          <button id="createFenceByCoordsBtn" data-action="byLatLng" type="button" onclick="createByLatLng()" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
-          <button id="editFenceBtn"           data-action="edit"     type="button" onclick="beginEdit()"      class="btn px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600" disabled>Editar geocerca</button>
-          <button id="saveFenceEditBtn"       data-action="saveEd"   type="button" onclick="saveEdit()"       class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" disabled>Guardar cambios</button>
-          <button id="cancelFenceEditBtn"     data-action="cancelEd" type="button" onclick="cancelEdit()"     class="btn px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600" disabled>Cancelar edición</button>
+          <button id="createFenceByCoordsBtn" onclick="createByLatLng()" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Geocerca (Lat/Lng)</button>
+          <button id="editFenceBtn"           onclick="beginEdit()"      class="btn px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600" disabled>Editar geocerca</button>
+          <button id="saveFenceEditBtn"       onclick="saveEdit()"       class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" disabled>Guardar cambios</button>
+          <button id="cancelFenceEditBtn"     onclick="cancelEdit()"     class="btn px-3 py-2 bg-stone-500 text-white rounded-lg hover:bg-stone-600" disabled>Cancelar edición</button>
         </div>
         <div class="flex flex-wrap gap-2 mt-2">
-          <button id="deleteFenceBtn" data-action="del" type="button" onclick="removeFence()" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
-          <button id="exportGeoJsonBtn" data-action="export" type="button" onclick="exportGeoJSON()" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
+          <button id="deleteFenceBtn" onclick="removeFence()" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
+          <button id="exportGeoJsonBtn" onclick="exportGeoJSON()" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
           <label class="btn px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 cursor-pointer">
             Importar GeoJSON
             <input id="importGeoJsonInput" type="file" accept=".json,.geojson,application/geo+json,application/json" class="hidden"
@@ -82,6 +82,18 @@
     </div>
   </div>
 
+  <!-- Modal para nombre -->
+  <div id="nameModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-xl p-5 w-full max-w-md">
+      <h3 class="text-lg font-semibold mb-3">Nombre de la geocerca</h3>
+      <input id="nameInput" class="w-full border rounded-md p-2" placeholder="Ej. Lote Norte" />
+      <div class="flex justify-end gap-2 mt-4">
+        <button class="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300" onclick="closeNameModal()">Cancelar</button>
+        <button class="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700" onclick="confirmNameSave()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     /* ===== Utils ===== */
     const gei = (id)=>document.getElementById(id);
@@ -106,6 +118,9 @@
     let mapClickHandler = null;    // refs para remover
     let mapDblHandler = null;
 
+    // Para guardar después del modal
+    let pendingSave = null; // {coords: L.LatLng[]}
+
     // Edición (Geoman)
     let editing = false;
     let backupCoords = null;
@@ -126,23 +141,6 @@
 
       renderFences();
       setStatus('mapa listo');
-
-      // Delegación global robusta (captura) – asegura reacción del botón aunque algo bloquee listeners
-      document.addEventListener('pointerdown', (ev)=>{
-        const b = ev.target.closest('[data-action]');
-        if(!b) return;
-        ev.preventDefault(); ev.stopPropagation();
-        const a = b.dataset.action;
-        if (a==='new') startDraw();
-        else if (a==='finish') finishDraw();
-        else if (a==='cancel') cancelDraw();
-        else if (a==='byLatLng') createByLatLng();
-        else if (a==='edit') beginEdit();
-        else if (a==='saveEd') saveEdit();
-        else if (a==='cancelEd') cancelEdit();
-        else if (a==='del') removeFence();
-        else if (a==='export') exportGeoJSON();
-      }, true);
     }
 
     /* ===== Interacciones del mapa ===== */
@@ -212,22 +210,11 @@
 
     function finishDraw(){
       if (tempCoords.length < 3) { alert('Agrega al menos 3 puntos.'); return; }
-
-      let name = prompt('Nombre de la geocerca:') || '';
-      name = name.trim();
-      if (!name) {
-        const n = loadFences().length + 1;
-        name = 'Geocerca ' + n;
-      }
-
-      const id   = 'f_' + Math.random().toString(36).slice(2,10);
-      const path = tempCoords.map(p=>({lat:p.lat,lng:p.lng}));
-      const fences = loadFences(); fences.push({id, name, path}); saveFences(fences);
-
-      clearTempDrawing();
-      enableMapInteractions();
-      renderFences(); zoomTo(id);
-      setStatus(`geocerca creada: ${name}`);
+      // Pasamos por modal (evita bloqueos de prompt)
+      const fences = loadFences();
+      const defName = 'Geocerca ' + (fences.length + 1);
+      pendingSave = { coords: [...tempCoords] };
+      openNameModal(defName);
     }
 
     function cancelDraw(){
@@ -246,6 +233,44 @@
       gei('newFenceBtn').disabled = false;
       gei('finishFenceBtn').disabled = true;
       gei('cancelFenceBtn').disabled = true;
+    }
+
+    /* ===== Modal nombre ===== */
+    function openNameModal(defaultName){
+      const m = gei('nameModal');
+      const i = gei('nameInput');
+      i.value = defaultName || '';
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+      setTimeout(()=> i.focus(), 0);
+      // Enter = guardar, Esc = cancelar
+      i.onkeydown = (ev)=>{
+        if(ev.key==='Enter'){ confirmNameSave(); }
+        if(ev.key==='Escape'){ closeNameModal(); }
+      };
+    }
+    function closeNameModal(){
+      const m = gei('nameModal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+      pendingSave = null;
+    }
+    function confirmNameSave(){
+      if(!pendingSave){ closeNameModal(); return; }
+      let name = gei('nameInput').value.trim();
+      if(!name){
+        const n = loadFences().length + 1;
+        name = 'Geocerca ' + n;
+      }
+      const id   = 'f_' + Math.random().toString(36).slice(2,10);
+      const path = pendingSave.coords.map(p=>({lat:p.lat,lng:p.lng}));
+      const fences = loadFences(); fences.push({id, name, path}); saveFences(fences);
+
+      closeNameModal();
+      clearTempDrawing();
+      enableMapInteractions();
+      renderFences(); zoomTo(id);
+      setStatus(`geocerca creada: ${name}`);
     }
 
     /* ===== Render / Selección ===== */
@@ -406,15 +431,12 @@
     }
 
     function createByLatLng(){
-      setStatus('abrir prompt');
-      let name = prompt('Nombre de la geocerca:') || '';
-      name = name.trim();
-      if (!name) {
-        const n = (loadFences().length + 1);
-        name = 'Geocerca ' + n;
-      }
-      const raw = prompt('Ingresa coordenadas en formato lat,lng (una por línea o separadas con ;)\\n\\nEjemplo:\\n-2.1500,-79.8800\\n-2.1600,-79.8700\\n-2.1400,-79.8600');
+      setStatus('abrir modal Lat/Lng');
+      let raw = prompt('Ingresa coordenadas en formato lat,lng (una por línea o separadas con ;)\\n\\nEjemplo:\\n-2.1500,-79.8800\\n-2.1600,-79.8700\\n-2.1400,-79.8600');
       if (!raw) return;
+      let name = prompt('Nombre de la geocerca:') || '';
+      name = (name||'').trim() || ('Geocerca ' + (loadFences().length + 1));
+
       const lines = raw.split(/\\n|;/).map(s=>s.trim()).filter(Boolean);
       const pts = [];
       for (const line of lines){
@@ -431,7 +453,7 @@
       setStatus('creada por Lat/Lng');
     }
 
-    /* ===== Exponer globales (para inline) ===== */
+    /* ===== Exponer globales (onclick inline) ===== */
     window.startDraw = startDraw;
     window.finishDraw = finishDraw;
     window.cancelDraw = cancelDraw;
@@ -442,21 +464,12 @@
     window.exportGeoJSON = exportGeoJSON;
     window.importGeoJSON = importGeoJSON;
     window.createByLatLng = createByLatLng;
+    window.openNameModal = openNameModal;
+    window.closeNameModal = closeNameModal;
+    window.confirmNameSave = confirmNameSave;
 
     /* ===== Arranque ===== */
-    window.addEventListener('load', ()=>{
-      initMap();
-      // Respaldo extra: listeners directos
-      gei('newFenceBtn').addEventListener('click', startDraw);
-      gei('finishFenceBtn').addEventListener('click', finishDraw);
-      gei('cancelFenceBtn').addEventListener('click', cancelDraw);
-      gei('createFenceByCoordsBtn').addEventListener('click', createByLatLng);
-      gei('editFenceBtn').addEventListener('click', beginEdit);
-      gei('saveFenceEditBtn').addEventListener('click', saveEdit);
-      gei('cancelFenceEditBtn').addEventListener('click', cancelEdit);
-      gei('deleteFenceBtn').addEventListener('click', removeFence);
-      gei('exportGeoJsonBtn').addEventListener('click', exportGeoJSON);
-    });
+    window.addEventListener('load', initMap);
   </script>
 </body>
 </html>
