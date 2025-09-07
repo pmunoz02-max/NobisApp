@@ -122,7 +122,7 @@
     const USERS_KEY = `${APP}_users`;
     const CURR_USER_KEY = `${APP}_current_user`;
     const GEOFENCE_PREFIX = `${APP}_geofences_`;
-    const LEGACY_KEY = 'geofences'; // para migración automática
+    const LEGACY_KEY = 'geocercas' in localStorage ? 'geocercas' : 'geofences'; // por si venías de una clave previa
 
     const uid = () => 'u_' + Math.random().toString(36).slice(2,10);
 
@@ -138,7 +138,7 @@
 
     const userKey = (id) => `${GEOFENCE_PREFIX}${id}`;
 
-    // Migración: si existía "geofences" global, lo pasamos a "Usuario 1".
+    // Migración: si existía base previa única, lo pasamos a "Usuario 1".
     function ensureUsersBootstrap() {
       let users = getUsers();
       let current = getCurrentUser();
@@ -150,7 +150,6 @@
         saveUsers(users);
         setCurrentUser(firstId);
 
-        // Migrar datos previos (si los había)
         try {
           const legacyRaw = localStorage.getItem(LEGACY_KEY);
           if (legacyRaw) {
@@ -159,13 +158,13 @@
           } else {
             localStorage.setItem(userKey(firstId), JSON.stringify([]));
           }
-        } catch { localStorage.setItem(userKey(firstId), JSON.stringify([])); }
+        } catch {
+          localStorage.setItem(userKey(firstId), JSON.stringify([]));
+        }
         return;
       }
 
-      // Si había usuarios pero no current, selecciona el primero
       if (!current) setCurrentUser(users[0].id);
-      // Garantiza que el user actual tenga su array
       current = getCurrentUser();
       if (!localStorage.getItem(userKey(current))) {
         localStorage.setItem(userKey(current), JSON.stringify([]));
@@ -178,7 +177,7 @@
       const clean = String(name || '').trim() || `Usuario ${users.length + 1}`;
       users.push({ id, name: clean });
       saveUsers(users);
-      localStorage.setItem(userKey(id), JSON.stringify([])); // NUEVO usuario => DB vacía
+      localStorage.setItem(userKey(id), JSON.stringify([])); // NUEVO => DB vacía
       setCurrentUser(id);
       return id;
     }
@@ -197,13 +196,10 @@
       const i = users.findIndex(u => u.id === id);
       if (i < 0) return;
 
-      // Borra su base
-      localStorage.removeItem(userKey(id));
-      // Quita usuario
+      localStorage.removeItem(userKey(id)); // borra su base
       users.splice(i, 1);
       saveUsers(users);
 
-      // Reasigna current
       if (users.length === 0) {
         const newId = createUser('Usuario 1'); // arranca vacío
         setCurrentUser(newId);
@@ -238,7 +234,7 @@
       return 'Geocerca ' + (maxN ? maxN + 1 : fs.length + 1);
     };
 
-    /* ========= APP (igual que antes, sin tocar flujos) ========= */
+    /* ========= APP (sin tocar flujos existentes) ========= */
     const $=id=>document.getElementById(id);
     const S=t=>{const s=$('statusDot'); if(s) s.textContent=t;};
     let map, selectedId=null; const layers={};
@@ -265,7 +261,7 @@
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
       map.setView([-1.5,-78.5],9);
 
-      // Botones
+      // Botones (ya existentes)
       $('newFenceBtn').onclick=startDraw;
       $('finishFenceBtn').onclick=finishDraw;
       $('cancelFenceBtn').onclick=cancelDraw;
@@ -452,8 +448,6 @@
     }
 
     /* ======= Edición manual (sin plugins) ======= */
-    let editHandles=[];
-    const handleIcon=L.divIcon({className:'vertex-handle',iconSize:[12,12]});
     const getRing=layer=>{const ll=layer.getLatLngs(); return Array.isArray(ll[0])?ll[0]:ll;};
     function createHandles(layer){
       clearHandles();
