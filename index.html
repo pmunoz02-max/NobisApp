@@ -12,15 +12,18 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 
-  <!-- Leaflet-Geoman (edición de vértices) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.css" />
-  <script src="https://unpkg.com/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.min.js"></script>
-
   <style>
     .label-in-map{background:transparent;border:none;box-shadow:none;color:#1f2937;font-weight:600;text-shadow:0 0 3px #ffffffc7}
     .btn:disabled{opacity:.45;cursor:not-allowed}
     .controls-layer{position:relative; z-index:1000; pointer-events:auto;}
     #map{touch-action:none;}
+
+    /* Manijas (handles) para arrastrar vértices */
+    .vertex-handle{
+      width:12px;height:12px;
+      background:#ffffff;border:2px solid #2563eb;border-radius:50%;
+      box-shadow: 0 0 0 2px #ffffffa8;
+    }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
@@ -89,7 +92,7 @@
       <!-- Ayuda -->
       <div class="bg-white p-4 rounded-2xl shadow text-sm text-gray-700">
         <p><b>Dibujo:</b> Nueva geocerca → clics/toques para vértices → <i>Finalizar</i> (o doble clic / clic en el 1º punto).</p>
-        <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → <b>Editar</b> → mueve/añade/elimina vértices → <b>Guardar cambios</b> o <b>Cancelar edición</b>.</p>
+        <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → <b>Editar</b> (aparecen puntos) → mueve vértices → <b>Guardar cambios</b> o <b>Cancelar edición</b>.</p>
         <p class="mt-1">También puedes crear por <b>Lat/Lng</b> (una línea <code>lat,lng</code> por vértice).</p>
       </div>
     </div>
@@ -124,18 +127,14 @@
     // Dibujo
     let drawing=false, temp=[], tempPoly=null, firstPt=null, onClick=null, onDbl=null, pendingCoords=null;
 
-    // Edición
-    let editing=false, backup=null;
+    // Edición manual
+    let editing=false, backup=null, editHandles=[];
 
     /************* Mapa *************/
     function init(){
       map=L.map('map');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
       map.setView([-1.5,-78.5],9);
-
-      if(map.pm&&map.pm.addControls){
-        map.pm.addControls({position:'topleft',drawPolygon:false,drawMarker:false,drawPolyline:false,drawRectangle:false,drawCircle:false,drawCircleMarker:false,cutPolygon:false,editMode:false,dragMode:false,removalMode:false});
-      }
 
       // Botones
       $('newFenceBtn').onclick=startDraw;
@@ -213,9 +212,7 @@
 
     /************* Renombrar *************/
     function showRenameBar(){
-      if(!selectedId){ // sincroniza por si el usuario solo miró el select
-        const v=$('geofenceSelect')?.value; if(v) selectFence(v);
-      }
+      if(!selectedId){ const v=$('geofenceSelect')?.value; if(v) selectFence(v); }
       if(!selectedId){ alert('Selecciona una geocerca.'); return; }
       if(editing){ alert('Termina/cancela la edición antes de renombrar.'); return; }
       const f=loadF().find(x=>x.id===selectedId);
@@ -247,7 +244,6 @@
         layers[f.id]=poly;
       });
 
-      // << NUEVO: autoselección si no hay selección todavía
       if(!selectedId && fences.length){
         selectedId = fences[0].id;
         const s=$('geofenceSelect'); if(s) s.value=selectedId;
@@ -279,71 +275,88 @@
       s.onchange=e=>zoomTo(e.target.value);
     }
 
-    /************* Edición con Geoman *************/
+    /************* Edición manual de vértices *************/
+    const handleIcon = L.divIcon({className:'vertex-handle', iconSize:[12,12]});
+
     function beginEdit(){
-      // << NUEVO: sincroniza con el select si selectedId está vacío
       if(!selectedId){
-        const v=$('geofenceSelect')?.value;
-        if(v) selectFence(v);
+        const v=$('geofenceSelect')?.value; if(v) selectFence(v);
       }
       if(!selectedId){ alert('Selecciona una geocerca.'); return; }
       if(drawing){ alert('Termina/cancela el dibujo.'); return; }
 
       const layer=layers[selectedId];
       if(!layer){ alert('No se encontró la capa.'); return; }
-      if(!layer.pm){ alert('Leaflet-Geoman no está cargado.'); return; }
 
-      // Backup para cancelar
-      backup = layer.getLatLngs().map(r=> r.map(p=>L.latLng(p.lat,p.lng)));
+      // Copia de seguridad
+      const ring = getRing(layer);
+      backup = ring.map(p=> L.latLng(p.lat, p.lng));
 
-      // Estilo de edición y habilitar handlers
+      // Estilo de edición
       layer.setStyle(STYLEEDIT);
-      layer.pm.enable({
-        allowSelfIntersection: false,
-        snappable: true,
-        snapDistance: 20,
-        cursorMarker: true,
-      });
 
-      layer.on('pm:vertexadded pm:vertexremoved pm:drag', _=>{
-        const n = (layer.getLatLngs()[0]||[]).length;
-        S(`editando — vértices: ${n}`);
-      });
+      // Crear manijas
+      createHandles(layer);
 
       editing=true; updateEditBtns();
-      map.doubleClickZoom.disable();
-      S('modo edición');
+      S('modo edición — arrastra los puntos');
+    }
+
+    function getRing(layer){
+      // getLatLngs() puede devolver [[...]]; quedarnos con el primer anillo
+      const ll = layer.getLatLngs();
+      return Array.isArray(ll[0]) ? ll[0] : ll;
+    }
+
+    function createHandles(layer){
+      clearHandles();
+      const ring = getRing(layer);
+
+      ring.forEach((latlng, idx)=>{
+        const m = L.marker(latlng, { draggable:true, icon:handleIcon, zIndexOffset:1000 }).addTo(map);
+        m.on('drag', ()=>{
+          // Actualiza el vértice y repinta
+          const p = m.getLatLng();
+          const r = getRing(layer).slice();  // copia superficial
+          r[idx] = p;
+          layer.setLatLngs([r]);
+        });
+        editHandles.push(m);
+      });
+    }
+
+    function clearHandles(){
+      editHandles.forEach(h=> map.removeLayer(h));
+      editHandles = [];
     }
 
     function saveEdit(){
       if(!selectedId) return;
-      const layer=layers[selectedId]; if(!layer||!layer.pm) return;
+      const layer=layers[selectedId];
+      if(!layer) return;
 
-      const latlngs = layer.getLatLngs()[0]||[];
-      if(latlngs.length<3){ alert('Mínimo 3 puntos'); return; }
+      const ring = getRing(layer);
+      if(ring.length<3){ alert('Mínimo 3 puntos'); return; }
 
-      const fences=loadF(); const i=fences.findIndex(x=>x.id===selectedId); if(i<0) return;
-      fences[i].path = latlngs.map(p=>({lat:p.lat,lng:p.lng}));
+      const fences=loadF();
+      const i=fences.findIndex(x=>x.id===selectedId); if(i<0) return;
+      fences[i].path = ring.map(p=>({lat:p.lat, lng:p.lng}));
       saveF(fences);
 
-      layer.pm.disable();
-      layer.off('pm:vertexadded pm:vertexremoved pm:drag');
+      clearHandles();
       editing=false; backup=null;
-      map.doubleClickZoom.enable();
-
       renderAll(); selectFence(selectedId);
       S('edición guardada');
     }
 
     function cancelEdit(){
       if(!selectedId) return;
-      const layer=layers[selectedId]; if(!layer||!layer.pm) return;
+      const layer=layers[selectedId];
+      if(!layer) return;
 
-      if(backup) layer.setLatLngs(backup);
-      layer.pm.disable();
-      layer.off('pm:vertexadded pm:vertexremoved pm:drag');
+      if(backup) layer.setLatLngs([backup]);
+      clearHandles();
       editing=false; backup=null;
-      map.doubleClickZoom.enable();
 
       paintSel(); updateEditBtns(); S('edición cancelada');
     }
@@ -412,9 +425,6 @@
       const fences=loadF(); const id='f_'+Math.random().toString(36).slice(2,10);
       fences.push({id,name,path:pts}); saveF(fences); renderAll(); zoomTo(id); S('creada por Lat/Lng');
     }
-
-    // Exponer (por si el entorno lo requiere)
-    window.beginEdit=beginEdit; window.saveEdit=saveEdit; window.cancelEdit=cancelEdit;
 
     window.addEventListener('load', init);
   </script>
