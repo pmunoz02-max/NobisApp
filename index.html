@@ -17,13 +17,8 @@
     .btn:disabled{opacity:.45;cursor:not-allowed}
     .controls-layer{position:relative; z-index:1000; pointer-events:auto;}
     #map{touch-action:none;}
-
-    /* Manijas (handles) para arrastrar vértices */
-    .vertex-handle{
-      width:12px;height:12px;
-      background:#ffffff;border:2px solid #2563eb;border-radius:50%;
-      box-shadow: 0 0 0 2px #ffffffa8;
-    }
+    /* Manijas de edición (vértices) */
+    .vertex-handle{width:12px;height:12px;background:#fff;border:2px solid #2563eb;border-radius:50%;box-shadow:0 0 0 2px #ffffffa8}
   </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
@@ -48,7 +43,7 @@
           <button id="cancelFenceBtn" type="button" class="btn px-3 py-2 bg-gray-600   text-white rounded-lg hover:bg-gray-700" disabled>Cancelar</button>
         </div>
 
-        <!-- Panel fijo para nombre (crear) -->
+        <!-- Panel nombre al crear -->
         <div id="nameBar" class="hidden mt-3 p-3 border rounded-xl bg-indigo-50 z-10">
           <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la geocerca</label>
           <div class="flex flex-wrap gap-2 items-stretch">
@@ -92,7 +87,7 @@
       <!-- Ayuda -->
       <div class="bg-white p-4 rounded-2xl shadow text-sm text-gray-700">
         <p><b>Dibujo:</b> Nueva geocerca → clics/toques para vértices → <i>Finalizar</i> (o doble clic / clic en el 1º punto).</p>
-        <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → <b>Editar</b> (aparecen puntos) → mueve vértices → <b>Guardar cambios</b> o <b>Cancelar edición</b>.</p>
+        <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → <b>Editar</b> (aparecen puntos) → arrastra vértices → <b>Guardar cambios</b> o <b>Cancelar edición</b>.</p>
         <p class="mt-1">También puedes crear por <b>Lat/Lng</b> (una línea <code>lat,lng</code> por vértice).</p>
       </div>
     </div>
@@ -111,32 +106,32 @@
   </div>
 
   <script>
-    /************* Storage robusto (respaldo en memoria) *************/
+    /* ---------- Persistencia robusta ---------- */
     const KEY='geofences'; let __mem=[];
     const loadF=()=>{try{const t=localStorage.getItem(KEY); if(!t) return __mem.slice(); const a=JSON.parse(t); return Array.isArray(a)?a:__mem.slice();}catch{return __mem.slice();}};
     const saveF=(a)=>{try{localStorage.setItem(KEY,JSON.stringify(a||[]));}catch{__mem=JSON.parse(JSON.stringify(a||[]));}};
     const nextDefaultName=()=>{const fs=loadF(); let maxN=0; for(const f of fs){const m=String(f?.name??'').match(/geocerca\s+(\d+)/i); const n=m?parseInt(m[1],10):0; if(n>maxN) maxN=n;} return 'Geocerca '+(maxN?maxN+1:fs.length+1);};
 
-    /************* Estado y utilidades *************/
-    const $=id=>document.getElementById(id); const S=t=>{const s=$('statusDot'); if(s) s.textContent=t;};
+    /* ---------- Estado global ---------- */
+    const $=id=>document.getElementById(id);
+    const S=t=>{const s=$('statusDot'); if(s) s.textContent=t;};
     let map, selectedId=null; const layers={};
     const STYLE={color:'#6d28d9',weight:3,fillColor:'#a78bfa',fillOpacity:.20};
     const STYLESEL={color:'#7c3aed',weight:4,fillColor:'#c4b5fd',fillOpacity:.26};
     const STYLEEDIT={color:'#0ea5e9',weight:3,fillColor:'#7dd3fc',fillOpacity:.18};
 
-    // Dibujo
+    /* Dibujo temporal */
     let drawing=false, temp=[], tempPoly=null, firstPt=null, onClick=null, onDbl=null, pendingCoords=null;
-
-    // Edición manual
+    /* Edición manual */
     let editing=false, backup=null, editHandles=[];
+    const handleIcon=L.divIcon({className:'vertex-handle',iconSize:[12,12]});
 
-    /************* Mapa *************/
+    /* ---------- Init ---------- */
     function init(){
       map=L.map('map');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
       map.setView([-1.5,-78.5],9);
 
-      // Botones
       $('newFenceBtn').onclick=startDraw;
       $('finishFenceBtn').onclick=finishDraw;
       $('cancelFenceBtn').onclick=cancelDraw;
@@ -160,10 +155,10 @@
       renderAll(); S('mapa listo');
     }
 
+    /* ---------- Dibujo ---------- */
     const disableMap=()=>{map.dragging.disable(); map.scrollWheelZoom.disable(); map.doubleClickZoom.disable(); map.boxZoom.disable(); map.touchZoom.disable(); map.keyboard.disable();};
     const enableMap =()=>{map.dragging.enable();  map.scrollWheelZoom.enable();  map.doubleClickZoom.enable();  map.boxZoom.enable();  map.touchZoom.enable();  map.keyboard.enable();};
 
-    /************* Dibujo *************/
     function startDraw(){
       if(editing){ alert('Termina/cancela la edición.'); return; }
       clearTemp(); drawing=true; temp=[]; disableMap();
@@ -177,7 +172,10 @@
       const ring=temp.length>1?[...temp,temp[0]]:[...temp];
       if(tempPoly) map.removeLayer(tempPoly);
       tempPoly=L.polygon(ring,{color:'#059669',weight:2,fillColor:'#34d399',fillOpacity:.15,dashArray:'4 6'}).addTo(map);
-      if(!firstPt){ firstPt=L.circleMarker(ll,{radius:6,color:'#111827',weight:2,fillColor:'#f59e0b',fillOpacity:.9}).addTo(map).bindTooltip('Cerrar'); firstPt.on('click',()=>{if(drawing&&temp.length>=3) finishDraw();});}
+      if(!firstPt){
+        firstPt=L.circleMarker(ll,{radius:6,color:'#111827',weight:2,fillColor:'#f59e0b',fillOpacity:.9}).addTo(map).bindTooltip('Cerrar');
+        firstPt.on('click',()=>{if(drawing&&temp.length>=3) finishDraw();});
+      }
       $('finishFenceBtn').disabled=temp.length<3; S(`vértices: ${temp.length}`);
     }
     function finishDraw(){
@@ -195,22 +193,19 @@
       hideNameBar();
     }
 
-    /************* Panel Nombre (crear) *************/
+    /* ---------- Panel nombre ---------- */
     function showNameBar(def){ $('nameBar').classList.remove('hidden'); $('nameField').value=String(def||'').trim()||nextDefaultName(); $('nameField').focus(); }
     function hideNameBar(){ $('nameBar').classList.add('hidden'); }
     function saveNameFromBar(){
       let name=String($('nameField').value||'').trim(); if(!name) name=nextDefaultName();
       const coords=pendingCoords||[...temp]; if(!coords||coords.length<3){ alert('No hay coordenadas para guardar.'); return; }
-      doSaveFence(name,coords);
-    }
-    function doSaveFence(name,coords){
       const id='f_'+Math.random().toString(36).slice(2,10);
       const path=coords.map(p=>({lat:p.lat,lng:p.lng}));
       const fences=loadF(); fences.push({id,name,path}); saveF(fences);
       clearTemp(); enableMap(); renderAll(); zoomTo(id); S(`geocerca creada: ${name}`);
     }
 
-    /************* Renombrar *************/
+    /* ---------- Renombrar ---------- */
     function showRenameBar(){
       if(!selectedId){ const v=$('geofenceSelect')?.value; if(v) selectFence(v); }
       if(!selectedId){ alert('Selecciona una geocerca.'); return; }
@@ -223,15 +218,14 @@
     function commitRename(){
       if(!selectedId) return;
       const name = String($('renameField').value||'').trim() || nextDefaultName();
-      const fences=loadF(); const i=fences.findIndex(x=>x.id===selectedId);
-      if(i<0) return;
+      const fences=loadF(); const i=fences.findIndex(x=>x.id===selectedId); if(i<0) return;
       fences[i].name = name; saveF(fences);
       $('renameBar').classList.add('hidden');
       renderAll(); selectFence(selectedId);
       S('nombre actualizado');
     }
 
-    /************* Render / selección *************/
+    /* ---------- Render / selección ---------- */
     function renderAll(){
       Object.values(layers).forEach(l=>map.removeLayer(l)); for(const k in layers) delete layers[k];
       const fences=loadF();
@@ -243,19 +237,13 @@
         poly.on('click',()=>selectFence(f.id));
         layers[f.id]=poly;
       });
-
-      if(!selectedId && fences.length){
-        selectedId = fences[0].id;
-        const s=$('geofenceSelect'); if(s) s.value=selectedId;
-      }
-
+      if(!selectedId && fences.length){ selectedId=fences[0].id; const s=$('geofenceSelect'); if(s) s.value=selectedId; }
       paintSel(); rebuildList(); fillSelect(); updateEditBtns();
     }
     function selectFence(id){ selectedId=id; paintSel(); updateEditBtns(); const s=$('geofenceSelect'); if(s) s.value=id||''; S('geocerca seleccionada'); }
     function paintSel(){ Object.entries(layers).forEach(([id,poly])=>poly.setStyle(id===selectedId?STYLESEL:STYLE)); }
     function zoomTo(id){ const f=loadF().find(x=>x.id===id); if(!f) return; const p=L.polygon(f.path.map(p=>[p.lat,p.lng])); map.fitBounds(p.getBounds(),{padding:[20,20]}); selectFence(id); }
 
-    /************* Lista / Select *************/
     function rebuildList(){
       const ul=$('fenceList'); const fences=loadF().slice().sort((a,b)=>(a?.name||'').localeCompare(b?.name||''));
       ul.innerHTML = fences.length ? fences.map(f=>`
@@ -275,90 +263,55 @@
       s.onchange=e=>zoomTo(e.target.value);
     }
 
-    /************* Edición manual de vértices *************/
-    const handleIcon = L.divIcon({className:'vertex-handle', iconSize:[12,12]});
+    /* ---------- Edición manual (sin plugins) ---------- */
+    function getRing(layer){ const ll=layer.getLatLngs(); return Array.isArray(ll[0])?ll[0]:ll; }
+    function createHandles(layer){
+      clearHandles();
+      const ring=getRing(layer);
+      ring.forEach((latlng,idx)=>{
+        const m=L.marker(latlng,{draggable:true,icon:handleIcon,zIndexOffset:1000}).addTo(map);
+        m.on('drag',()=>{
+          const p=m.getLatLng();
+          const r=getRing(layer).slice();
+          r[idx]=p;
+          layer.setLatLngs([r]);
+        });
+        editHandles.push(m);
+      });
+    }
+    function clearHandles(){ editHandles.forEach(h=>map.removeLayer(h)); editHandles=[]; }
 
     function beginEdit(){
-      if(!selectedId){
-        const v=$('geofenceSelect')?.value; if(v) selectFence(v);
-      }
+      if(!selectedId){ const v=$('geofenceSelect')?.value; if(v) selectFence(v); }
       if(!selectedId){ alert('Selecciona una geocerca.'); return; }
       if(drawing){ alert('Termina/cancela el dibujo.'); return; }
 
       const layer=layers[selectedId];
       if(!layer){ alert('No se encontró la capa.'); return; }
 
-      // Copia de seguridad
-      const ring = getRing(layer);
-      backup = ring.map(p=> L.latLng(p.lat, p.lng));
-
-      // Estilo de edición
+      backup=getRing(layer).map(p=>L.latLng(p.lat,p.lng)); // copia
       layer.setStyle(STYLEEDIT);
-
-      // Crear manijas
       createHandles(layer);
 
       editing=true; updateEditBtns();
       S('modo edición — arrastra los puntos');
     }
 
-    function getRing(layer){
-      // getLatLngs() puede devolver [[...]]; quedarnos con el primer anillo
-      const ll = layer.getLatLngs();
-      return Array.isArray(ll[0]) ? ll[0] : ll;
-    }
-
-    function createHandles(layer){
-      clearHandles();
-      const ring = getRing(layer);
-
-      ring.forEach((latlng, idx)=>{
-        const m = L.marker(latlng, { draggable:true, icon:handleIcon, zIndexOffset:1000 }).addTo(map);
-        m.on('drag', ()=>{
-          // Actualiza el vértice y repinta
-          const p = m.getLatLng();
-          const r = getRing(layer).slice();  // copia superficial
-          r[idx] = p;
-          layer.setLatLngs([r]);
-        });
-        editHandles.push(m);
-      });
-    }
-
-    function clearHandles(){
-      editHandles.forEach(h=> map.removeLayer(h));
-      editHandles = [];
-    }
-
     function saveEdit(){
       if(!selectedId) return;
-      const layer=layers[selectedId];
-      if(!layer) return;
-
-      const ring = getRing(layer);
+      const layer=layers[selectedId]; if(!layer) return;
+      const ring=getRing(layer);
       if(ring.length<3){ alert('Mínimo 3 puntos'); return; }
-
-      const fences=loadF();
-      const i=fences.findIndex(x=>x.id===selectedId); if(i<0) return;
-      fences[i].path = ring.map(p=>({lat:p.lat, lng:p.lng}));
-      saveF(fences);
-
-      clearHandles();
-      editing=false; backup=null;
-      renderAll(); selectFence(selectedId);
-      S('edición guardada');
+      const fences=loadF(); const i=fences.findIndex(x=>x.id===selectedId); if(i<0) return;
+      fences[i].path=ring.map(p=>({lat:p.lat,lng:p.lng})); saveF(fences);
+      clearHandles(); editing=false; backup=null; renderAll(); selectFence(selectedId); S('edición guardada');
     }
 
     function cancelEdit(){
       if(!selectedId) return;
-      const layer=layers[selectedId];
-      if(!layer) return;
-
+      const layer=layers[selectedId]; if(!layer) return;
       if(backup) layer.setLatLngs([backup]);
-      clearHandles();
-      editing=false; backup=null;
-
-      paintSel(); updateEditBtns(); S('edición cancelada');
+      clearHandles(); editing=false; backup=null; paintSel(); updateEditBtns(); S('edición cancelada');
     }
 
     function updateEditBtns(){
@@ -366,16 +319,13 @@
       $('deleteFenceBtn').disabled = !selectedId || editing;
       $('saveFenceEditBtn').disabled   = !editing;
       $('cancelFenceEditBtn').disabled = !editing;
-
       $('renameFenceBtn').disabled = !selectedId || editing;
-
-      // Evitar mezclar modos
       $('newFenceBtn').disabled = editing;
       $('finishFenceBtn').disabled = true;
       $('cancelFenceBtn').disabled = true;
     }
 
-    /************* Utilidades *************/
+    /* ---------- Utilidades ---------- */
     function removeFence(){ if(!selectedId) return; if(!confirm('¿Eliminar esta geocerca?')) return;
       saveF(loadF().filter(f=>f.id!==selectedId)); selectedId=null; renderAll(); S('geocerca eliminada'); }
 
@@ -430,3 +380,4 @@
   </script>
 </body>
 </html>
+
