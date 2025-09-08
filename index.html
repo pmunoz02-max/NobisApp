@@ -103,7 +103,7 @@
     <ul id="fenceList" class="p-3 divide-y"></ul>
   </div>
 
-  <!-- ====== GESTIÓN DE PERSONAL (RESTABLECIDO) ====== -->
+  <!-- ====== GESTIÓN DE PERSONAL (VISIBLE) ====== -->
   <div id="personnelModule" class="mt-6 card">
     <div class="px-4 py-3 border-b flex items-center justify-between">
       <h3 class="text-lg font-semibold">Gestión de personal</h3>
@@ -114,7 +114,7 @@
     </div>
   </div>
 
-  <!-- ====== ACTIVIDADES (RESTABLECIDO) ====== -->
+  <!-- ====== ACTIVIDADES ====== -->
   <div id="activitiesModule" class="mt-6 card">
     <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Actividades</h3></div>
     <div class="p-4 grid md:grid-cols-3 gap-4">
@@ -281,9 +281,14 @@ function initMap(){
   var el=$('map'); if(el && (!el.style.height || el.clientHeight===0)){ el.style.height='520px'; }
   map=L.map('map',{preferCanvas:true}).setView([-1.5,-78.5],9);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  // Recalibres seguros
   setTimeout(function(){ try{map.invalidateSize(true)}catch(e){} },0);
   setTimeout(function(){ try{map.invalidateSize(true)}catch(e){} },300);
-  window.addEventListener('resize', function(){ try{map.invalidateSize(true)}catch(e){} });
+  if('ResizeObserver' in window){
+    new ResizeObserver(function(){ try{map.invalidateSize(true)}catch(e){} }).observe(el);
+  }else{
+    window.addEventListener('resize', function(){ try{map.invalidateSize(true)}catch(e){} });
+  }
 }
 
 /* ====== DIBUJO / EDICIÓN ====== */
@@ -488,7 +493,7 @@ function staffSendPosition(){
   }, function(err){if(msg) msg.textContent='Error de geolocalización: '+err.message},{enableHighAccuracy:true,timeout:10000})
 }
 
-/* ====== PERSONAL ====== */
+/* ====== PERSONAL (MÓDULO RESTAURADO) ====== */
 function renderPersonnel(){
   var users=getUsers();
   var staff=users.filter(function(u){return u.role==='staff'});
@@ -640,6 +645,7 @@ window.addEventListener('load', function(){
   ensureUsersBootstrap();
   CURRENT_USER_ID=getCurrentUser();
 
+  // Mapa simple y estable
   initMap();
 
   // Geocercas
@@ -681,7 +687,6 @@ window.addEventListener('load', function(){
   $('doAssignBtn').onclick=assignFenceToStaff;
   $('refreshChecksBtn').onclick=renderChecksList;
   $('assignAdminSelect').onchange=populateAssignFences;
-  // Botones para crear usuarios desde Administración
   $('createAdminBtn').onclick=function(){createUserWithRole(prompt('Nombre del administrador')||'','admin'); rerenderAll('administrador creado')};
   $('createStaffBtn').onclick=function(){createUserWithRole(prompt('Nombre del personal')||'','staff'); rerenderAll('personal creado')};
 
