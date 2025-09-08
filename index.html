@@ -302,6 +302,155 @@
       }
     });
   </script>
+<script>
+/* ===== Activar módulo de Gestión de personal (sin tocar el mapa) ===== */
+(function(){
+  const USERS_KEY = 'NobisApp_users';
+  const $ = (id) => document.getElementById(id);
+
+  function readUsers(){
+    try{ const a = JSON.parse(localStorage.getItem(USERS_KEY)||'[]'); return Array.isArray(a)?a:[]; }
+    catch(e){ return []; }
+  }
+  function writeUsers(arr){ localStorage.setItem(USERS_KEY, JSON.stringify(arr||[])); }
+
+  function createStaff(name){
+    const users = readUsers();
+    const id = 'u_' + Math.random().toString(36).slice(2,10);
+    const count = users.filter(u => u.role === 'staff').length + 1;
+    const n = (name||'').trim() || `Personal ${count}`;
+    users.push({ id, name: n, role: 'staff' });
+    writeUsers(users);
+    return id;
+  }
+  function renameUserById(id, newName){
+    const users = readUsers();
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    u.name = (newName||u.name).trim() || u.name;
+    writeUsers(users);
+  }
+  function deleteUserById(id){
+    const users = readUsers().filter(u => u.id !== id);
+    writeUsers(users);
+  }
+
+  // Actualiza selects de otros módulos que dependen del personal (si existen)
+  function refreshLinkedSelects(){
+    const users = readUsers();
+    const staff = users.filter(u => u.role === 'staff');
+    const shtml = staff.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+
+    const ids = ['assignStaffSelect','actStaffSelect','logStaffFilter','checkStaffSelect'];
+    ids.forEach(id => {
+      const el = $(id);
+      if(!el) return;
+      if(id === 'logStaffFilter') el.innerHTML = '<option value="">(Todos)</option>' + shtml;
+      else el.innerHTML = shtml;
+    });
+  }
+
+  function renderPersonnel(){
+    const cont = $('staffTable');
+    const hint = $('noStaffHint');
+    if(!cont) return;
+
+    const users = readUsers();
+    const staff = users.filter(u => u.role === 'staff');
+
+    if(!staff.length){
+      cont.innerHTML = '';
+      if(hint) hint.classList.remove('hidden');
+      return;
+    }
+    if(hint) hint.classList.add('hidden');
+
+    let html = `<div class="overflow-auto">
+      <table class="min-w-full text-left text-sm">
+        <thead>
+          <tr class="text-slate-500">
+            <th class="px-2 py-1">Nombre</th>
+            <th class="px-2 py-1">Rol</th>
+            <th class="px-2 py-1">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    staff.forEach(u => {
+      html += `<tr class="border-t">
+        <td class="px-2 py-1">${u.name}</td>
+        <td class="px-2 py-1">
+          <span class="inline-block text-xs bg-emerald-500/15 text-emerald-700 px-2 py-0.5 rounded">staff</span>
+        </td>
+        <td class="px-2 py-1">
+          <button class="px-2 py-1 rounded bg-sky-600 text-white btn-rename-staff" data-id="${u.id}">Renombrar</button>
+          <button class="ml-2 px-2 py-1 rounded bg-rose-600 text-white btn-del-staff" data-id="${u.id}">Eliminar</button>
+        </td>
+      </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    cont.innerHTML = html;
+  }
+
+  function wire(){
+    const addBtn = $('addStaffFromPersonnel');
+    if(addBtn){
+      addBtn.addEventListener('click', () => {
+        const name = prompt('Nombre del personal:');
+        if(name === null) return;
+        createStaff(name);
+        renderPersonnel();
+        refreshLinkedSelects();
+      });
+    }
+
+    const refBtn = $('refreshPersonnelBtn');
+    if(refBtn){
+      refBtn.addEventListener('click', () => renderPersonnel());
+    }
+
+    // Delegación: renombrar/eliminar desde la tabla
+    document.addEventListener('click', (ev) => {
+      const t = ev.target;
+      if(t.classList.contains('btn-rename-staff')){
+        const id = t.getAttribute('data-id');
+        const users = readUsers();
+        const u = users.find(x => x.id === id);
+        if(!u) return;
+        const nn = prompt('Nuevo nombre:', u.name);
+        if(nn === null) return;
+        renameUserById(id, nn);
+        renderPersonnel();
+        refreshLinkedSelects();
+      }
+      if(t.classList.contains('btn-del-staff')){
+        const id = t.getAttribute('data-id');
+        const users = readUsers();
+        const u = users.find(x => x.id === id);
+        if(!u) return;
+        if(!confirm(`Eliminar "${u.name}"?`)) return;
+        deleteUserById(id);
+        renderPersonnel();
+        refreshLinkedSelects();
+      }
+    });
+
+    // Primera renderización
+    renderPersonnel();
+    refreshLinkedSelects();
+  }
+
+  // Ejecuta aunque DOMContentLoaded ya haya ocurrido
+  if(document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
+})();
+</script>
+
+
 </body>
 </html>
 
