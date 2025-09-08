@@ -80,6 +80,16 @@
           <button id="renameFenceBtn"         type="button" class="btn px-3 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700" disabled>Renombrar</button>
         </div>
 
+        <!-- Renombrar geocerca -->
+        <div id="renameBar" class="hidden mt-3 p-3 border rounded-xl bg-sky-50">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nuevo nombre</label>
+          <div class="flex gap-2">
+            <input id="renameField" class="flex-1 border rounded-md p-2" />
+            <button id="renameSaveBtn"   class="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">Guardar</button>
+            <button id="renameCancelBtn" class="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">Cancelar</button>
+          </div>
+        </div>
+
         <div class="flex flex-wrap gap-2 mt-2">
           <button id="deleteFenceBtn"   type="button" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700" disabled>Eliminar geocerca</button>
           <button id="exportGeoJsonBtn" type="button" class="btn px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800">Exportar GeoJSON</button>
@@ -117,7 +127,7 @@
       <ul id="fenceList" class="p-3 divide-y"></ul>
     </div>
 
-    <!-- ======== ADMINISTRACIÓN DE USUARIOS (si no eres staff) ======== -->
+    <!-- ======== ADMINISTRACIÓN DE USUARIOS ======== -->
     <div id="adminModule" class="mt-6 card">
       <div class="px-4 py-3 border-b flex items-center justify-between">
         <h3 class="text-lg font-semibold">Administración de usuarios</h3>
@@ -164,6 +174,70 @@
         <div id="usersTable" class="text-sm"></div>
       </div>
     </div>
+
+    <!-- ======== GESTIÓN DE PERSONAL ======== -->
+    <div id="personnelModule" class="mt-6 card">
+      <div class="px-4 py-3 border-b flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Gestión de personal</h3>
+        <div class="text-xs text-gray-500">Usa “Asignar geocerca” en el módulo de administración para cambiar asignaciones.</div>
+      </div>
+      <div class="p-4">
+        <div id="staffTable" class="text-sm overflow-auto"></div>
+      </div>
+    </div>
+
+    <!-- ======== ACTIVIDADES ======== -->
+    <div id="activitiesModule" class="mt-6 card">
+      <div class="px-4 py-3 border-b">
+        <h3 class="text-lg font-semibold">Actividades</h3>
+      </div>
+
+      <div class="p-4 grid md:grid-cols-3 gap-4">
+        <!-- Catálogo -->
+        <div class="border rounded-xl p-3">
+          <div class="font-medium mb-2">Catálogo de actividades</div>
+          <div class="flex gap-2 mb-3">
+            <input id="actNewName" class="flex-1 border rounded-md p-2" placeholder="Ej. Siembra, Riego, Cosecha" />
+            <button id="actAddBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Añadir</button>
+          </div>
+          <ul id="actList" class="text-sm space-y-1"></ul>
+        </div>
+
+        <!-- Registro actividad -->
+        <div class="border rounded-xl p-3">
+          <div class="font-medium mb-2">Registrar actividad</div>
+          <div class="grid gap-2">
+            <div>
+              <label class="text-sm">Personal</label>
+              <select id="actStaffSelect" class="w-full border rounded-md p-2"></select>
+            </div>
+            <div>
+              <label class="text-sm">Actividad</label>
+              <select id="actSelect" class="w-full border rounded-md p-2"></select>
+            </div>
+            <div>
+              <label class="text-sm">Nota</label>
+              <input id="actNote" class="w-full border rounded-md p-2" placeholder="Opcional" />
+            </div>
+            <div class="flex gap-2">
+              <button id="actLogGpsBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Registrar (con GPS)</button>
+              <button id="actLogManualBtn" class="px-3 py-2 rounded-lg bg-slate-700 text-white hover:bg-slate-800">Registrar (manual)</button>
+            </div>
+            <div id="actMsg" class="text-xs"></div>
+          </div>
+        </div>
+
+        <!-- Lista / Exportar -->
+        <div class="border rounded-xl p-3">
+          <div class="font-medium mb-2">Registros</div>
+          <div class="flex gap-2 mb-2">
+            <select id="logStaffFilter" class="border rounded-md p-2 flex-1"></select>
+            <button id="exportCsvBtn" class="px-3 py-2 rounded-lg bg-cyan-700 text-white hover:bg-cyan-800">Exportar CSV</button>
+          </div>
+          <ul id="actLogs" class="text-sm space-y-1 max-h-60 overflow-auto"></ul>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -174,6 +248,8 @@
     var GEOFENCE_PREFIX=APP+'_geofences_';
     var ASSIGN_PREFIX=APP+'_staff_assign_';
     var CHECKS_PREFIX=APP+'_checkins_';
+    var ACTCAT_PREFIX=APP+'_actcat_';   // catálogo por admin/owner
+    var ACTLOG_PREFIX=APP+'_actlog_';   // registros por admin/owner
 
     function getLegacyRaw(){
       try{
@@ -184,6 +260,9 @@
     }
     function uid(){return 'u_'+Math.random().toString(36).slice(2,10);}
     function userKey(id){return GEOFENCE_PREFIX+id;}
+    function catKey(adminId){return ACTCAT_PREFIX+adminId;}
+    function logKey(adminId){return ACTLOG_PREFIX+adminId;}
+
     function getUsers(){
       try{var raw=localStorage.getItem(USERS_KEY);var arr=raw?JSON.parse(raw):[];return Array.isArray(arr)?arr:[];}catch(e){return [];}
     }
@@ -214,7 +293,8 @@
       var users=getUsers(); var id=uid();
       var clean=String(name||'').trim()||(role==='staff'?'Personal '+(users.length+1):'Usuario '+(users.length+1));
       users.push({id:id,name:clean,role:role||'admin'}); saveUsers(users);
-      localStorage.setItem(userKey(id),JSON.stringify([]));
+      localStorage.setItem(userKey(id),JSON.stringify([])); // BD de geocercas
+      // cat/log sólo cuando sean necesarios
       setCurrentUser(id); return id;
     }
     function createUser(name){return createUserWithRole(name,'admin');}
@@ -226,6 +306,8 @@
       for(var i=0;i<users.length;i++){ if(users[i].id===id){ idx=i; role=users[i].role||'admin'; break; } }
       if(idx<0) return; if(role==='owner'){ alert('El dueño no se puede eliminar.'); return; }
       localStorage.removeItem(userKey(id)); localStorage.removeItem(ASSIGN_PREFIX+id); localStorage.removeItem(CHECKS_PREFIX+id);
+      // si era admin, también cat/log
+      localStorage.removeItem(catKey(id)); localStorage.removeItem(logKey(id));
       users.splice(idx,1); saveUsers(users);
       var cur=getCurrentUser(); if(cur===id){ if(users.length) setCurrentUser(users[0].id); else setCurrentUser(createUserWithRole('Usuario 1','owner')); }
     }
@@ -277,14 +359,25 @@
       $('renameCancelBtn').onclick=function(){$('renameBar').classList.add('hidden');};
 
       // Admin
-      $('createAdminBtn').onclick=function(){createUserWithRole(prompt('Nombre del administrador')||'','admin'); renderAll(); renderUserUI(); renderAdminPanel(); applyRoleUI(); S('administrador creado');};
-      $('createStaffBtn').onclick=function(){createUserWithRole(prompt('Nombre del personal')||'','staff'); renderAll(); renderUserUI(); renderAdminPanel(); applyRoleUI(); S('personal creado');};
+      $('createAdminBtn').onclick=function(){createUserWithRole(prompt('Nombre del administrador')||'','admin'); renderAll(); renderUserUI(); renderAdminPanel(); renderPersonnel(); renderActivities(); applyRoleUI(); S('administrador creado');};
+      $('createStaffBtn').onclick=function(){createUserWithRole(prompt('Nombre del personal')||'','staff'); renderAll(); renderUserUI(); renderAdminPanel(); renderPersonnel(); renderActivities(); applyRoleUI(); S('personal creado');};
       $('doAssignBtn').onclick=assignFenceToStaff;
       $('refreshChecksBtn').onclick=renderChecksList;
       $('assignAdminSelect').onchange=populateAssignFences;
       $('sendPositionBtn').onclick=staffSendPosition;
 
-      renderAll(); renderAdminPanel(); applyRoleUI(); S('mapa listo');
+      // Actividades
+      $('actAddBtn').onclick=actAdd;
+      $('actLogGpsBtn').onclick=function(){actLog(true);};
+      $('actLogManualBtn').onclick=function(){actLog(false);};
+      $('exportCsvBtn').onclick=exportLogsCSV;
+
+      renderAll();
+      renderAdminPanel();
+      renderPersonnel();
+      renderActivities();
+      applyRoleUI();
+      S('mapa listo');
     }
 
     function renderUserUI(){
@@ -295,12 +388,12 @@
       $('newUserBtn').onclick=function(){
         var r=prompt('Rol (admin/staff)?','admin'); if(!r) return; r=r.toLowerCase(); if(r!=='admin'&&r!=='staff'){alert('Rol inválido');return;}
         var name=prompt('Nombre del usuario:')||''; var id=createUserWithRole(name,r);
-        CURRENT_USER_ID=id; selectedId=null; clearHandles(); renderUserUI(); renderAll(); renderAdminPanel(); applyRoleUI(); S('usuario creado');
+        CURRENT_USER_ID=id; selectedId=null; clearHandles(); renderUserUI(); renderAll(); renderAdminPanel(); renderPersonnel(); renderActivities(); applyRoleUI(); S('usuario creado');
       };
-      $('renameUserBtn').onclick=function(){var id=sel.value; var u=userById(id); if(!u) return; var name=prompt('Nuevo nombre:',u.name); if(name===null) return; renameUser(id,name); renderUserUI(); renderAdminPanel(); S('usuario renombrado');};
+      $('renameUserBtn').onclick=function(){var id=sel.value; var u=userById(id); if(!u) return; var name=prompt('Nuevo nombre:',u.name); if(name===null) return; renameUser(id,name); renderUserUI(); renderAdminPanel(); renderPersonnel(); renderActivities(); S('usuario renombrado');};
       $('deleteUserBtn').onclick=function(){var id=sel.value; var u=userById(id); if(!u) return; if(u.role==='owner'){alert('No puedes eliminar al dueño.'); return;} if(!confirm('Eliminar "'+u.name+'"?')) return;
-        deleteUser(id); CURRENT_USER_ID=getCurrentUser(); selectedId=null; clearHandles(); renderUserUI(); renderAll(); renderAdminPanel(); applyRoleUI(); S('usuario eliminado');};
-      sel.onchange=function(e){setCurrentUser(e.target.value); CURRENT_USER_ID=e.target.value; selectedId=null; clearHandles(); renderAll(); renderAdminPanel(); applyRoleUI(); S('usuario cambiado');};
+        deleteUser(id); CURRENT_USER_ID=getCurrentUser(); selectedId=null; clearHandles(); renderUserUI(); renderAll(); renderAdminPanel(); renderPersonnel(); renderActivities(); applyRoleUI(); S('usuario eliminado');};
+      sel.onchange=function(e){setCurrentUser(e.target.value); CURRENT_USER_ID=e.target.value; selectedId=null; clearHandles(); renderAll(); renderAdminPanel(); renderPersonnel(); renderActivities(); applyRoleUI(); S('usuario cambiado');};
     }
 
     function applyRoleUI(){
@@ -316,9 +409,9 @@
       $('renameFenceBtn').disabled=isStaff||(!selectedId||editing);
       $('deleteFenceBtn').disabled=isStaff||(!selectedId||editing);
 
-      var sp=$('staffPanel'); var am=$('adminModule');
-      if(isStaff){ sp.classList.remove('hidden'); am.classList.add('hidden'); updateStaffAssignInfo(); }
-      else{ sp.classList.add('hidden'); am.classList.remove('hidden'); }
+      var sp=$('staffPanel'), am=$('adminModule'), pm=$('personnelModule'), xm=$('activitiesModule');
+      if(isStaff){ sp.classList.remove('hidden'); am.classList.add('hidden'); pm.classList.add('hidden'); xm.classList.add('hidden'); updateStaffAssignInfo(); }
+      else{ sp.classList.add('hidden'); am.classList.remove('hidden'); pm.classList.remove('hidden'); xm.classList.remove('hidden'); }
     }
 
     /* ======= Dibujo ======= */
@@ -499,11 +592,11 @@
         html+='<tr class="border-t"><td class="px-2 py-1">'+u.name+'</td><td class="px-2 py-1"><span class="role-badge '+cls+'">'+u.role+'</span></td><td class="px-2 py-1 text-slate-600">'+(u.role==='owner'?'—':'<span class="italic">Usa los botones de arriba</span>')+'</td></tr>'; }
       html+='</tbody></table></div>'; $('usersTable').innerHTML=html;
 
-      var staffSel=$('assignStaffSelect'), adminSel=$('assignAdminSelect'), fenceSel=$('assignFenceSelect');
+      var staffSel=$('assignStaffSelect'), adminSel=$('assignAdminSelect');
       var staffList=users.filter(function(u){return u.role==='staff';});
       var admins=users.filter(function(u){return u.role==='admin'||u.role==='owner';});
       var shtml=''; for(var s=0;s<staffList.length;s++){shtml+='<option value="'+staffList[s].id+'">'+staffList[s].name+'</option>';} staffSel.innerHTML=shtml;
-      var ahtml=''; for(var a=0;a<admins.length;a++){ahtml+='<option value="'+admins[a].id+'">'+admins[a].name+' ['+(admins[a].role||'admin')+']</option>';} adminSel.innerHTML=ahtml;
+      var ahtml=''; for(var a=0;a<admins.length;a++){ahtml+='<option value="'+admins[a].id+'">'+admins[a].name+' ['+(admins[a].role||'admin')+']</option>';} $('assignAdminSelect').innerHTML=ahtml;
       populateAssignFences();
 
       var csel=$('checkStaffSelect'); csel.innerHTML=shtml; renderChecksList(); updateStaffAssignInfo();
@@ -514,7 +607,7 @@
     function assignFenceToStaff(){
       var staffId=$('assignStaffSelect').value, adminId=$('assignAdminSelect').value, fenceId=$('assignFenceSelect').value;
       if(!staffId||!adminId||!fenceId){$('assignMsg').textContent='Selecciona personal, admin y geocerca.'; return;}
-      setAssign(staffId,{adminId:adminId,fenceId:fenceId}); $('assignMsg').textContent='Asignación guardada ✔'; updateStaffAssignInfo();
+      setAssign(staffId,{adminId:adminId,fenceId:fenceId}); $('assignMsg').textContent='Asignación guardada ✔'; updateStaffAssignInfo(); renderPersonnel();
     }
     function renderChecksList(){
       var staffId=$('checkStaffSelect').value, ul=$('checksList'), arr=staffId?getChecks(staffId):[];
@@ -539,7 +632,123 @@
       }, function(err){msg.textContent='Error de geolocalización: '+err.message;},{enableHighAccuracy:true,timeout:10000});
     }
 
-    /* ======= Crear por coordenadas (se mantiene) ======= */
+    /* ======= PERSONAL (listado) ======= */
+    function renderPersonnel(){
+      var users=getUsers();
+      var staff=users.filter(function(u){return u.role==='staff';});
+      var html='<div class="overflow-auto"><table class="min-w-full text-left text-sm"><thead><tr class="text-slate-500"><th class="px-2 py-1">Nombre</th><th class="px-2 py-1">Asignación</th><th class="px-2 py-1">Acciones</th></tr></thead><tbody>';
+      for(var i=0;i<staff.length;i++){
+        var s=staff[i], asg=getAssign(s.id), badge='<span class="role-badge role-staff">staff</span>';
+        var asign='—';
+        if(asg){ var adm=userById(asg.adminId); var fn=getFenceName(asg.adminId,asg.fenceId)||'—'; asign=(adm?adm.name:'—')+' → '+fn; }
+        html+='<tr class="border-t"><td class="px-2 py-1">'+s.name+' '+badge+'</td><td class="px-2 py-1">'+asign+'</td>'
+             +'<td class="px-2 py-1"><button data-r="'+s.id+'" class="px-2 py-1 rounded bg-sky-600 text-white mr-2 btn-rename-staff">Renombrar</button>'
+             +'<button data-d="'+s.id+'" class="px-2 py-1 rounded bg-rose-600 text-white btn-del-staff">Eliminar</button></td></tr>';
+      }
+      html+='</tbody></table></div>';
+      $('staffTable').innerHTML=html;
+
+      var rs=document.querySelectorAll('.btn-rename-staff');
+      for(var r=0;r<rs.length;r++){rs[r].onclick=function(){var id=this.getAttribute('data-r'); var u=userById(id); if(!u) return; var name=prompt('Nuevo nombre (staff):',u.name); if(name===null) return; renameUser(id,name); renderPersonnel(); renderUserUI();};}
+      var ds=document.querySelectorAll('.btn-del-staff');
+      for(var d=0;d<ds.length;d++){ds[d].onclick=function(){var id=this.getAttribute('data-d'); var u=userById(id); if(!u) return; if(!confirm('Eliminar "'+u.name+'"?')) return; deleteUser(id); renderPersonnel(); renderAdminPanel(); renderUserUI();};}
+    }
+
+    /* ======= ACTIVIDADES ======= */
+    function loadCatalog(adminId){try{var t=localStorage.getItem(catKey(adminId)); var a=t?JSON.parse(t):[]; return Array.isArray(a)?a:[]}catch(e){return []}}
+    function saveCatalog(adminId, arr){localStorage.setItem(catKey(adminId), JSON.stringify(arr||[]));}
+    function loadLogs(adminId){try{var t=localStorage.getItem(logKey(adminId)); var a=t?JSON.parse(t):[]; return Array.isArray(a)?a:[]}catch(e){return []}}
+    function saveLogs(adminId, arr){localStorage.setItem(logKey(adminId), JSON.stringify(arr||[]));}
+
+    function renderActivities(){
+      var role=roleOf(CURRENT_USER_ID);
+      if(role==='staff'){ // nada que preparar
+        return;
+      }
+      // llenar selects de personal
+      var users=getUsers();
+      var staff=users.filter(function(u){return u.role==='staff';});
+      var shtml=''; for(var i=0;i<staff.length;i++){shtml+='<option value="'+staff[i].id+'">'+staff[i].name+'</option>';}
+      $('actStaffSelect').innerHTML=shtml;
+      $('logStaffFilter').innerHTML='<option value="">(Todos)</option>'+shtml;
+
+      // catálogo
+      renderCatalogUI();
+      // registros
+      renderLogsUI();
+    }
+    function renderCatalogUI(){
+      var cat=loadCatalog(CURRENT_USER_ID);
+      var html='';
+      for(var i=0;i<cat.length;i++){
+        html+='<li class="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50">'
+             +'<span>'+cat[i].name+'</span>'
+             +'<span><button data-i="'+i+'" class="px-2 py-1 rounded bg-sky-600 text-white mr-2 btn-rename-act">Renombrar</button>'
+             +'<button data-i="'+i+'" class="px-2 py-1 rounded bg-rose-600 text-white btn-del-act">Eliminar</button></span></li>';
+      }
+      $('actList').innerHTML= html || '<li class="text-gray-500">Sin actividades. Añade arriba.</li>';
+      var rs=document.querySelectorAll('.btn-rename-act');
+      for(var r=0;r<rs.length;r++){rs[r].onclick=function(){var i=parseInt(this.getAttribute('data-i'),10); var cat=loadCatalog(CURRENT_USER_ID); var nm=prompt('Nuevo nombre:',cat[i].name); if(nm===null) return; cat[i].name=String(nm||'').trim()||cat[i].name; saveCatalog(CURRENT_USER_ID,cat); renderCatalogUI(); renderActSelect();};}
+      var ds=document.querySelectorAll('.btn-del-act');
+      for(var d=0;d<ds.length;d++){ds[d].onclick=function(){var i=parseInt(this.getAttribute('data-i'),10); var cat=loadCatalog(CURRENT_USER_ID); cat.splice(i,1); saveCatalog(CURRENT_USER_ID,cat); renderCatalogUI(); renderActSelect();};}
+      renderActSelect();
+    }
+    function renderActSelect(){
+      var cat=loadCatalog(CURRENT_USER_ID), html='';
+      for(var i=0;i<cat.length;i++){html+='<option value="'+cat[i].id+'">'+cat[i].name+'</option>';}
+      $('actSelect').innerHTML=html;
+    }
+    function actAdd(){
+      var nm=String($('actNewName').value||'').trim(); if(!nm){alert('Escribe un nombre.'); return;}
+      var cat=loadCatalog(CURRENT_USER_ID); cat.push({id:'a_'+Math.random().toString(36).slice(2,10), name:nm});
+      saveCatalog(CURRENT_USER_ID,cat); $('actNewName').value=''; renderCatalogUI();
+    }
+    function actLog(useGps){
+      var staffId=$('actStaffSelect').value, actId=$('actSelect').value, note=$('actNote').value||'';
+      var cat=loadCatalog(CURRENT_USER_ID), actName=''; for(var i=0;i<cat.length;i++) if(cat[i].id===actId) actName=cat[i].name;
+      if(!staffId||!actId){$('actMsg').textContent='Selecciona personal y actividad.'; return;}
+      var addRecord=function(lat,lng,flag){
+        var logs=loadLogs(CURRENT_USER_ID); logs.unshift({id:'r_'+Math.random().toString(36).slice(2,10), ts:Date.now(), staffId:staffId, actId:actId, actName:actName, note:note, lat:lat, lng:lng, ok:flag}); saveLogs(CURRENT_USER_ID,logs);
+        $('actMsg').textContent = flag===false ? 'Registrado (GPS fuera de geocerca).' : 'Registrado.';
+        renderLogsUI();
+      };
+      if(useGps){
+        var asg=getAssign(staffId); if(!asg){$('actMsg').textContent='Ese personal no tiene geocerca asignada.'; return;}
+        if(!navigator.geolocation){$('actMsg').textContent='GPS no disponible.'; return;}
+        navigator.geolocation.getCurrentPosition(function(pos){
+          var lat=pos.coords.latitude, lng=pos.coords.longitude, ring=getFencePath(asg.adminId,asg.fenceId);
+          var ok=ring.length>=3?pointInPolygon(lat,lng,ring):false;
+          addRecord(lat,lng,ok);
+        }, function(err){$('actMsg').textContent='Error GPS: '+err.message;},{enableHighAccuracy:true,timeout:10000});
+      }else{
+        addRecord(null,null,null);
+      }
+    }
+    function renderLogsUI(){
+      var logs=loadLogs(CURRENT_USER_ID), staffId=$('logStaffFilter').value;
+      if(staffId) logs=logs.filter(function(r){return r.staffId===staffId;});
+      var users=getUsers(); var html='';
+      for(var i=0;i<Math.min(logs.length,200);i++){
+        var r=logs[i], u=userById(r.staffId), nm=u?u.name:'(?)';
+        var gps=r.lat!=null?(' ['+(r.lat.toFixed? r.lat.toFixed(5):r.lat)+', '+(r.lng&&r.lng.toFixed? r.lng.toFixed(5):r.lng)+']'):'';
+        var badge = (r.ok===true?'<span class="text-emerald-700">DENTRO</span>': (r.ok===false?'<span class="text-rose-700">FUERA</span>':'<span class="text-slate-500">—</span>'));
+        html+='<li>['+(new Date(r.ts).toLocaleString())+'] '+nm+' — '+(r.actName||'Actividad')+' '+badge+gps+(r.note?(' — '+r.note):'')+'</li>';
+      }
+      $('actLogs').innerHTML = html || '<li class="text-gray-500">Sin registros.</li>';
+    }
+    function exportLogsCSV(){
+      var logs=loadLogs(CURRENT_USER_ID), staffId=$('logStaffFilter').value;
+      if(staffId) logs=logs.filter(function(r){return r.staffId===staffId;});
+      var rows=[['Fecha','Personal','Actividad','DentroGeocerca','Lat','Lng','Nota']];
+      for(var i=0;i<logs.length;i++){
+        var r=logs[i], u=userById(r.staffId);
+        rows.push([new Date(r.ts).toISOString(), (u?u.name:''), (r.actName||''), (r.ok===true?'DENTRO':(r.ok===false?'FUERA':'')), (r.lat||''), (r.lng||''), (r.note||'')]);
+      }
+      var csv=rows.map(function(a){return a.map(function(x){x=(x==null?'':String(x)); if(x.includes(',')||x.includes('"')||x.includes('\n')) x='"'+x.replace(/"/g,'""')+'"'; return x;}).join(',');}).join('\n');
+      var blob=new Blob([csv],{type:'text/csv'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='actividades.csv'; a.click(); URL.revokeObjectURL(url);
+    }
+
+    /* ======= Crear por coordenadas ======= */
     function createByLatLng(){
       if(roleOf(CURRENT_USER_ID)==='staff'){alert('El personal no puede crear geocercas.'); return;}
       var raw=prompt('Introduce líneas lat,lng (una por vértice):'); if(!raw) return;
