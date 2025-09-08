@@ -16,7 +16,11 @@
     .label-in-map{background:transparent;border:none;box-shadow:none;color:#1f2937;font-weight:600;text-shadow:0 0 3px #ffffffc7}
     .btn:disabled{opacity:.45;cursor:not-allowed}
     .controls-layer{position:relative; z-index:1000; pointer-events:auto;}
-    #map{touch-action:none;}
+    #map{
+      touch-action: none;
+      height: 520px;       /* alto visible */
+      min-height: 380px;   /* por si hay colapso del layout */
+    }
     .vertex-handle{width:12px;height:12px;background:#fff;border:2px solid #2563eb;border-radius:50%;box-shadow:0 0 0 2px #ffffffa8}
     .role-badge{font-size:.72rem;padding:.15rem .4rem;border-radius:.5rem}
     .role-owner{background:#1e293b;color:#fff}
@@ -118,7 +122,7 @@
     <!-- ======== MAPA ======== -->
     <div class="mt-4 card overflow-hidden">
       <div class="px-4 py-3 border-b"><h2 class="text-lg font-semibold">Mapa</h2></div>
-      <div id="map" style="height:460px; position:relative; z-index:0;"></div>
+      <div id="map"></div>
     </div>
 
     <!-- ======== LISTA DE GEOCERCAS ======== -->
@@ -137,9 +141,6 @@
         <div id="staffTable" class="text-sm overflow-auto"></div>
       </div>
     </div>
-
-
-
 
     <!-- ======== ACTIVIDADES (si owner/admin) ======== -->
     <div id="activitiesModule" class="mt-6 card">
@@ -194,25 +195,21 @@
       </div>
     </div>
 
-        <!-- ======== REPORTES ======== -->
-<div id="reportsModule" class="mt-6 card">
-  <div class="px-4 py-3 border-b">
-    <h3 class="text-lg font-semibold">Reportes</h3>
-  </div>
-  <div class="p-4">
-    <div id="repSummary" class="grid md:grid-cols-5 gap-3 mb-4"></div>
-    <div class="flex gap-2">
-      <button id="exportChecksBtn" class="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">
-        Exportar Check-ins CSV
-      </button>
-      <button id="exportActsBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
-        Exportar Actividades CSV
-      </button>
+    <!-- ======== REPORTES (si owner/admin) ======== -->
+    <div id="reportsModule" class="mt-6 card">
+      <div class="px-4 py-3 border-b">
+        <h3 class="text-lg font-semibold">Reportes</h3>
+      </div>
+      <div class="p-4">
+        <div id="repSummary" class="grid md:grid-cols-5 gap-3 mb-4"></div>
+        <div class="flex gap-2">
+          <button id="exportChecksBtn" class="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">Exportar Check-ins CSV</button>
+          <button id="exportActsBtn"   class="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Exportar Actividades CSV</button>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
-    <!-- ======== ADMINISTRACIÓN DE USUARIOS (queda al final) ======== -->
+    <!-- ======== ADMINISTRACIÓN DE USUARIOS ======== -->
     <div id="adminModule" class="mt-6 card">
       <div class="px-4 py-3 border-b flex items-center justify-between">
         <h3 class="text-lg font-semibold">Administración de usuarios</h3>
@@ -354,6 +351,16 @@
       map=L.map('map');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
       map.setView([-1.5,-78.5],9);
+
+      // --- ARREGLO: refrescar tamaño del mapa para evitar "mapa en blanco"
+      const refreshMapSize = () => { try{ map && map.invalidateSize(true); }catch(e){} };
+      setTimeout(refreshMapSize, 0);
+      setTimeout(refreshMapSize, 250);
+      window.addEventListener('resize', refreshMapSize);
+      const mapContainer = document.getElementById('map');
+      if (mapContainer && 'ResizeObserver' in window) {
+        new ResizeObserver(refreshMapSize).observe(mapContainer);
+      }
 
       $('newFenceBtn').onclick=startDraw;
       $('finishFenceBtn').onclick=finishDraw;
@@ -606,7 +613,7 @@
     }
 
     /* ======= ADMIN: asignaciones y check-ins ======= */
-    function loadUserFences(adminId){try{var t=localStorage.getItem(userKey(adminId)); var a=t?JSON.parse(t):[]; return Array.isArray(a)?a:[]}catch(e){return []}}
+    function loadUserFences(adminId){try{var t=localStorage.getItem(GEOFENCE_PREFIX+adminId); var a=t?JSON.parse(t):[]; return Array.isArray(a)?a:[]}catch(e){return []}}
     function setAssign(staffId,data){localStorage.setItem(ASSIGN_PREFIX+staffId,JSON.stringify(data||null))}
     function getAssign(staffId){try{var t=localStorage.getItem(ASSIGN_PREFIX+staffId); return t?JSON.parse(t):null}catch(e){return null}}
     function pushCheck(staffId,rec){var k=CHECKS_PREFIX+staffId, arr=[]; try{var t=localStorage.getItem(k); arr=t?JSON.parse(t):[]; if(!Array.isArray(arr)) arr=[]}catch(e){} arr.unshift(rec); localStorage.setItem(k,JSON.stringify(arr))}
@@ -765,7 +772,7 @@
     /* ======= REPORTES ======= */
     function renderReports(){
       if(roleOf(CURRENT_USER_ID)==='staff') return;
-      var users=getUsers(), staff=users.filter(function(u){return u.role==='staff'}), admins=users.filter(function(u){return u.role!=='staff'});
+      var users=getUsers(), staff=users.filter(function(u){return u.role==='staff'});
       var geos=loadF().length;
       var asign=0; for(var s=0;s<staff.length;s++){ if(getAssign(staff[s].id)) asign++ }
       var acts=loadLogs(CURRENT_USER_ID).length;
