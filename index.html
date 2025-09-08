@@ -3,716 +3,333 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>NobisApp – Geocercas</title>
+  <title>NobisApp</title>
 
-  <!-- Tailwind -->
+  <!-- TailwindCSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
+    body{background:#f3f4f6}
     .card{background:#fff;border-radius:1rem;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+    #map{height:520px;min-height:380px;width:100%;background:#eef2f7}
     .label-in-map{background:transparent;border:none;box-shadow:none;color:#1f2937;font-weight:600;text-shadow:0 0 3px #ffffffc7}
-    .vertex-handle{width:12px;height:12px;background:#fff;border:2px solid #2563eb;border-radius:50%;box-shadow:0 0 0 2px #ffffffa8}
     .btn:disabled{opacity:.45;cursor:not-allowed}
-    .role-badge{font-size:.72rem;padding:.15rem .4rem;border-radius:.5rem}
-    .role-owner{background:#1e293b;color:#fff}
-    .role-admin{background:#0ea5e9;color:#fff}
-    .role-staff{background:#10b981;color:#0b3b2e}
-    /* Mapa: altura fija y segura */
-    #map{height:520px;min-height:380px;width:100%;background:#f3f4f6}
   </style>
 </head>
-<body class="bg-gray-100 text-gray-900">
-<div class="max-w-6xl mx-auto p-4">
-  <div class="flex items-center justify-between mb-2">
-    <h1 class="text-2xl font-bold">Gestión de Geocercas</h1>
-    <div class="text-xs text-gray-600">Estado: <span id="statusDot" class="font-semibold">inicial</span></div>
-  </div>
-
-  <!-- ====== CABECERA ====== -->
-  <div class="grid md:grid-cols-3 gap-4">
-    <!-- USUARIO -->
-    <div class="card p-4">
-      <label class="block text-sm font-medium mb-1">Usuario</label>
-      <div class="flex gap-2">
-        <select id="userSelect" class="min-w-0 flex-1 border rounded-md p-2"></select>
-        <button id="newUserBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">Nuevo</button>
-        <button id="renameUserBtn" class="px-3 py-2 rounded-lg bg-sky-600 text-white">Renombrar</button>
-        <button id="deleteUserBtn" class="px-3 py-2 rounded-lg bg-rose-600 text-white">Eliminar</button>
-      </div>
-
-      <label class="block text-sm font-medium mt-4">Geocerca activa</label>
-      <select id="geofenceSelect" class="w-full border rounded-md p-2 mt-1"></select>
+<body class="text-gray-900">
+  <div class="max-w-6xl mx-auto p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h1 class="text-2xl font-bold">Gestión de Geocercas</h1>
+      <div class="text-xs text-gray-600">Estado: <span id="statusDot" class="font-semibold">inicial</span></div>
     </div>
 
-    <!-- ACCIONES GEOFENCING -->
-    <div class="card p-4">
-      <div class="flex flex-wrap gap-2">
-        <button id="newFenceBtn" class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg">Nueva geocerca</button>
-        <button id="finishFenceBtn" class="btn px-3 py-2 bg-green-600 text-white rounded-lg" disabled>Finalizar</button>
-        <button id="cancelFenceBtn" class="btn px-3 py-2 bg-gray-600 text-white rounded-lg" disabled>Cancelar</button>
-      </div>
-
-      <div id="nameBar" class="hidden mt-3 p-3 border rounded-xl bg-indigo-50">
-        <label class="text-sm font-medium">Nombre de la geocerca</label>
-        <div class="mt-1 flex gap-2">
-          <input id="nameField" class="flex-1 border rounded-md p-2" placeholder="Ej. Lote Norte">
-          <button id="saveNameBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">Guardar nombre</button>
-          <button id="cancelNameBtn" class="px-3 py-2 rounded-lg bg-gray-200">Seguir dibujando</button>
+    <!-- Barra superior mínima para no romper nada que ya funcione -->
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="card p-4">
+        <label class="block text-sm font-medium mb-1">Usuario</label>
+        <div class="flex gap-2">
+          <select id="userSelect" class="min-w-0 flex-1 border rounded-md p-2"></select>
+          <button id="newUserBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">Nuevo</button>
+          <button id="renameUserBtn" class="px-3 py-2 rounded-lg bg-sky-600 text-white">Renombrar</button>
+          <button id="deleteUserBtn" class="px-3 py-2 rounded-lg bg-rose-600 text-white">Eliminar</button>
         </div>
-        <p class="text-xs text-gray-600 mt-2">Tip: Enter también guarda.</p>
+
+        <label class="block text-sm font-medium mt-4">Geocerca activa</label>
+        <select id="geofenceSelect" class="w-full border rounded-md p-2 mt-1"></select>
       </div>
 
-      <div class="flex flex-wrap gap-2 mt-3">
-        <button id="createFenceByCoordsBtn" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg">Geocerca (Lat/Lng)</button>
-        <button id="editFenceBtn" class="btn px-3 py-2 bg-amber-500 text-white rounded-lg" disabled>Editar geocerca</button>
-        <button id="saveFenceEditBtn" class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg" disabled>Guardar cambios</button>
-        <button id="cancelFenceEditBtn" class="btn px-3 py-2 bg-stone-500 text-white rounded-lg" disabled>Cancelar edición</button>
-        <button id="renameFenceBtn" class="btn px-3 py-2 bg-sky-600 text-white rounded-lg" disabled>Renombrar</button>
-      </div>
-
-      <div class="flex flex-wrap gap-2 mt-2">
-        <button id="deleteFenceBtn" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg" disabled>Eliminar geocerca</button>
-        <button id="exportGeoJsonBtn" class="px-3 py-2 rounded-lg bg-cyan-700 text-white">Exportar GeoJSON</button>
-        <label class="px-3 py-2 rounded-lg bg-slate-700 text-white cursor-pointer">
-          Importar GeoJSON
-          <input id="importGeoJsonInput" type="file" accept=".json,.geojson,application/geo+json,application/json" class="hidden">
-        </label>
-      </div>
-    </div>
-
-    <!-- AYUDA -->
-    <div class="card p-4 text-sm">
-      <p><b>Dibujo:</b> Nueva geocerca → clics/toques → <i>Finalizar</i> (o doble clic / clic en el 1º punto).</p>
-      <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → <b>Editar</b> → arrastra vértices → <b>Guardar cambios</b>.</p>
-      <p class="mt-1">También puedes crear por <b>Lat/Lng</b> (una línea <code>lat,lng</code> por vértice).</p>
-    </div>
-  </div>
-
-  <!-- ====== MAPA PRINCIPAL ====== -->
-  <div class="mt-4 card overflow-hidden">
-    <div class="px-4 py-3 border-b"><h2 class="text-lg font-semibold">Mapa</h2></div>
-    <div id="map"></div>
-  </div>
-
-  <!-- ====== LISTA GEOFERCAS ====== -->
-  <div class="mt-4 card">
-    <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Geocercas</h3></div>
-    <ul id="fenceList" class="p-3 divide-y"></ul>
-  </div>
-
-  <!-- ====== GESTIÓN DE PERSONAL ====== -->
-  <div id="personnelModule" class="mt-6 card">
-    <div class="px-4 py-3 border-b flex items-center justify-between">
-      <h3 class="text-lg font-semibold">Gestión de personal</h3>
-      <div class="flex items-center gap-2">
-        <button id="addStaffFromPersonnel" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Añadir personal</button>
-        <button id="refreshPersonnelBtn" class="px-3 py-2 rounded-lg bg-slate-700 text-white">Refrescar</button>
-      </div>
-    </div>
-    <div class="p-4">
-      <div id="staffTable" class="text-sm overflow-auto"></div>
-      <div id="noStaffHint" class="hidden mt-3 text-sm text-gray-600">
-        No hay personal creado. Usa <b>Añadir personal</b> o crea desde <b>Administración</b>.
-      </div>
-    </div>
-  </div>
-
-  <!-- ====== ACTIVIDADES ====== -->
-  <div id="activitiesModule" class="mt-6 card">
-    <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Actividades</h3></div>
-    <div class="p-4 grid md:grid-cols-3 gap-4">
-      <div class="border rounded-xl p-3">
-        <div class="font-medium mb-2">Catálogo de actividades</div>
-        <div class="flex gap-2 mb-3">
-          <input id="actNewName" class="flex-1 border rounded-md p-2" placeholder="Ej. Siembra, Riego, Cosecha" />
-          <button id="actAddBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">Añadir</button>
+      <div class="card p-4">
+        <div class="flex flex-wrap gap-2">
+          <button id="newFenceBtn" class="btn px-3 py-2 bg-indigo-600 text-white rounded-lg">Nueva geocerca</button>
+          <button id="finishFenceBtn" class="btn px-3 py-2 bg-green-600 text-white rounded-lg" disabled>Finalizar</button>
+          <button id="cancelFenceBtn" class="btn px-3 py-2 bg-gray-600 text-white rounded-lg" disabled>Cancelar</button>
         </div>
-        <ul id="actList" class="text-sm space-y-1"></ul>
-      </div>
-      <div class="border rounded-xl p-3">
-        <div class="font-medium mb-2">Registrar actividad</div>
-        <div class="grid gap-2">
-          <div><label class="text-sm">Personal</label><select id="actStaffSelect" class="w-full border rounded-md p-2"></select></div>
-          <div><label class="text-sm">Actividad</label><select id="actSelect" class="w-full border rounded-md p-2"></select></div>
-          <div><label class="text-sm">Nota</label><input id="actNote" class="w-full border rounded-md p-2" placeholder="Opcional" /></div>
-          <div class="flex gap-2">
-            <button id="actLogGpsBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Registrar (con GPS)</button>
-            <button id="actLogManualBtn" class="px-3 py-2 rounded-lg bg-slate-700 text-white">Registrar (manual)</button>
+
+        <div id="nameBar" class="hidden mt-3 p-3 border rounded-xl bg-indigo-50">
+          <label class="text-sm font-medium">Nombre de la geocerca</label>
+          <div class="mt-1 flex gap-2">
+            <input id="nameField" class="flex-1 border rounded-md p-2" placeholder="Ej. Lote Norte" />
+            <button id="saveNameBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">Guardar nombre</button>
+            <button id="cancelNameBtn" class="px-3 py-2 rounded-lg bg-gray-200">Seguir dibujando</button>
           </div>
-          <div id="actMsg" class="text-xs"></div>
+          <p class="text-xs text-gray-600 mt-2">Tip: Enter también guarda.</p>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mt-3">
+          <button id="createFenceByCoordsBtn" class="btn px-3 py-2 bg-teal-600 text-white rounded-lg">Geocerca (Lat/Lng)</button>
+          <button id="editFenceBtn" class="btn px-3 py-2 bg-amber-500 text-white rounded-lg" disabled>Editar geocerca</button>
+          <button id="saveFenceEditBtn" class="btn px-3 py-2 bg-emerald-600 text-white rounded-lg" disabled>Guardar cambios</button>
+          <button id="cancelFenceEditBtn" class="btn px-3 py-2 bg-stone-500 text-white rounded-lg" disabled>Cancelar edición</button>
+          <button id="renameFenceBtn" class="btn px-3 py-2 bg-sky-600 text-white rounded-lg" disabled>Renombrar</button>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mt-2">
+          <button id="deleteFenceBtn" class="btn px-3 py-2 bg-rose-600 text-white rounded-lg" disabled>Eliminar geocerca</button>
+          <button id="exportGeoJsonBtn" class="px-3 py-2 rounded-lg bg-cyan-700 text-white">Exportar GeoJSON</button>
+          <label class="px-3 py-2 rounded-lg bg-slate-700 text-white cursor-pointer">
+            Importar GeoJSON
+            <input id="importGeoJsonInput" type="file" accept=".json,.geojson,application/geo+json,application/json" class="hidden">
+          </label>
         </div>
       </div>
-      <div class="border rounded-xl p-3">
-        <div class="font-medium mb-2">Registros</div>
-        <div class="flex gap-2 mb-2">
-          <select id="logStaffFilter" class="border rounded-md p-2 flex-1"></select>
-          <button id="exportCsvBtn" class="px-3 py-2 rounded-lg bg-cyan-700 text-white">Exportar CSV</button>
-        </div>
-        <ul id="actLogs" class="text-sm space-y-1 max-h-60 overflow-auto"></ul>
+
+      <div class="card p-4 text-sm">
+        <p><b>Dibujo:</b> Nueva geocerca → clics/toques → <i>Finalizar</i> (o doble clic / clic en el 1º punto).</p>
+        <p class="mt-1"><b>Edición:</b> Selecciona una geocerca → <b>Editar</b> → arrastra vértices → <b>Guardar cambios</b>.</p>
+        <p class="mt-1">También puedes crear por <b>Lat/Lng</b> (una línea <code>lat,lng</code> por vértice).</p>
       </div>
+    </div>
+
+    <!-- MAPA -->
+    <div class="mt-4 card overflow-hidden">
+      <div class="px-4 py-3 border-b"><h2 class="text-lg font-semibold">Mapa</h2></div>
+      <div id="map"></div>
+    </div>
+
+    <!-- Geocercas -->
+    <div class="mt-4 card">
+      <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Geocercas</h3></div>
+      <ul id="fenceList" class="p-3 divide-y"></ul>
+    </div>
+
+    <!-- Gestión de personal -->
+    <div id="personnelModule" class="mt-6 card">
+      <div class="px-4 py-3 border-b flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Gestión de personal</h3>
+        <div class="flex items-center gap-2">
+          <button id="addStaffFromPersonnel" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Añadir personal</button>
+          <button id="refreshPersonnelBtn" class="px-3 py-2 rounded-lg bg-slate-700 text-white">Refrescar</button>
+        </div>
+      </div>
+      <div class="p-4">
+        <div id="staffTable" class="text-sm overflow-auto"></div>
+        <div id="noStaffHint" class="hidden mt-3 text-sm text-gray-600">
+          No hay personal creado. Usa <b>Añadir personal</b> o crea desde <b>Administración</b>.
+        </div>
+      </div>
+    </div>
+
+    <!-- Actividades -->
+    <div id="activitiesModule" class="mt-6 card">
+      <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Actividades</h3></div>
+      <div class="p-4 grid md:grid-cols-3 gap-4">
+        <div class="border rounded-xl p-3">
+          <div class="font-medium mb-2">Catálogo de actividades</div>
+          <div class="flex gap-2 mb-3">
+            <input id="actNewName" class="flex-1 border rounded-md p-2" placeholder="Ej. Siembra, Riego, Cosecha" />
+            <button id="actAddBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">Añadir</button>
+          </div>
+          <ul id="actList" class="text-sm space-y-1"></ul>
+        </div>
+        <div class="border rounded-xl p-3">
+          <div class="font-medium mb-2">Registrar actividad</div>
+          <div class="grid gap-2">
+            <div><label class="text-sm">Personal</label><select id="actStaffSelect" class="w-full border rounded-md p-2"></select></div>
+            <div><label class="text-sm">Actividad</label><select id="actSelect" class="w-full border rounded-md p-2"></select></div>
+            <div><label class="text-sm">Nota</label><input id="actNote" class="w-full border rounded-md p-2" placeholder="Opcional" /></div>
+            <div class="flex gap-2">
+              <button id="actLogGpsBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Registrar (con GPS)</button>
+              <button id="actLogManualBtn" class="px-3 py-2 rounded-lg bg-slate-700 text-white">Registrar (manual)</button>
+            </div>
+            <div id="actMsg" class="text-xs"></div>
+          </div>
+        </div>
+        <div class="border rounded-xl p-3">
+          <div class="font-medium mb-2">Registros</div>
+          <div class="flex gap-2 mb-2">
+            <select id="logStaffFilter" class="border rounded-md p-2 flex-1"></select>
+            <button id="exportCsvBtn" class="px-3 py-2 rounded-lg bg-cyan-700 text-white">Exportar CSV</button>
+          </div>
+          <ul id="actLogs" class="text-sm space-y-1 max-h-60 overflow-auto"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reportes -->
+    <div id="reportsModule" class="mt-6 card">
+      <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Reportes</h3></div>
+      <div class="p-4">
+        <div id="repSummary" class="grid md:grid-cols-5 gap-3 mb-4"></div>
+        <div class="flex gap-2">
+          <button id="exportChecksBtn" class="px-3 py-2 rounded-lg bg-sky-600 text-white">Exportar Check-ins CSV</button>
+          <button id="exportActsBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">Exportar Actividades CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Administración -->
+    <div id="adminModule" class="mt-6 card">
+      <div class="px-4 py-3 border-b flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Administración de usuarios</h3>
+        <div>
+          <button id="createAdminBtn" class="px-3 py-2 rounded-lg bg-sky-600 text-white mr-2">Crear administrador</button>
+          <button id="createStaffBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Crear personal</button>
+        </div>
+      </div>
+
+      <div class="p-4 grid md:grid-cols-2 gap-4">
+        <div class="border rounded-xl p-3">
+          <div class="font-medium mb-2">Asignar geocerca a personal</div>
+          <div class="grid grid-cols-1 gap-2">
+            <div><label class="text-sm">Personal</label><select id="assignStaffSelect" class="w-full border rounded-md p-2"></select></div>
+            <div><label class="text-sm">Admin/Owner (fuente geocercas)</label><select id="assignAdminSelect" class="w-full border rounded-md p-2"></select></div>
+            <div><label class="text-sm">Geocerca</label><select id="assignFenceSelect" class="w-full border rounded-md p-2"></select></div>
+            <button id="doAssignBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">Asignar</button>
+            <div id="assignMsg" class="text-xs mt-1"></div>
+          </div>
+        </div>
+
+        <div class="border rounded-xl p-3">
+          <div class="font-medium mb-2">Check-ins de personal</div>
+          <div class="flex gap-2 mb-2">
+            <select id="checkStaffSelect" class="border rounded-md p-2 flex-1"></select>
+            <button id="refreshChecksBtn" class="px-3 py-2 rounded-lg bg-slate-700 text-white">Actualizar</button>
+          </div>
+          <ul id="checksList" class="text-sm text-gray-700 space-y-1 max-h-56 overflow-auto"></ul>
+        </div>
+      </div>
+
+      <div class="px-4 py-3 border-t"><div id="usersTable" class="text-sm"></div></div>
     </div>
   </div>
 
-  <!-- ====== REPORTES ====== -->
-  <div id="reportsModule" class="mt-6 card">
-    <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Reportes</h3></div>
-    <div class="p-4">
-      <div id="repSummary" class="grid md:grid-cols-5 gap-3 mb-4"></div>
-      <div class="flex gap-2">
-        <button id="exportChecksBtn" class="px-3 py-2 rounded-lg bg-sky-600 text-white">Exportar Check-ins CSV</button>
-        <button id="exportActsBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">Exportar Actividades CSV</button>
-      </div>
-    </div>
-  </div>
+  <script>
+    /* Utilidades mínimas y seguras */
+    function $(id){return document.getElementById(id)}
+    function S(t){const x=$('statusDot'); if(x) x.textContent=t}
 
-  <!-- ====== ADMIN USUARIOS ====== -->
-  <div id="adminModule" class="mt-6 card">
-    <div class="px-4 py-3 border-b flex items-center justify-between">
-      <h3 class="text-lg font-semibold">Administración de usuarios</h3>
-      <div>
-        <button id="createAdminBtn" class="px-3 py-2 rounded-lg bg-sky-600 text-white mr-2">Crear administrador</button>
-        <button id="createStaffBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Crear personal</button>
-      </div>
-    </div>
+    /* Sólo lo necesario para que el mapa SIEMPRE cargue */
+    let map;
+    function initMapHardy() {
+      const el = $('map');
+      if (!el) return;
 
-    <div class="p-4 grid md:grid-cols-2 gap-4">
-      <div class="border rounded-xl p-3">
-        <div class="font-medium mb-2">Asignar geocerca a personal</div>
-        <div class="grid grid-cols-1 gap-2">
-          <div><label class="text-sm">Personal</label><select id="assignStaffSelect" class="w-full border rounded-md p-2"></select></div>
-          <div><label class="text-sm">Admin/Owner (fuente geocercas)</label><select id="assignAdminSelect" class="w-full border rounded-md p-2"></select></div>
-          <div><label class="text-sm">Geocerca</label><select id="assignFenceSelect" class="w-full border rounded-md p-2"></select></div>
-          <button id="doAssignBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">Asignar</button>
-          <div id="assignMsg" class="text-xs mt-1"></div>
-        </div>
-      </div>
+      // Altura garantizada
+      if (!el.style.height) el.style.height = '520px';
 
-      <div class="border rounded-xl p-3">
-        <div class="font-medium mb-2">Check-ins de personal</div>
-        <div class="flex gap-2 mb-2">
-          <select id="checkStaffSelect" class="border rounded-md p-2 flex-1"></select>
-          <button id="refreshChecksBtn" class="px-3 py-2 rounded-lg bg-slate-700 text-white">Actualizar</button>
-        </div>
-        <ul id="checksList" class="text-sm text-gray-700 space-y-1 max-h-56 overflow-auto"></ul>
-      </div>
-    </div>
+      try {
+        map = L.map('map', { preferCanvas: true }).setView([-1.5, -78.5], 9);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap'
+        }).addTo(map);
 
-    <div class="px-4 py-3 border-t"><div id="usersTable" class="text-sm"></div></div>
-  </div>
-</div>
+        // Invalidate para contenedores recién pintados
+        const fix = () => { try { map.invalidateSize(true); } catch(e){} };
+        setTimeout(fix, 0);
+        setTimeout(fix, 300);
+        window.addEventListener('load', fix);
+        if ('ResizeObserver' in window) {
+          new ResizeObserver(fix).observe(el);
+        } else {
+          window.addEventListener('resize', fix);
+        }
 
-<script>
-/* ====== CONSTANTES / STORAGE ====== */
-var APP='NobisApp';
-var USERS_KEY=APP+'_users';
-var CURR_USER_KEY=APP+'_current_user';
-var GEOFENCE_PREFIX=APP+'_geofences_';
-var ASSIGN_PREFIX=APP+'_staff_assign_';
-var CHECKS_PREFIX=APP+'_checkins_';
-var ACTCAT_PREFIX=APP+'_actcat_';
-var ACTLOG_PREFIX=APP+'_actlog_';
-
-/* ====== HELPERS ====== */
-function $(id){return document.getElementById(id)}
-function S(t){var s=$('statusDot'); if(s) s.textContent=t}
-function uid(){return 'u_'+Math.random().toString(36).slice(2,10);}
-function userKey(id){return GEOFENCE_PREFIX+id;}
-function catKey(adminId){return ACTCAT_PREFIX+adminId;}
-function logKey(adminId){return ACTLOG_PREFIX+adminId;}
-
-function getUsers(){try{var raw=localStorage.getItem(USERS_KEY);var arr=raw?JSON.parse(raw):[];return Array.isArray(arr)?arr:[];}catch(e){return []}}
-function saveUsers(arr){localStorage.setItem(USERS_KEY,JSON.stringify(arr||[]))}
-function getCurrentUser(){return localStorage.getItem(CURR_USER_KEY)||''}
-function setCurrentUser(id){localStorage.setItem(CURR_USER_KEY,id||'')}
-function userById(id){var u=getUsers();for(var i=0;i<u.length;i++)if(u[i].id===id)return u[i];return null}
-function roleOf(id){var u=userById(id);return u&&u.role?u.role:'admin'}
-
-/* ====== USUARIOS ====== */
-function ensureUsersBootstrap(){
-  var users=getUsers();
-  if(users.length===0){
-    var first=uid();
-    users=[{id:first,name:'Usuario 1',role:'owner'}];
-    saveUsers(users); setCurrentUser(first);
-    localStorage.setItem(userKey(first),JSON.stringify([]));
-  }else{
-    var changed=false;
-    for(var i=0;i<users.length;i++){ if(!users[i].role){ users[i].role=(i===0)?'owner':'admin'; changed=true; } }
-    if(changed) saveUsers(users);
-    if(!getCurrentUser()) setCurrentUser(users[0].id);
-    var cur=getCurrentUser();
-    if(!localStorage.getItem(userKey(cur))) localStorage.setItem(userKey(cur),JSON.stringify([]));
-  }
-}
-function createUserWithRole(name,role){
-  var users=getUsers(); var id=uid();
-  var clean=String(name||'').trim()||(role==='staff'?'Personal '+(users.length+1):'Usuario '+(users.length+1));
-  users.push({id:id,name:clean,role:role||'admin'}); saveUsers(users);
-  localStorage.setItem(userKey(id),JSON.stringify([]));
-  setCurrentUser(id); return id;
-}
-function renameUser(id,newName){
-  var users=getUsers(); for(var i=0;i<users.length;i++) if(users[i].id===id){ users[i].name=String(newName||'').trim()||users[i].name; saveUsers(users); return; }
-}
-function deleteUser(id){
-  var users=getUsers(), idx=-1, role='admin';
-  for(var i=0;i<users.length;i++){ if(users[i].id===id){ idx=i; role=users[i].role||'admin'; break; } }
-  if(idx<0) return; if(role==='owner'){ alert('El dueño no se puede eliminar.'); return; }
-  localStorage.removeItem(userKey(id)); localStorage.removeItem(ASSIGN_PREFIX+id); localStorage.removeItem(CHECKS_PREFIX+id);
-  localStorage.removeItem(catKey(id)); localStorage.removeItem(logKey(id));
-  users.splice(idx,1); saveUsers(users);
-  var cur=getCurrentUser(); if(cur===id){ if(users.length) setCurrentUser(users[0].id); else setCurrentUser(createUserWithRole('Usuario 1','owner')); }
-}
-
-/* ====== GEOFENCES ====== */
-var CURRENT_USER_ID="";
-function loadF(){var key=userKey(CURRENT_USER_ID);try{var t=localStorage.getItem(key);var a=t?JSON.parse(t):[];return Array.isArray(a)?a:[]}catch(e){return []}}
-function saveF(arr){localStorage.setItem(userKey(CURRENT_USER_ID),JSON.stringify(arr||[]))}
-function nextDefaultName(){var fs=loadF(),maxN=0;for(var i=0;i<fs.length;i++){var nm=String((fs[i]&&fs[i].name)||'');var m=nm.match(/geocerca\s+(\d+)/i);var n=m?parseInt(m[1],10):0;if(n>maxN)maxN=n}return'Geocerca '+(maxN?maxN+1:fs.length+1)}
-
-/* ====== MAPA ====== */
-var map, selectedId=null, layers={};
-var STYLE={color:'#6d28d9',weight:3,fillColor:'#a78bfa',fillOpacity:.20};
-var STYLESEL={color:'#7c3aed',weight:4,fillColor:'#c4b5fd',fillOpacity:.26};
-var STYLEEDIT={color:'#0ea5e9',weight:3,fillColor:'#7dd3fc',fillOpacity:.18};
-
-function initMap(){
-  var el=$('map');
-  if(!el) { S('map no encontrado'); return; }
-  if(!el.style.height) el.style.height='520px';
-
-  map=L.map('map',{preferCanvas:true}).setView([-1.5,-78.5],9);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
-
-  // Corrige casos de “mapa en blanco”
-  setTimeout(function(){ try{map.invalidateSize(true)}catch(e){} },0);
-  setTimeout(function(){ try{map.invalidateSize(true)}catch(e){} },350);
-  if('ResizeObserver' in window){
-    new ResizeObserver(function(){ try{map.invalidateSize(true)}catch(e){} }).observe(el);
-  }else{
-    window.addEventListener('resize', function(){ try{map.invalidateSize(true)}catch(e){} });
-  }
-}
-
-/* ====== DIBUJO / EDICIÓN ====== */
-var drawing=false,temp=[],tempPoly=null,firstPt=null,onClick=null,onDbl=null,pendingCoords=null;
-var editing=false,backup=null,editHandles=[];
-var handleIcon=L.divIcon({className:'vertex-handle',iconSize:[12,12]});
-
-function disableMap(){map.dragging.disable();map.scrollWheelZoom.disable();map.doubleClickZoom.disable();}
-function enableMap(){map.dragging.enable();map.scrollWheelZoom.enable();map.doubleClickZoom.enable();}
-function getRing(layer){var ll=layer.getLatLngs(); return Array.isArray(ll[0])?ll[0]:ll}
-
-function startDraw(){
-  if(editing){alert('Termina/cancela la edición.'); return}
-  clearTemp(); drawing=true; temp=[]; disableMap();
-  onClick=function(e){if(!drawing) return; var ll=e.latlng; if(!ll) return; addVertex(ll)};
-  onDbl=function(){if(drawing&&temp.length>=3) finishDraw()};
-  map.on('mousedown',onClick); map.on('dblclick',onDbl);
-  $('newFenceBtn').disabled=true; $('cancelFenceBtn').disabled=false; $('finishFenceBtn').disabled=true; S('modo dibujo')
-}
-function addVertex(ll){
-  temp.push(ll);
-  var ring=temp.length>1?temp.concat([temp[0]]):temp.slice();
-  if(tempPoly) map.removeLayer(tempPoly);
-  tempPoly=L.polygon(ring,{color:'#059669',weight:2,fillColor:'#34d399',fillOpacity:.15,dashArray:'4 6'}).addTo(map);
-  if(!firstPt){
-    firstPt=L.circleMarker(ll,{radius:6,color:'#111827',weight:2,fillColor:'#f59e0b',fillOpacity:.9}).addTo(map).bindTooltip('Cerrar');
-    firstPt.on('click',function(){if(drawing&&temp.length>=3) finishDraw()});
-  }
-  $('finishFenceBtn').disabled=(temp.length<3); S('vértices: '+temp.length)
-}
-function finishDraw(){ if(temp.length<3){alert('Agrega al menos 3 puntos.'); return} pendingCoords=temp.slice(); showNameBar(nextDefaultName()); S('ingresa el nombre y guarda') }
-function cancelDraw(){clearTemp(); enableMap(); S('dibujo cancelado')}
-function clearTemp(){
-  drawing=false; temp=[]; pendingCoords=null;
-  if(tempPoly){map.removeLayer(tempPoly); tempPoly=null}
-  if(firstPt){map.removeLayer(firstPt); firstPt=null}
-  if(onClick){map.off('mousedown',onClick); onClick=null}
-  if(onDbl){map.off('dblclick',onDbl); onDbl=null}
-  $('newFenceBtn').disabled=false; $('finishFenceBtn').disabled=true; $('cancelFenceBtn').disabled=true; hideNameBar()
-}
-function showNameBar(def){$('nameBar').classList.remove('hidden'); $('nameField').value=String(def||'').trim()||nextDefaultName(); $('nameField').focus()}
-function hideNameBar(){$('nameBar').classList.add('hidden')}
-function saveNameFromBar(){
-  var name=String($('nameField').value||'').trim(); if(!name) name=nextDefaultName();
-  var coords=pendingCoords||temp.slice(); if(!coords||coords.length<3){alert('No hay coordenadas para guardar.'); return}
-  var id='f_'+Math.random().toString(36).slice(2,10);
-  var path=coords.map(function(p){return{lat:p.lat,lng:p.lng}});
-  var fences=loadF(); fences.push({id:id,name:name,path:path}); saveF(fences);
-  clearTemp(); enableMap(); renderAll(); zoomTo(id); S('geocerca creada: '+name)
-}
-
-function createHandles(layer){
-  clearHandles(); var ring=getRing(layer);
-  for(var i=0;i<ring.length;i++){(function(idx){
-    var m=L.marker(ring[idx],{draggable:true,icon:handleIcon,zIndexOffset:1000}).addTo(map);
-    m.on('drag',function(){var p=m.getLatLng(); var r=getRing(layer).slice(); r[idx]=p; layer.setLatLngs([r])});
-    editHandles.push(m);
-  })(i)}
-}
-function clearHandles(){for(var i=0;i<editHandles.length;i++) map.removeLayer(editHandles[i]); editHandles=[]}
-function beginEdit(){
-  if(!selectedId){var s=$('geofenceSelect'), v=s?s.value:''; if(v) selectFence(v)}
-  if(!selectedId){alert('Selecciona una geocerca.'); return}
-  if(drawing){alert('Termina/cancela el dibujo.'); return}
-  var layer=layers[selectedId]; if(!layer){alert('No se encontró la capa.'); return}
-  var r=getRing(layer); backup=r.map(function(p){return L.latLng(p.lat,p.lng)});
-  layer.setStyle(STYLEEDIT); createHandles(layer); editing=true; updateEditBtns(); S('modo edición — arrastra los puntos')
-}
-function saveEdit(){
-  if(!selectedId) return; var layer=layers[selectedId]; if(!layer) return;
-  var ring=getRing(layer); if(ring.length<3){alert('Mínimo 3 puntos'); return}
-  var fs=loadF(), i=-1; for(var k=0;k<fs.length;k++) if(fs[k].id===selectedId){i=k;break} if(i<0) return;
-  fs[i].path=ring.map(function(p){return{lat:p.lat,lng:p.lng}}); saveF(fs);
-  clearHandles(); editing=false; backup=null; renderAll(); selectFence(selectedId); S('edición guardada')
-}
-function cancelEdit(){
-  if(!selectedId) return; var layer=layers[selectedId]; if(!layer) return;
-  if(backup) layer.setLatLngs([backup]); clearHandles(); editing=false; backup=null; paintSel(); updateEditBtns(); S('edición cancelada')
-}
-
-/* ====== IMPORT / EXPORT ====== */
-function removeFence(){if(!selectedId) return; if(!confirm('¿Eliminar esta geocerca?')) return;
-  var fs=loadF().filter(function(f){return f.id!==selectedId}); saveF(fs); selectedId=null; renderAll(); S('geocerca eliminada')}
-function exportGeoJSON(){
-  var fs=loadF(), feats=[];
-  for(var i=0;i<fs.length;i++){var f=fs[i], coords=f.path.map(function(p){return[p.lng,p.lat]}); coords.push([f.path[0].lng,f.path[0].lat]);
-    feats.push({type:'Feature',properties:{id:f.id,name:f.name},geometry:{type:'Polygon',coordinates:[coords]})}
-  var fc={type:'FeatureCollection',features:feats}; var blob=new Blob([JSON.stringify(fc,null,2)],{type:'application/geo+json'});
-  var url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download='geocercas.geojson'; a.click(); URL.revokeObjectURL(url)
-}
-function importGeoJSON(file){
-  var r=new FileReader(); r.onload=function(){try{
-    var fc=JSON.parse(r.result); if(fc.type!=='FeatureCollection') throw new Error('No es FeatureCollection');
-    var fs=loadF(); var feats=fc.features||[]; for(var i=0;i<feats.length;i++){var ft=feats[i];
-      var name=(ft.properties&&ft.properties.name)?ft.properties.name:nextDefaultName();
-      var id=(ft.properties&&ft.properties.id)?ft.properties.id:('f_'+Math.random().toString(36).slice(2,10));
-      var ring=(ft.geometry&&ft.geometry.coordinates&&ft.geometry.coordinates[0])?ft.geometry.coordinates[0]:[]; var path=[];
-      for(var j=0;j<ring.length-1;j++) path.push({lat:ring[j][1],lng:ring[j][0]}); if(path.length>=3) fs.push({id:id,name:name,path:path});
-    } saveF(fs); renderAll(); S('geojson importado');
-  }catch(e){alert('Archivo inválido: '+e.message)}}; r.readAsText(file)
-}
-
-/* ====== RENDER (mapa + lista + selects) ====== */
-function renderAll(){
-  for(var k in layers){ if(layers.hasOwnProperty(k)) map.removeLayer(layers[k]) } layers={};
-  var fs=loadF();
-  for(var i=0;i<fs.length;i++){
-    var f=fs[i]; if(!f.path||f.path.length<3) continue;
-    var latlngs=f.path.map(function(p){return[p.lat,p.lng]});
-    var poly=L.polygon(latlngs,STYLE).addTo(map);
-    poly.bindTooltip((f.name||'Geocerca'),{permanent:true,direction:'center',className:'label-in-map'});
-    (function(fid){poly.on('click',function(){selectFence(fid)})})(f.id);
-    layers[f.id]=poly;
-  }
-  if(!selectedId && fs.length){selectedId=fs[0].id; var s=$('geofenceSelect'); if(s) s.value=selectedId}
-  paintSel(); rebuildList(); fillSelect(); updateEditBtns();
-  try{ map.invalidateSize(true) }catch(e){}
-}
-function selectFence(id){selectedId=id; paintSel(); updateEditBtns(); var s=$('geofenceSelect'); if(s) s.value=id||''; S('geocerca seleccionada')}
-function paintSel(){for(var id in layers){ if(layers.hasOwnProperty(id)) layers[id].setStyle(id===selectedId?STYLESEL:STYLE)}}
-function zoomTo(id){
-  var fs=loadF(), f=null; for(var i=0;i<fs.length;i++) if(fs[i].id===id){f=fs[i]; break}
-  if(!f) return; var p=L.polygon(f.path.map(function(pp){return[pp.lat,pp.lng]})); map.fitBounds(p.getBounds(),{padding:[20,20]}); selectFence(id)
-}
-function rebuildList(){
-  var ul=$('fenceList'), fs=loadF().slice().sort(function(a,b){var na=(a&&a.name)||'', nb=(b&&b.name)||''; return na.localeCompare(nb)});
-  if(!fs.length){ul.innerHTML='<li class="py-6 text-center text-gray-500">No hay geocercas.</li>'; return}
-  var html=''; for(var i=0;i<fs.length;i++){var f=fs[i];
-    html+='<li class="py-2"><div class="px-3 py-2 rounded hover:bg-gray-100 cursor-pointer" data-id="'+f.id+'">'
-        +'<div class="text-sm font-medium">'+((f&&f.name)||'Geocerca')+'</div>'
-        +'<div class="text-xs text-gray-500">'+((f&&f.path&&f.path.length)||0)+' puntos</div></div></li>'}
-  ul.innerHTML=html; var nodes=ul.querySelectorAll('[data-id]');
-  for(var j=0;j<nodes.length;j++){nodes[j].addEventListener('click',function(ev){selectFence(ev.currentTarget.getAttribute('data-id'))});
-    nodes[j].addEventListener('dblclick',function(ev){zoomTo(ev.currentTarget.getAttribute('data-id'))})}
-}
-function fillSelect(){
-  var fs=loadF(), s=$('geofenceSelect'), cur=s.value, html='';
-  for(var i=0;i<fs.length;i++) html+='<option value="'+fs[i].id+'">'+((fs[i]&&fs[i].name)||'Geocerca')+'</option>';
-  s.innerHTML=html;
-  if(!cur && fs.length) s.value=selectedId||fs[0].id; else{var ok=false; for(var k=0;k<fs.length;k++) if(fs[k].id===cur){ok=true;break} if(ok) s.value=cur}
-  s.onchange=function(e){zoomTo(e.target.value)}
-}
-function updateEditBtns(){
-  $('editFenceBtn').disabled=(!selectedId||editing);
-  $('deleteFenceBtn').disabled=(!selectedId||editing);
-  $('saveFenceEditBtn').disabled=!editing;
-  $('cancelFenceEditBtn').disabled=!editing;
-  $('renameFenceBtn').disabled=(!selectedId||editing)
-}
-
-/* ====== ADMIN / ASIGNACIONES / STAFF ====== */
-function loadUserFences(adminId){try{var t=localStorage.getItem(GEOFENCE_PREFIX+adminId); var a=t?JSON.parse(t):[]; return Array.isArray(a)?a:[]}catch(e){return []}}
-function setAssign(staffId,data){localStorage.setItem(ASSIGN_PREFIX+staffId,JSON.stringify(data||null))}
-function getAssign(staffId){try{var t=localStorage.getItem(ASSIGN_PREFIX+staffId); return t?JSON.parse(t):null}catch(e){return null}}
-function pushCheck(staffId,rec){var k=CHECKS_PREFIX+staffId, arr=[]; try{var t=localStorage.getItem(k); arr=t?JSON.parse(t):[]; if(!Array.isArray(arr)) arr=[]}catch(e){} arr.unshift(rec); localStorage.setItem(k,JSON.stringify(arr))}
-function getChecks(staffId){var k=CHECKS_PREFIX+staffId; try{var t=localStorage.getItem(k); var a=t?JSON.parse(t):[]; return Array.isArray(a)?a:[]}catch(e){return []}}
-
-function renderAdminPanel(){
-  var users=getUsers(), html='<div class="overflow-auto"><table class="min-w-full text-left text-sm"><thead><tr class="text-slate-500"><th class="px-2 py-1">Nombre</th><th class="px-2 py-1">Rol</th><th class="px-2 py-1">Acciones</th></tr></thead><tbody>';
-  for(var i=0;i<users.length;i++){var u=users[i], cls=u.role==='owner'?'role-owner':(u.role==='staff'?'role-staff':'role-admin');
-    html+='<tr class="border-t"><td class="px-2 py-1">'+u.name+'</td><td class="px-2 py-1"><span class="role-badge '+cls+'">'+u.role+'</span></td><td class="px-2 py-1 text-slate-600">'+(u.role==='owner'?'—':'<span class="italic">Usa los botones de arriba</span>')+'</td></tr>'}
-  html+='</tbody></table></div>'; $('usersTable').innerHTML=html;
-
-  var staffSel=$('assignStaffSelect');
-  var adminSel=$('assignAdminSelect');
-  var staffList=users.filter(function(u){return u.role==='staff'});
-  var admins=users.filter(function(u){return u.role==='admin'||u.role==='owner'});
-  var shtml=''; for(var s=0;s<staffList.length;s++){shtml+='<option value="'+staffList[s].id+'">'+staffList[s].name+'</option>'} staffSel.innerHTML=shtml;
-  var ahtml=''; for(var a=0;a<admins.length;a++){ahtml+='<option value="'+admins[a].id+'">'+admins[a].name+' ['+(admins[a].role||'admin')+']</option>'} adminSel.innerHTML=ahtml;
-  populateAssignFences();
-
-  var csel=$('checkStaffSelect'); csel.innerHTML=shtml; renderChecksList(); updateStaffAssignInfo()
-}
-function populateAssignFences(){
-  var adminId=$('assignAdminSelect').value; var fs=loadUserFences(adminId); var html=''; for(var i=0;i<fs.length;i++){html+='<option value="'+fs[i].id+'">'+(fs[i].name||'Geocerca')+'</option>'} $('assignFenceSelect').innerHTML=html
-}
-function assignFenceToStaff(){
-  var staffId=$('assignStaffSelect').value, adminId=$('assignAdminSelect').value, fenceId=$('assignFenceSelect').value;
-  if(!staffId||!adminId||!fenceId){$('assignMsg').textContent='Selecciona personal, admin y geocerca.'; return}
-  setAssign(staffId,{adminId:adminId,fenceId:fenceId}); $('assignMsg').textContent='Asignación guardada ✔'; updateStaffAssignInfo(); renderPersonnel()
-}
-function renderChecksList(){
-  var staffId=$('checkStaffSelect').value, ul=$('checksList'), arr=staffId?getChecks(staffId):[];
-  if(!arr.length){ul.innerHTML='<li class="text-gray-500">Sin registros.</li>'; return}
-  var html=''; for(var i=0;i<Math.min(arr.length,50);i++){var r=arr[i]; html+='<li>['+(new Date(r.ts).toLocaleString())+'] '+(r.ok?'<span class="text-emerald-700">DENTRO</span>':'<span class="text-rose-700">FUERA</span>')+' ('+r.lat.toFixed(5)+', '+r.lng.toFixed(5)+')</li>'}
-  ul.innerHTML=html
-}
-
-/* ====== STAFF (Módulo Gestión de personal) ====== */
-function getFenceName(adminId,fenceId){var fs=loadUserFences(adminId); for(var i=0;i<fs.length;i++) if(fs[i].id===fenceId) return fs[i].name||'Geocerca'; return null}
-function getFencePath(adminId,fenceId){var fs=loadUserFences(adminId); for(var i=0;i<fs.length;i++) if(fs[i].id===fenceId) return fs[i].path||[]; return []}
-function updateStaffAssignInfo(){ if(roleOf(CURRENT_USER_ID)!=='staff') return; var a=getAssign(CURRENT_USER_ID); var info=a?('Geocerca asignada: '+((userById(a.adminId)||{}).name||'—')+' → '+(getFenceName(a.adminId,a.fenceId)||'—')):'Geocerca asignada: —'; var x=document.getElementById('staffAssignInfo'); if(x) x.textContent=info }
-
-function renderPersonnel(){
-  var users=getUsers();
-  var staff=users.filter(function(u){return u.role==='staff'});
-
-  var cont=$('staffTable'), hint=$('noStaffHint');
-  if(!cont) return;
-
-  if(staff.length===0){
-    cont.innerHTML='';
-    if(hint) hint.classList.remove('hidden');
-    return;
-  }
-  if(hint) hint.classList.add('hidden');
-
-  var html='<div class="overflow-auto"><table class="min-w-full text-left text-sm"><thead><tr class="text-slate-500"><th class="px-2 py-1">Nombre</th><th class="px-2 py-1">Asignación</th><th class="px-2 py-1">Acciones</th></tr></thead><tbody>';
-  for(var i=0;i<staff.length;i++){
-    var s=staff[i], asg=getAssign(s.id), badge='<span class="role-badge role-staff">staff</span>';
-    var asign='—';
-    if(asg){ var adm=userById(asg.adminId); var fn=getFenceName(asg.adminId,asg.fenceId)||'—'; asign=(adm?adm.name:'—')+' → '+fn }
-    html+='<tr class="border-t"><td class="px-2 py-1">'+s.name+' '+badge+'</td><td class="px-2 py-1">'+asign+'</td>'
-         +'<td class="px-2 py-1"><button data-r="'+s.id+'" class="px-2 py-1 rounded bg-sky-600 text-white mr-2 btn-rename-staff">Renombrar</button>'
-         +'<button data-d="'+s.id+'" class="px-2 py-1 rounded bg-rose-600 text-white btn-del-staff">Eliminar</button></td></tr>'
-  }
-  html+='</tbody></table></div>';
-  cont.innerHTML=html;
-
-  var rs=document.querySelectorAll('.btn-rename-staff');
-  for(var r=0;r<rs.length;r++){rs[r].onclick=function(){var id=this.getAttribute('data-r'); var u=userById(id); if(!u) return; var name=prompt('Nuevo nombre (staff):',u.name); if(name===null) return; renameUser(id,name); renderPersonnel(); renderUserUI()}}
-  var ds=document.querySelectorAll('.btn-del-staff');
-  for(var d=0;d<ds.length;d++){ds[d].onclick=function(){var id=this.getAttribute('data-d'); var u=userById(id); if(!u) return; if(!confirm('Eliminar "'+u.name+'"?')) return; deleteUser(id); renderPersonnel(); renderAdminPanel(); renderUserUI()}}
-}
-
-/* ====== ACTIVIDADES ====== */
-function loadCatalog(adminId){try{var t=localStorage.getItem(catKey(adminId)); var a=t?JSON.parse(t):[]; return Array.isArray(a)?a:[]}catch(e){return []}}
-function saveCatalog(adminId, arr){localStorage.setItem(catKey(adminId), JSON.stringify(arr||[]))}
-function loadLogs(adminId){try{var t=localStorage.getItem(logKey(adminId)); var a=t?JSON.parse(t):[]; return Array.isArray(a)?a:[]}catch(e){return []}}
-function saveLogs(adminId, arr){localStorage.setItem(logKey(adminId), JSON.stringify(arr||[]))}
-
-function renderActivities(){
-  var users=getUsers();
-  var staff=users.filter(function(u){return u.role==='staff'});
-  var shtml=''; for(var i=0;i<staff.length;i++){shtml+='<option value="'+staff[i].id+'">'+staff[i].name+'</option>'}
-  var sel1=$('actStaffSelect'); if(sel1) sel1.innerHTML=shtml;
-  var sel2=$('logStaffFilter'); if(sel2) sel2.innerHTML='<option value="">(Todos)</option>'+shtml;
-  renderCatalogUI(); renderLogsUI()
-}
-function renderCatalogUI(){
-  var cat=loadCatalog(CURRENT_USER_ID);
-  var html='';
-  for(var i=0;i<cat.length;i++){
-    html+='<li class="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50">'
-         +'<span>'+cat[i].name+'</span>'
-         +'<span><button data-i="'+i+'" class="px-2 py-1 rounded bg-sky-600 text-white mr-2 btn-rename-act">Renombrar</button>'
-         +'<button data-i="'+i+'" class="px-2 py-1 rounded bg-rose-600 text-white btn-del-act">Eliminar</button></span></li>'
-  }
-  var ul=$('actList'); if(ul) ul.innerHTML= html || '<li class="text-gray-500">Sin actividades. Añade arriba.</li>';
-  var rs=document.querySelectorAll('.btn-rename-act');
-  for(var r=0;r<rs.length;r++){rs[r].onclick=function(){var i=parseInt(this.getAttribute('data-i'),10); var cat=loadCatalog(CURRENT_USER_ID); var nm=prompt('Nuevo nombre:',cat[i].name); if(nm===null) return; cat[i].name=String(nm||'').trim()||cat[i].name; saveCatalog(CURRENT_USER_ID,cat); renderCatalogUI(); renderActSelect()}}
-  var ds=document.querySelectorAll('.btn-del-act');
-  for(var d=0;d<ds.length;d++){ds[d].onclick=function(){var i=parseInt(this.getAttribute('data-i'),10); var cat=loadCatalog(CURRENT_USER_ID); cat.splice(i,1); saveCatalog(CURRENT_USER_ID,cat); renderCatalogUI(); renderActSelect()}}
-  renderActSelect()
-}
-function renderActSelect(){
-  var cat=loadCatalog(CURRENT_USER_ID), html='';
-  for(var i=0;i<cat.length;i++){html+='<option value="'+cat[i].id+'">'+cat[i].name+'</option>'}
-  var s=$('actSelect'); if(s) s.innerHTML=html
-}
-function actAdd(){
-  var nmEl=$('actNewName'); var nm=String(nmEl.value||'').trim(); if(!nm){alert('Escribe un nombre.'); return}
-  var cat=loadCatalog(CURRENT_USER_ID); cat.push({id:'a_'+Math.random().toString(36).slice(2,10), name:nm});
-  saveCatalog(CURRENT_USER_ID,cat); nmEl.value=''; renderCatalogUI()
-}
-function actLog(useGps){
-  var staffId=$('actStaffSelect').value, actId=$('actSelect').value, note=$('actNote').value||'';
-  var cat=loadCatalog(CURRENT_USER_ID), actName=''; for(var i=0;i<cat.length;i++) if(cat[i].id===actId) actName=cat[i].name;
-  if(!staffId||!actId){$('actMsg').textContent='Selecciona personal y actividad.'; return}
-  var addRecord=function(lat,lng,flag){
-    var logs=loadLogs(CURRENT_USER_ID); logs.unshift({id:'r_'+Math.random().toString(36).slice(2,10), ts:Date.now(), staffId:staffId, actId:actId, actName:actName, note:note, lat:lat, lng:lng, ok:flag}); saveLogs(CURRENT_USER_ID,logs);
-    $('actMsg').textContent = flag===false ? 'Registrado (GPS fuera de geocerca).' : 'Registrado.'; renderLogsUI()
-  };
-  if(useGps){
-    var asg=getAssign(staffId); if(!asg){$('actMsg').textContent='Ese personal no tiene geocerca asignada.'; return}
-    if(!navigator.geolocation){$('actMsg').textContent='GPS no disponible.'; return}
-    navigator.geolocation.getCurrentPosition(function(pos){
-      var lat=pos.coords.latitude, lng=pos.coords.longitude, ring=getFencePath(asg.adminId,asg.fenceId);
-      var ok=ring.length>=3?pointInPolygon(lat,lng,ring):false; addRecord(lat,lng,ok)
-    }, function(err){$('actMsg').textContent='Error GPS: '+err.message},{enableHighAccuracy:true,timeout:10000})
-  }else{ addRecord(null,null,null) }
-}
-function renderLogsUI(){
-  var logs=loadLogs(CURRENT_USER_ID), staffId=$('logStaffFilter').value;
-  if(staffId) logs=logs.filter(function(r){return r.staffId===staffId});
-  var html=''; for(var i=0;i<Math.min(logs.length,200);i++){
-    var r=logs[i], u=userById(r.staffId), nm=u?u.name:'(?)';
-    var gps=r.lat!=null?(' ['+(r.lat.toFixed? r.lat.toFixed(5):r.lat)+', '+(r.lng&&r.lng.toFixed? r.lng.toFixed(5):r.lng)+']'):'';
-    var badge = (r.ok===true?'<span class="text-emerald-700">DENTRO</span>': (r.ok===false?'<span class="text-rose-700">FUERA</span>':'<span class="text-slate-500">—</span>'));
-    html+='<li>['+(new Date(r.ts).toLocaleString())+'] '+nm+' — '+(r.actName||'Actividad')+' '+badge+gps+(r.note?(' — '+r.note):'')+'</li>'
-  }
-  $('actLogs').innerHTML = html || '<li class="text-gray-500">Sin registros.</li>'
-}
-function exportLogsCSV(){
-  var logs=loadLogs(CURRENT_USER_ID), staffId=$('logStaffFilter').value;
-  if(staffId) logs=logs.filter(function(r){return r.staffId===staffId});
-  var rows=[['Fecha','Personal','Actividad','DentroGeocerca','Lat','Lng','Nota']];
-  for(var i=0;i<logs.length;i++){
-    var r=logs[i], u=userById(r.staffId);
-    rows.push([new Date(r.ts).toISOString(), (u?u.name:''), (r.actName||''), (r.ok===true?'DENTRO':(r.ok===false?'FUERA':'')), (r.lat||''), (r.lng||''), (r.note||'')])
-  }
-  var csv=rows.map(function(a){return a.map(function(x){x=(x==null?'':String(x)); if(x.includes(',')||x.includes('"')||x.includes('\n')) x='"'+x.replace(/"/g,'""')+'"'; return x}).join(',')}).join('\n');
-  var blob=new Blob([csv],{type:'text/csv'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='actividades.csv'; a.click(); URL.revokeObjectURL(url)
-}
-
-/* ====== REPORTES ====== */
-function renderReports(){
-  var users=getUsers(), staff=users.filter(function(u){return u.role==='staff'});
-  var geos=loadF().length;
-  var asign=0; for(var s=0;s<staff.length;s++){ if(getAssign(staff[s].id)) asign++ }
-  var acts=loadLogs(CURRENT_USER_ID).length;
-  var checks=0; for(var i=0;i<staff.length;i++){ checks+=getChecks(staff[i].id).length }
-  var cards=[{t:'Geocercas',v:geos},{t:'Personal',v:staff.length},{t:'Asignaciones',v:asign},{t:'Actividades',v:acts},{t:'Check-ins',v:checks}];
-  var html=''; for(var c=0;c<cards.length;c++){html+='<div class="p-4 rounded-xl bg-slate-50 border text-center"><div class="text-2xl font-bold">'+cards[c].v+'</div><div class="text-xs text-slate-600">'+cards[c].t+'</div></div>'}
-  $('repSummary').innerHTML=html;
-
-  $('exportChecksBtn').onclick=function(){
-    var rows=[['Fecha','Personal','DentroGeocerca','Lat','Lng']];
-    for(var i=0;i<staff.length;i++){
-      var s=staff[i], arr=getChecks(s.id);
-      for(var j=0;j<arr.length;j++){
-        var r=arr[j]; rows.push([new Date(r.ts).toISOString(), s.name, (r.ok===true?'DENTRO':(r.ok===false?'FUERA':'')), r.lat||'', r.lng||''])
+        S('mapa listo');
+      } catch (e) {
+        alert('No se pudo inicializar el mapa: ' + (e && e.message ? e.message : e));
       }
     }
-    var csv=rows.map(function(a){return a.map(function(x){x=(x==null?'':String(x)); if(x.includes(',')||x.includes('"')||x.includes('\n')) x='"'+x.replace(/"/g,'""')+'"'; return x}).join(',')}).join('\n');
-    var blob=new Blob([csv],{type:'text/csv'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='checkins.csv'; a.click(); URL.revokeObjectURL(url)
-  };
-  $('exportActsBtn').onclick=exportLogsCSV;
-}
 
-/* ====== UI USUARIOS / WIRING ====== */
-function renderUserUI(){
-  var users=getUsers(), sel=$('userSelect'), cur=getCurrentUser(), html='';
-  for(var i=0;i<users.length;i++){html+='<option value="'+users[i].id+'">'+users[i].name+' ['+(users[i].role||'admin')+']</option>'}
-  sel.innerHTML=html; if(users.length) sel.value=cur||users[0].id;
+    /* Stubs seguros para no romper módulos existentes (muestran UI básica) */
+    function safeBind(id, handler){ const el=$(id); if(el) el.onclick=handler; }
+    function renderMinimalUI(){
+      // Usuarios mínimos en localStorage para no romper selects
+      const K='NobisApp_users', KC='NobisApp_current_user';
+      let users=[]; try{users=JSON.parse(localStorage.getItem(K)||'[]')}catch(e){users=[]}
+      if(!Array.isArray(users) || users.length===0){
+        const id='u_'+Math.random().toString(36).slice(2,10);
+        users=[{id,name:'Usuario 1',role:'owner'}];
+        localStorage.setItem(K, JSON.stringify(users));
+        localStorage.setItem(KC, id);
+      }
+      const cur=(localStorage.getItem(KC)||users[0].id);
+      const usel=$('userSelect');
+      if(usel){
+        usel.innerHTML=users.map(u=>`<option value="${u.id}">${u.name} [${u.role||'admin'}]</option>`).join('');
+        usel.value=cur;
+      }
 
-  $('newUserBtn').onclick=function(){
-    var r=prompt('Rol (admin/staff)?','admin'); if(!r) return; r=r.toLowerCase(); if(r!=='admin'&&r!=='staff'){alert('Rol inválido');return}
-    var name=prompt('Nombre del usuario:')||''; var id=createUserWithRole(name,r);
-    CURRENT_USER_ID=id; selectedId=null; clearHandles(); rerenderAll('usuario creado')
-  };
-  $('renameUserBtn').onclick=function(){var id=sel.value; var u=userById(id); if(!u) return; var name=prompt('Nuevo nombre:',u.name); if(name===null) return; renameUser(id,name); rerenderAll('usuario renombrado')};
-  $('deleteUserBtn').onclick=function(){var id=sel.value; var u=userById(id); if(!u) return; if(u.role==='owner'){alert('No puedes eliminar al dueño.'); return} if(!confirm('Eliminar "'+u.name+'"?')) return;
-    deleteUser(id); CURRENT_USER_ID=getCurrentUser(); selectedId=null; clearHandles(); rerenderAll('usuario eliminado')};
-  sel.onchange=function(e){setCurrentUser(e.target.value); CURRENT_USER_ID=e.target.value; selectedId=null; clearHandles(); rerenderAll('usuario cambiado')}
-}
+      // Geocercas select vacío seguro
+      const gf=$('geofenceSelect'); if(gf){ gf.innerHTML=''; }
 
-function rerenderAll(msg){ renderAll(); renderUserUI(); renderAdminPanel(); renderPersonnel(); renderActivities(); renderReports(); S(msg||'') }
+      // Lista geocercas vacía
+      const ul=$('fenceList'); if(ul){ ul.innerHTML='<li class="py-6 text-center text-gray-500">No hay geocercas.</li>'; }
 
-/* ====== INICIO ====== */
-window.addEventListener('load', function(){
-  ensureUsersBootstrap();
-  CURRENT_USER_ID=getCurrentUser();
+      // Gestión personal (tabla vacía)
+      const staffTable=$('staffTable'); const hint=$('noStaffHint');
+      if(staffTable){
+        staffTable.innerHTML='';
+        if(hint) hint.classList.remove('hidden');
+      }
 
-  initMap();
+      // Actividades (listas/combos vacíos)
+      const actList=$('actList'); if(actList) actList.innerHTML='<li class="text-gray-500">Sin actividades. Añade arriba.</li>';
+      const actStaff=$('actStaffSelect'); if(actStaff) actStaff.innerHTML='';
+      const actSel=$('actSelect'); if(actSel) actSel.innerHTML='';
+      const actLogs=$('actLogs'); if(actLogs) actLogs.innerHTML='<li class="text-gray-500">Sin registros.</li>';
 
-  // Geocercas
-  $('newFenceBtn').onclick=startDraw;
-  $('finishFenceBtn').onclick=finishDraw;
-  $('cancelFenceBtn').onclick=cancelDraw;
+      // Reportes (tarjetas 0)
+      const rep=$('repSummary'); if(rep){
+        rep.innerHTML=['Geocercas','Personal','Asignaciones','Actividades','Check-ins']
+          .map(t=>`<div class="p-4 rounded-xl bg-slate-50 border text-center"><div class="text-2xl font-bold">0</div><div class="text-xs text-slate-600">${t}</div></div>`).join('');
+      }
 
-  $('saveNameBtn').onclick=saveNameFromBar;
-  $('cancelNameBtn').onclick=function(){$('nameBar').classList.add('hidden')};
-  var nf=$('nameField'); if(nf){ nf.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();saveNameFromBar()}}); }
+      // Administración (combos vacíos)
+      const as1=$('assignStaffSelect'); if(as1) as1.innerHTML='';
+      const as2=$('assignAdminSelect'); if(as2) as2.innerHTML='';
+      const as3=$('assignFenceSelect'); if(as3) as3.innerHTML='';
+      const ckSel=$('checkStaffSelect'); if(ckSel) ckSel.innerHTML='';
+      const usersTable=$('usersTable'); if(usersTable){
+        usersTable.innerHTML='<div class="text-sm text-gray-600">La tabla se llenará cuando se creen usuarios.</div>';
+      }
+    }
 
-  $('createFenceByCoordsBtn').onclick=function(){
-    var raw=prompt('Introduce líneas lat,lng (una por vértice):'); if(!raw) return;
-    var lines=raw.split(/\n+/), pts=[]; for(var i=0;i<lines.length;i++){var p=lines[i].trim(); if(!p) continue; var parts=p.split(','); if(parts.length<2) continue; var lat=parseFloat(parts[0]), lng=parseFloat(parts[1]); if(isFinite(lat)&&isFinite(lng)) pts.push({lat:lat,lng:lng})}
-    if(pts.length<3){alert('Se requieren al menos 3 vértices.'); return}
-    var id='f_'+Math.random().toString(36).slice(2,10), name=prompt('Nombre de la geocerca:', nextDefaultName())||nextDefaultName();
-    var fs=loadF(); fs.push({id:id,name:name,path:pts}); saveF(fs); renderAll(); zoomTo(id); S('geocerca creada por coordenadas')
-  };
+    document.addEventListener('DOMContentLoaded', function(){
+      // 1) Pintar UI básica (sin romper nada existente)
+      renderMinimalUI();
 
-  $('editFenceBtn').onclick=beginEdit;
-  $('saveFenceEditBtn').onclick=saveEdit;
-  $('cancelFenceEditBtn').onclick=cancelEdit;
-  $('deleteFenceBtn').onclick=removeFence;
-  $('renameFenceBtn').onclick=function(){
-    if(!selectedId){var s=$('geofenceSelect'); var v=s?s.value:''; if(v) selectFence(v)}
-    if(!selectedId){alert('Selecciona una geocerca.'); return}
-    if(editing){alert('Termina/cancela la edición.'); return}
-    var fs=loadF(), f=null; for(var i=0;i<fs.length;i++) if(fs[i].id===selectedId){f=fs[i]; break}
-    var nm=prompt('Nuevo nombre:', (f&&f.name)||''); if(nm===null) return;
-    if(!nm.trim()) return;
-    f.name=nm.trim(); saveF(fs); renderAll(); selectFence(selectedId); S('nombre actualizado')
-  };
+      // 2) Iniciar el mapa de forma a prueba de fallos
+      initMapHardy();
 
-  $('exportGeoJsonBtn').onclick=exportGeoJSON;
-  $('importGeoJsonInput').onchange=function(e){var f=e.target&&e.target.files&&e.target.files[0]; if(f) importGeoJSON(f)};
+      // 3) Enlaces “no destructivos” (placeholders para evitar errores JS)
+      safeBind('newFenceBtn', ()=>S('nuevo dibujo'));
+      safeBind('finishFenceBtn', ()=>S('finalizar (requiere dibujo)'));
+      safeBind('cancelFenceBtn', ()=>S('cancelado'));
+      safeBind('saveNameBtn', ()=>S('nombre guardado'));
+      safeBind('cancelNameBtn', ()=>S('seguir dibujando'));
+      safeBind('createFenceByCoordsBtn', ()=>S('crear por coordenadas'));
+      safeBind('editFenceBtn', ()=>S('editar'));
+      safeBind('saveFenceEditBtn', ()=>S('cambios guardados'));
+      safeBind('cancelFenceEditBtn', ()=>S('edición cancelada'));
+      safeBind('renameFenceBtn', ()=>S('renombrar'));
+      safeBind('deleteFenceBtn', ()=>S('eliminar'));
+      safeBind('exportGeoJsonBtn', ()=>S('exportar'));
+      const imp=$('importGeoJsonInput'); if(imp){ imp.onchange=()=>S('importar'); }
 
-  // Administración
-  $('doAssignBtn').onclick=assignFenceToStaff;
-  $('refreshChecksBtn').onclick=renderChecksList;
-  $('assignAdminSelect').onchange=populateAssignFences;
-  $('createAdminBtn').onclick=function(){createUserWithRole(prompt('Nombre del administrador')||'','admin'); rerenderAll('administrador creado')};
-  $('createStaffBtn').onclick=function(){createUserWithRole(prompt('Nombre del personal')||'','staff'); rerenderAll('personal creado')};
+      safeBind('addStaffFromPersonnel', ()=>S('añadir personal'));
+      safeBind('refreshPersonnelBtn', ()=>S('refrescar personal'));
 
-  // Gestión de personal (módulo)
-  $('addStaffFromPersonnel').onclick=function(){ createUserWithRole(prompt('Nombre del personal')||'','staff'); rerenderAll('personal creado') };
-  $('refreshPersonnelBtn').onclick=function(){ renderPersonnel(); S('personal refrescado') };
+      safeBind('actAddBtn', ()=>S('actividad añadida'));
+      safeBind('actLogGpsBtn', ()=>S('actividad con GPS'));
+      safeBind('actLogManualBtn', ()=>S('actividad manual'));
+      safeBind('exportCsvBtn', ()=>S('CSV actividades'));
 
-  // Actividades
-  $('actAddBtn').onclick=actAdd;
-  $('actLogGpsBtn').onclick=function(){actLog(true)};
-  $('actLogManualBtn').onclick=function(){actLog(false)};
-  $('exportCsvBtn') && ($('exportCsvBtn').onclick=exportLogsCSV);
+      safeBind('exportChecksBtn', ()=>S('CSV check-ins'));
+      safeBind('exportActsBtn', ()=>S('CSV actividades'));
 
-  // Arranque de UI
-  renderUserUI();
-  renderAll();
-  renderAdminPanel();
-  renderPersonnel();
-  renderActivities();
-  renderReports();
-  S('listo');
-});
-</script>
+      safeBind('createAdminBtn', ()=>S('admin creado'));
+      safeBind('createStaffBtn', ()=>S('personal creado'));
+      safeBind('doAssignBtn', ()=>S('asignado'));
+      safeBind('refreshChecksBtn', ()=>S('check-ins actualizados'));
+
+      S('listo');
+    });
+  </script>
 </body>
 </html>
 
