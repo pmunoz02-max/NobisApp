@@ -5,19 +5,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>NobisApp</title>
 
-  <!-- TailwindCSS -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet CSS con 2 CDNs (primario + fallback). Si uno falla, el otro carga. -->
+  <link id="leafletCss1" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <link id="leafletCss2" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" onload="this.media='all'" media="print">
 
   <style>
     body{background:#f3f4f6}
     .card{background:#fff;border-radius:1rem;box-shadow:0 8px 24px rgba(15,23,42,.06)}
-    #map{height:520px;min-height:380px;width:100%;background:#eef2f7}
+    #map{height:520px;min-height:380px;width:100%;background:#eef2f7;position:relative}
     .label-in-map{background:transparent;border:none;box-shadow:none;color:#1f2937;font-weight:600;text-shadow:0 0 3px #ffffffc7}
     .btn:disabled{opacity:.45;cursor:not-allowed}
+    #mapError{position:absolute;inset:auto 0 0 0;background:#fee2e2;color:#7f1d1d;font-size:.85rem;padding:.4rem .6rem;display:none}
   </style>
 </head>
 <body class="text-gray-900">
@@ -27,7 +28,7 @@
       <div class="text-xs text-gray-600">Estado: <span id="statusDot" class="font-semibold">inicial</span></div>
     </div>
 
-    <!-- Barra superior mínima para no romper nada que ya funcione -->
+    <!-- Encabezado conservador (no toca tu lógica previa) -->
     <div class="grid md:grid-cols-3 gap-4">
       <div class="card p-4">
         <label class="block text-sm font-medium mb-1">Usuario</label>
@@ -87,16 +88,17 @@
     <!-- MAPA -->
     <div class="mt-4 card overflow-hidden">
       <div class="px-4 py-3 border-b"><h2 class="text-lg font-semibold">Mapa</h2></div>
-      <div id="map"></div>
+      <div id="map">
+        <div id="mapError"></div>
+      </div>
     </div>
 
-    <!-- Geocercas -->
+    <!-- Módulos (resumen) -->
     <div class="mt-4 card">
       <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Geocercas</h3></div>
       <ul id="fenceList" class="p-3 divide-y"></ul>
     </div>
 
-    <!-- Gestión de personal -->
     <div id="personnelModule" class="mt-6 card">
       <div class="px-4 py-3 border-b flex items-center justify-between">
         <h3 class="text-lg font-semibold">Gestión de personal</h3>
@@ -113,7 +115,6 @@
       </div>
     </div>
 
-    <!-- Actividades -->
     <div id="activitiesModule" class="mt-6 card">
       <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Actividades</h3></div>
       <div class="p-4 grid md:grid-cols-3 gap-4">
@@ -149,7 +150,6 @@
       </div>
     </div>
 
-    <!-- Reportes -->
     <div id="reportsModule" class="mt-6 card">
       <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Reportes</h3></div>
       <div class="p-4">
@@ -161,7 +161,6 @@
       </div>
     </div>
 
-    <!-- Administración -->
     <div id="adminModule" class="mt-6 card">
       <div class="px-4 py-3 border-b flex items-center justify-between">
         <h3 class="text-lg font-semibold">Administración de usuarios</h3>
@@ -197,48 +196,72 @@
     </div>
   </div>
 
+  <!-- Loader robusto de Leaflet + inicialización resistente -->
   <script>
-    /* Utilidades mínimas y seguras */
     function $(id){return document.getElementById(id)}
     function S(t){const x=$('statusDot'); if(x) x.textContent=t}
+    function showMapError(msg){ const b=$('mapError'); if(b){ b.textContent=msg; b.style.display='block'; } }
 
-    /* Sólo lo necesario para que el mapa SIEMPRE cargue */
-    let map;
-    function initMapHardy() {
-      const el = $('map');
-      if (!el) return;
+    // Carga secuencial con fallback de 3 CDNs
+    (function loadLeaflet(cb){
+      const srcs=[
+        'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
+        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'
+      ];
+      let i=0;
+      function next(){
+        if(window.L && L.map){ return cb(); }
+        if(i>=srcs.length){ showMapError('No se pudo cargar Leaflet. Revisa tu conexión/CDN.'); return; }
+        const s=document.createElement('script');
+        s.src=srcs[i++]; s.async=false;
+        s.onload=()=>cb();
+        s.onerror=()=>next();
+        document.head.appendChild(s);
+      }
+      next();
+    })(function initMap(){
+      const el=$('map');
+      if(!el){ showMapError('Contenedor #map no encontrado.'); return; }
+      if(!el.style.height) el.style.height='520px';
 
-      // Altura garantizada
-      if (!el.style.height) el.style.height = '520px';
+      let map;
+      try{
+        map=L.map('map',{preferCanvas:true}).setView([-1.5,-78.5],9);
 
-      try {
-        map = L.map('map', { preferCanvas: true }).setView([-1.5, -78.5], 9);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '© OpenStreetMap'
+        // Capa OSM principal
+        const osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+          maxZoom:19, attribution:'© OpenStreetMap'
         }).addTo(map);
 
-        // Invalidate para contenedores recién pintados
-        const fix = () => { try { map.invalidateSize(true); } catch(e){} };
-        setTimeout(fix, 0);
-        setTimeout(fix, 300);
-        window.addEventListener('load', fix);
-        if ('ResizeObserver' in window) {
-          new ResizeObserver(fix).observe(el);
-        } else {
-          window.addEventListener('resize', fix);
-        }
+        // Fallback: si hay errores de tiles, alterno a Carto
+        let errors=0, switched=false;
+        osm.on('tileerror',function(){
+          errors++; 
+          if(!switched && errors>=4){
+            switched=true;
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+              maxZoom:19, attribution:'© OpenStreetMap, © CARTO'
+            }).addTo(map);
+            showMapError('Conmutado a servidor de tiles alternativo (Carto).');
+          }
+        });
+
+        // Invalidates para evitar “canvas gris”
+        const fix=()=>{ try{ map.invalidateSize(true); }catch(e){} };
+        setTimeout(fix,0); setTimeout(fix,300);
+        window.addEventListener('load',fix);
+        if('ResizeObserver' in window) new ResizeObserver(fix).observe(el); else window.addEventListener('resize',fix);
 
         S('mapa listo');
-      } catch (e) {
-        alert('No se pudo inicializar el mapa: ' + (e && e.message ? e.message : e));
-      }
-    }
 
-    /* Stubs seguros para no romper módulos existentes (muestran UI básica) */
-    function safeBind(id, handler){ const el=$(id); if(el) el.onclick=handler; }
-    function renderMinimalUI(){
-      // Usuarios mínimos en localStorage para no romper selects
+      }catch(e){
+        showMapError('Error iniciando el mapa: '+(e&&e.message?e.message:e));
+      }
+    });
+
+    // Relleno mínimo de UI para que nada rompa mientras corriges lógica
+    document.addEventListener('DOMContentLoaded', function(){
       const K='NobisApp_users', KC='NobisApp_current_user';
       let users=[]; try{users=JSON.parse(localStorage.getItem(K)||'[]')}catch(e){users=[]}
       if(!Array.isArray(users) || users.length===0){
@@ -254,32 +277,22 @@
         usel.value=cur;
       }
 
-      // Geocercas select vacío seguro
       const gf=$('geofenceSelect'); if(gf){ gf.innerHTML=''; }
-
-      // Lista geocercas vacía
       const ul=$('fenceList'); if(ul){ ul.innerHTML='<li class="py-6 text-center text-gray-500">No hay geocercas.</li>'; }
 
-      // Gestión personal (tabla vacía)
       const staffTable=$('staffTable'); const hint=$('noStaffHint');
-      if(staffTable){
-        staffTable.innerHTML='';
-        if(hint) hint.classList.remove('hidden');
-      }
+      if(staffTable){ staffTable.innerHTML=''; if(hint) hint.classList.remove('hidden'); }
 
-      // Actividades (listas/combos vacíos)
       const actList=$('actList'); if(actList) actList.innerHTML='<li class="text-gray-500">Sin actividades. Añade arriba.</li>';
       const actStaff=$('actStaffSelect'); if(actStaff) actStaff.innerHTML='';
       const actSel=$('actSelect'); if(actSel) actSel.innerHTML='';
       const actLogs=$('actLogs'); if(actLogs) actLogs.innerHTML='<li class="text-gray-500">Sin registros.</li>';
 
-      // Reportes (tarjetas 0)
       const rep=$('repSummary'); if(rep){
         rep.innerHTML=['Geocercas','Personal','Asignaciones','Actividades','Check-ins']
           .map(t=>`<div class="p-4 rounded-xl bg-slate-50 border text-center"><div class="text-2xl font-bold">0</div><div class="text-xs text-slate-600">${t}</div></div>`).join('');
       }
 
-      // Administración (combos vacíos)
       const as1=$('assignStaffSelect'); if(as1) as1.innerHTML='';
       const as2=$('assignAdminSelect'); if(as2) as2.innerHTML='';
       const as3=$('assignFenceSelect'); if(as3) as3.innerHTML='';
@@ -287,47 +300,6 @@
       const usersTable=$('usersTable'); if(usersTable){
         usersTable.innerHTML='<div class="text-sm text-gray-600">La tabla se llenará cuando se creen usuarios.</div>';
       }
-    }
-
-    document.addEventListener('DOMContentLoaded', function(){
-      // 1) Pintar UI básica (sin romper nada existente)
-      renderMinimalUI();
-
-      // 2) Iniciar el mapa de forma a prueba de fallos
-      initMapHardy();
-
-      // 3) Enlaces “no destructivos” (placeholders para evitar errores JS)
-      safeBind('newFenceBtn', ()=>S('nuevo dibujo'));
-      safeBind('finishFenceBtn', ()=>S('finalizar (requiere dibujo)'));
-      safeBind('cancelFenceBtn', ()=>S('cancelado'));
-      safeBind('saveNameBtn', ()=>S('nombre guardado'));
-      safeBind('cancelNameBtn', ()=>S('seguir dibujando'));
-      safeBind('createFenceByCoordsBtn', ()=>S('crear por coordenadas'));
-      safeBind('editFenceBtn', ()=>S('editar'));
-      safeBind('saveFenceEditBtn', ()=>S('cambios guardados'));
-      safeBind('cancelFenceEditBtn', ()=>S('edición cancelada'));
-      safeBind('renameFenceBtn', ()=>S('renombrar'));
-      safeBind('deleteFenceBtn', ()=>S('eliminar'));
-      safeBind('exportGeoJsonBtn', ()=>S('exportar'));
-      const imp=$('importGeoJsonInput'); if(imp){ imp.onchange=()=>S('importar'); }
-
-      safeBind('addStaffFromPersonnel', ()=>S('añadir personal'));
-      safeBind('refreshPersonnelBtn', ()=>S('refrescar personal'));
-
-      safeBind('actAddBtn', ()=>S('actividad añadida'));
-      safeBind('actLogGpsBtn', ()=>S('actividad con GPS'));
-      safeBind('actLogManualBtn', ()=>S('actividad manual'));
-      safeBind('exportCsvBtn', ()=>S('CSV actividades'));
-
-      safeBind('exportChecksBtn', ()=>S('CSV check-ins'));
-      safeBind('exportActsBtn', ()=>S('CSV actividades'));
-
-      safeBind('createAdminBtn', ()=>S('admin creado'));
-      safeBind('createStaffBtn', ()=>S('personal creado'));
-      safeBind('doAssignBtn', ()=>S('asignado'));
-      safeBind('refreshChecksBtn', ()=>S('check-ins actualizados'));
-
-      S('listo');
     });
   </script>
 </body>
