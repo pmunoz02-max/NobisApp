@@ -15,13 +15,14 @@
   <style>
     .card{background:#fff;border-radius:1rem;box-shadow:0 8px 24px rgba(15,23,42,.06)}
     .label-in-map{background:transparent;border:none;box-shadow:none;color:#1f2937;font-weight:600;text-shadow:0 0 3px #ffffffc7}
-    .leaflet-container{background:#f3f4f6}
+    .leaflet-container{background:#f3f4f6; min-height: 360px;}
     .vertex-handle{width:12px;height:12px;background:#fff;border:2px solid #2563eb;border-radius:50%;box-shadow:0 0 0 2px #ffffffa8}
     .btn:disabled{opacity:.45;cursor:not-allowed}
     .role-badge{font-size:.72rem;padding:.15rem .4rem;border-radius:.5rem}
     .role-owner{background:#1e293b;color:#fff}
     .role-admin{background:#0ea5e9;color:#fff}
     .role-staff{background:#10b981;color:#0b3b2e}
+    #map{height:520px;min-height:380px;width:100%}
   </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
@@ -94,7 +95,7 @@
   <!-- ====== MAPA PRINCIPAL ====== -->
   <div class="mt-4 card overflow-hidden">
     <div class="px-4 py-3 border-b"><h2 class="text-lg font-semibold">Mapa</h2></div>
-    <div id="map" style="height:520px;min-height:380px;"></div>
+    <div id="map"></div>
   </div>
 
   <!-- ====== LISTA GEOFERCAS ====== -->
@@ -103,14 +104,20 @@
     <ul id="fenceList" class="p-3 divide-y"></ul>
   </div>
 
-  <!-- ====== GESTIÓN DE PERSONAL (VISIBLE) ====== -->
+  <!-- ====== GESTIÓN DE PERSONAL (ASEGURADO) ====== -->
   <div id="personnelModule" class="mt-6 card">
     <div class="px-4 py-3 border-b flex items-center justify-between">
       <h3 class="text-lg font-semibold">Gestión de personal</h3>
-      <div class="text-xs text-gray-500">Usa “Asignar geocerca” en Administración para cambiar asignaciones.</div>
+      <div class="flex items-center gap-2">
+        <button id="addStaffFromPersonnel" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Añadir personal</button>
+        <button id="refreshPersonnelBtn" class="px-3 py-2 rounded-lg bg-slate-700 text-white">Refrescar</button>
+      </div>
     </div>
     <div class="p-4">
       <div id="staffTable" class="text-sm overflow-auto"></div>
+      <div id="noStaffHint" class="hidden mt-3 text-sm text-gray-600">
+        No hay personal creado. Usa <b>Añadir personal</b> aquí arriba o desde <b>Administración de usuarios</b>.
+      </div>
     </div>
   </div>
 
@@ -278,16 +285,23 @@ var STYLESEL={color:'#7c3aed',weight:4,fillColor:'#c4b5fd',fillOpacity:.26};
 var STYLEEDIT={color:'#0ea5e9',weight:3,fillColor:'#7dd3fc',fillOpacity:.18};
 
 function initMap(){
-  var el=$('map'); if(el && (!el.style.height || el.clientHeight===0)){ el.style.height='520px'; }
-  map=L.map('map',{preferCanvas:true}).setView([-1.5,-78.5],9);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
-  // Recalibres seguros
-  setTimeout(function(){ try{map.invalidateSize(true)}catch(e){} },0);
-  setTimeout(function(){ try{map.invalidateSize(true)}catch(e){} },300);
-  if('ResizeObserver' in window){
-    new ResizeObserver(function(){ try{map.invalidateSize(true)}catch(e){} }).observe(el);
-  }else{
-    window.addEventListener('resize', function(){ try{map.invalidateSize(true)}catch(e){} });
+  try{
+    var el=$('map');
+    if(!el){S('map no encontrado');return}
+    if(!el.style.height) el.style.height='520px';
+    map=L.map('map',{preferCanvas:true}).setView([-1.5,-78.5],9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+
+    // Recalibres seguros
+    setTimeout(function(){ try{map.invalidateSize(true)}catch(e){} },0);
+    setTimeout(function(){ try{map.invalidateSize(true)}catch(e){} },350);
+    if('ResizeObserver' in window){
+      new ResizeObserver(function(){ try{map.invalidateSize(true)}catch(e){} }).observe(el);
+    }else{
+      window.addEventListener('resize', function(){ try{map.invalidateSize(true)}catch(e){} });
+    }
+  }catch(err){
+    S('error mapa: '+err.message);
   }
 }
 
@@ -393,19 +407,23 @@ function importGeoJSON(file){
 
 /* ====== RENDER (mapa + lista + selects) ====== */
 function renderAll(){
-  for(var k in layers){ if(layers.hasOwnProperty(k)) map.removeLayer(layers[k]) } layers={};
-  var fs=loadF();
-  for(var i=0;i<fs.length;i++){
-    var f=fs[i]; if(!f.path||f.path.length<3) continue;
-    var latlngs=f.path.map(function(p){return[p.lat,p.lng]});
-    var poly=L.polygon(latlngs,STYLE).addTo(map);
-    poly.bindTooltip((f.name||'Geocerca'),{permanent:true,direction:'center',className:'label-in-map'});
-    (function(fid){poly.on('click',function(){selectFence(fid)})})(f.id);
-    layers[f.id]=poly;
+  try{
+    for(var k in layers){ if(layers.hasOwnProperty(k)) map.removeLayer(layers[k]) } layers={};
+    var fs=loadF();
+    for(var i=0;i<fs.length;i++){
+      var f=fs[i]; if(!f.path||f.path.length<3) continue;
+      var latlngs=f.path.map(function(p){return[p.lat,p.lng]});
+      var poly=L.polygon(latlngs,STYLE).addTo(map);
+      poly.bindTooltip((f.name||'Geocerca'),{permanent:true,direction:'center',className:'label-in-map'});
+      (function(fid){poly.on('click',function(){selectFence(fid)})})(f.id);
+      layers[f.id]=poly;
+    }
+    if(!selectedId && fs.length){selectedId=fs[0].id; var s=$('geofenceSelect'); if(s) s.value=selectedId}
+    paintSel(); rebuildList(); fillSelect(); updateEditBtns();
+    try{ map.invalidateSize(true) }catch(e){}
+  }catch(err){
+    S('error renderAll: '+err.message);
   }
-  if(!selectedId && fs.length){selectedId=fs[0].id; var s=$('geofenceSelect'); if(s) s.value=selectedId}
-  paintSel(); rebuildList(); fillSelect(); updateEditBtns();
-  try{ map.invalidateSize(true) }catch(e){}
 }
 function selectFence(id){selectedId=id; paintSel(); updateEditBtns(); var s=$('geofenceSelect'); if(s) s.value=id||''; S('geocerca seleccionada')}
 function paintSel(){for(var id in layers){ if(layers.hasOwnProperty(id)) layers[id].setStyle(id===selectedId?STYLESEL:STYLE)}}
@@ -493,10 +511,21 @@ function staffSendPosition(){
   }, function(err){if(msg) msg.textContent='Error de geolocalización: '+err.message},{enableHighAccuracy:true,timeout:10000})
 }
 
-/* ====== PERSONAL (MÓDULO RESTAURADO) ====== */
+/* ====== PERSONAL (tabla y acciones) ====== */
 function renderPersonnel(){
   var users=getUsers();
   var staff=users.filter(function(u){return u.role==='staff'});
+
+  var cont=$('staffTable'), hint=$('noStaffHint');
+  if(!cont) return;
+
+  if(staff.length===0){
+    cont.innerHTML='';
+    if(hint) hint.classList.remove('hidden');
+    return;
+  }
+  if(hint) hint.classList.add('hidden');
+
   var html='<div class="overflow-auto"><table class="min-w-full text-left text-sm"><thead><tr class="text-slate-500"><th class="px-2 py-1">Nombre</th><th class="px-2 py-1">Asignación</th><th class="px-2 py-1">Acciones</th></tr></thead><tbody>';
   for(var i=0;i<staff.length;i++){
     var s=staff[i], asg=getAssign(s.id), badge='<span class="role-badge role-staff">staff</span>';
@@ -507,7 +536,7 @@ function renderPersonnel(){
          +'<button data-d="'+s.id+'" class="px-2 py-1 rounded bg-rose-600 text-white btn-del-staff">Eliminar</button></td></tr>'
   }
   html+='</tbody></table></div>';
-  var cont=$('staffTable'); if(cont) cont.innerHTML=html;
+  cont.innerHTML=html;
 
   var rs=document.querySelectorAll('.btn-rename-staff');
   for(var r=0;r<rs.length;r++){rs[r].onclick=function(){var id=this.getAttribute('data-r'); var u=userById(id); if(!u) return; var name=prompt('Nuevo nombre (staff):',u.name); if(name===null) return; renameUser(id,name); renderPersonnel(); renderUserUI()}}
@@ -642,68 +671,76 @@ function rerenderAll(msg){ renderAll(); renderUserUI(); renderAdminPanel(); rend
 
 /* ====== EVENTOS BOTONES GLOBALES ====== */
 window.addEventListener('load', function(){
-  ensureUsersBootstrap();
-  CURRENT_USER_ID=getCurrentUser();
+  try{
+    ensureUsersBootstrap();
+    CURRENT_USER_ID=getCurrentUser();
 
-  // Mapa simple y estable
-  initMap();
+    // Mapa simple y estable
+    initMap();
 
-  // Geocercas
-  $('newFenceBtn').onclick=startDraw;
-  $('finishFenceBtn').onclick=finishDraw;
-  $('cancelFenceBtn').onclick=cancelDraw;
+    // Geocercas
+    $('newFenceBtn').onclick=startDraw;
+    $('finishFenceBtn').onclick=finishDraw;
+    $('cancelFenceBtn').onclick=cancelDraw;
 
-  $('saveNameBtn').onclick=saveNameFromBar;
-  $('cancelNameBtn').onclick=function(){$('nameBar').classList.add('hidden')};
-  var nf=$('nameField'); if(nf){ nf.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();saveNameFromBar()}}); }
+    $('saveNameBtn').onclick=saveNameFromBar;
+    $('cancelNameBtn').onclick=function(){$('nameBar').classList.add('hidden')};
+    var nf=$('nameField'); if(nf){ nf.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();saveNameFromBar()}}); }
 
-  $('createFenceByCoordsBtn').onclick=function(){
-    var raw=prompt('Introduce líneas lat,lng (una por vértice):'); if(!raw) return;
-    var lines=raw.split(/\n+/), pts=[]; for(var i=0;i<lines.length;i++){var p=lines[i].trim(); if(!p) continue; var parts=p.split(','); if(parts.length<2) continue; var lat=parseFloat(parts[0]), lng=parseFloat(parts[1]); if(isFinite(lat)&&isFinite(lng)) pts.push({lat:lat,lng:lng})}
-    if(pts.length<3){alert('Se requieren al menos 3 vértices.'); return}
-    var id='f_'+Math.random().toString(36).slice(2,10), name=prompt('Nombre de la geocerca:', nextDefaultName())||nextDefaultName();
-    var fs=loadF(); fs.push({id:id,name:name,path:pts}); saveF(fs); renderAll(); zoomTo(id); S('geocerca creada por coordenadas')
-  };
+    $('createFenceByCoordsBtn').onclick=function(){
+      var raw=prompt('Introduce líneas lat,lng (una por vértice):'); if(!raw) return;
+      var lines=raw.split(/\n+/), pts=[]; for(var i=0;i<lines.length;i++){var p=lines[i].trim(); if(!p) continue; var parts=p.split(','); if(parts.length<2) continue; var lat=parseFloat(parts[0]), lng=parseFloat(parts[1]); if(isFinite(lat)&&isFinite(lng)) pts.push({lat:lat,lng:lng})}
+      if(pts.length<3){alert('Se requieren al menos 3 vértices.'); return}
+      var id='f_'+Math.random().toString(36).slice(2,10), name=prompt('Nombre de la geocerca:', nextDefaultName())||nextDefaultName();
+      var fs=loadF(); fs.push({id:id,name:name,path:pts}); saveF(fs); renderAll(); zoomTo(id); S('geocerca creada por coordenadas')
+    };
 
-  $('editFenceBtn').onclick=beginEdit;
-  $('saveFenceEditBtn').onclick=saveEdit;
-  $('cancelFenceEditBtn').onclick=cancelEdit;
-  $('deleteFenceBtn').onclick=removeFence;
+    $('editFenceBtn').onclick=beginEdit;
+    $('saveFenceEditBtn').onclick=saveEdit;
+    $('cancelFenceEditBtn').onclick=cancelEdit;
+    $('deleteFenceBtn').onclick=removeFence;
 
-  $('renameFenceBtn').onclick=function(){
-    if(!selectedId){var s=$('geofenceSelect'); var v=s?s.value:''; if(v) selectFence(v)}
-    if(!selectedId){alert('Selecciona una geocerca.'); return}
-    if(editing){alert('Termina/cancela la edición.'); return}
-    var fs=loadF(), f=null; for(var i=0;i<fs.length;i++) if(fs[i].id===selectedId){f=fs[i]; break}
-    var nm=prompt('Nuevo nombre:', (f&&f.name)||''); if(nm===null) return;
-    if(!nm.trim()) return;
-    f.name=nm.trim(); saveF(fs); renderAll(); selectFence(selectedId); S('nombre actualizado')
-  };
+    $('renameFenceBtn').onclick=function(){
+      if(!selectedId){var s=$('geofenceSelect'); var v=s?s.value:''; if(v) selectFence(v)}
+      if(!selectedId){alert('Selecciona una geocerca.'); return}
+      if(editing){alert('Termina/cancela la edición.'); return}
+      var fs=loadF(), f=null; for(var i=0;i<fs.length;i++) if(fs[i].id===selectedId){f=fs[i]; break}
+      var nm=prompt('Nuevo nombre:', (f&&f.name)||''); if(nm===null) return;
+      if(!nm.trim()) return;
+      f.name=nm.trim(); saveF(fs); renderAll(); selectFence(selectedId); S('nombre actualizado')
+    };
 
-  $('exportGeoJsonBtn').onclick=exportGeoJSON;
-  $('importGeoJsonInput').onchange=function(e){var f=e.target&&e.target.files&&e.target.files[0]; if(f) importGeoJSON(f)};
+    $('exportGeoJsonBtn').onclick=exportGeoJSON;
+    $('importGeoJsonInput').onchange=function(e){var f=e.target&&e.target.files&&e.target.files[0]; if(f) importGeoJSON(f)};
 
-  // Administración
-  $('doAssignBtn').onclick=assignFenceToStaff;
-  $('refreshChecksBtn').onclick=renderChecksList;
-  $('assignAdminSelect').onchange=populateAssignFences;
-  $('createAdminBtn').onclick=function(){createUserWithRole(prompt('Nombre del administrador')||'','admin'); rerenderAll('administrador creado')};
-  $('createStaffBtn').onclick=function(){createUserWithRole(prompt('Nombre del personal')||'','staff'); rerenderAll('personal creado')};
+    // Administración
+    $('doAssignBtn').onclick=assignFenceToStaff;
+    $('refreshChecksBtn').onclick=renderChecksList;
+    $('assignAdminSelect').onchange=populateAssignFences;
+    $('createAdminBtn').onclick=function(){createUserWithRole(prompt('Nombre del administrador')||'','admin'); rerenderAll('administrador creado')};
+    $('createStaffBtn').onclick=function(){createUserWithRole(prompt('Nombre del personal')||'','staff'); rerenderAll('personal creado')};
 
-  // Actividades
-  $('actAddBtn').onclick=actAdd;
-  $('actLogGpsBtn').onclick=function(){actLog(true)};
-  $('actLogManualBtn').onclick=function(){actLog(false)};
-  $('exportCsvBtn') && ($('exportCsvBtn').onclick=exportLogsCSV);
+    // Gestión de personal (botones del módulo)
+    $('addStaffFromPersonnel').onclick=function(){ createUserWithRole(prompt('Nombre del personal')||'','staff'); rerenderAll('personal creado') };
+    $('refreshPersonnelBtn').onclick=function(){ renderPersonnel(); S('personal refrescado') };
 
-  // Arranque de UI
-  renderUserUI();
-  renderAll();
-  renderAdminPanel();
-  renderPersonnel();
-  renderActivities();
-  renderReports();
-  S('listo');
+    // Actividades
+    $('actAddBtn').onclick=actAdd;
+    $('actLogGpsBtn').onclick=function(){actLog(true)};
+    $('actLogManualBtn').onclick=function(){actLog(false)};
+    $('exportCsvBtn') && ($('exportCsvBtn').onclick=exportLogsCSV);
+
+    // Arranque de UI
+    renderUserUI();
+    renderAll();
+    renderAdminPanel();
+    renderPersonnel();
+    renderActivities();
+    renderReports();
+    S('listo');
+  }catch(err){
+    S('error init: '+err.message);
+  }
 });
 </script>
 </body>
