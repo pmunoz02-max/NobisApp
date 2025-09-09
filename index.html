@@ -1,6 +1,7 @@
 <!doctype html>
 // ==== Inicio (robusto, sin alert bloqueante) ====
-(function boot() {
+<html lang="es">
+  (function boot() {
   // Espera a que exista Leaflet y el contenedor del mapa
   var listo = !!(window.L && document.getElementById('map'));
   if (!listo) return setTimeout(boot, 50);
@@ -17,8 +18,6 @@
     setTimeout(boot, 80);
   }
 })();
-
-<html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta
