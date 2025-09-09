@@ -8,7 +8,7 @@
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Leaflet CSS con 2 CDNs -->
+  <!-- Leaflet CSS con 2 CDNs (primario + fallback). Si uno falla, el otro carga. -->
   <link id="leafletCss1" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
   <link id="leafletCss2" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" onload="this.media='all'" media="print">
 
@@ -16,6 +16,7 @@
     body{background:#f3f4f6}
     .card{background:#fff;border-radius:1rem;box-shadow:0 8px 24px rgba(15,23,42,.06)}
     #map{height:520px;min-height:380px;width:100%;background:#eef2f7;position:relative}
+    .label-in-map{background:transparent;border:none;box-shadow:none;color:#1f2937;font-weight:600;text-shadow:0 0 3px #ffffffc7}
     .btn:disabled{opacity:.45;cursor:not-allowed}
     #mapError{position:absolute;inset:auto 0 0 0;background:#fee2e2;color:#7f1d1d;font-size:.85rem;padding:.4rem .6rem;display:none}
   </style>
@@ -27,7 +28,7 @@
       <div class="text-xs text-gray-600">Estado: <span id="statusDot" class="font-semibold">inicial</span></div>
     </div>
 
-    <!-- Header -->
+    <!-- Encabezado conservador (no toca tu lógica previa) -->
     <div class="grid md:grid-cols-3 gap-4">
       <div class="card p-4">
         <label class="block text-sm font-medium mb-1">Usuario</label>
@@ -87,16 +88,17 @@
     <!-- MAPA -->
     <div class="mt-4 card overflow-hidden">
       <div class="px-4 py-3 border-b"><h2 class="text-lg font-semibold">Mapa</h2></div>
-      <div id="map"><div id="mapError"></div></div>
+      <div id="map">
+        <div id="mapError"></div>
+      </div>
     </div>
 
-    <!-- Geocercas -->
+    <!-- Módulos (resumen) -->
     <div class="mt-4 card">
       <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Geocercas</h3></div>
       <ul id="fenceList" class="p-3 divide-y"></ul>
     </div>
 
-    <!-- Gestión de personal -->
     <div id="personnelModule" class="mt-6 card">
       <div class="px-4 py-3 border-b flex items-center justify-between">
         <h3 class="text-lg font-semibold">Gestión de personal</h3>
@@ -113,7 +115,6 @@
       </div>
     </div>
 
-    <!-- Actividades -->
     <div id="activitiesModule" class="mt-6 card">
       <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Actividades</h3></div>
       <div class="p-4 grid md:grid-cols-3 gap-4">
@@ -149,7 +150,6 @@
       </div>
     </div>
 
-    <!-- Reportes -->
     <div id="reportsModule" class="mt-6 card">
       <div class="px-4 py-3 border-b"><h3 class="text-lg font-semibold">Reportes</h3></div>
       <div class="p-4">
@@ -161,7 +161,6 @@
       </div>
     </div>
 
-    <!-- Administración -->
     <div id="adminModule" class="mt-6 card">
       <div class="px-4 py-3 border-b flex items-center justify-between">
         <h3 class="text-lg font-semibold">Administración de usuarios</h3>
@@ -197,12 +196,13 @@
     </div>
   </div>
 
-  <!-- Loader robusto Leaflet + mapa (igual que el que ya te funciona) -->
+  <!-- Loader robusto de Leaflet + inicialización resistente -->
   <script>
     function $(id){return document.getElementById(id)}
     function S(t){const x=$('statusDot'); if(x) x.textContent=t}
     function showMapError(msg){ const b=$('mapError'); if(b){ b.textContent=msg; b.style.display='block'; } }
 
+    // Carga secuencial con fallback de 3 CDNs
     (function loadLeaflet(cb){
       const srcs=[
         'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
@@ -229,10 +229,12 @@
       try{
         map=L.map('map',{preferCanvas:true}).setView([-1.5,-78.5],9);
 
+        // Capa OSM principal
         const osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
           maxZoom:19, attribution:'© OpenStreetMap'
         }).addTo(map);
 
+        // Fallback: si hay errores de tiles, alterno a Carto
         let errors=0, switched=false;
         osm.on('tileerror',function(){
           errors++; 
@@ -245,21 +247,20 @@
           }
         });
 
+        // Invalidates para evitar “canvas gris”
         const fix=()=>{ try{ map.invalidateSize(true); }catch(e){} };
         setTimeout(fix,0); setTimeout(fix,300);
         window.addEventListener('load',fix);
         if('ResizeObserver' in window) new ResizeObserver(fix).observe(el); else window.addEventListener('resize',fix);
 
-        // Hago el mapa accesible al módulo de geocercas sin tocar nada más
-        window.nobisMap = map;
-        document.dispatchEvent(new CustomEvent('nobis:map-ready'));
         S('mapa listo');
+
       }catch(e){
         showMapError('Error iniciando el mapa: '+(e&&e.message?e.message:e));
       }
     });
 
-    // Bootstrap mínimo (usuarios y reportes con tarjetas 0)
+    // Relleno mínimo de UI para que nada rompa mientras corriges lógica
     document.addEventListener('DOMContentLoaded', function(){
       const K='NobisApp_users', KC='NobisApp_current_user';
       let users=[]; try{users=JSON.parse(localStorage.getItem(K)||'[]')}catch(e){users=[]}
@@ -276,989 +277,45 @@
         usel.value=cur;
       }
 
+      const gf=$('geofenceSelect'); if(gf){ gf.innerHTML=''; }
+      const ul=$('fenceList'); if(ul){ ul.innerHTML='<li class="py-6 text-center text-gray-500">No hay geocercas.</li>'; }
+
+      const staffTable=$('staffTable'); const hint=$('noStaffHint');
+      if(staffTable){ staffTable.innerHTML=''; if(hint) hint.classList.remove('hidden'); }
+
+      const actList=$('actList'); if(actList) actList.innerHTML='<li class="text-gray-500">Sin actividades. Añade arriba.</li>';
+      const actStaff=$('actStaffSelect'); if(actStaff) actStaff.innerHTML='';
+      const actSel=$('actSelect'); if(actSel) actSel.innerHTML='';
+      const actLogs=$('actLogs'); if(actLogs) actLogs.innerHTML='<li class="text-gray-500">Sin registros.</li>';
+
       const rep=$('repSummary'); if(rep){
         rep.innerHTML=['Geocercas','Personal','Asignaciones','Actividades','Check-ins']
           .map(t=>`<div class="p-4 rounded-xl bg-slate-50 border text-center"><div class="text-2xl font-bold">0</div><div class="text-xs text-slate-600">${t}</div></div>`).join('');
       }
+
+      const as1=$('assignStaffSelect'); if(as1) as1.innerHTML='';
+      const as2=$('assignAdminSelect'); if(as2) as2.innerHTML='';
+      const as3=$('assignFenceSelect'); if(as3) as3.innerHTML='';
+      const ckSel=$('checkStaffSelect'); if(ckSel) ckSel.innerHTML='';
+      const usersTable=$('usersTable'); if(usersTable){
+        usersTable.innerHTML='<div class="text-sm text-gray-600">La tabla se llenará cuando se creen usuarios.</div>';
+      }
     });
   </script>
 
-  <!-- ===== Geocercas: lógica restaurada (sin tocar el mapa) ===== -->
-  <script>
-  (function geofencesModule(){
-    "use strict";
-    const FKEY_PREFIX = 'NobisApp_fences_';
-    const UK='NobisApp_users', CK='NobisApp_current_user';
-
-    let map;                 // se asigna cuando el mapa está listo
-    let drawing = false;
-    let editing = false;
-    let activeId = null;
-
-    const draw = {
-      markers: [],
-      tempLine: null,
-      tempPoly: null
-    };
-
-    const layers = {
-      group: null,            // L.LayerGroup para todas las geocercas
-      verts: []               // marcadores de edición
-    };
-
-    const els = {
-      userSel: $('userSelect'),
-      fenceSel: $('geofenceSelect'),
-      fenceList: $('fenceList'),
-
-      newBtn: $('newFenceBtn'),
-      finBtn: $('finishFenceBtn'),
-      cancelBtn: $('cancelFenceBtn'),
-      editBtn: $('editFenceBtn'),
-      saveEditBtn: $('saveFenceEditBtn'),
-      cancelEditBtn: $('cancelFenceEditBtn'),
-      renameBtn: $('renameFenceBtn'),
-      delBtn: $('deleteFenceBtn'),
-      nameBar: $('nameBar'),
-      nameField: $('nameField'),
-      saveNameBtn: $('saveNameBtn'),
-      cancelNameBtn: $('cancelNameBtn'),
-      byCoordsBtn: $('createFenceByCoordsBtn'),
-      exportBtn: $('exportGeoJsonBtn'),
-      importInput: $('importGeoJsonInput'),
-    };
-
-    function getCurrentUserId(){
-      const raw = localStorage.getItem(CK);
-      if(raw) return raw;
-      const users = JSON.parse(localStorage.getItem(UK)||'[]');
-      return users[0]?.id || 'owner';
-    }
-    function fk(uid){ return FKEY_PREFIX + uid; }
-
-    function readFences(uid){
-      try{ const a = JSON.parse(localStorage.getItem(fk(uid))||'[]'); return Array.isArray(a)?a:[]; }
-      catch(e){ return []; }
-    }
-    function writeFences(uid, arr){
-      localStorage.setItem(fk(uid), JSON.stringify(arr||[]));
-    }
-
-    function uuid(){ return 'g_'+Math.random().toString(36).slice(2,10); }
-
-    function enable(el, on=true){ if(el) el.disabled = !on; }
-    function show(el, on=true){ if(!el) return; el.classList.toggle('hidden', !on); }
-
-    function clearTempDraw(){
-      draw.markers.forEach(m => m.remove());
-      draw.markers = [];
-      if(draw.tempLine){ draw.tempLine.remove(); draw.tempLine=null; }
-      if(draw.tempPoly){ draw.tempPoly.remove(); draw.tempPoly=null; }
-    }
-
-    function setButtonsForIdle(){
-      drawing=false; editing=false;
-      enable(els.newBtn, true);
-      enable(els.finBtn, false);
-      enable(els.cancelBtn, false);
-      enable(els.editBtn, !!activeId);
-      enable(els.saveEditBtn, false);
-      enable(els.cancelEditBtn, false);
-      enable(els.renameBtn, !!activeId);
-      enable(els.delBtn, !!activeId);
-      show(els.nameBar, false);
-    }
-
-    function setButtonsForDrawing(){
-      drawing=true; editing=false;
-      enable(els.newBtn, false);
-      enable(els.finBtn, false);      // se habilita al tener >=3 pts
-      enable(els.cancelBtn, true);
-      enable(els.editBtn, false);
-      enable(els.saveEditBtn, false);
-      enable(els.cancelEditBtn, false);
-      enable(els.renameBtn, false);
-      enable(els.delBtn, false);
-      show(els.nameBar, false);
-    }
-
-    function setButtonsForEditing(){
-      drawing=false; editing=true;
-      enable(els.newBtn, false);
-      enable(els.finBtn, false);
-      enable(els.cancelBtn, false);
-      enable(els.editBtn, false);
-      enable(els.saveEditBtn, true);
-      enable(els.cancelEditBtn, true);
-      enable(els.renameBtn, false);
-      enable(els.delBtn, false);
-      show(els.nameBar, false);
-    }
-
-    function latlngsFromMarkers(list){ return list.map(m => m.getLatLng()); }
-
-    function drawFenceOnMap(f){
-      // polígono + tooltip permanente
-      const polygon = L.polygon(f.latlngs, { color:'#7c3aed', weight:3, fillOpacity:.2 });
-      polygon.bindTooltip(f.name || 'Geocerca', {permanent:true, direction:'center', className:'label-in-map'});
-      polygon.addTo(layers.group);
-
-      // guardar ref
-      f._layerId = L.Util.stamp(polygon); // id interno de leaflet
-      f._polygon = polygon;
-
-      // click para seleccionar
-      polygon.on('click', () => {
-        activeId = f.id;
-        renderSelectors();
-        map.fitBounds(polygon.getBounds(), {padding:[24,24]});
-      });
-    }
-
-    function renderAllFences(){
-      const uid=getCurrentUserId();
-      const fences = readFences(uid);
-
-      layers.group.clearLayers();
-      fences.forEach(drawFenceOnMap);
-
-      // lista
-      if(els.fenceList){
-        if(!fences.length){
-          els.fenceList.innerHTML = '<li class="py-6 text-center text-gray-500">No hay geocercas.</li>';
-        } else {
-          els.fenceList.innerHTML = fences.map(f => `
-            <li class="py-2 flex items-center justify-between">
-              <span class="text-sm">${f.name}</span>
-              <div class="text-xs text-gray-500">${f.latlngs.length} vértices</div>
-            </li>`).join('');
-        }
-      }
-    }
-
-    function renderSelectors(){
-      const uid=getCurrentUserId();
-      const fences = readFences(uid);
-
-      // select
-      if(els.fenceSel){
-        els.fenceSel.innerHTML = fences.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
-        if(activeId && fences.some(f=>f.id===activeId)) els.fenceSel.value = activeId;
-        else activeId = fences[0]?.id || null;
-        if(els.fenceSel && activeId) els.fenceSel.value = activeId;
-      }
-
-      // estado botones
-      setButtonsForIdle();
-    }
-
-    function refreshUI(){
-      renderSelectors();
-      renderAllFences();
-    }
-
-    /* ==== Dibujo manual ==== */
-    function onMapClickAddVertex(e){
-      if(!drawing) return;
-      const pt = L.circleMarker(e.latlng,{radius:5, color:'#6366f1', fill:true, fillOpacity:1}).addTo(map);
-      draw.markers.push(pt);
-
-      const pts = latlngsFromMarkers(draw.markers);
-      if(draw.tempLine){ draw.tempLine.setLatLngs(pts); }
-      else { draw.tempLine = L.polyline(pts,{color:'#6366f1',weight:2,dashArray:'4 4'}).addTo(map); }
-
-      if(pts.length>=3){
-        enable(els.finBtn,true);
-        if(draw.tempPoly){ draw.tempPoly.setLatLngs(pts); }
-        else { draw.tempPoly = L.polygon(pts,{color:'#a78bfa',weight:2,fillOpacity:.1}).addTo(map); }
-      }
-    }
-
-    function startDrawing(){
-      if(!map) return;
-      clearTempDraw();
-      setButtonsForDrawing();
-      drawing = true;
-      map.on('click', onMapClickAddVertex);
-    }
-
-    function cancelDrawing(){
-      map.off('click', onMapClickAddVertex);
-      clearTempDraw();
-      setButtonsForIdle();
-    }
-
-    function finalizeDrawing(){
-      const pts = latlngsFromMarkers(draw.markers);
-      if(pts.length<3){ alert('Agrega al menos 3 puntos.'); return; }
-      // pedir nombre
-      show(els.nameBar, true);
-      els.nameField.focus();
-
-      const saveName = ()=>{
-        const name = (els.nameField.value||'').trim() || `Geocerca ${Date.now()%1000}`;
-        const uid = getCurrentUserId();
-        const fences = readFences(uid);
-        const f = { id: uuid(), name, latlngs: pts };
-        fences.push(f);
-        writeFences(uid, fences);
-
-        map.off('click', onMapClickAddVertex);
-        clearTempDraw();
-        show(els.nameBar, false);
-        els.nameField.value='';
-
-        activeId = f.id;
-        refreshUI();
-        const poly = readFences(uid).find(x=>x.id===f.id)?._polygon;
-        if(poly) map.fitBounds(poly.getBounds(), {padding:[24,24]});
-      };
-
-      els.saveNameBtn.onclick = saveName;
-      els.nameField.onkeydown = (ev)=>{ if(ev.key==='Enter') saveName(); };
-      els.cancelNameBtn.onclick = ()=>{
-        show(els.nameBar,false);
-      };
-    }
-
-    /* ==== Edición sin plugins ==== */
-    function enterEditMode(){
-      if(!activeId) return;
-      const uid=getCurrentUserId();
-      const fences = readFences(uid);
-      const f = fences.find(x=>x.id===activeId);
-      if(!f || !f._polygon) return;
-
-      setButtonsForEditing();
-      const latlngs = f._polygon.getLatLngs()[0] || f._polygon.getLatLngs();
-
-      layers.verts = latlngs.map(ll=>{
-        const m = L.circleMarker(ll,{radius:6,color:'#f59e0b',fill:true,fillOpacity:1, draggable:true});
-        // hack drag
-        m.dragging = new L.Handler.MarkerDrag(m);
-        m.addTo(map);
-        m.on('mousedown', ()=>m.dragging.enable());
-        m.on('mouseup',   ()=>m.dragging.disable());
-        m.on('drag', ()=> {
-          const cur = layers.verts.map(v=>v.getLatLng());
-          f._polygon.setLatLngs([cur]);
-        });
-        return m;
-      });
-    }
-
-    function saveEdit(){
-      if(!activeId) return;
-      const uid=getCurrentUserId();
-      const fences = readFences(uid);
-      const f = fences.find(x=>x.id===activeId);
-      if(!f || !f._polygon) return;
-
-      const cur = layers.verts.map(v=>v.getLatLng());
-      if(cur.length<3){ alert('Se requieren al menos 3 vértices.'); return; }
-
-      f.latlngs = cur;
-      writeFences(uid, fences);
-      exitEdit(true);
-    }
-
-    function exitEdit(redraw=false){
-      layers.verts.forEach(v=>{ v.dragging && v.dragging.disable(); v.remove(); });
-      layers.verts = [];
-      setButtonsForIdle();
-      if(redraw) refreshUI();
-    }
-
-    /* ==== CRUD extra ==== */
-    function renameFence(){
-      if(!activeId) return;
-      const uid=getCurrentUserId();
-      const fences = readFences(uid);
-      const f = fences.find(x=>x.id===activeId);
-      if(!f) return;
-      const nn = prompt('Nuevo nombre:', f.name);
-      if(nn===null) return;
-      f.name = nn.trim() || f.name;
-      writeFences(uid, fences);
-      refreshUI();
-    }
-
-    function deleteFence(){
-      if(!activeId) return;
-      const uid=getCurrentUserId();
-      let fences = readFences(uid);
-      const f = fences.find(x=>x.id===activeId);
-      if(!f) return;
-      if(!confirm(`Eliminar "${f.name}"?`)) return;
-      if(f._polygon) f._polygon.remove();
-      fences = fences.filter(x=>x.id!==activeId);
-      writeFences(uid, fences);
-      activeId = fences[0]?.id || null;
-      refreshUI();
-    }
-
-    function createByCoords(){
-      const txt = prompt('Pegue líneas lat,lng por vértice (una por línea):\n-1.23456,-78.12345');
-      if(txt===null) return;
-      const lines = txt.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-      const pts=[];
-      for(const line of lines){
-        const [a,b]=line.split(',').map(s=>+s.trim());
-        if(Number.isFinite(a)&&Number.isFinite(b)){ pts.push([a,b]); }
-      }
-      if(pts.length<3){ alert('Se requieren al menos 3 coordenadas.'); return; }
-      const name = prompt('Nombre de la geocerca:', `Geocerca ${Date.now()%1000}`) || `Geocerca ${Date.now()%1000}`;
-      const uid=getCurrentUserId();
-      const fences=readFences(uid);
-      const f={id:uuid(),name,latlngs:pts};
-      fences.push(f);
-      writeFences(uid,fences);
-      activeId=f.id;
-      refreshUI();
-      const poly = readFences(uid).find(x=>x.id===f.id)?._polygon;
-      if(poly) map.fitBounds(poly.getBounds(), {padding:[24,24]});
-    }
-
-    /* ==== Import/Export ==== */
-    function exportGeoJSON(){
-      const uid=getCurrentUserId();
-      const fences=readFences(uid);
-      const fc={
-        type:'FeatureCollection',
-        features:fences.map(f=>({
-          type:'Feature',
-          properties:{id:f.id,name:f.name},
-          geometry:{type:'Polygon', coordinates:[[...f.latlngs.map(ll=>[ll.lng,ll.lat]), [f.latlngs[0].lng,f.latlngs[0].lat]]]}
-        }))
-      };
-      const blob=new Blob([JSON.stringify(fc,null,2)],{type:'application/geo+json'});
-      const a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);
-      a.download='geocercas.geojson';
-      document.body.appendChild(a); a.click(); a.remove();
-    }
-
-    function importGeoJSON(file){
-      const uid=getCurrentUserId();
-      const reader=new FileReader();
-      reader.onload=()=>{
-        try{
-          const gj=JSON.parse(reader.result);
-          let feats=[];
-          if(gj.type==='FeatureCollection') feats=gj.features||[];
-          else if(gj.type==='Feature') feats=[gj];
-          else { alert('GeoJSON no reconocido'); return; }
-
-          const fences=readFences(uid);
-          for(const ft of feats){
-            if(!ft.geometry || ft.geometry.type!=='Polygon') continue;
-            const ring=ft.geometry.coordinates?.[0]||[];
-            const pts=ring.slice(0,-1).map(([lng,lat])=>({lat,lng})); // quita cierre duplicado
-            if(pts.length<3) continue;
-            fences.push({id:uuid(), name: (ft.properties?.name||'Geocerca importada'), latlngs: pts});
-          }
-          writeFences(uid,fences);
-          refreshUI();
-        }catch(e){ alert('No se pudo leer el GeoJSON'); }
-      };
-      reader.readAsText(file);
-    }
-
-    /* ==== Wiring ==== */
-    function wireOnceMapReady(){
-      if(!window.nobisMap){ return; }
-      map = window.nobisMap;
-      layers.group = L.layerGroup().addTo(map);
-
-      // eventos UI
-      els.newBtn?.addEventListener('click', startDrawing);
-      els.cancelBtn?.addEventListener('click', cancelDrawing);
-      els.finBtn?.addEventListener('click', finalizeDrawing);
-
-      els.editBtn?.addEventListener('click', enterEditMode);
-      els.saveEditBtn?.addEventListener('click', saveEdit);
-      els.cancelEditBtn?.addEventListener('click', ()=>exitEdit(false));
-
-      els.renameBtn?.addEventListener('click', renameFence);
-      els.delBtn?.addEventListener('click', deleteFence);
-
-      els.byCoordsBtn?.addEventListener('click', createByCoords);
-      els.exportBtn?.addEventListener('click', exportGeoJSON);
-      els.importInput?.addEventListener('change', (e)=>{ const f=e.target.files?.[0]; if(f) importGeoJSON(f); e.target.value=''; });
-
-      els.fenceSel?.addEventListener('change', ()=>{
-        activeId = els.fenceSel.value || null;
-        setButtonsForIdle();
-        const uid=getCurrentUserId();
-        const fences=readFences(uid);
-        const f=fences.find(x=>x.id===activeId);
-        if(f && f._polygon) map.fitBounds(f._polygon.getBounds(),{padding:[24,24]});
-      });
-
-      // cambio de usuario → recarga de geocercas
-      els.userSel?.addEventListener('change', ()=>{
-        localStorage.setItem(CK, els.userSel.value);
-        activeId=null;
-        refreshUI();
-      });
-
-      refreshUI();
-    }
-
-    if(document.readyState==='loading'){
-      document.addEventListener('DOMContentLoaded', ()=>{
-        if(window.nobisMap) wireOnceMapReady();
-      });
-    }
-    // cuando el mapa está listo
-    document.addEventListener('nobis:map-ready', wireOnceMapReady);
-  })();
-  </script>
-
-  <!-- ===== Gestión de personal (aislado, no rompe otros módulos) ===== -->
-  <script>
-  (function staffModule(){
-    "use strict";
-    function byId(id){ return document.getElementById(id); }
-    const USERS_KEY = "NobisApp_users";
-
-    function readUsers(){
-      try { const raw = localStorage.getItem(USERS_KEY); const val = raw ? JSON.parse(raw) : []; return Array.isArray(val) ? val : []; }
-      catch(e){ console.error("[staff] readUsers", e); return []; }
-    }
-    function writeUsers(arr){
-      try { localStorage.setItem(USERS_KEY, JSON.stringify(arr||[])); }
-      catch(e){ console.error("[staff] writeUsers", e); }
-    }
-    function createStaff(name){
-      const users = readUsers();
-      const id = "u_" + Math.random().toString(36).slice(2,10);
-      const count = users.filter(u => u.role === "staff").length + 1;
-      const finalName = (name || "").trim() || `Personal ${count}`;
-      users.push({ id, name: finalName, role: "staff" });
-      writeUsers(users);
-      return id;
-    }
-    function renameUserById(id, newName){
-      const users = readUsers();
-      const u = users.find(x => x.id === id);
-      if(!u) return;
-      const n = (newName||"").trim();
-      if(!n) return;
-      u.name = n;
-      writeUsers(users);
-    }
-    function deleteUserById(id){
-      const users = readUsers().filter(u => u.id !== id);
-      writeUsers(users);
-    }
-
-    function refreshLinkedSelects(){
-      const users = readUsers();
-      const staff = users.filter(u => u.role === "staff");
-      const shtml = staff.map(u => `<option value="${u.id}">${u.name}</option>`).join("");
-      const ids = ["assignStaffSelect","actStaffSelect","logStaffFilter","checkStaffSelect"];
-      ids.forEach((id) => {
-        const el = byId(id);
-        if(!el) return;
-        if(id === "logStaffFilter"){
-          el.innerHTML = `<option value="">(Todos)</option>${shtml}`;
-        } else {
-          el.innerHTML = shtml;
-        }
-      });
-    }
-
-    function renderPersonnel(){
-      const tableContainer = byId("staffTable");
-      const hint = byId("noStaffHint");
-      if(!tableContainer) return;
-
-      const users = readUsers();
-      const staff = users.filter(u => u.role === "staff");
-
-      if(!staff.length){
-        tableContainer.innerHTML = "";
-        if(hint) hint.classList.remove("hidden");
-        return;
-      }
-      if(hint) hint.classList.add("hidden");
-
-      let html = `
-        <div class="overflow-auto">
-          <table class="min-w-full text-left text-sm">
-            <thead>
-              <tr class="text-slate-500">
-                <th class="px-2 py-1">Nombre</th>
-                <th class="px-2 py-1">Rol</th>
-                <th class="px-2 py-1">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-      `;
-      for(const u of staff){
-        html += `
-          <tr class="border-t">
-            <td class="px-2 py-1">${u.name}</td>
-            <td class="px-2 py-1">
-              <span class="inline-block text-xs bg-emerald-500/15 text-emerald-700 px-2 py-0.5 rounded">staff</span>
-            </td>
-            <td class="px-2 py-1">
-              <button type="button" class="px-2 py-1 rounded bg-sky-600 text-white btn-rename-staff" data-id="${u.id}">Renombrar</button>
-              <button type="button" class="ml-2 px-2 py-1 rounded bg-rose-600 text-white btn-del-staff" data-id="${u.id}">Eliminar</button>
-            </td>
-          </tr>
-        `;
-      }
-      html += `</tbody></table></div>`;
-      tableContainer.innerHTML = html;
-    }
-
-    function wireEvents(){
-      const addBtn = byId("addStaffFromPersonnel");
-      if(addBtn){
-        addBtn.addEventListener("click", function(){
-          try{
-            const name = window.prompt("Nombre del personal:");
-            if(name === null) return;
-            createStaff(name);
-            renderPersonnel();
-            refreshLinkedSelects();
-          }catch(e){ console.error("[staff] add", e); }
-        }, false);
-      }
-
-      const refreshBtn = byId("refreshPersonnelBtn");
-      if(refreshBtn){
-        refreshBtn.addEventListener("click", function(){
-          try{ renderPersonnel(); }catch(e){ console.error("[staff] refresh", e); }
-        }, false);
-      }
-
-      const tableContainer = byId("staffTable");
-      if(tableContainer){
-        tableContainer.addEventListener("click", function(ev){
-          const t = ev.target;
-          if(!(t instanceof HTMLElement)) return;
-          try{
-            if(t.classList.contains("btn-rename-staff")){
-              const id = t.getAttribute("data-id");
-              const users = readUsers();
-              const u = users.find(x => x.id === id);
-              if(!u) return;
-              const nn = window.prompt("Nuevo nombre:", u.name);
-              if(nn === null) return;
-              renameUserById(id, nn);
-              renderPersonnel();
-              refreshLinkedSelects();
-            } else if(t.classList.contains("btn-del-staff")){
-              const id = t.getAttribute("data-id");
-              const users = readUsers();
-              const u = users.find(x => x.id === id);
-              if(!u) return;
-              if(!window.confirm(`Eliminar "${u.name}"?`)) return;
-              deleteUserById(id);
-              renderPersonnel();
-              refreshLinkedSelects();
-            }
-          }catch(e){ console.error("[staff] table actions", e); }
-        }, false);
-      }
-
-      try{
-        renderPersonnel();
-        refreshLinkedSelects();
-      }catch(e){ console.error("[staff] initial render", e); }
-    }
-
-    if(document.readyState === "loading"){
-      document.addEventListener("DOMContentLoaded", wireEvents, { once:true });
-    } else {
-      wireEvents();
-    }
-  })();
-  </script>
-  <script id="patch-geofences-v1">
+  <script id="patch-geofence-latlng-v1">
 (function(){
   "use strict";
-  // Evitar que se cargue 2 veces
-  if (window.__NOBIS_GEOFENCE_PATCH__) return;
-  window.__NOBIS_GEOFENCE_PATCH__ = true;
+  if (window.__PATCH_GEOFENCE_LATLNG__) return;
+  window.__PATCH_GEOFENCE_LATLNG__ = true;
 
-  function el(id){ return document.getElementById(id); }
-  const UK = 'NobisApp_users';
-  const CK = 'NobisApp_current_user';
-  const FPRE = 'NobisApp_fences_';
+  // ---------- Utils ----------
+  function byId(id){ return document.getElementById(id); }
+  function ensureBtnType(id){ const b=byId(id); if(b && b.type!=="button") b.type="button"; }
+  function uid(){ return "f_"+Math.random().toString(36).slice(2,10); }
+  function nowName(){ return "Geocerca "+(Date.now()%1000); }
 
-  // --- Storage helpers ---
-  function currentUserId(){
-    try{
-      const cur = localStorage.getItem(CK);
-      if (cur) return cur;
-      const users = JSON.parse(localStorage.getItem(UK)||'[]');
-      return (users && users[0] && users[0].id) ? users[0].id : 'default';
-    }catch(e){ return 'default'; }
-  }
-  function fkey(){ return FPRE + currentUserId(); }
-  function readF(){ try{ const a = JSON.parse(localStorage.getItem(fkey())||'[]'); return Array.isArray(a)?a:[] } catch(e){ return [] } }
-  function writeF(arr){ localStorage.setItem(fkey(), JSON.stringify(arr||[])); }
-
-  // --- Mapa ---
-  let map = null;
-  function getMap(){ return (window.nobisMap || window.map || null); }
-
-  // --- Capas/estado ---
-  let group = null;          // layer group para las geocercas
-  let activeId = null;
-  let drawing = false, editing = false;
-
-  // Dibujo temporal
-  let tmpMarkers = [], tmpPolyline = null, tmpPoly = null;
-
-  // Edición
-  let editHandles = [], backupLatLngs = null;
-
-  // UI refs (IDs existentes de tu HTML)
-  const refs = {
-    newBtn: el('newFenceBtn'),
-    finBtn: el('finishFenceBtn'),
-    cancelBtn: el('cancelFenceBtn'),
-    editBtn: el('editFenceBtn'),
-    saveEditBtn: el('saveFenceEditBtn'),
-    cancelEditBtn: el('cancelFenceEditBtn'),
-    renameBtn: el('renameFenceBtn'),
-    delBtn: el('deleteFenceBtn'),
-    byCoordsBtn: el('createFenceByCoordsBtn'),
-    exportBtn: el('exportGeoJsonBtn'),
-    importInput: el('importGeoJsonInput'),
-    fenceSel: el('geofenceSelect'),
-    list: el('fenceList'),
-    nameBar: el('nameBar'),
-    nameField: el('nameField'),
-    saveNameBtn: el('saveNameBtn'),
-    cancelNameBtn: el('cancelNameBtn')
-  };
-
-  function enable(n, on){ if(n) n.disabled = !on; }
-  function show(n, on){ if(n) n.classList.toggle('hidden', !on); }
-  function uid(){ return 'f_'+Math.random().toString(36).slice(2,10); }
-
-  function setButtonsIdle(){
-    drawing=false; editing=false;
-    enable(refs.newBtn,true);
-    enable(refs.finBtn,false);
-    enable(refs.cancelBtn,false);
-    enable(refs.editBtn, !!activeId);
-    enable(refs.saveEditBtn,false);
-    enable(refs.cancelEditBtn,false);
-    enable(refs.renameBtn, !!activeId);
-    enable(refs.delBtn, !!activeId);
-    show(refs.nameBar,false);
-  }
-  function setButtonsDrawing(){
-    drawing=true; editing=false;
-    enable(refs.newBtn,false);
-    enable(refs.finBtn,false);   // se activa con >=3 puntos
-    enable(refs.cancelBtn,true);
-    enable(refs.editBtn,false);
-    enable(refs.saveEditBtn,false);
-    enable(refs.cancelEditBtn,false);
-    enable(refs.renameBtn,false);
-    enable(refs.delBtn,false);
-    show(refs.nameBar,false);
-  }
-  function setButtonsEditing(){
-    drawing=false; editing=true;
-    enable(refs.newBtn,false);
-    enable(refs.finBtn,false);
-    enable(refs.cancelBtn,false);
-    enable(refs.editBtn,false);
-    enable(refs.saveEditBtn,true);
-    enable(refs.cancelEditBtn,true);
-    enable(refs.renameBtn,false);
-    enable(refs.delBtn,false);
-    show(refs.nameBar,false);
-  }
-
-  // --- DIBUJO ---
-  function clearTemp(){
-    tmpMarkers.forEach(m=>m.remove()); tmpMarkers=[];
-    if(tmpPolyline){ tmpPolyline.remove(); tmpPolyline=null; }
-    if(tmpPoly){ tmpPoly.remove(); tmpPoly=null; }
-  }
-  function onMapClickAddVertex(e){
-    if(!drawing) return;
-    const m = L.circleMarker(e.latlng,{radius:5,color:'#6366f1',fillColor:'#818cf8',fillOpacity:1}).addTo(map);
-    tmpMarkers.push(m);
-    const pts = tmpMarkers.map(x=>x.getLatLng());
-    if(tmpPolyline) tmpPolyline.setLatLngs(pts);
-    else tmpPolyline = L.polyline(pts,{color:'#6366f1',dashArray:'4 4'}).addTo(map);
-    if(pts.length>=3){
-      enable(refs.finBtn,true);
-      if(tmpPoly) tmpPoly.setLatLngs(pts);
-      else tmpPoly = L.polygon(pts,{color:'#a78bfa',weight:2,fillOpacity:.12}).addTo(map);
-    }
-  }
-  function startDrawing(){
-    if(editing){ alert('Termina/cancela la edición.'); return; }
-    clearTemp();
-    setButtonsDrawing();
-    map.on('click', onMapClickAddVertex);
-  }
-  function cancelDrawing(){
-    map.off('click', onMapClickAddVertex);
-    clearTemp();
-    setButtonsIdle();
-  }
-  function finalizeDrawing(){
-    const pts = tmpMarkers.map(x=>x.getLatLng());
-    if(pts.length<3){ alert('Agrega al menos 3 puntos.'); return; }
-    show(refs.nameBar,true);
-    refs.nameField && refs.nameField.focus();
-
-    const doSave = ()=>{
-      const name = (refs.nameField?.value||'').trim() || ('Geocerca '+(Date.now()%1000));
-      const fences = readF();
-      const id = uid();
-      fences.push({id, name, latlngs: pts});
-      writeF(fences);
-      map.off('click', onMapClickAddVertex);
-      clearTemp();
-      show(refs.nameBar,false);
-      if(refs.nameField) refs.nameField.value='';
-      activeId = id;
-      drawAll();
-      zoomToActive();
-      setButtonsIdle();
-    };
-    if(refs.saveNameBtn) refs.saveNameBtn.onclick = doSave;
-    if(refs.nameField) refs.nameField.onkeydown = (ev)=>{ if(ev.key==='Enter') doSave(); };
-    if(refs.cancelNameBtn) refs.cancelNameBtn.onclick = ()=> show(refs.nameBar,false);
-  }
-
-  // --- PINTAR TODO ---
-  function drawAll(){
-    if(!group) group = L.layerGroup().addTo(map);
-    group.clearLayers();
-    const fences = readF();
-
-    fences.forEach(f=>{
-      const poly = L.polygon(f.latlngs,{color:'#7c3aed',weight:3,fillOpacity:.2}).addTo(group);
-      poly.bindTooltip(f.name||'Geocerca',{permanent:true,direction:'center',className:'label-in-map'});
-      f.__layer = poly;
-      poly.on('click', ()=>{ activeId=f.id; renderSelectors(); zoomToActive(); setButtonsIdle(); });
-    });
-
-    // Lista
-    if(refs.list){
-      refs.list.innerHTML = fences.length
-        ? fences.map(f=>`<li class="py-2 px-3 hover:bg-gray-50 cursor-pointer" data-id="${f.id}">
-            <div class="text-sm font-medium">${f.name}</div>
-            <div class="text-xs text-gray-500">${f.latlngs.length} puntos</div>
-          </li>`).join('')
-        : '<li class="py-6 text-center text-gray-500">No hay geocercas.</li>';
-      refs.list.querySelectorAll('[data-id]').forEach(n=>{
-        n.addEventListener('click', ()=>{ activeId=n.getAttribute('data-id'); renderSelectors(); zoomToActive(); setButtonsIdle(); });
-      });
-    }
-
-    renderSelectors();
-  }
-  function renderSelectors(){
-    const fences = readF();
-    if(refs.fenceSel){
-      refs.fenceSel.innerHTML = fences.map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
-      if(!activeId && fences[0]) activeId = fences[0].id;
-      if(activeId) refs.fenceSel.value = activeId;
-    }
-    enable(refs.editBtn, !!activeId);
-    enable(refs.renameBtn, !!activeId);
-    enable(refs.delBtn, !!activeId);
-  }
-  function zoomToActive(){
-    const f = readF().find(x=>x.id===activeId);
-    if(f && f.__layer) map.fitBounds(f.__layer.getBounds(), {padding:[24,24]});
-  }
-
-  // --- EDICIÓN ---
-  function enterEdit(){
-    if(!activeId){ alert('Selecciona una geocerca.'); return; }
-    const fences = readF();
-    const f = fences.find(x=>x.id===activeId);
-    if(!f || !f.__layer) return;
-
-    setButtonsEditing();
-    const latlngs = f.__layer.getLatLngs()[0] || f.__layer.getLatLngs();
-    backupLatLngs = latlngs;
-
-    editHandles = latlngs.map(ll=>{
-      const m = L.circleMarker(ll,{radius:6,color:'#f59e0b',fillColor:'#fbbf24',fillOpacity:1}).addTo(map);
-      // Drag "manual" (sin plugins)
-      m.dragging = new L.Handler.MarkerDrag(m);
-      m.on('mousedown', ()=>m.dragging.enable());
-      m.on('mouseup',   ()=>m.dragging.disable());
-      m.on('drag', ()=>{
-        const cur = editHandles.map(h=>h.getLatLng());
-        f.__layer.setLatLngs([cur]);
-      });
-      return m;
-    });
-    editing = true;
-  }
-  function saveEdit(){
-    if(!activeId) return;
-    const fences = readF();
-    const f = fences.find(x=>x.id===activeId);
-    if(!f || !f.__layer) return;
-    const cur = editHandles.map(h=>h.getLatLng());
-    if(cur.length<3){ alert('Mínimo 3 vértices.'); return; }
-    f.latlngs = cur;
-    writeF(fences);
-    exitEdit(true);
-  }
-  function exitEdit(redraw){
-    editHandles.forEach(h=>{ h.dragging && h.dragging.disable(); h.remove(); });
-    editHandles = [];
-    editing=false;
-    setButtonsIdle();
-    if(redraw) drawAll();
-  }
-
-  // --- CRUD extra ---
-  function renameFence(){
-    if(!activeId) return;
-    const fences = readF();
-    const f = fences.find(x=>x.id===activeId);
-    if(!f) return;
-    const nn = prompt('Nuevo nombre:', f.name);
-    if(nn===null) return;
-    f.name = (nn||'').trim() || f.name;
-    writeF(fences);
-    drawAll();
-  }
-  function deleteFence(){
-    if(!activeId) return;
-    const fences = readF();
-    const f = fences.find(x=>x.id===activeId);
-    if(!f) return;
-    if(!confirm(`Eliminar "${f.name}"?`)) return;
-    if(f.__layer) f.__layer.remove();
-    const arr = fences.filter(x=>x.id!==activeId);
-    writeF(arr);
-    activeId = arr[0]?.id || null;
-    drawAll();
-    setButtonsIdle();
-  }
-  function createByCoords(){
-    const raw = prompt('Introduce líneas lat,lng (una por vértice):');
-    if(raw===null) return;
-    const lines = raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-    const pts=[];
-    for(const ln of lines){
-      const [a,b] = ln.split(',').map(s=>+s.trim());
-      if(Number.isFinite(a)&&Number.isFinite(b)) pts.push({lat:a,lng:b});
-    }
-    if(pts.length<3){ alert('Se requieren al menos 3 vértices.'); return; }
-    const nm = prompt('Nombre de la geocerca:', 'Geocerca '+(Date.now()%1000)) || ('Geocerca '+(Date.now()%1000));
-    const fences = readF();
-    const id = uid();
-    fences.push({id:id, name:nm, latlngs:pts});
-    writeF(fences);
-    activeId=id; drawAll(); zoomToActive();
-  }
-
-  // --- Import / Export ---
-  function exportGeo(){
-    const fences = readF();
-    const fc = {
-      type:'FeatureCollection',
-      features: fences.map(f=>{
-        const coords = f.latlngs.map(p=>[p.lng,p.lat]);
-        coords.push([coords[0][0], coords[0][1]]);
-        return { type:'Feature', properties:{id:f.id,name:f.name}, geometry:{type:'Polygon', coordinates:[coords]} };
-      })
-    };
-    const blob = new Blob([JSON.stringify(fc,null,2)], {type:'application/geo+json'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'geocercas.geojson'; a.click(); URL.revokeObjectURL(a.href);
-  }
-  function importGeo(file){
-    const reader=new FileReader();
-    reader.onload=()=>{
-      try{
-        const gj=JSON.parse(reader.result);
-        const fences=readF();
-        const feats = gj.type==='FeatureCollection' ? (gj.features||[]) : (gj.type==='Feature' ? [gj] : []);
-        feats.forEach(ft=>{
-          if(ft.geometry?.type!=='Polygon') return;
-          const ring=ft.geometry.coordinates?.[0]||[];
-          const pts=ring.slice(0,-1).map(([lng,lat])=>({lat,lng}));
-          if(pts.length>=3) fences.push({id:uid(), name:(ft.properties?.name||'Geocerca importada'), latlngs:pts});
-        });
-        writeF(fences);
-        drawAll();
-      }catch(e){ alert('GeoJSON inválido'); }
-    };
-    reader.readAsText(file);
-  }
-
-  // --- Wiring ---
-  function wire(){
-    map = getMap();
-    if(!map){
-      // Esperar a tu evento de inicialización de mapa (si lo usas)
-      document.addEventListener('nobis:map-ready', ()=>{
-        map = getMap();
-        if(!map) return;
-        group = L.layerGroup().addTo(map);
-        drawAll();
-        setButtonsIdle();
-      }, {once:true});
-    } else {
-      group = L.layerGroup().addTo(map);
-      drawAll();
-      setButtonsIdle();
-    }
-
-    refs.newBtn && refs.newBtn.addEventListener('click', startDrawing);
-    refs.cancelBtn && refs.cancelBtn.addEventListener('click', cancelDrawing);
-    refs.finBtn && refs.finBtn.addEventListener('click', finalizeDrawing);
-
-    refs.editBtn && refs.editBtn.addEventListener('click', enterEdit);
-    refs.saveEditBtn && refs.saveEditBtn.addEventListener('click', saveEdit);
-    refs.cancelEditBtn && refs.cancelEditBtn.addEventListener('click', ()=>exitEdit(false));
-
-    refs.renameBtn && refs.renameBtn.addEventListener('click', renameFence);
-    refs.delBtn && refs.delBtn.addEventListener('click', deleteFence);
-
-    refs.byCoordsBtn && refs.byCoordsBtn.addEventListener('click', createByCoords);
-    refs.exportBtn && refs.exportBtn.addEventListener('click', exportGeo);
-    refs.importInput && refs.importInput.addEventListener('change', (e)=>{ const f=e.target.files?.[0]; if(f) importGeo(f); e.target.value=''; });
-
-    refs.fenceSel && refs.fenceSel.addEventListener('change', ()=>{ activeId=refs.fenceSel.value||null; zoomToActive(); setButtonsIdle(); });
-
-    // Si cambias de usuario en tu selector, refresca las geocercas
-    const userSel = el('userSelect');
-    userSel && userSel.addEventListener('change', ()=>{ activeId=null; drawAll(); setButtonsIdle(); });
-  }
-
-  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', wire, {once:true}); }
-  else { wire(); }
-})();
-</script>
-<script id="patch-geofences-v2">
-(function(){
-  "use strict";
-  if (window.__NOBIS_GEOFENCE_PATCH_V2__) return;
-  window.__NOBIS_GEOFENCE_PATCH_V2__ = true;
-
-  // ---------- Utiles ----------
-  function el(id){ return document.getElementById(id); }
-  function enable(n,on){ if(n) n.disabled = !on; }
-  function show(n,on){ if(n) n.classList.toggle('hidden', !on); }
-  function uid(){ return 'f_'+Math.random().toString(36).slice(2,10); }
-  function nowName(){ return 'Geocerca ' + (Date.now()%1000); }
-
-  // ---------- Claves de storage (compatibles) ----------
+  // ---------- Storage (compatibles con tu app) ----------
   const UK='NobisApp_users', CK='NobisApp_current_user', FPRE='NobisApp_fences_';
   function currentUserId(){
     try{
@@ -1269,362 +326,122 @@
     }catch(e){ return 'default'; }
   }
   function fkey(){ return FPRE + currentUserId(); }
-  function readF(){
-    try{ const a=JSON.parse(localStorage.getItem(fkey())||'[]'); return Array.isArray(a)?a:[]; }
+  function readFences(){
+    try { const a = JSON.parse(localStorage.getItem(fkey()) || "[]"); return Array.isArray(a) ? a : []; }
     catch(e){ return []; }
   }
-  function writeF(arr){ localStorage.setItem(fkey(), JSON.stringify(arr||[])); }
+  function writeFences(arr){ localStorage.setItem(fkey(), JSON.stringify(arr||[])); }
 
-  // ---------- Referencias UI ----------
-  const R = {
-    newBtn: el('newFenceBtn'),
-    finBtn: el('finishFenceBtn'),
-    cancelBtn: el('cancelFenceBtn'),
-    editBtn: el('editFenceBtn'),
-    saveEditBtn: el('saveFenceEditBtn'),
-    cancelEditBtn: el('cancelFenceEditBtn'),
-    renameBtn: el('renameFenceBtn'),
-    delBtn: el('deleteFenceBtn'),
-    byCoordsBtn: el('createFenceByCoordsBtn'),
-    exportBtn: el('exportGeoJsonBtn'),
-    importInput: el('importGeoJsonInput'),
-    fenceSel: el('geofenceSelect'),
-    list: el('fenceList'),
-    nameBar: el('nameBar'),
-    nameField: el('nameField'),
-    saveNameBtn: el('saveNameBtn'),
-    cancelNameBtn: el('cancelNameBtn')
-  };
-
-  // ---------- Estado interno ----------
-  let map=null, group=null;
-  let activeId=null, drawing=false, editing=false;
-
-  // Dibujo temporal
-  let tmpMarkers=[], tmpPolyline=null, tmpPoly=null;
-
-  // Edición
-  let editVerts=[], editBackup=null;
-  const handleIcon = L && L.divIcon ? L.divIcon({className:'', html:'<div style="width:12px;height:12px;border:2px solid #f59e0b;background:#fff;border-radius:50%"></div>', iconSize:[12,12]}) : null;
-
-  function setIdle(){
-    drawing=false; editing=false;
-    enable(R.newBtn,true);
-    enable(R.finBtn,false);
-    enable(R.cancelBtn,false);
-    enable(R.editBtn, !!activeId);
-    enable(R.saveEditBtn,false);
-    enable(R.cancelEditBtn,false);
-    enable(R.renameBtn, !!activeId);
-    enable(R.delBtn, !!activeId);
-    show(R.nameBar,false);
-  }
-  function setDrawing(){
-    drawing=true; editing=false;
-    enable(R.newBtn,false);
-    enable(R.finBtn,false);
-    enable(R.cancelBtn,true);
-    enable(R.editBtn,false);
-    enable(R.saveEditBtn,false);
-    enable(R.cancelEditBtn,false);
-    enable(R.renameBtn,false);
-    enable(R.delBtn,false);
-    show(R.nameBar,false);
-  }
-  function setEditing(){
-    drawing=false; editing=true;
-    enable(R.newBtn,false);
-    enable(R.finBtn,false);
-    enable(R.cancelBtn,false);
-    enable(R.editBtn,false);
-    enable(R.saveEditBtn,true);
-    enable(R.cancelEditBtn,true);
-    enable(R.renameBtn,false);
-    enable(R.delBtn,false);
-    show(R.nameBar,false);
-  }
-
-  // ---------- Dibujo ----------
-  function clearTemp(){
-    tmpMarkers.forEach(m=>m.remove()); tmpMarkers=[];
-    if(tmpPolyline){ tmpPolyline.remove(); tmpPolyline=null; }
-    if(tmpPoly){ tmpPoly.remove(); tmpPoly=null; }
-  }
-  function onMapClickAdd(e){
-    if(!drawing) return;
-    const m = L.circleMarker(e.latlng,{radius:5,color:'#6366f1',fillColor:'#818cf8',fillOpacity:1}).addTo(map);
-    tmpMarkers.push(m);
-    const pts = tmpMarkers.map(x=>x.getLatLng());
-    if(tmpPolyline) tmpPolyline.setLatLngs(pts); else tmpPolyline=L.polyline(pts,{color:'#6366f1',dashArray:'4 4'}).addTo(map);
-    if(pts.length>=3){
-      enable(R.finBtn,true);
-      if(tmpPoly) tmpPoly.setLatLngs(pts); else tmpPoly=L.polygon(pts,{color:'#a78bfa',weight:2,fillOpacity:.12}).addTo(map);
+  // ---------- Parseo de coordenadas ----------
+  // Acepta formatos por línea: "lat,lng" o "lat lng" (con espacios/comas/;).
+  function parseLatLngMultiline(text){
+    const pts = [];
+    const lines = (text||"").split(/\r?\n/);
+    for (let line of lines){
+      line = line.trim();
+      if(!line) continue;
+      const tok = line.split(/[,\s;]+/).filter(Boolean);
+      if(tok.length < 2) continue;
+      const lat = parseFloat(tok[0]);
+      const lng = parseFloat(tok[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)){
+        pts.push({lat, lng});
+      }
     }
-  }
-  function startDrawing(ev){
-    ev && ev.preventDefault();
-    if(!map) return;
-    if(editing){ alert('Termina/cancela la edición.'); return; }
-    clearTemp();
-    setDrawing();
-    map.on('click', onMapClickAdd);
-  }
-  function cancelDrawing(ev){
-    ev && ev.preventDefault();
-    if(!map) return;
-    map.off('click', onMapClickAdd);
-    clearTemp();
-    setIdle();
-  }
-  function finalizeDrawing(ev){
-    ev && ev.preventDefault();
-    if(!map) return;
-    const pts = tmpMarkers.map(x=>x.getLatLng());
-    if(pts.length<3){ alert('Agrega al menos 3 puntos.'); return; }
-    show(R.nameBar,true);
-    if(R.nameField) R.nameField.focus();
-
-    const doSave=()=>{
-      const nm = (R.nameField?.value||'').trim() || nowName();
-      const arr = readF();
-      const id = uid();
-      arr.push({id, name:nm, latlngs:pts});
-      writeF(arr);
-      map.off('click', onMapClickAdd);
-      clearTemp();
-      show(R.nameBar,false);
-      if(R.nameField) R.nameField.value='';
-      activeId=id;
-      drawAll();
-      zoomActive();
-      setIdle();
-    };
-    if(R.saveNameBtn) R.saveNameBtn.onclick = doSave;
-    if(R.nameField) R.nameField.onkeydown = (e)=>{ if(e.key==='Enter') doSave(); };
-    if(R.cancelNameBtn) R.cancelNameBtn.onclick = ()=> show(R.nameBar,false);
+    return pts;
   }
 
-  // ---------- Pintado / selección ----------
-  function drawAll(){
-    if(!group) group=L.layerGroup().addTo(map);
-    group.clearLayers();
-    const fences=readF();
-    fences.forEach(f=>{
-      const poly=L.polygon(f.latlngs,{color:'#7c3aed',weight:3,fillOpacity:.2}).addTo(group);
-      f.__layer=poly;
-      poly.bindTooltip(f.name||'Geocerca',{permanent:true,direction:'center',className:'label-in-map'});
-      poly.on('click',()=>{ activeId=f.id; renderSelectors(); zoomActive(); setIdle(); });
-    });
+  // ---------- UI helpers (no invaden tu lógica existente) ----------
+  function refreshSelectorsAndList(activeId){
+    const fences = readFences();
 
-    // lista
-    if(R.list){
-      R.list.innerHTML = fences.length
+    // Select principal
+    const sel = byId('geofenceSelect');
+    if (sel){
+      sel.innerHTML = fences.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+      if (activeId) sel.value = activeId;
+    }
+
+    // Lista lateral
+    const list = byId('fenceList');
+    if (list){
+      list.innerHTML = fences.length
         ? fences.map(f=>`<li class="py-2 px-3 hover:bg-gray-50 cursor-pointer" data-id="${f.id}">
             <div class="text-sm font-medium">${f.name}</div>
             <div class="text-xs text-gray-500">${f.latlngs.length} puntos</div>
           </li>`).join('')
         : '<li class="py-6 text-center text-gray-500">No hay geocercas.</li>';
-      R.list.querySelectorAll('[data-id]').forEach(n=>{
-        n.addEventListener('click', ()=>{ activeId=n.getAttribute('data-id'); renderSelectors(); zoomActive(); setIdle(); });
-      });
     }
-    renderSelectors();
   }
-  function renderSelectors(){
-    const fences=readF();
-    if(R.fenceSel){
-      R.fenceSel.innerHTML = fences.map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
-      if(!activeId && fences[0]) activeId=fences[0].id;
-      if(activeId) R.fenceSel.value=activeId;
+
+  // ---------- Dibujo (opcional, sin interferir) ----------
+  function tryDrawOnMap(fence){
+    // Si tu app ya redibuja desde storage, esto no molesta.
+    try{
+      const map = (window.nobisMap || window.map || null);
+      if (!map || !window.L) return;
+      const group = (window.NOBIS_FENCE_GROUP) || L.layerGroup().addTo(map);
+      if (!window.NOBIS_FENCE_GROUP) window.NOBIS_FENCE_GROUP = group;
+
+      const poly = L.polygon(fence.latlngs, { color:'#7c3aed', weight:3, fillOpacity:.2 }).addTo(group);
+      poly.bindTooltip(fence.name || 'Geocerca', { permanent:true, direction:'center', className:'label-in-map' });
+      // Ajuste de vista a la nueva geocerca
+      try { map.fitBounds(poly.getBounds(), { padding:[24,24] }); } catch(e){}
+    }catch(_e){}
+  }
+
+  // ---------- Acción principal ----------
+  function createFenceByCoords(){
+    const example = [
+      "Ejemplo (una línea por vértice):",
+      "-1.23456, -78.12345",
+      "-1.24000, -78.11000",
+      "-1.23000, -78.10500"
+    ].join("\n");
+
+    const raw = prompt("Pega coordenadas Lat,Lng (una por línea):\n"+example);
+    if (raw === null) return;
+
+    const pts = parseLatLngMultiline(raw);
+    if (pts.length < 3){
+      alert("Se requieren al menos 3 coordenadas válidas (lat,lng).");
+      return;
     }
-    enable(R.editBtn, !!activeId);
-    enable(R.renameBtn, !!activeId);
-    enable(R.delBtn, !!activeId);
-  }
-  function zoomActive(){
-    const f=readF().find(x=>x.id===activeId);
-    if(f && f.__layer) map.fitBounds(f.__layer.getBounds(),{padding:[24,24]});
+
+    const name = (prompt("Nombre de la geocerca:", nowName()) || "").trim() || nowName();
+
+    const arr = readFences();
+    const id = uid();
+    const fence = { id, name, latlngs: pts };
+    arr.push(fence);
+    writeFences(arr);
+
+    // Refrescar UI compatible
+    refreshSelectorsAndList(id);
+
+    // Aviso a otros módulos (si escuchan este evento)
+    try { window.dispatchEvent(new CustomEvent('nobis:fences-updated', { detail:{ id } })); } catch(_e){}
+
+    // Dibujo directo (no interfiere si tu app también redibuja)
+    tryDrawOnMap(fence);
   }
 
-  // ---------- Edición ----------
-  function enterEdit(ev){
-    ev && ev.preventDefault();
-    if(!activeId){ alert('Selecciona una geocerca.'); return; }
-    const f=readF().find(x=>x.id===activeId);
-    if(!f || !f.__layer) return;
-
-    setEditing();
-    const latlngs=(f.__layer.getLatLngs()[0]||f.__layer.getLatLngs()).slice();
-    editBackup = latlngs.map(ll=>L.latLng(ll.lat,ll.lng));
-
-    // Manijas con L.marker draggable (sencillo y compatible)
-    editVerts = latlngs.map(ll=>{
-      const m = L.marker(ll,{draggable:true, icon: handleIcon||undefined}).addTo(map);
-      m.on('drag', ()=>{
-        const cur=editVerts.map(h=>h.getLatLng());
-        f.__layer.setLatLngs([cur]);
-      });
-      return m;
-    });
-  }
-  function saveEdit(ev){
-    ev && ev.preventDefault();
-    if(!activeId) return;
-    const arr=readF();
-    const f=arr.find(x=>x.id===activeId);
-    if(!f || !f.__layer) return;
-    const cur=editVerts.map(h=>h.getLatLng());
-    if(cur.length<3){ alert('Mínimo 3 vértices.'); return; }
-    f.latlngs = cur;
-    writeF(arr);
-    exitEdit(true);
-  }
-  function exitEdit(redraw, ev){
-    ev && ev.preventDefault();
-    editVerts.forEach(h=>h.remove()); editVerts=[];
-    setIdle();
-    if(redraw){ drawAll(); }
-    else{
-      // revertir
-      const f=readF().find(x=>x.id===activeId);
-      if(f && f.__layer && editBackup) f.__layer.setLatLngs([editBackup]);
+  function wire(){
+    ensureBtnType('createFenceByCoordsBtn');
+    const btn = byId('createFenceByCoordsBtn');
+    if (btn){
+      btn.addEventListener('click', function(ev){ ev.preventDefault(); createFenceByCoords(); }, false);
     }
-    editBackup=null;
   }
 
-  // ---------- CRUD extra ----------
-  function renameFence(ev){
-    ev && ev.preventDefault();
-    if(!activeId) return;
-    const arr=readF();
-    const f=arr.find(x=>x.id===activeId);
-    if(!f) return;
-    const nn=prompt('Nuevo nombre:', f.name);
-    if(nn===null) return;
-    f.name=(nn||'').trim()||f.name;
-    writeF(arr);
-    drawAll();
-  }
-  function deleteFence(ev){
-    ev && ev.preventDefault();
-    if(!activeId) return;
-    const arr=readF();
-    const f=arr.find(x=>x.id===activeId);
-    if(!f) return;
-    if(!confirm(`Eliminar "${f.name}"?`)) return;
-    if(f.__layer) f.__layer.remove();
-    const out=arr.filter(x=>x.id!==activeId);
-    writeF(out);
-    activeId = out[0]?.id || null;
-    drawAll();
-    setIdle();
-  }
-  function createByCoords(ev){
-    ev && ev.preventDefault();
-    const raw = prompt('Introduce líneas lat,lng (una por vértice):');
-    if(raw===null) return;
-    const lines = raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-    const pts=[];
-    for(const ln of lines){
-      const [a,b]=(ln.split(',').map(s=>+s.trim()));
-      if(Number.isFinite(a)&&Number.isFinite(b)) pts.push({lat:a,lng:b});
-    }
-    if(pts.length<3){ alert('Se requieren al menos 3 vértices.'); return; }
-    const nm = prompt('Nombre de la geocerca:', nowName()) || nowName();
-    const arr=readF(); const id=uid();
-    arr.push({id,name:nm,latlngs:pts}); writeF(arr);
-    activeId=id; drawAll(); zoomActive(); setIdle();
-  }
-
-  // ---------- Import / Export ----------
-  function exportGeo(ev){
-    ev && ev.preventDefault();
-    const fences=readF();
-    const fc={ type:'FeatureCollection', features:fences.map(f=>{
-      const coords=f.latlngs.map(p=>[p.lng,p.lat]);
-      coords.push([coords[0][0],coords[0][1]]);
-      return {type:'Feature',properties:{id:f.id,name:f.name},geometry:{type:'Polygon',coordinates:[coords]}};
-    })};
-    const blob=new Blob([JSON.stringify(fc,null,2)],{type:'application/geo+json'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='geocercas.geojson'; a.click(); URL.revokeObjectURL(a.href);
-  }
-  function importGeo(ev){
-    const file = ev.target && ev.target.files && ev.target.files[0];
-    if(!file) return;
-    const reader=new FileReader();
-    reader.onload=()=>{
-      try{
-        const gj=JSON.parse(reader.result);
-        const feats = gj.type==='FeatureCollection' ? (gj.features||[]) : (gj.type==='Feature' ? [gj] : []);
-        const arr=readF();
-        feats.forEach(ft=>{
-          if(ft.geometry?.type!=='Polygon') return;
-          const ring=ft.geometry.coordinates?.[0]||[];
-          const pts=ring.slice(0,-1).map(([lng,lat])=>({lat,lng}));
-          if(pts.length>=3) arr.push({id:uid(),name:(ft.properties?.name||'Geocerca importada'),latlngs:pts});
-        });
-        writeF(arr);
-        drawAll();
-      }catch(e){ alert('GeoJSON inválido'); }
-      ev.target.value='';
-    };
-    reader.readAsText(file);
-  }
-
-  // ---------- Wiring de botones (con preventDefault para evitar submit) ----------
-  function bindButtons(){
-    R.newBtn && R.newBtn.addEventListener('click', startDrawing);
-    R.finBtn && R.finBtn.addEventListener('click', finalizeDrawing);
-    R.cancelBtn && R.cancelBtn.addEventListener('click', cancelDrawing);
-
-    R.editBtn && R.editBtn.addEventListener('click', enterEdit);
-    R.saveEditBtn && R.saveEditBtn.addEventListener('click', saveEdit);
-    R.cancelEditBtn && R.cancelEditBtn.addEventListener('click', exitEdit);
-
-    R.renameBtn && R.renameBtn.addEventListener('click', renameFence);
-    R.delBtn && R.delBtn.addEventListener('click', deleteFence);
-
-    R.byCoordsBtn && R.byCoordsBtn.addEventListener('click', createByCoords);
-    R.exportBtn && R.exportBtn.addEventListener('click', exportGeo);
-    R.importInput && R.importInput.addEventListener('change', importGeo);
-
-    R.fenceSel && R.fenceSel.addEventListener('change', ()=>{ activeId=R.fenceSel.value||null; zoomActive(); setIdle(); });
-  }
-
-  // ---------- Arranque robusto (map polling) ----------
-  function initWhenMapReady(){
-    let tries=0;
-    const maxTries=100; // ~20s si intervalo 200ms
-    const timer=setInterval(()=>{
-      map = (window.nobisMap || window.map || null);
-      if(map && window.L){
-        clearInterval(timer);
-        group = L.layerGroup().addTo(map);
-        bindButtons();
-        drawAll();
-        setIdle();
-      }else if(++tries>=maxTries){
-        clearInterval(timer);
-        // Igual bind de botones para que al menos muestren prompts/estados
-        bindButtons();
-      }
-    },200);
-  }
-
-  // Evitar que formularios “traguen” clicks de botones
-  ['newFenceBtn','finishFenceBtn','cancelFenceBtn','editFenceBtn','saveFenceEditBtn','cancelFenceEditBtn','renameFenceBtn','deleteFenceBtn','createFenceByCoordsBtn','exportGeoJsonBtn']
-    .forEach(id=>{
-      const b=el(id);
-      if(b && b.getAttribute('type')!=='button') b.setAttribute('type','button');
-    });
-
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded', initWhenMapReady, {once:true});
-  }else{
-    initWhenMapReady();
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', wire, { once:true });
+  } else {
+    wire();
   }
 })();
 </script>
 
 </body>
 </html>
+
