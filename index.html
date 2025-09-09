@@ -650,6 +650,167 @@
   }catch(_){}
 })();
 </script>
+<script id="patch-geofence-latlng-v7">
+(function(){
+  try{
+    if (window.__PATCH_GEOFENCE_LATLNG_V7__) return;
+    window.__PATCH_GEOFENCE_LATLNG_V7__ = true;
+
+    // ==== Utilidades (ES5) ====
+    function byId(id){ return document.getElementById(id); }
+    function uid(){ return 'f_' + Math.random().toString(36).slice(2,10); }
+    function nowName(){ return 'Geocerca ' + (Date.now()%1000); }
+
+    // ==== Storage defensivo (claves existentes) ====
+    var UK='NobisApp_users', CK='NobisApp_current_user', FPRE='NobisApp_fences_';
+    function currentUserId(){
+      try{
+        var cur = localStorage.getItem(CK);
+        if (cur) return cur;
+        var users = JSON.parse(localStorage.getItem(UK)||'[]');
+        if (users && users[0] && users[0].id) return users[0].id;
+      }catch(_){}
+      return 'default';
+    }
+    function fkey(){ return FPRE + currentUserId(); }
+    function readFences(){
+      try{
+        var a = JSON.parse(localStorage.getItem(fkey()) || '[]');
+        return Array.isArray(a) ? a : [];
+      }catch(_){ return []; }
+    }
+    function writeFences(arr){
+      try{ localStorage.setItem(fkey(), JSON.stringify(arr||[])); }catch(_){}
+    }
+
+    // ==== Parser robusto (soporta ';' y saltos, coma/punto decimal, lon/lat) ====
+    function parseLatLngMultiline(text){
+      var pts=[]; if(!text) return pts;
+      var segments = text.split(/[;\r\n]+/);
+      for (var i=0;i<segments.length;i++){
+        var seg = (segments[i]||'').trim();
+        if(!seg) continue;
+        // Toma los DOS primeros números (acepta -12.34 o -12,34)
+        var nums = seg.match(/[-+]?\d+(?:[.,]\d+)?/g);
+        if(!nums || nums.length<2) continue;
+        var a = parseFloat(nums[0].replace(',', '.'));
+        var b = parseFloat(nums[1].replace(',', '.'));
+        if(!isFinite(a) || !isFinite(b)) continue;
+        var lat=a, lng=b;
+        // Si el primero luce como lon y el segundo como lat, invierte
+        if (Math.abs(lat)>90 || Math.abs(lng)>180){ lat=b; lng=a; }
+        if (Math.abs(lat)<=90 && Math.abs(lng)<=180){ pts.push({lat:lat,lng:lng}); }
+      }
+      return pts;
+    }
+
+    // ==== Refresco ligero de UI si existen esos elementos ====
+    function refreshSelectorsAndList(activeId){
+      try{
+        var fences = readFences();
+        var sel = byId('geofenceSelect');
+        if(sel){
+          var html='', i;
+          for(i=0;i<fences.length;i++){
+            html += '<option value="'+fences[i].id+'">'+fences[i].name+'</option>';
+          }
+          sel.innerHTML = html;
+          if(activeId) sel.value = activeId;
+        }
+        var list = byId('fenceList');
+        if(list){
+          if(!fences.length){
+            list.innerHTML = '<li class="py-6 text-center text-gray-500">No hay geocercas.</li>';
+          }else{
+            var Lh='';
+            for(i=0;i<fences.length;i++){
+              Lh += '<li class="py-2 px-3 hover:bg-gray-50 cursor-pointer" data-id="'+fences[i].id+'">'+
+                    '<div class="text-sm font-medium">'+fences[i].name+'</div>'+
+                    '<div class="text-xs text-gray-500">'+fences[i].latlngs.length+' puntos</div>'+
+                    '</li>';
+            }
+            list.innerHTML = Lh;
+          }
+        }
+      }catch(_){}
+    }
+
+    // ==== Dibujo de respaldo (solo si hay Leaflet y mapa) ====
+    function drawFallbackOnMap(fence){
+      try{
+        var map = window.nobisMap || window.map;
+        if(!map || !window.L) return;
+        if(!window.NOBIS_FENCE_GROUP){ window.NOBIS_FENCE_GROUP = L.layerGroup().addTo(map); }
+        var poly = L.polygon(fence.latlngs,{color:'#7c3aed',weight:3,fillOpacity:0.2}).addTo(window.NOBIS_FENCE_GROUP);
+        try{ poly.bindTooltip(fence.name||'Geocerca',{permanent:true,direction:'center',className:'label-in-map'}); }catch(_){}
+        try{ map.fitBounds(poly.getBounds(),{padding:[24,24]}); }catch(_){}
+      }catch(_){}
+    }
+
+    // ==== Crear desde puntos y persistir ====
+    function saveFenceFromPts(name, pts){
+      try{
+        var id = uid();
+        var fence = {
+          id: id,
+          name: (name||nowName()),
+          latlngs: pts,                   // [{lat,lng}]
+          coords: (function(){
+            var a=[],i; for(i=0;i<pts.length;i++){ a.push([pts[i].lat, pts[i].lng]); } return a;
+          })(),
+          createdAt: Date.now()
+        };
+        var arr = readFences(); arr.push(fence); writeFences(arr);
+        refreshSelectorsAndList(id);
+        // Si tu app tiene funciones de repintado, intenta llamarlas (no falla si no existen)
+        try{
+          if (typeof window.renderGeofences === 'function') window.renderGeofences();
+          else if (typeof window.refreshGeofences === 'function') window.refreshGeofences();
+          else if (typeof window.redrawGeofences === 'function') window.redrawGeofences();
+        }catch(_){}
+        // Dibujo de respaldo
+        drawFallbackOnMap(fence);
+      }catch(_){}
+    }
+
+    // ==== Interacción principal ====
+    function createFenceByCoords(){
+      try{
+        var example = "Pega coordenadas Lat,Lng (una por línea o separadas con ';'):\n"+
+                      "-1.23456, -78.12345\n-1.23400 -78.12000\n"+
+                      "-1,23456  -78,12345   (coma decimal)\n"+
+                      "-78.12, -1.23         (lon,lat; se corrige)\n\n"+
+                      "También en una sola línea separadas por ';':\n"+
+                      "-1.7315,-77.9077; -1.7323,-77.9077; -1.7322,-77.9092";
+        var raw = window.prompt(example);
+        if (raw === null) return;
+        var pts = parseLatLngMultiline(raw);
+        if (pts.length < 3){ window.alert("Se requieren al menos 3 coordenadas válidas (lat,lng)."); return; }
+        var name = (window.prompt("Nombre de la geocerca:", nowName()) || '').trim();
+        if(!name) name = nowName();
+        saveFenceFromPts(name, pts);
+      }catch(_){}
+    }
+
+    function wire(){
+      try{
+        var btn = byId('createFenceByCoordsBtn');
+        if (btn){
+          if (btn.type !== 'button') btn.type = 'button';
+          btn.onclick = function(ev){ try{ if(ev) ev.preventDefault(); createFenceByCoords(); }catch(_){ } };
+        }
+      }catch(_){}
+    }
+
+    // Arranque: esperar a que todo cargue
+    if (document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', function(){ try{ wire(); }catch(_){} }, false);
+    } else {
+      try{ wire(); }catch(_){}
+    }
+  }catch(_e){}
+})();
+</script>
 
 </body>
 </html>
