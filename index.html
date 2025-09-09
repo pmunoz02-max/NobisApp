@@ -878,5 +878,373 @@
     }
   })();
   </script>
+  <script id="patch-geofences-v1">
+(function(){
+  "use strict";
+  // Evitar que se cargue 2 veces
+  if (window.__NOBIS_GEOFENCE_PATCH__) return;
+  window.__NOBIS_GEOFENCE_PATCH__ = true;
+
+  function el(id){ return document.getElementById(id); }
+  const UK = 'NobisApp_users';
+  const CK = 'NobisApp_current_user';
+  const FPRE = 'NobisApp_fences_';
+
+  // --- Storage helpers ---
+  function currentUserId(){
+    try{
+      const cur = localStorage.getItem(CK);
+      if (cur) return cur;
+      const users = JSON.parse(localStorage.getItem(UK)||'[]');
+      return (users && users[0] && users[0].id) ? users[0].id : 'default';
+    }catch(e){ return 'default'; }
+  }
+  function fkey(){ return FPRE + currentUserId(); }
+  function readF(){ try{ const a = JSON.parse(localStorage.getItem(fkey())||'[]'); return Array.isArray(a)?a:[] } catch(e){ return [] } }
+  function writeF(arr){ localStorage.setItem(fkey(), JSON.stringify(arr||[])); }
+
+  // --- Mapa ---
+  let map = null;
+  function getMap(){ return (window.nobisMap || window.map || null); }
+
+  // --- Capas/estado ---
+  let group = null;          // layer group para las geocercas
+  let activeId = null;
+  let drawing = false, editing = false;
+
+  // Dibujo temporal
+  let tmpMarkers = [], tmpPolyline = null, tmpPoly = null;
+
+  // Edición
+  let editHandles = [], backupLatLngs = null;
+
+  // UI refs (IDs existentes de tu HTML)
+  const refs = {
+    newBtn: el('newFenceBtn'),
+    finBtn: el('finishFenceBtn'),
+    cancelBtn: el('cancelFenceBtn'),
+    editBtn: el('editFenceBtn'),
+    saveEditBtn: el('saveFenceEditBtn'),
+    cancelEditBtn: el('cancelFenceEditBtn'),
+    renameBtn: el('renameFenceBtn'),
+    delBtn: el('deleteFenceBtn'),
+    byCoordsBtn: el('createFenceByCoordsBtn'),
+    exportBtn: el('exportGeoJsonBtn'),
+    importInput: el('importGeoJsonInput'),
+    fenceSel: el('geofenceSelect'),
+    list: el('fenceList'),
+    nameBar: el('nameBar'),
+    nameField: el('nameField'),
+    saveNameBtn: el('saveNameBtn'),
+    cancelNameBtn: el('cancelNameBtn')
+  };
+
+  function enable(n, on){ if(n) n.disabled = !on; }
+  function show(n, on){ if(n) n.classList.toggle('hidden', !on); }
+  function uid(){ return 'f_'+Math.random().toString(36).slice(2,10); }
+
+  function setButtonsIdle(){
+    drawing=false; editing=false;
+    enable(refs.newBtn,true);
+    enable(refs.finBtn,false);
+    enable(refs.cancelBtn,false);
+    enable(refs.editBtn, !!activeId);
+    enable(refs.saveEditBtn,false);
+    enable(refs.cancelEditBtn,false);
+    enable(refs.renameBtn, !!activeId);
+    enable(refs.delBtn, !!activeId);
+    show(refs.nameBar,false);
+  }
+  function setButtonsDrawing(){
+    drawing=true; editing=false;
+    enable(refs.newBtn,false);
+    enable(refs.finBtn,false);   // se activa con >=3 puntos
+    enable(refs.cancelBtn,true);
+    enable(refs.editBtn,false);
+    enable(refs.saveEditBtn,false);
+    enable(refs.cancelEditBtn,false);
+    enable(refs.renameBtn,false);
+    enable(refs.delBtn,false);
+    show(refs.nameBar,false);
+  }
+  function setButtonsEditing(){
+    drawing=false; editing=true;
+    enable(refs.newBtn,false);
+    enable(refs.finBtn,false);
+    enable(refs.cancelBtn,false);
+    enable(refs.editBtn,false);
+    enable(refs.saveEditBtn,true);
+    enable(refs.cancelEditBtn,true);
+    enable(refs.renameBtn,false);
+    enable(refs.delBtn,false);
+    show(refs.nameBar,false);
+  }
+
+  // --- DIBUJO ---
+  function clearTemp(){
+    tmpMarkers.forEach(m=>m.remove()); tmpMarkers=[];
+    if(tmpPolyline){ tmpPolyline.remove(); tmpPolyline=null; }
+    if(tmpPoly){ tmpPoly.remove(); tmpPoly=null; }
+  }
+  function onMapClickAddVertex(e){
+    if(!drawing) return;
+    const m = L.circleMarker(e.latlng,{radius:5,color:'#6366f1',fillColor:'#818cf8',fillOpacity:1}).addTo(map);
+    tmpMarkers.push(m);
+    const pts = tmpMarkers.map(x=>x.getLatLng());
+    if(tmpPolyline) tmpPolyline.setLatLngs(pts);
+    else tmpPolyline = L.polyline(pts,{color:'#6366f1',dashArray:'4 4'}).addTo(map);
+    if(pts.length>=3){
+      enable(refs.finBtn,true);
+      if(tmpPoly) tmpPoly.setLatLngs(pts);
+      else tmpPoly = L.polygon(pts,{color:'#a78bfa',weight:2,fillOpacity:.12}).addTo(map);
+    }
+  }
+  function startDrawing(){
+    if(editing){ alert('Termina/cancela la edición.'); return; }
+    clearTemp();
+    setButtonsDrawing();
+    map.on('click', onMapClickAddVertex);
+  }
+  function cancelDrawing(){
+    map.off('click', onMapClickAddVertex);
+    clearTemp();
+    setButtonsIdle();
+  }
+  function finalizeDrawing(){
+    const pts = tmpMarkers.map(x=>x.getLatLng());
+    if(pts.length<3){ alert('Agrega al menos 3 puntos.'); return; }
+    show(refs.nameBar,true);
+    refs.nameField && refs.nameField.focus();
+
+    const doSave = ()=>{
+      const name = (refs.nameField?.value||'').trim() || ('Geocerca '+(Date.now()%1000));
+      const fences = readF();
+      const id = uid();
+      fences.push({id, name, latlngs: pts});
+      writeF(fences);
+      map.off('click', onMapClickAddVertex);
+      clearTemp();
+      show(refs.nameBar,false);
+      if(refs.nameField) refs.nameField.value='';
+      activeId = id;
+      drawAll();
+      zoomToActive();
+      setButtonsIdle();
+    };
+    if(refs.saveNameBtn) refs.saveNameBtn.onclick = doSave;
+    if(refs.nameField) refs.nameField.onkeydown = (ev)=>{ if(ev.key==='Enter') doSave(); };
+    if(refs.cancelNameBtn) refs.cancelNameBtn.onclick = ()=> show(refs.nameBar,false);
+  }
+
+  // --- PINTAR TODO ---
+  function drawAll(){
+    if(!group) group = L.layerGroup().addTo(map);
+    group.clearLayers();
+    const fences = readF();
+
+    fences.forEach(f=>{
+      const poly = L.polygon(f.latlngs,{color:'#7c3aed',weight:3,fillOpacity:.2}).addTo(group);
+      poly.bindTooltip(f.name||'Geocerca',{permanent:true,direction:'center',className:'label-in-map'});
+      f.__layer = poly;
+      poly.on('click', ()=>{ activeId=f.id; renderSelectors(); zoomToActive(); setButtonsIdle(); });
+    });
+
+    // Lista
+    if(refs.list){
+      refs.list.innerHTML = fences.length
+        ? fences.map(f=>`<li class="py-2 px-3 hover:bg-gray-50 cursor-pointer" data-id="${f.id}">
+            <div class="text-sm font-medium">${f.name}</div>
+            <div class="text-xs text-gray-500">${f.latlngs.length} puntos</div>
+          </li>`).join('')
+        : '<li class="py-6 text-center text-gray-500">No hay geocercas.</li>';
+      refs.list.querySelectorAll('[data-id]').forEach(n=>{
+        n.addEventListener('click', ()=>{ activeId=n.getAttribute('data-id'); renderSelectors(); zoomToActive(); setButtonsIdle(); });
+      });
+    }
+
+    renderSelectors();
+  }
+  function renderSelectors(){
+    const fences = readF();
+    if(refs.fenceSel){
+      refs.fenceSel.innerHTML = fences.map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
+      if(!activeId && fences[0]) activeId = fences[0].id;
+      if(activeId) refs.fenceSel.value = activeId;
+    }
+    enable(refs.editBtn, !!activeId);
+    enable(refs.renameBtn, !!activeId);
+    enable(refs.delBtn, !!activeId);
+  }
+  function zoomToActive(){
+    const f = readF().find(x=>x.id===activeId);
+    if(f && f.__layer) map.fitBounds(f.__layer.getBounds(), {padding:[24,24]});
+  }
+
+  // --- EDICIÓN ---
+  function enterEdit(){
+    if(!activeId){ alert('Selecciona una geocerca.'); return; }
+    const fences = readF();
+    const f = fences.find(x=>x.id===activeId);
+    if(!f || !f.__layer) return;
+
+    setButtonsEditing();
+    const latlngs = f.__layer.getLatLngs()[0] || f.__layer.getLatLngs();
+    backupLatLngs = latlngs;
+
+    editHandles = latlngs.map(ll=>{
+      const m = L.circleMarker(ll,{radius:6,color:'#f59e0b',fillColor:'#fbbf24',fillOpacity:1}).addTo(map);
+      // Drag "manual" (sin plugins)
+      m.dragging = new L.Handler.MarkerDrag(m);
+      m.on('mousedown', ()=>m.dragging.enable());
+      m.on('mouseup',   ()=>m.dragging.disable());
+      m.on('drag', ()=>{
+        const cur = editHandles.map(h=>h.getLatLng());
+        f.__layer.setLatLngs([cur]);
+      });
+      return m;
+    });
+    editing = true;
+  }
+  function saveEdit(){
+    if(!activeId) return;
+    const fences = readF();
+    const f = fences.find(x=>x.id===activeId);
+    if(!f || !f.__layer) return;
+    const cur = editHandles.map(h=>h.getLatLng());
+    if(cur.length<3){ alert('Mínimo 3 vértices.'); return; }
+    f.latlngs = cur;
+    writeF(fences);
+    exitEdit(true);
+  }
+  function exitEdit(redraw){
+    editHandles.forEach(h=>{ h.dragging && h.dragging.disable(); h.remove(); });
+    editHandles = [];
+    editing=false;
+    setButtonsIdle();
+    if(redraw) drawAll();
+  }
+
+  // --- CRUD extra ---
+  function renameFence(){
+    if(!activeId) return;
+    const fences = readF();
+    const f = fences.find(x=>x.id===activeId);
+    if(!f) return;
+    const nn = prompt('Nuevo nombre:', f.name);
+    if(nn===null) return;
+    f.name = (nn||'').trim() || f.name;
+    writeF(fences);
+    drawAll();
+  }
+  function deleteFence(){
+    if(!activeId) return;
+    const fences = readF();
+    const f = fences.find(x=>x.id===activeId);
+    if(!f) return;
+    if(!confirm(`Eliminar "${f.name}"?`)) return;
+    if(f.__layer) f.__layer.remove();
+    const arr = fences.filter(x=>x.id!==activeId);
+    writeF(arr);
+    activeId = arr[0]?.id || null;
+    drawAll();
+    setButtonsIdle();
+  }
+  function createByCoords(){
+    const raw = prompt('Introduce líneas lat,lng (una por vértice):');
+    if(raw===null) return;
+    const lines = raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    const pts=[];
+    for(const ln of lines){
+      const [a,b] = ln.split(',').map(s=>+s.trim());
+      if(Number.isFinite(a)&&Number.isFinite(b)) pts.push({lat:a,lng:b});
+    }
+    if(pts.length<3){ alert('Se requieren al menos 3 vértices.'); return; }
+    const nm = prompt('Nombre de la geocerca:', 'Geocerca '+(Date.now()%1000)) || ('Geocerca '+(Date.now()%1000));
+    const fences = readF();
+    const id = uid();
+    fences.push({id:id, name:nm, latlngs:pts});
+    writeF(fences);
+    activeId=id; drawAll(); zoomToActive();
+  }
+
+  // --- Import / Export ---
+  function exportGeo(){
+    const fences = readF();
+    const fc = {
+      type:'FeatureCollection',
+      features: fences.map(f=>{
+        const coords = f.latlngs.map(p=>[p.lng,p.lat]);
+        coords.push([coords[0][0], coords[0][1]]);
+        return { type:'Feature', properties:{id:f.id,name:f.name}, geometry:{type:'Polygon', coordinates:[coords]} };
+      })
+    };
+    const blob = new Blob([JSON.stringify(fc,null,2)], {type:'application/geo+json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'geocercas.geojson'; a.click(); URL.revokeObjectURL(a.href);
+  }
+  function importGeo(file){
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const gj=JSON.parse(reader.result);
+        const fences=readF();
+        const feats = gj.type==='FeatureCollection' ? (gj.features||[]) : (gj.type==='Feature' ? [gj] : []);
+        feats.forEach(ft=>{
+          if(ft.geometry?.type!=='Polygon') return;
+          const ring=ft.geometry.coordinates?.[0]||[];
+          const pts=ring.slice(0,-1).map(([lng,lat])=>({lat,lng}));
+          if(pts.length>=3) fences.push({id:uid(), name:(ft.properties?.name||'Geocerca importada'), latlngs:pts});
+        });
+        writeF(fences);
+        drawAll();
+      }catch(e){ alert('GeoJSON inválido'); }
+    };
+    reader.readAsText(file);
+  }
+
+  // --- Wiring ---
+  function wire(){
+    map = getMap();
+    if(!map){
+      // Esperar a tu evento de inicialización de mapa (si lo usas)
+      document.addEventListener('nobis:map-ready', ()=>{
+        map = getMap();
+        if(!map) return;
+        group = L.layerGroup().addTo(map);
+        drawAll();
+        setButtonsIdle();
+      }, {once:true});
+    } else {
+      group = L.layerGroup().addTo(map);
+      drawAll();
+      setButtonsIdle();
+    }
+
+    refs.newBtn && refs.newBtn.addEventListener('click', startDrawing);
+    refs.cancelBtn && refs.cancelBtn.addEventListener('click', cancelDrawing);
+    refs.finBtn && refs.finBtn.addEventListener('click', finalizeDrawing);
+
+    refs.editBtn && refs.editBtn.addEventListener('click', enterEdit);
+    refs.saveEditBtn && refs.saveEditBtn.addEventListener('click', saveEdit);
+    refs.cancelEditBtn && refs.cancelEditBtn.addEventListener('click', ()=>exitEdit(false));
+
+    refs.renameBtn && refs.renameBtn.addEventListener('click', renameFence);
+    refs.delBtn && refs.delBtn.addEventListener('click', deleteFence);
+
+    refs.byCoordsBtn && refs.byCoordsBtn.addEventListener('click', createByCoords);
+    refs.exportBtn && refs.exportBtn.addEventListener('click', exportGeo);
+    refs.importInput && refs.importInput.addEventListener('change', (e)=>{ const f=e.target.files?.[0]; if(f) importGeo(f); e.target.value=''; });
+
+    refs.fenceSel && refs.fenceSel.addEventListener('change', ()=>{ activeId=refs.fenceSel.value||null; zoomToActive(); setButtonsIdle(); });
+
+    // Si cambias de usuario en tu selector, refresca las geocercas
+    const userSel = el('userSelect');
+    userSel && userSel.addEventListener('change', ()=>{ activeId=null; drawAll(); setButtonsIdle(); });
+  }
+
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', wire, {once:true}); }
+  else { wire(); }
+})();
+</script>
+
 </body>
 </html>
