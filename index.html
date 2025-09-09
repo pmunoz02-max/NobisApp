@@ -3,36 +3,39 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gestión de Geocercas</title>
+  <title>Geocercas</title>
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-o9N1j7kG1G8zS2f6sQPFfCjPZQ+1QttYvVQ4JQ1gITk=" crossorigin=""></script>
+  <!-- Leaflet (CSS + JS) -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-o9N1j7kG1G8zS2f6sQPFfCjPZQ+1QttYvVQ4JQ1gITk="
+          crossorigin=""></script>
 
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, Segoe UI, Arial, sans-serif; background: #f7f7fb; color: #111827; }
-    header { padding: 12px 16px; background: #111827; color: white; font-weight: 600; }
-    .app { display: grid; grid-template-columns: 320px 1fr; gap: 0; height: calc(100vh - 56px); }
-    .sidebar { background: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; }
-    .section { padding: 12px 12px 8px; border-bottom: 1px solid #f0f0f5; }
-    .section h2 { margin: 0 0 8px; font-size: 14px; color: #374151; text-transform: uppercase; letter-spacing: .04em;}
-    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .controls button, .controls label { font-size: 12px; }
-    button { padding: 8px 10px; border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; cursor: pointer; }
-    button:disabled { opacity: .5; cursor: not-allowed; }
-    button.primary { background: #4f46e5; color: white; border-color: #4338ca; }
-    button.warn { background: #ef4444; color:white; border-color:#dc2626; }
-    .list { list-style: none; padding: 0; margin: 0; max-height: 230px; overflow: auto; }
-    .list li { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; cursor: pointer; }
-    .list li:hover { background: #f9fafb; }
-    .namebar { display: none; padding: 8px 10px; gap: 6px; border-top: 1px dashed #e5e7eb; }
-    .namebar input { width: 100%; padding: 8px 10px; border:1px solid #e5e7eb; border-radius:8px; }
-    .hidden { display: none !important; }
-    .map { height: 100%; width: 100%; }
-    .map-wrap { height: 100%; }
-    .label-in-map { background: rgba(255,255,255,.7); border: 0; box-shadow: none; color:#111827; font-weight:600; }
-    .file-input { display: inline-block; }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f6f7fb;color:#111827}
+    header{background:#111827;color:#fff;padding:12px 16px;font-weight:600}
+    .app{display:grid;grid-template-columns:320px 1fr;height:calc(100vh - 48px)}
+    .sidebar{background:#fff;border-right:1px solid #e5e7eb;overflow:auto}
+    .section{padding:12px;border-bottom:1px solid #eef0f3}
+    .section h2{margin:0 0 8px;font-size:13px;color:#374151;text-transform:uppercase;letter-spacing:.04em}
+    .controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    button{padding:8px 10px;border:1px solid #e5e7eb;background:#fff;border-radius:8px;font-size:12px;cursor:pointer}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .primary{background:#4f46e5;border-color:#4338ca;color:#fff}
+    .danger{background:#ef4444;border-color:#dc2626;color:#fff}
+    .list{list-style:none;margin:0;padding:0;max-height:220px;overflow:auto;border:1px solid #eef0f3;border-radius:8px}
+    .list li{padding:8px 10px;border-bottom:1px solid #f2f3f6;cursor:pointer}
+    .list li:last-child{border-bottom:0}
+    .hint{font-size:12px;color:#6b7280}
+    .namebar{display:none;gap:6px}
+    .namebar input{flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px}
+    .map{height:100%;width:100%}
+    .label-in-map{background:rgba(255,255,255,.7);border:0;box-shadow:none;color:#111827;font-weight:600}
   </style>
 </head>
 <body>
@@ -42,8 +45,8 @@
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="section">
-        <h2>Geocercas</h2>
-        <div class="controls" style="grid-template-columns: 1fr 1fr;">
+        <h2>Acciones</h2>
+        <div class="controls">
           <button id="newFenceBtn">Nueva</button>
           <button id="finishFenceBtn" class="primary" disabled>Finalizar</button>
           <button id="cancelFenceBtn" disabled>Cancelar</button>
@@ -51,21 +54,26 @@
           <button id="saveFenceEditBtn" class="primary" disabled>Guardar cambios</button>
           <button id="cancelFenceEditBtn" disabled>Cancelar edición</button>
           <button id="renameFenceBtn" disabled>Renombrar</button>
-          <button id="deleteFenceBtn" class="warn" disabled>Eliminar</button>
+          <button id="deleteFenceBtn" class="danger" disabled>Eliminar</button>
           <button id="createFenceByCoordsBtn">Geocerca (Lat/Lng)</button>
-          <button id="exportGeoJsonBtn">Exportar</button>
-          <label class="file-input">
-            <input id="importGeoJsonInput" type="file" accept=".json,.geojson,application/geo+json" />
+          <button id="exportGeoJsonBtn">Exportar GeoJSON</button>
+          <label style="display:inline-block">
+            <input id="importGeoJsonInput" type="file" accept=".geojson,.json,application/geo+json,application/json" />
           </label>
         </div>
       </div>
 
       <div class="section">
-        <h2>Lista</h2>
+        <h2>Geocercas</h2>
         <ul id="fenceList" class="list"></ul>
+        <p class="hint" style="margin-top:8px">
+          • Dibujo: clics en el mapa → “Finalizar”.<br>
+          • Edición: selecciona → “Editar”, arrastra vértices → “Guardar cambios”.<br>
+          • También puedes crear por coordenadas con “Geocerca (Lat/Lng)”.
+        </p>
       </div>
 
-      <div id="nameBar" class="namebar section" style="border-bottom: none;">
+      <div id="nameBar" class="section namebar">
         <input id="nameField" type="text" placeholder="Nombre de la geocerca">
         <button id="saveNameBtn" class="primary">Guardar</button>
         <button id="cancelNameBtn">Cancelar</button>
@@ -73,31 +81,30 @@
     </aside>
 
     <!-- Mapa -->
-    <main class="map-wrap">
+    <main>
       <div id="map" class="map"></div>
     </main>
   </div>
 
-  <!-- ===== Lógica ES5 segura ===== -->
   <script>
   (function(){
-    // ------- Utils -------
+    // ===== Utilidades =====
     function $(id){ return document.getElementById(id); }
     function uid(){ return 'f_' + Math.random().toString(36).slice(2,10); }
     function nowName(){ return 'Geocerca ' + (new Date().getTime()%1000); }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 
-    // ------- Storage -------
+    // ===== Storage (single-user base; luego lo hacemos multiuser de nuevo) =====
     var STORAGE_KEY = 'NobisApp_fences_default';
     function readF(){ try{ var a=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); return (a && typeof a.length==='number')?a:[]; }catch(_){ return []; } }
-    function writeF(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr||[])); }catch(_){ } }
+    function writeF(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr||[])); }catch(_){} }
 
-    // ------- Estado / mapa -------
+    // ===== Estado / referencias =====
     var map, group, activeId=null;
     var drawing=false, editing=false;
     var tmpMarkers=[], tmpPolyline=null, tmpPoly=null;
     var editMarkers=[], editBackup=null;
 
-    // ------- Referencias UI -------
     var R = {
       newBtn: $('newFenceBtn'),
       finBtn: $('finishFenceBtn'),
@@ -117,8 +124,8 @@
       cancelNameBtn: $('cancelNameBtn')
     };
 
-    function enable(n,on){ if(n){ n.disabled = !on; } }
-    function show(n,on){ if(n){ n.style.display = on ? 'flex' : 'none'; } }
+    function enable(n,on){ if(n) n.disabled=!on; }
+    function showNameBar(on){ if(R.nameBar) R.nameBar.style.display = on ? 'flex' : 'none'; }
 
     function setIdle(){
       drawing=false; editing=false;
@@ -130,7 +137,7 @@
       enable(R.cancelEditBtn,false);
       enable(R.renameBtn, !!activeId);
       enable(R.delBtn, !!activeId);
-      show(R.nameBar,false);
+      showNameBar(false);
     }
     function setDrawing(){
       drawing=true; editing=false;
@@ -142,7 +149,7 @@
       enable(R.cancelEditBtn,false);
       enable(R.renameBtn,false);
       enable(R.delBtn,false);
-      show(R.nameBar,false);
+      showNameBar(false);
     }
     function setEditing(){
       drawing=false; editing=true;
@@ -154,10 +161,10 @@
       enable(R.cancelEditBtn,true);
       enable(R.renameBtn,false);
       enable(R.delBtn,false);
-      show(R.nameBar,false);
+      showNameBar(false);
     }
 
-    // ------- Inicializar mapa -------
+    // ===== Inicializar mapa =====
     function initMap(){
       map = L.map('map').setView([-1.7307, -77.9122], 15);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -166,300 +173,219 @@
       }).addTo(map);
       group = L.layerGroup().addTo(map);
 
-      // Wiring
+      // Wiring UI
       R.newBtn.onclick = startDrawing;
       R.finBtn.onclick = finalizeDrawing;
       R.cancelBtn.onclick = cancelDrawing;
-
       R.editBtn.onclick = enterEdit;
       R.saveEditBtn.onclick = saveEdit;
       R.cancelEditBtn.onclick = function(){ exitEdit(false); };
-
       R.renameBtn.onclick = renameFence;
       R.delBtn.onclick = deleteFence;
-
       R.byCoordsBtn.onclick = createByCoords;
       R.exportBtn.onclick = exportGeo;
-      R.importInput.onchange = function(e){
-        try{
-          var f = e.target.files && e.target.files[0];
-          if(!f) return;
-          var reader=new FileReader();
-          reader.onload = function(){
-            try{
-              var gj = JSON.parse(reader.result);
-              var feats = (gj.type==='FeatureCollection') ? (gj.features||[]) : (gj.type==='Feature' ? [gj] : []);
-              var arr = readF();
-              for(var i=0;i<feats.length;i++){
-                var ft=feats[i];
-                if(!ft.geometry || ft.geometry.type!=='Polygon') continue;
-                var ring = (ft.geometry.coordinates && ft.geometry.coordinates[0]) || [];
-                var pts=[], j;
-                for(j=0;j<ring.length-1;j++){ // quitamos cierre duplicado si viene
-                  pts.push({lat:ring[j][1], lng:ring[j][0]});
-                }
-                if(pts.length>=3){ arr.push({id:uid(), name:(ft.properties&&ft.properties.name)||'Geocerca importada', latlngs:pts}); }
-              }
-              writeF(arr); drawAll();
-            }catch(_){ alert('GeoJSON inválido'); }
-          };
-          reader.readAsText(f);
-        }finally{
-          e.target.value='';
-        }
-      };
+      R.importInput.onchange = importGeo;
 
       drawAll();
       setIdle();
     }
 
-    // ------- Dibujo en mapa -------
+    // ===== Dibujo temporal =====
     function clearTemp(){
-      var i;
-      for(i=0;i<tmpMarkers.length;i++){ map.removeLayer(tmpMarkers[i]); }
+      for(var i=0;i<tmpMarkers.length;i++){ map.removeLayer(tmpMarkers[i]); }
       tmpMarkers=[]; if(tmpPolyline){ map.removeLayer(tmpPolyline); tmpPolyline=null; }
       if(tmpPoly){ map.removeLayer(tmpPoly); tmpPoly=null; }
     }
     function onMapClickAdd(e){
       if(!drawing) return;
-      var m = L.circleMarker(e.latlng, {radius:5, color:'#6366f1', fillColor:'#818cf8', fillOpacity:1}).addTo(map);
+      var m=L.circleMarker(e.latlng,{radius:5,color:'#6366f1',fillColor:'#818cf8',fillOpacity:1}).addTo(map);
       tmpMarkers.push(m);
-      var pts=[], i;
-      for(i=0;i<tmpMarkers.length;i++){ pts.push(tmpMarkers[i].getLatLng()); }
-      if(tmpPolyline) tmpPolyline.setLatLngs(pts); else tmpPolyline = L.polyline(pts, {color:'#6366f1', dashArray:'4 4'}).addTo(map);
+      var pts=[],i; for(i=0;i<tmpMarkers.length;i++){ pts.push(tmpMarkers[i].getLatLng()); }
+      if(tmpPolyline) tmpPolyline.setLatLngs(pts); else tmpPolyline=L.polyline(pts,{color:'#6366f1',dashArray:'4 4'}).addTo(map);
       if(pts.length>=3){
         enable(R.finBtn,true);
-        if(tmpPoly) tmpPoly.setLatLngs(pts); else tmpPoly = L.polygon(pts,{color:'#a78bfa',weight:2,fillOpacity:.12}).addTo(map);
+        if(tmpPoly) tmpPoly.setLatLngs(pts); else tmpPoly=L.polygon(pts,{color:'#a78bfa',weight:2,fillOpacity:.12}).addTo(map);
       }
     }
     function startDrawing(){
       if(editing){ alert('Termina/cancela la edición primero.'); return; }
-      clearTemp();
-      setDrawing();
-      map.on('click', onMapClickAdd);
+      clearTemp(); setDrawing(); map.on('click', onMapClickAdd);
     }
-    function cancelDrawing(){
-      map.off('click', onMapClickAdd);
-      clearTemp();
-      setIdle();
-    }
+    function cancelDrawing(){ map.off('click',onMapClickAdd); clearTemp(); setIdle(); }
     function finalizeDrawing(){
-      var i, pts=[];
-      for(i=0;i<tmpMarkers.length;i++){ pts.push(tmpMarkers[i].getLatLng()); }
+      var pts=[],i; for(i=0;i<tmpMarkers.length;i++){ pts.push(tmpMarkers[i].getLatLng()); }
       if(pts.length<3){ alert('Agrega al menos 3 puntos.'); return; }
-
-      show(R.nameBar,true);
-      R.nameField.focus();
+      showNameBar(true); R.nameField.focus();
 
       function doSave(){
-        var name = (R.nameField.value||'').trim() || nowName();
-        var arr = readF();
-        var id = uid();
-        var latlngs = [];
-        for(var k=0;k<pts.length;k++){ latlngs.push({lat:pts[k].lat, lng:pts[k].lng}); }
-        arr.push({id:id, name:name, latlngs:latlngs});
-        writeF(arr);
-
-        map.off('click', onMapClickAdd);
-        clearTemp();
-        show(R.nameBar,false); R.nameField.value='';
-        activeId = id;
-        drawAll();
-        zoomToActive();
-        setIdle();
+        var name=(R.nameField.value||'').trim()||nowName();
+        var arr=readF(); var id=uid();
+        var latlngs=[],k; for(k=0;k<pts.length;k++){ latlngs.push({lat:pts[k].lat,lng:pts[k].lng}); }
+        arr.push({id:id,name:name,latlngs:latlngs}); writeF(arr);
+        map.off('click',onMapClickAdd); clearTemp(); showNameBar(false); R.nameField.value='';
+        activeId=id; drawAll(); zoomToActive(); setIdle();
       }
-      R.saveNameBtn.onclick = doSave;
-      R.nameField.onkeydown = function(ev){ if(ev.key==='Enter'){ doSave(); } };
-      R.cancelNameBtn.onclick = function(){ show(R.nameBar,false); };
+      R.saveNameBtn.onclick=doSave;
+      R.nameField.onkeydown=function(ev){ if(ev.key==='Enter') doSave(); };
+      R.cancelNameBtn.onclick=function(){ showNameBar(false); };
     }
 
-    // ------- Render de todas las geocercas -------
+    // ===== Render geocercas =====
     function drawAll(){
       group.clearLayers();
-      var arr = readF();
-      var i;
-      for(i=0;i<arr.length;i++){
+      var arr=readF();
+      for(var i=0;i<arr.length;i++){
         (function(f){
-          var poly = L.polygon(f.latlngs, {color:'#7c3aed', weight:3, fillOpacity:.2}).addTo(group);
+          var poly=L.polygon(f.latlngs,{color:'#7c3aed',weight:3,fillOpacity:.2}).addTo(group);
           try{ poly.bindTooltip(f.name||'Geocerca',{permanent:true,direction:'center',className:'label-in-map'});}catch(_){}
-          f.__layer = poly;
-          poly.on('click', function(){ activeId = f.id; renderList(); zoomToActive(); setIdle(); });
+          f.__layer=poly;
+          poly.on('click',function(){ activeId=f.id; renderList(); zoomToActive(); setIdle(); });
         })(arr[i]);
       }
       renderList();
     }
-
     function renderList(){
-      var arr = readF();
-      if(!R.list) return;
-      if(!arr.length){ R.list.innerHTML = '<li class="py-6" style="text-align:center;color:#6b7280;">No hay geocercas.</li>'; return; }
-      var i, html='';
-      for(i=0;i<arr.length;i++){
-        html += '<li data-id="'+arr[i].id+'"><div style="font-weight:600;font-size:13px;">'+escapeHtml(arr[i].name)+'</div>'+
-                '<div style="color:#6b7280;font-size:12px;">'+arr[i].latlngs.length+' puntos</div></li>';
+      var arr=readF(); if(!R.list) return;
+      if(!arr.length){ R.list.innerHTML='<li style="text-align:center;color:#6b7280;padding:10px">No hay geocercas.</li>'; return; }
+      var html='',i; for(i=0;i<arr.length;i++){
+        html+='<li data-id="'+arr[i].id+'"><div style="font-weight:600;font-size:13px;">'+escapeHtml(arr[i].name)+'</div>'+
+              '<div class="hint">'+arr[i].latlngs.length+' puntos</div></li>';
       }
-      R.list.innerHTML = html;
-      var items = R.list.querySelectorAll('[data-id]');
+      R.list.innerHTML=html;
+      var items=R.list.querySelectorAll('[data-id]');
       for(i=0;i<items.length;i++){
-        items[i].onclick = (function(n){ return function(){ activeId=n; zoomToActive(); setIdle(); drawAll(); }; })(items[i].getAttribute('data-id'));
+        items[i].onclick=(function(id){return function(){ activeId=id; zoomToActive(); setIdle(); drawAll(); };})(items[i].getAttribute('data-id'));
       }
-      enable(R.editBtn, !!activeId);
-      enable(R.renameBtn, !!activeId);
-      enable(R.delBtn, !!activeId);
+      enable(R.editBtn, !!activeId); enable(R.renameBtn, !!activeId); enable(R.delBtn, !!activeId);
     }
-
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
-
     function zoomToActive(){
-      var f = findActive();
-      if(f && f.__layer){ try{ map.fitBounds(f.__layer.getBounds(), {padding:[24,24]}); }catch(_){ } }
+      var f=findActive(); if(f && f.__layer){ try{ map.fitBounds(f.__layer.getBounds(),{padding:[24,24]}); }catch(_){ } }
     }
     function findActive(){
-      var arr = readF(), i;
-      for(i=0;i<arr.length;i++){ if(arr[i].id===activeId) return arr[i]; }
-      return null;
+      var arr=readF(); for(var i=0;i<arr.length;i++){ if(arr[i].id===activeId) return arr[i]; } return null;
     }
 
-    // ------- Edición -------
+    // ===== Edición =====
     function enterEdit(){
       if(!activeId){ alert('Selecciona una geocerca.'); return; }
-      var f = findActive();
-      if(!f || !f.__layer) return;
+      var f=findActive(); if(!f || !f.__layer) return;
       setEditing();
-
-      var latlngs = f.__layer.getLatLngs();
-      latlngs = latlngs && latlngs[0] ? latlngs[0] : latlngs;
-      editBackup = [];
-      editMarkers = [];
-      for(var i=0;i<latlngs.length;i++){
-        editBackup.push( L.latLng(latlngs[i].lat, latlngs[i].lng) );
-        var m = L.marker(latlngs[i], {draggable:true, title:'Arrastra'}).addTo(map);
-        m.on('drag', (function(){
-          return function(){
-            var cur=[], j;
-            for(j=0;j<editMarkers.length;j++){ cur.push(editMarkers[j].getLatLng()); }
+      var lls=f.__layer.getLatLngs(); lls=lls && lls[0]? lls[0] : lls;
+      editBackup=[]; editMarkers=[];
+      for(var i=0;i<lls.length;i++){
+        editBackup.push(L.latLng(lls[i].lat,lls[i].lng));
+        (function(idx){
+          var m=L.marker(lls[idx],{draggable:true,title:'Arrastra'}).addTo(map);
+          m.on('drag',function(){ 
+            var cur=[],j; for(j=0;j<editMarkers.length;j++){ cur.push(editMarkers[j].getLatLng()); }
             f.__layer.setLatLngs([cur]);
-          };
-        })());
-        editMarkers.push(m);
+          });
+          editMarkers.push(m);
+        })(i);
       }
     }
-
     function saveEdit(){
       if(!activeId) return;
-      var f = findActive();
-      if(!f || !f.__layer) return;
-      var cur=[], i;
-      for(i=0;i<editMarkers.length;i++){ cur.push(editMarkers[i].getLatLng()); }
+      var f=findActive(); if(!f || !f.__layer) return;
+      var cur=[],i; for(i=0;i<editMarkers.length;i++){ cur.push(editMarkers[i].getLatLng()); }
       if(cur.length<3){ alert('Mínimo 3 vértices.'); return; }
-
-      // Persistir
-      var arr = readF();
-      for(i=0;i<arr.length;i++){
-        if(arr[i].id===activeId){
-          var pts=[], k;
-          for(k=0;k<cur.length;k++){ pts.push({lat:cur[k].lat, lng:cur[k].lng}); }
-          arr[i].latlngs = pts;
-          break;
-        }
-      }
-      writeF(arr);
-      exitEdit(true);
+      var arr=readF(); for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ 
+        var pts=[],k; for(k=0;k<cur.length;k++){ pts.push({lat:cur[k].lat,lng:cur[k].lng}); }
+        arr[i].latlngs=pts; break;
+      }}
+      writeF(arr); exitEdit(true);
     }
-
     function exitEdit(redraw){
       for(var i=0;i<editMarkers.length;i++){ map.removeLayer(editMarkers[i]); }
-      editMarkers=[]; editBackup=null;
-      setIdle();
-      if(redraw){ drawAll(); }
+      editMarkers=[]; editBackup=null; setIdle(); if(redraw) drawAll();
     }
 
-    // ------- CRUD -------
+    // ===== CRUD =====
     function renameFence(){
       if(!activeId) return;
-      var arr = readF(), i, f=null;
-      for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ f=arr[i]; break; } }
+      var arr=readF(),i,f=null; for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ f=arr[i]; break; } }
       if(!f) return;
-      var nn = prompt('Nuevo nombre:', f.name||'');
-      if(nn===null) return;
-      nn = (nn||'').trim();
-      if(!nn) return;
-      f.name = nn;
-      writeF(arr); drawAll();
+      var nn=prompt('Nuevo nombre:', f.name||''); if(nn===null) return; nn=(nn||'').trim(); if(!nn) return;
+      f.name=nn; writeF(arr); drawAll();
     }
-
     function deleteFence(){
       if(!activeId) return;
-      var arr = readF(), i, f=null;
-      for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ f=arr[i]; break; } }
+      var arr=readF(),i,f=null; for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ f=arr[i]; break; } }
       if(!f) return;
       if(!confirm('Eliminar "'+(f.name||'Geocerca')+'"?')) return;
-      arr = arr.filter(function(x){ return x.id!==activeId; });
-      writeF(arr);
-      activeId = null;
-      drawAll(); setIdle();
+      var out=[]; for(i=0;i<arr.length;i++){ if(arr[i].id!==activeId) out.push(arr[i]); }
+      writeF(out); activeId=null; drawAll(); setIdle();
     }
 
-    // ------- Crear por coordenadas -------
+    // ===== Crear por Lat/Lng =====
     function parseLatLngMultiline(text){
       var pts=[]; if(!text) return pts;
-      var segments = String(text).split(/[;\r\n]+/);
+      var segments=String(text).split(/[;\r\n]+/);
       for(var i=0;i<segments.length;i++){
-        var seg = (segments[i]||'').trim();
-        if(!seg) continue;
-        var nums = seg.match(/[-+]?\d+(?:[.,]\d+)?/g);
-        if(!nums || nums.length<2) continue;
-        var a = parseFloat(String(nums[0]).replace(',', '.'));
-        var b = parseFloat(String(nums[1]).replace(',', '.'));
-        if(!isFinite(a) || !isFinite(b)) continue;
-        var lat=a, lng=b;
-        if (Math.abs(lat)>90 || Math.abs(lng)>180){ lat=b; lng=a; }
-        if (Math.abs(lat)<=90 && Math.abs(lng)<=180){ pts.push({lat:lat, lng:lng}); }
+        var seg=(segments[i]||'').trim(); if(!seg) continue;
+        var nums=seg.match(/[-+]?\d+(?:[.,]\d+)?/g); if(!nums || nums.length<2) continue;
+        var a=parseFloat(String(nums[0]).replace(',', '.'));
+        var b=parseFloat(String(nums[1]).replace(',', '.'));
+        if(!isFinite(a)||!isFinite(b)) continue;
+        var lat=a,lng=b; if(Math.abs(lat)>90||Math.abs(lng)>180){ lat=b; lng=a; }
+        if(Math.abs(lat)<=90 && Math.abs(lng)<=180){ pts.push({lat:lat,lng:lng}); }
       }
       return pts;
     }
-
     function createByCoords(){
-      var example = "Pega coordenadas Lat,Lng (una por línea o separadas con ';'):\n"+
-                    "-1.23456, -78.12345\n-1.23400 -78.12000\n"+
-                    "-1,23456  -78,12345   (coma decimal)\n"+
-                    "-78.12, -1.23         (lon,lat; se corrige)\n\n"+
-                    "También en una sola línea separadas por ';':\n"+
-                    "-1.7315,-77.9077; -1.7323,-77.9077; -1.7322,-77.9092";
-      var raw = window.prompt(example);
-      if (raw === null) return;
-      var pts = parseLatLngMultiline(raw);
-      if (!pts || pts.length < 3){ window.alert("Se requieren al menos 3 coordenadas válidas (lat,lng)."); return; }
-      var name = (window.prompt("Nombre de la geocerca:", nowName()) || '').trim();
-      if(!name) name = nowName();
-
-      var arr = readF();
-      var id = uid();
-      arr.push({id:id, name:name, latlngs:pts});
-      writeF(arr);
-      activeId=id;
-      drawAll();
-      zoomToActive();
-      setIdle();
+      var example="Pega coordenadas Lat,Lng (una por línea o separadas con ';'):\n"+
+                  "-1.23456, -78.12345\n-1.23400 -78.12000\n"+
+                  "-1,23456  -78,12345   (coma decimal)\n"+
+                  "-78.12, -1.23         (lon,lat; se corrige)\n\n"+
+                  "También en una sola línea separadas por ';':\n"+
+                  "-1.7315,-77.9077; -1.7323,-77.9077; -1.7322,-77.9092";
+      var raw=prompt(example); if(raw===null) return;
+      var pts=parseLatLngMultiline(raw);
+      if(!pts || pts.length<3){ alert('Se requieren al menos 3 coordenadas válidas (lat,lng).'); return; }
+      var name=(prompt('Nombre de la geocerca:', nowName())||'').trim(); if(!name) name=nowName();
+      var arr=readF(); var id=uid(); arr.push({id:id,name:name,latlngs:pts}); writeF(arr);
+      activeId=id; drawAll(); zoomToActive(); setIdle();
     }
 
-    // ------- Exportar / Importar -------
+    // ===== Importar / Exportar =====
     function exportGeo(){
-      var fences = readF();
-      var fc = { type:'FeatureCollection', features: [] };
+      var fences=readF(), fc={type:'FeatureCollection', features:[]};
       for(var i=0;i<fences.length;i++){
-        var f = fences[i];
-        var coords=[], j;
-        for(j=0;j<f.latlngs.length;j++){ coords.push([f.latlngs[j].lng, f.latlngs[j].lat]); }
-        if(coords.length){ coords.push([coords[0][0], coords[0][1]]); }
-        fc.features.push({ type:'Feature', properties:{id:f.id, name:f.name}, geometry:{type:'Polygon', coordinates:[coords]} });
+        var f=fences[i], coords=[],j;
+        for(j=0;j<f.latlngs.length;j++){ coords.push([f.latlngs[j].lng,f.latlngs[j].lat]); }
+        if(coords.length){ coords.push([coords[0][0],coords[0][1]]); }
+        fc.features.push({type:'Feature',properties:{id:f.id,name:f.name},geometry:{type:'Polygon',coordinates:[coords]}});
       }
-      var blob = new Blob([JSON.stringify(fc,null,2)], {type:'application/geo+json'});
-      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'geocercas.geojson'; a.click(); URL.revokeObjectURL(a.href);
+      var blob=new Blob([JSON.stringify(fc,null,2)],{type:'application/geo+json'});
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='geocercas.geojson'; a.click(); URL.revokeObjectURL(a.href);
+    }
+    function importGeo(e){
+      var f=e.target.files && e.target.files[0]; if(!f) return;
+      var reader=new FileReader();
+      reader.onload=function(){
+        try{
+          var gj=JSON.parse(reader.result);
+          var feats=gj.type==='FeatureCollection'?(gj.features||[]):(gj.type==='Feature'?[gj]:[]);
+          var arr=readF();
+          for(var i=0;i<feats.length;i++){
+            var ft=feats[i]; if(!ft.geometry || ft.geometry.type!=='Polygon') continue;
+            var ring=(ft.geometry.coordinates && ft.geometry.coordinates[0])||[];
+            var pts=[],k; for(k=0;k<ring.length-1;k++){ pts.push({lat:ring[k][1],lng:ring[k][0]}); }
+            if(pts.length>=3) arr.push({id:uid(),name:(ft.properties&&ft.properties.name)||'Geocerca importada',latlngs:pts});
+          }
+          writeF(arr); drawAll();
+        }catch(_){ alert('GeoJSON inválido'); }
+        e.target.value='';
+      };
+      reader.readAsText(f);
     }
 
-    // ------- Listeners extra -------
-    window.addEventListener('load', initMap);
+    // ===== Arranque =====
+    if (document.readyState==='loading') {
+      document.addEventListener('DOMContentLoaded', initMap, false);
+    } else {
+      initMap();
+    }
   })();
   </script>
 </body>
