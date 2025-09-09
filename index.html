@@ -508,6 +508,148 @@
   }
 })();
 </script>
+<script id="patch-geofence-latlng-v6">
+(function(){
+  try{
+    if (window.__PATCH_GEOFENCE_LATLNG_V6__) return;
+    window.__PATCH_GEOFENCE_LATLNG_V6__ = true;
+
+    // ---- Utils sin globals ----
+    function byId(id){ return document.getElementById(id); }
+    function ensureBtnType(id){ try{ var b=byId(id); if(b && b.type!=='button') b.type='button'; }catch(_){} }
+    function uid(){ return 'f_'+Math.random().toString(36).slice(2,10); }
+    function nowName(){ return 'Geocerca '+(Date.now()%1000); }
+
+    // ---- Storage defensivo ----
+    var UK='NobisApp_users', CK='NobisApp_current_user', FPRE='NobisApp_fences_', AK='NobisApp_active_fence';
+    function currentUserId(){
+      try{
+        var cur = localStorage.getItem(CK);
+        if(cur) return cur;
+        var users = JSON.parse(localStorage.getItem(UK)||'[]');
+        return (users && users[0] && users[0].id) ? users[0].id : 'default';
+      }catch(_){ return 'default'; }
+    }
+    function fkey(){ return FPRE + currentUserId(); }
+    function readFences(){ try{ var a=JSON.parse(localStorage.getItem(fkey())||'[]'); return Array.isArray(a)?a:[]; }catch(_){ return []; } }
+    function writeFences(arr){ try{ localStorage.setItem(fkey(), JSON.stringify(arr||[])); }catch(_){ } }
+    function setActiveFence(id){ try{ localStorage.setItem(AK, id||''); }catch(_){} }
+
+    // ---- Parser robusto (soporta ';' y saltos, coma/punto decimal, lon/lat) ----
+    function parseLatLngMultiline(text){
+      var pts=[]; if(!text) return pts;
+      var segments = text.split(/[;\r\n]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+      for (var i=0;i<segments.length;i++){
+        var seg = segments[i];
+        var nums = seg.match(/[-+]?\d+(?:[.,]\d+)?/g);
+        if(!nums || nums.length<2) continue;
+        var a = parseFloat(nums[0].replace(',', '.'));
+        var b = parseFloat(nums[1].replace(',', '.'));
+        if(!isFinite(a)||!isFinite(b)) continue;
+        var lat=a, lng=b, ok=false;
+        if (Math.abs(lat)<=90 && Math.abs(lng)<=180) ok=true;
+        else { lat=b; lng=a; if (Math.abs(lat)<=90 && Math.abs(lng)<=180) ok=true; }
+        if(ok) pts.push({lat:lat,lng:lng});
+      }
+      return pts;
+    }
+
+    // ---- Refresco de UI si existen elementos ----
+    function refreshSelectorsAndList(activeId){
+      try{
+        var fences = readFences();
+        var sel = byId('geofenceSelect');
+        if(sel){
+          sel.innerHTML = fences.map(function(f){ return '<option value="'+f.id+'">'+f.name+'</option>'; }).join('');
+          if(activeId) sel.value = activeId;
+        }
+        var list = byId('fenceList');
+        if(list){
+          list.innerHTML = fences.length
+            ? fences.map(function(f){
+                return '<li class="py-2 px-3 hover:bg-gray-50 cursor-pointer" data-id="'+f.id+'">'+
+                       '<div class="text-sm font-medium">'+f.name+'</div>'+
+                       '<div class="text-xs text-gray-500">'+f.latlngs.length+' puntos</div>'+
+                       '</li>';
+              }).join('')
+            : '<li class="py-6 text-center text-gray-500">No hay geocercas.</li>';
+        }
+      }catch(_){}
+    }
+
+    // ---- Hooks suaves ----
+    function announceChange(newId){
+      try{ window.dispatchEvent(new CustomEvent('nobis:fences-updated', { detail:{ id:newId } })); }catch(_){}
+      try{ window.dispatchEvent(new CustomEvent('geofence:created',   { detail:{ id:newId } })); }catch(_){}
+      var fns=['nobisRenderFences','renderGeofences','drawAllGeofences','updateGeofencesUI','refreshGeofences','redrawGeofences','paintFences','repaintFences'];
+      for(var i=0;i<fns.length;i++){ try{ if(typeof window[fns[i]]==='function'){ window[fns[i]](); break; } }catch(_){} }
+    }
+
+    // ---- Dibujo de respaldo (solo si L y mapa existen) ----
+    function drawFallbackOnMap(fence){
+      try{
+        var map = window.nobisMap || window.map || null;
+        if(!map || !window.L) return;
+        var g = window.NOBIS_FENCE_GROUP || L.layerGroup().addTo(map);
+        if(!window.NOBIS_FENCE_GROUP) window.NOBIS_FENCE_GROUP = g;
+        var poly = L.polygon(fence.latlngs,{color:'#7c3aed',weight:3,fillOpacity:.2}).addTo(g);
+        try{ poly.bindTooltip(fence.name||'Geocerca',{permanent:true,direction:'center',className:'label-in-map'}); }catch(_){}
+        try{ map.fitBounds(poly.getBounds(),{padding:[24,24]}); }catch(_){}
+      }catch(_){}
+    }
+
+    function saveFenceFromPts(name, pts){
+      try{
+        var id = uid();
+        var fence = {
+          id:id,
+          name: name||nowName(),
+          latlngs: pts.map(function(p){ return {lat:p.lat,lng:p.lng}; }),
+          coords:  pts.map(function(p){ return [p.lat,p.lng]; }),
+          createdAt: Date.now()
+        };
+        var arr = readFences(); arr.push(fence); writeFences(arr); setActiveFence(id);
+        refreshSelectorsAndList(id);
+        announceChange(id);
+        drawFallbackOnMap(fence);
+      }catch(_){}
+    }
+
+    function createFenceByCoords(){
+      try{
+        var example = [
+          "Pega coordenadas Lat,Lng (una por línea o separadas con ';'). Formatos válidos:",
+          "-1.23456, -78.12345",
+          "-1.23456 -78.12345",
+          "-1,23456  -78,12345   (coma decimal)",
+          "(-1.23456, -78.12345)",
+          "-78.12345, -1.23456   (lon,lat; se detecta y corrige)",
+          "",
+          "También sirve en una sola línea separadas por ';':",
+          "-1.7315,-77.9077; -1.7323,-77.9077; -1.7322,-77.9092"
+        ].join("\n");
+        var raw = prompt(example);
+        if (raw === null) return;
+        var pts = parseLatLngMultiline(raw);
+        if (pts.length < 3){ alert("Se requieren al menos 3 coordenadas válidas (lat,lng)."); return; }
+        var name = (prompt("Nombre de la geocerca:", nowName()) || '').trim() || nowName();
+        saveFenceFromPts(name, pts);
+      }catch(_){}
+    }
+
+    function wire(){
+      try{
+        ensureBtnType('createFenceByCoordsBtn');
+        var btn = byId('createFenceByCoordsBtn');
+        if(btn){ btn.onclick = function(ev){ try{ ev && ev.preventDefault(); createFenceByCoords(); }catch(_){ } }; }
+      }catch(_){}
+    }
+
+    // Espera a que TODO esté cargado, para no romper nada
+    window.addEventListener('load', function(){ try{ setTimeout(wire, 0); }catch(_){} });
+  }catch(_){}
+})();
+</script>
 
 </body>
 </html>
