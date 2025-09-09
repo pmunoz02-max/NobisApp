@@ -444,6 +444,151 @@
   }
 })();
 </script>
+<script id="patch-geofence-latlng-v3">
+(function(){
+  "use strict";
+  if (window.__PATCH_GEOFENCE_LATLNG_V3__) return;
+  window.__PATCH_GEOFENCE_LATLNG_V3__ = true;
+
+  function byId(id){ return document.getElementById(id); }
+  function ensureBtnType(id){ const b=byId(id); if(b && b.type!=="button") b.type="button"; }
+  function uid(){ return "f_"+Math.random().toString(36).slice(2,10); }
+  function nowName(){ return "Geocerca "+(Date.now()%1000); }
+
+  // Storage (mismas claves que tu app)
+  const UK='NobisApp_users', CK='NobisApp_current_user', FPRE='NobisApp_fences_';
+  function currentUserId(){
+    try{
+      const cur = localStorage.getItem(CK);
+      if (cur) return cur;
+      const users = JSON.parse(localStorage.getItem(UK)||'[]');
+      return (users && users[0] && users[0].id) ? users[0].id : 'default';
+    }catch(e){ return 'default'; }
+  }
+  function fkey(){ return FPRE + currentUserId(); }
+  function readFences(){
+    try { const a = JSON.parse(localStorage.getItem(fkey()) || "[]"); return Array.isArray(a) ? a : []; }
+    catch(e){ return []; }
+  }
+  function writeFences(arr){ localStorage.setItem(fkey(), JSON.stringify(arr||[])); }
+
+  // ===== Parser robusto (soporta ; y \n, coma/punto decimal, y lon,lat) =====
+  function parseLatLngMultiline(text){
+    const pts=[];
+    if(!text) return pts;
+
+    // 1) Dividir por ; o saltos de línea (segmentos que deberían contener un par)
+    const segments = text.split(/[;\r\n]+/).map(s=>s.trim()).filter(Boolean);
+
+    for (const seg of segments){
+      // Extraer los DOS primeros números de cada segmento (ignora paréntesis, texto, etc.)
+      const nums = seg.match(/[-+]?\d+(?:[.,]\d+)?/g);
+      if(!nums || nums.length < 2) continue;
+
+      // Convertir a float (coma → punto)
+      let a = parseFloat(nums[0].replace(',', '.'));
+      let b = parseFloat(nums[1].replace(',', '.'));
+      if(!Number.isFinite(a) || !Number.isFinite(b)) continue;
+
+      // Heurística de orden:
+      // Opción 1: a=lat, b=lng
+      let lat=a, lng=b, ok=false;
+      if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+        ok = true;
+      } else {
+        // Opción 2: a=lng, b=lat → invertimos
+        lat=b; lng=a;
+        if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) ok = true;
+      }
+      if(!ok) continue;
+
+      pts.push({lat, lng});
+    }
+    return pts;
+  }
+
+  // ===== UI helpers (no interfieren) =====
+  function refreshSelectorsAndList(activeId){
+    const fences = readFences();
+    const sel = byId('geofenceSelect');
+    if (sel){
+      sel.innerHTML = fences.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+      if (activeId) sel.value = activeId;
+    }
+    const list = byId('fenceList');
+    if (list){
+      list.innerHTML = fences.length
+        ? fences.map(f=>`<li class="py-2 px-3 hover:bg-gray-50 cursor-pointer" data-id="${f.id}">
+            <div class="text-sm font-medium">${f.name}</div>
+            <div class="text-xs text-gray-500">${f.latlngs.length} puntos</div>
+          </li>`).join('')
+        : '<li class="py-6 text-center text-gray-500">No hay geocercas.</li>';
+    }
+  }
+
+  // Dibujo directo opcional (no interfiere si tu render ya repinta)
+  function tryDrawOnMap(fence){
+    try{
+      const map=(window.nobisMap||window.map||null);
+      if(!map || !window.L) return;
+      const g=(window.NOBIS_FENCE_GROUP)||L.layerGroup().addTo(map);
+      if(!window.NOBIS_FENCE_GROUP) window.NOBIS_FENCE_GROUP=g;
+      const poly=L.polygon(fence.latlngs,{color:'#7c3aed',weight:3,fillOpacity:.2}).addTo(g);
+      poly.bindTooltip(fence.name||'Geocerca',{permanent:true,direction:'center',className:'label-in-map'});
+      try{ map.fitBounds(poly.getBounds(),{padding:[24,24]}); }catch(e){}
+    }catch(_e){}
+  }
+
+  function createFenceByCoords(){
+    const example = [
+      "Pega coordenadas Lat,Lng (una por línea o separadas con ';'). Formatos válidos:",
+      "-1.23456, -78.12345",
+      "-1.23456 -78.12345",
+      "-1,23456  -78,12345   (coma decimal)",
+      "(-1.23456, -78.12345)",
+      "-78.12345, -1.23456   (lon,lat; se detecta y corrige)",
+      "",
+      "También sirve en una sola línea separadas por ';':",
+      "-1.7315,-77.9077; -1.7323,-77.9077; -1.7322,-77.9092"
+    ].join("\n");
+
+    const raw = prompt(example);
+    if (raw === null) return;
+
+    const pts = parseLatLngMultiline(raw);
+    if (pts.length < 3){
+      alert("Se requieren al menos 3 coordenadas válidas (lat,lng).");
+      return;
+    }
+
+    const name = (prompt("Nombre de la geocerca:", nowName()) || "").trim() || nowName();
+
+    const arr = readFences();
+    const id = uid();
+    const fence = { id, name, latlngs: pts };
+    arr.push(fence);
+    writeFences(arr);
+
+    refreshSelectorsAndList(id);
+    try { window.dispatchEvent(new CustomEvent('nobis:fences-updated', { detail:{ id } })); } catch(_e){}
+    tryDrawOnMap(fence);
+  }
+
+  function wire(){
+    ensureBtnType('createFenceByCoordsBtn');
+    const btn = byId('createFenceByCoordsBtn');
+    if (btn){
+      btn.onclick = function(ev){ ev.preventDefault(); createFenceByCoords(); };
+    }
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', wire, { once:true });
+  } else {
+    wire();
+  }
+})();
+</script>
 
 
 </body>
