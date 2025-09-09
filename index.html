@@ -303,19 +303,18 @@
     });
   </script>
 
-  <script id="patch-geofence-latlng-v1">
+<script id="patch-geofence-latlng-v2">
 (function(){
   "use strict";
-  if (window.__PATCH_GEOFENCE_LATLNG__) return;
-  window.__PATCH_GEOFENCE_LATLNG__ = true;
+  if (window.__PATCH_GEOFENCE_LATLNG_V2__) return;
+  window.__PATCH_GEOFENCE_LATLNG_V2__ = true;
 
-  // ---------- Utils ----------
   function byId(id){ return document.getElementById(id); }
   function ensureBtnType(id){ const b=byId(id); if(b && b.type!=="button") b.type="button"; }
   function uid(){ return "f_"+Math.random().toString(36).slice(2,10); }
   function nowName(){ return "Geocerca "+(Date.now()%1000); }
 
-  // ---------- Storage (compatibles con tu app) ----------
+  // Storage (mismas claves que tu app)
   const UK='NobisApp_users', CK='NobisApp_current_user', FPRE='NobisApp_fences_';
   function currentUserId(){
     try{
@@ -332,37 +331,48 @@
   }
   function writeFences(arr){ localStorage.setItem(fkey(), JSON.stringify(arr||[])); }
 
-  // ---------- Parseo de coordenadas ----------
-  // Acepta formatos por línea: "lat,lng" o "lat lng" (con espacios/comas/;).
+  // ===== Parser robusto =====
+  // Extrae los primeros 2 números por línea (soporta punto o coma decimal, ignora paréntesis y texto).
+  // También detecta e invierte lon/lat si hace falta.
   function parseLatLngMultiline(text){
-    const pts = [];
-    const lines = (text||"").split(/\r?\n/);
-    for (let line of lines){
-      line = line.trim();
+    const pts=[];
+    const lines=(text||"").split(/\r?\n/);
+    for(let line of lines){
+      line=line.trim();
       if(!line) continue;
-      const tok = line.split(/[,\s;]+/).filter(Boolean);
-      if(tok.length < 2) continue;
-      const lat = parseFloat(tok[0]);
-      const lng = parseFloat(tok[1]);
-      if (Number.isFinite(lat) && Number.isFinite(lng)){
-        pts.push({lat, lng});
+
+      // toma tokens numéricos tipo -12.34 o -12,34
+      const nums=line.match(/[-+]?\d+(?:[.,]\d+)?/g);
+      if(!nums || nums.length<2) continue;
+
+      let lat = parseFloat(nums[0].replace(',', '.'));
+      let lng = parseFloat(nums[1].replace(',', '.'));
+
+      if(!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+      // Heurística de orden:
+      // - Si "lat" está fuera de [-90,90] pero "lng" sí está en [-90,90], asumimos que viene lon,lat → invertimos.
+      if ((Math.abs(lat) > 90 && Math.abs(lng) <= 90) ||
+          (Math.abs(lng) <= 90 && Math.abs(lat) > 90)) {
+        // probable lon,lat
+        const tmp = lat; lat = lng; lng = tmp;
       }
+      // Último filtro razonable
+      if (Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
+
+      pts.push({lat, lng});
     }
     return pts;
   }
 
-  // ---------- UI helpers (no invaden tu lógica existente) ----------
+  // ===== UI helpers (no interfieren) =====
   function refreshSelectorsAndList(activeId){
     const fences = readFences();
-
-    // Select principal
     const sel = byId('geofenceSelect');
     if (sel){
       sel.innerHTML = fences.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
       if (activeId) sel.value = activeId;
     }
-
-    // Lista lateral
     const list = byId('fenceList');
     if (list){
       list.innerHTML = fences.length
@@ -374,32 +384,29 @@
     }
   }
 
-  // ---------- Dibujo (opcional, sin interferir) ----------
   function tryDrawOnMap(fence){
-    // Si tu app ya redibuja desde storage, esto no molesta.
     try{
-      const map = (window.nobisMap || window.map || null);
-      if (!map || !window.L) return;
-      const group = (window.NOBIS_FENCE_GROUP) || L.layerGroup().addTo(map);
-      if (!window.NOBIS_FENCE_GROUP) window.NOBIS_FENCE_GROUP = group;
-
-      const poly = L.polygon(fence.latlngs, { color:'#7c3aed', weight:3, fillOpacity:.2 }).addTo(group);
-      poly.bindTooltip(fence.name || 'Geocerca', { permanent:true, direction:'center', className:'label-in-map' });
-      // Ajuste de vista a la nueva geocerca
-      try { map.fitBounds(poly.getBounds(), { padding:[24,24] }); } catch(e){}
+      const map=(window.nobisMap||window.map||null);
+      if(!map || !window.L) return;
+      const g=(window.NOBIS_FENCE_GROUP)||L.layerGroup().addTo(map);
+      if(!window.NOBIS_FENCE_GROUP) window.NOBIS_FENCE_GROUP=g;
+      const poly=L.polygon(fence.latlngs,{color:'#7c3aed',weight:3,fillOpacity:.2}).addTo(g);
+      poly.bindTooltip(fence.name||'Geocerca',{permanent:true,direction:'center',className:'label-in-map'});
+      try{ map.fitBounds(poly.getBounds(),{padding:[24,24]}); }catch(e){}
     }catch(_e){}
   }
 
-  // ---------- Acción principal ----------
   function createFenceByCoords(){
     const example = [
-      "Ejemplo (una línea por vértice):",
+      "Pega una línea por vértice. Formatos válidos:",
       "-1.23456, -78.12345",
-      "-1.24000, -78.11000",
-      "-1.23000, -78.10500"
+      "-1.23456 -78.12345",
+      "-1,23456  -78,12345   (coma decimal)",
+      "(-1.23456, -78.12345)",
+      "-78.12345, -1.23456   (lon,lat; se detecta y corrige)"
     ].join("\n");
 
-    const raw = prompt("Pega coordenadas Lat,Lng (una por línea):\n"+example);
+    const raw = prompt(example);
     if (raw === null) return;
 
     const pts = parseLatLngMultiline(raw);
@@ -416,13 +423,8 @@
     arr.push(fence);
     writeFences(arr);
 
-    // Refrescar UI compatible
     refreshSelectorsAndList(id);
-
-    // Aviso a otros módulos (si escuchan este evento)
     try { window.dispatchEvent(new CustomEvent('nobis:fences-updated', { detail:{ id } })); } catch(_e){}
-
-    // Dibujo directo (no interfiere si tu app también redibuja)
     tryDrawOnMap(fence);
   }
 
@@ -430,7 +432,8 @@
     ensureBtnType('createFenceByCoordsBtn');
     const btn = byId('createFenceByCoordsBtn');
     if (btn){
-      btn.addEventListener('click', function(ev){ ev.preventDefault(); createFenceByCoords(); }, false);
+      // Forzamos nuestro handler (evitamos doble listeners previos)
+      btn.onclick = function(ev){ ev.preventDefault(); createFenceByCoords(); };
     }
   }
 
@@ -441,6 +444,7 @@
   }
 })();
 </script>
+
 
 </body>
 </html>
