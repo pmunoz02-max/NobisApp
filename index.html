@@ -17,9 +17,9 @@
   <style>
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f6f7fb;color:#111827}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f6f7fb;color:#111827; display: flex; flex-direction: column;}
     header{background:#111827;color:#fff;padding:12px 16px;font-weight:600}
-    .app{display:grid;grid-template-columns:320px 1fr;height:calc(100vh - 48px)}
+    .app{display:grid;grid-template-columns:320px 1fr;flex: 1;}
     .sidebar{background:#fff;border-right:1px solid #e5e7eb;overflow:auto}
     .section{padding:12px;border-bottom:1px solid #eef0f3}
     .section h2{margin:0 0 8px;font-size:13px;color:#374151;text-transform:uppercase;letter-spacing:.04em}
@@ -67,9 +67,9 @@
         <h2>Geocercas</h2>
         <ul id="fenceList" class="list"></ul>
         <p class="hint" style="margin-top:8px">
-          • Dibujo: clics en el mapa → “Finalizar”.<br>
-          • Edición: selecciona → “Editar”, arrastra vértices → “Guardar cambios”.<br>
-          • También puedes crear por coordenadas con “Geocerca (Lat/Lng)”.
+          • Dibujo: clics en el mapa → "Finalizar".<br>
+          • Edición: selecciona → "Editar", arrastra vértices → "Guardar cambios".<br>
+          • También puedes crear por coordenadas con "Geocerca (Lat/Lng)".
         </p>
       </div>
 
@@ -87,7 +87,7 @@
   </div>
 
   <script>
-  (function(){
+  document.addEventListener('DOMContentLoaded', function() {
     // ===== Utilidades =====
     function $(id){ return document.getElementById(id); }
     function uid(){ return 'f_' + Math.random().toString(36).slice(2,10); }
@@ -96,8 +96,8 @@
 
     // ===== Storage (single-user base; luego lo hacemos multiuser de nuevo) =====
     var STORAGE_KEY = 'NobisApp_fences_default';
-    function readF(){ try{ var a=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); return (a && typeof a.length==='number')?a:[]; }catch(_){ return []; } }
-    function writeF(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr||[])); }catch(_){} }
+    function readFences(){ try{ var a=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); return (a && typeof a.length==='number')?a:[]; }catch(_){ return []; } }
+    function writeFences(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr||[])); }catch(_){} }
 
     // ===== Estado / referencias =====
     var map, group, activeId=null;
@@ -105,7 +105,7 @@
     var tmpMarkers=[], tmpPolyline=null, tmpPoly=null;
     var editMarkers=[], editBackup=null;
 
-    var R = {
+    var UI = {
       newBtn: $('newFenceBtn'),
       finBtn: $('finishFenceBtn'),
       cancelBtn: $('cancelFenceBtn'),
@@ -125,42 +125,42 @@
     };
 
     function enable(n,on){ if(n) n.disabled=!on; }
-    function showNameBar(on){ if(R.nameBar) R.nameBar.style.display = on ? 'flex' : 'none'; }
+    function showNameBar(on){ if(UI.nameBar) UI.nameBar.style.display = on ? 'flex' : 'none'; }
 
     function setIdle(){
       drawing=false; editing=false;
-      enable(R.newBtn,true);
-      enable(R.finBtn,false);
-      enable(R.cancelBtn,false);
-      enable(R.editBtn, !!activeId);
-      enable(R.saveEditBtn,false);
-      enable(R.cancelEditBtn,false);
-      enable(R.renameBtn, !!activeId);
-      enable(R.delBtn, !!activeId);
+      enable(UI.newBtn,true);
+      enable(UI.finBtn,false);
+      enable(UI.cancelBtn,false);
+      enable(UI.editBtn, !!activeId);
+      enable(UI.saveEditBtn,false);
+      enable(UI.cancelEditBtn,false);
+      enable(UI.renameBtn, !!activeId);
+      enable(UI.delBtn, !!activeId);
       showNameBar(false);
     }
     function setDrawing(){
       drawing=true; editing=false;
-      enable(R.newBtn,false);
-      enable(R.finBtn,false);
-      enable(R.cancelBtn,true);
-      enable(R.editBtn,false);
-      enable(R.saveEditBtn,false);
-      enable(R.cancelEditBtn,false);
-      enable(R.renameBtn,false);
-      enable(R.delBtn,false);
+      enable(UI.newBtn,false);
+      enable(UI.finBtn,false);
+      enable(UI.cancelBtn,true);
+      enable(UI.editBtn,false);
+      enable(UI.saveEditBtn,false);
+      enable(UI.cancelEditBtn,false);
+      enable(UI.renameBtn,false);
+      enable(UI.delBtn,false);
       showNameBar(false);
     }
     function setEditing(){
       drawing=false; editing=true;
-      enable(R.newBtn,false);
-      enable(R.finBtn,false);
-      enable(R.cancelBtn,false);
-      enable(R.editBtn,false);
-      enable(R.saveEditBtn,true);
-      enable(R.cancelEditBtn,true);
-      enable(R.renameBtn,false);
-      enable(R.delBtn,false);
+      enable(UI.newBtn,false);
+      enable(UI.finBtn,false);
+      enable(UI.cancelBtn,false);
+      enable(UI.editBtn,false);
+      enable(UI.saveEditBtn,true);
+      enable(UI.cancelEditBtn,true);
+      enable(UI.renameBtn,false);
+      enable(UI.delBtn,false);
       showNameBar(false);
     }
 
@@ -174,17 +174,17 @@
       group = L.layerGroup().addTo(map);
 
       // Wiring UI
-      R.newBtn.onclick = startDrawing;
-      R.finBtn.onclick = finalizeDrawing;
-      R.cancelBtn.onclick = cancelDrawing;
-      R.editBtn.onclick = enterEdit;
-      R.saveEditBtn.onclick = saveEdit;
-      R.cancelEditBtn.onclick = function(){ exitEdit(false); };
-      R.renameBtn.onclick = renameFence;
-      R.delBtn.onclick = deleteFence;
-      R.byCoordsBtn.onclick = createByCoords;
-      R.exportBtn.onclick = exportGeo;
-      R.importInput.onchange = importGeo;
+      UI.newBtn.onclick = startDrawing;
+      UI.finBtn.onclick = finalizeDrawing;
+      UI.cancelBtn.onclick = cancelDrawing;
+      UI.editBtn.onclick = enterEdit;
+      UI.saveEditBtn.onclick = saveEdit;
+      UI.cancelEditBtn.onclick = function(){ exitEdit(false); };
+      UI.renameBtn.onclick = renameFence;
+      UI.delBtn.onclick = deleteFence;
+      UI.byCoordsBtn.onclick = createByCoords;
+      UI.exportBtn.onclick = exportGeo;
+      UI.importInput.onchange = importGeo;
 
       drawAll();
       setIdle();
@@ -203,7 +203,7 @@
       var pts=[],i; for(i=0;i<tmpMarkers.length;i++){ pts.push(tmpMarkers[i].getLatLng()); }
       if(tmpPolyline) tmpPolyline.setLatLngs(pts); else tmpPolyline=L.polyline(pts,{color:'#6366f1',dashArray:'4 4'}).addTo(map);
       if(pts.length>=3){
-        enable(R.finBtn,true);
+        enable(UI.finBtn,true);
         if(tmpPoly) tmpPoly.setLatLngs(pts); else tmpPoly=L.polygon(pts,{color:'#a78bfa',weight:2,fillOpacity:.12}).addTo(map);
       }
     }
@@ -215,25 +215,25 @@
     function finalizeDrawing(){
       var pts=[],i; for(i=0;i<tmpMarkers.length;i++){ pts.push(tmpMarkers[i].getLatLng()); }
       if(pts.length<3){ alert('Agrega al menos 3 puntos.'); return; }
-      showNameBar(true); R.nameField.focus();
+      showNameBar(true); UI.nameField.focus();
 
       function doSave(){
-        var name=(R.nameField.value||'').trim()||nowName();
-        var arr=readF(); var id=uid();
+        var name=(UI.nameField.value||'').trim()||nowName();
+        var arr=readFences(); var id=uid();
         var latlngs=[],k; for(k=0;k<pts.length;k++){ latlngs.push({lat:pts[k].lat,lng:pts[k].lng}); }
-        arr.push({id:id,name:name,latlngs:latlngs}); writeF(arr);
-        map.off('click',onMapClickAdd); clearTemp(); showNameBar(false); R.nameField.value='';
+        arr.push({id:id,name:name,latlngs:latlngs}); writeFences(arr);
+        map.off('click',onMapClickAdd); clearTemp(); showNameBar(false); UI.nameField.value='';
         activeId=id; drawAll(); zoomToActive(); setIdle();
       }
-      R.saveNameBtn.onclick=doSave;
-      R.nameField.onkeydown=function(ev){ if(ev.key==='Enter') doSave(); };
-      R.cancelNameBtn.onclick=function(){ showNameBar(false); };
+      UI.saveNameBtn.onclick=doSave;
+      UI.nameField.onkeydown=function(ev){ if(ev.key==='Enter') doSave(); };
+      UI.cancelNameBtn.onclick=function(){ showNameBar(false); };
     }
 
     // ===== Render geocercas =====
     function drawAll(){
       group.clearLayers();
-      var arr=readF();
+      var arr=readFences();
       for(var i=0;i<arr.length;i++){
         (function(f){
           var poly=L.polygon(f.latlngs,{color:'#7c3aed',weight:3,fillOpacity:.2}).addTo(group);
@@ -245,24 +245,24 @@
       renderList();
     }
     function renderList(){
-      var arr=readF(); if(!R.list) return;
-      if(!arr.length){ R.list.innerHTML='<li style="text-align:center;color:#6b7280;padding:10px">No hay geocercas.</li>'; return; }
+      var arr=readFences(); if(!UI.list) return;
+      if(!arr.length){ UI.list.innerHTML='<li style="text-align:center;color:#6b7280;padding:10px">No hay geocercas.</li>'; return; }
       var html='',i; for(i=0;i<arr.length;i++){
         html+='<li data-id="'+arr[i].id+'"><div style="font-weight:600;font-size:13px;">'+escapeHtml(arr[i].name)+'</div>'+
               '<div class="hint">'+arr[i].latlngs.length+' puntos</div></li>';
       }
-      R.list.innerHTML=html;
-      var items=R.list.querySelectorAll('[data-id]');
+      UI.list.innerHTML=html;
+      var items=UI.list.querySelectorAll('[data-id]');
       for(i=0;i<items.length;i++){
         items[i].onclick=(function(id){return function(){ activeId=id; zoomToActive(); setIdle(); drawAll(); };})(items[i].getAttribute('data-id'));
       }
-      enable(R.editBtn, !!activeId); enable(R.renameBtn, !!activeId); enable(R.delBtn, !!activeId);
+      enable(UI.editBtn, !!activeId); enable(UI.renameBtn, !!activeId); enable(UI.delBtn, !!activeId);
     }
     function zoomToActive(){
       var f=findActive(); if(f && f.__layer){ try{ map.fitBounds(f.__layer.getBounds(),{padding:[24,24]}); }catch(_){ } }
     }
     function findActive(){
-      var arr=readF(); for(var i=0;i<arr.length;i++){ if(arr[i].id===activeId) return arr[i]; } return null;
+      var arr=readFences(); for(var i=0;i<arr.length;i++){ if(arr[i].id===activeId) return arr[i]; } return null;
     }
 
     // ===== Edición =====
@@ -289,11 +289,11 @@
       var f=findActive(); if(!f || !f.__layer) return;
       var cur=[],i; for(i=0;i<editMarkers.length;i++){ cur.push(editMarkers[i].getLatLng()); }
       if(cur.length<3){ alert('Mínimo 3 vértices.'); return; }
-      var arr=readF(); for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ 
+      var arr=readFences(); for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ 
         var pts=[],k; for(k=0;k<cur.length;k++){ pts.push({lat:cur[k].lat,lng:cur[k].lng}); }
         arr[i].latlngs=pts; break;
       }}
-      writeF(arr); exitEdit(true);
+      writeFences(arr); exitEdit(true);
     }
     function exitEdit(redraw){
       for(var i=0;i<editMarkers.length;i++){ map.removeLayer(editMarkers[i]); }
@@ -303,18 +303,18 @@
     // ===== CRUD =====
     function renameFence(){
       if(!activeId) return;
-      var arr=readF(),i,f=null; for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ f=arr[i]; break; } }
+      var arr=readFences(),i,f=null; for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ f=arr[i]; break; } }
       if(!f) return;
       var nn=prompt('Nuevo nombre:', f.name||''); if(nn===null) return; nn=(nn||'').trim(); if(!nn) return;
-      f.name=nn; writeF(arr); drawAll();
+      f.name=nn; writeFences(arr); drawAll();
     }
     function deleteFence(){
       if(!activeId) return;
-      var arr=readF(),i,f=null; for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ f=arr[i]; break; } }
+      var arr=readFences(),i,f=null; for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ f=arr[i]; break; } }
       if(!f) return;
       if(!confirm('Eliminar "'+(f.name||'Geocerca')+'"?')) return;
       var out=[]; for(i=0;i<arr.length;i++){ if(arr[i].id!==activeId) out.push(arr[i]); }
-      writeF(out); activeId=null; drawAll(); setIdle();
+      writeFences(out); activeId=null; drawAll(); setIdle();
     }
 
     // ===== Crear por Lat/Lng =====
@@ -343,13 +343,13 @@
       var pts=parseLatLngMultiline(raw);
       if(!pts || pts.length<3){ alert('Se requieren al menos 3 coordenadas válidas (lat,lng).'); return; }
       var name=(prompt('Nombre de la geocerca:', nowName())||'').trim(); if(!name) name=nowName();
-      var arr=readF(); var id=uid(); arr.push({id:id,name:name,latlngs:pts}); writeF(arr);
+      var arr=readFences(); var id=uid(); arr.push({id:id,name:name,latlngs:pts}); writeFences(arr);
       activeId=id; drawAll(); zoomToActive(); setIdle();
     }
 
     // ===== Importar / Exportar =====
     function exportGeo(){
-      var fences=readF(), fc={type:'FeatureCollection', features:[]};
+      var fences=readFences(), fc={type:'FeatureCollection', features:[]};
       for(var i=0;i<fences.length;i++){
         var f=fences[i], coords=[],j;
         for(j=0;j<f.latlngs.length;j++){ coords.push([f.latlngs[j].lng,f.latlngs[j].lat]); }
@@ -366,27 +366,23 @@
         try{
           var gj=JSON.parse(reader.result);
           var feats=gj.type==='FeatureCollection'?(gj.features||[]):(gj.type==='Feature'?[gj]:[]);
-          var arr=readF();
+          var arr=readFences();
           for(var i=0;i<feats.length;i++){
             var ft=feats[i]; if(!ft.geometry || ft.geometry.type!=='Polygon') continue;
             var ring=(ft.geometry.coordinates && ft.geometry.coordinates[0])||[];
             var pts=[],k; for(k=0;k<ring.length-1;k++){ pts.push({lat:ring[k][1],lng:ring[k][0]}); }
             if(pts.length>=3) arr.push({id:uid(),name:(ft.properties&&ft.properties.name)||'Geocerca importada',latlngs:pts});
           }
-          writeF(arr); drawAll();
+          writeFences(arr); drawAll();
         }catch(_){ alert('GeoJSON inválido'); }
         e.target.value='';
       };
       reader.readAsText(f);
     }
 
-    // ===== Arranque =====
-    if (document.readyState==='loading') {
-      document.addEventListener('DOMContentLoaded', initMap, false);
-    } else {
-      initMap();
-    }
-  })();
+    // Inicializar la aplicación
+    initMap();
+  });
   </script>
 </body>
 </html>
