@@ -772,7 +772,12 @@
     }
 
     // ==== Inicio ====
-    document.addEventListener("DOMContentLoaded", initMap);
+   // Asegura que Leaflet y el DOM estén listos antes de inicializar
+window.addEventListener("load", function () {
+  try { initMap(); }
+  catch (e) { console.error("initMap() falló:", e); alert("Error inicializando la app. Revisa consola."); }
+});
+
   </script>
 </body>
 </html>
