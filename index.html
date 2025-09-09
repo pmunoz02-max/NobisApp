@@ -1,29 +1,11 @@
 <!doctype html>
-// ==== Inicio (robusto, sin alert bloqueante) ====
 <html lang="es">
-  (function boot() {
-  // Espera a que exista Leaflet y el contenedor del mapa
-  var listo = !!(window.L && document.getElementById('map'));
-  if (!listo) return setTimeout(boot, 50);
-
-  try {
-    // Evita inicializar dos veces
-    if (window.__APP_INITIALIZED__) return;
-    window.__APP_INITIALIZED__ = true;
-    initMap();
-  } catch (e) {
-    console.error('initMap() error:', e);
-    // Si algo todavía no está listo, reintenta en breve
-    window.__APP_INITIALIZED__ = false;
-    setTimeout(boot, 80);
-  }
-})();
-<head>
-  <meta charset="utf-8" />
-  <meta
-    http-equiv="Cache-Control"
-    content="no-store, no-cache, must-revalidate, max-age=0"
-  />
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-store, no-cache, must-revalidate, max-age=0"
+    />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -314,6 +296,13 @@
         return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
       });
     }
+    <script
+  defer
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-o9N1j7kG1G8zS2f6sQPFfCjPZQ+1QttYvVQ4JQ1gITk="
+  crossorigin=""
+></script>
+
 
     // ==== Multiusuario (cada usuario con su propia "BD" local) ====
     var USER_KEY = "NOBIS_current_user";
@@ -789,12 +778,25 @@
       reader.readAsText(f);
     }
 
-    // ==== Inicio ====
-   // Asegura que Leaflet y el DOM estén listos antes de inicializar
-window.addEventListener("load", function () {
-  try { initMap(); }
-  catch (e) { console.error("initMap() falló:", e); alert("Error inicializando la app. Revisa consola."); }
-});
+   // ==== Inicio (robusto, sin alert bloqueante) ====
+(function boot() {
+  // Espera a que exista Leaflet y el contenedor del mapa
+  var listo = !!(window.L && document.getElementById('map'));
+  if (!listo) return setTimeout(boot, 50);
+
+  try {
+    // Evita inicializar dos veces
+    if (window.__APP_INITIALIZED__) return;
+    window.__APP_INITIALIZED__ = true;
+    initMap();
+  } catch (e) {
+    console.error('initMap() error:', e);
+    // Reintenta si algo todavía no está listo
+    window.__APP_INITIALIZED__ = false;
+    setTimeout(boot, 80);
+  }
+})();
+
 
 
   </script>
