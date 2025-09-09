@@ -17,10 +17,26 @@
   <style>
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f6f7fb;color:#111827; display: flex; flex-direction: column;}
-    header{background:#111827;color:#fff;padding:12px 16px;font-weight:600}
-    .app{display:grid;grid-template-columns:320px 1fr;flex: 1; height: calc(100vh - 56px);} /* altura explícita para que el mapa no colapse */
-    main{height:100%} /* asegura que el contenedor del mapa tenga altura */
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:#f6f7fb;color:#111827;
+      display:flex;flex-direction:column;
+    }
+    header{
+      background:#111827;color:#fff;padding:12px 16px;font-weight:600;
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+    }
+    .userbar{display:flex;align-items:center;gap:8px;font-weight:500}
+    .userbar small{opacity:.85;font-weight:400}
+    .userbar button{
+      padding:6px 8px;border:1px solid #374151;background:#1f2937;color:#fff;
+      border-radius:8px;font-size:12px;cursor:pointer
+    }
+    .userbar button:hover{background:#111827}
+
+    .app{display:grid;grid-template-columns:320px 1fr;flex:1; height:calc(100vh - 56px)}
+    main{height:100%}
     .sidebar{background:#fff;border-right:1px solid #e5e7eb;overflow:auto}
     .section{padding:12px;border-bottom:1px solid #eef0f3}
     .section h2{margin:0 0 8px;font-size:13px;color:#374151;text-transform:uppercase;letter-spacing:.04em}
@@ -40,7 +56,15 @@
   </style>
 </head>
 <body>
-  <header>Geocercas</header>
+  <header>
+    <div>Geocercas</div>
+    <div id="userBar" class="userbar">
+      <small>Usuario:</small>
+      <span id="currentUserName">—</span>
+      <button id="btnSwitchUser">Cambiar de usuario</button>
+      <button id="btnLogout">Salir</button>
+    </div>
+  </header>
 
   <div class="app">
     <!-- Sidebar -->
@@ -89,18 +113,116 @@
 
   <script>
   document.addEventListener('DOMContentLoaded', function() {
-    // ===== Utilidades =====
-    function $(id){ return document.getElementById(id); }
+    /* =======================
+       MÓDULO DE ACCESO / USERS
+       ======================= */
+    var USERS_KEY = 'NobisApp_users';
+    var CURR_KEY  = 'NobisApp_current_user';
+    var STORAGE_BASE = 'NobisApp_fences_';
+
     function uid(){ return 'f_' + Math.random().toString(36).slice(2,10); }
     function nowName(){ return 'Geocerca ' + (new Date().getTime()%1000); }
+    function $(id){ return document.getElementById(id); }
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 
-    // ===== Storage =====
-    var STORAGE_KEY = 'NobisApp_fences_default';
-    function readFences(){ try{ var a=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); return (a && typeof a.length==='number')?a:[]; }catch(_){ return []; } }
+    function loadUsers(){
+      try{ var a=JSON.parse(localStorage.getItem(USERS_KEY)||'[]'); return (a && typeof a.length==='number')?a:[]; }
+      catch(_){ return []; }
+    }
+    function saveUsers(arr){ try{ localStorage.setItem(USERS_KEY, JSON.stringify(arr||[])); }catch(_){} }
+
+    function ensureOwner(){
+      var users = loadUsers();
+      if (!users || !users.length) {
+        users = [{ id:'owner', name:'Dueño', role:'owner' }];
+        saveUsers(users);
+      }
+      if (!localStorage.getItem(CURR_KEY)) {
+        localStorage.setItem(CURR_KEY, users[0].id);
+      }
+      return users;
+    }
+
+    function currentUserId(){ return localStorage.getItem(CURR_KEY) || 'owner'; }
+    function findUser(id){
+      var us = loadUsers();
+      for (var i=0;i<us.length;i++) if (us[i].id===id) return us[i];
+      return null;
+    }
+
+    function setCurrentUser(id){
+      localStorage.setItem(CURR_KEY, id);
+      // Recargar para reconfigurar STORAGE_KEY y UI
+      location.reload();
+    }
+
+    function promptSwitchUser(){
+      var users = loadUsers();
+      var lines = ['Selecciona usuario existente o crea uno nuevo:',
+                   ''];
+      for (var i=0;i<users.length;i++){
+        lines.push((i+1)+') '+users[i].name+'  ['+users[i].role+']');
+      }
+      lines.push('');
+      lines.push('N) Nuevo admin');
+      lines.push('P) Nuevo personal');
+      lines.push('');
+      lines.push('Ingresa el número, o N/P:');
+      var ans = prompt(lines.join('\n'));
+      if (ans===null) return;
+
+      ans = String(ans).trim().toUpperCase();
+      if (/^\d+$/.test(ans)) {
+        var idx = parseInt(ans,10)-1;
+        if (idx>=0 && idx<users.length) {
+          setCurrentUser(users[idx].id);
+        }
+        return;
+      }
+      if (ans==='N' || ans==='P') {
+        var name = prompt('Nombre del nuevo '+(ans==='N'?'admin':'personal')+':');
+        if (name===null) return;
+        name = (name||'').trim();
+        if (!name) return;
+        var id = name.toLowerCase().replace(/[^a-z0-9]+/g,'-') + '-' + Math.random().toString(36).slice(2,6);
+        var role = (ans==='N' ? 'admin' : 'staff');
+        users.push({id:id, name:name, role:role});
+        saveUsers(users);
+        // Arranca con base vacía por diseño (no hay que hacer nada más).
+        setCurrentUser(id);
+      }
+    }
+
+    function doLogout(){
+      // Por simplicidad, "Salir" te lleva al selector (no dejamos sin usuario).
+      promptSwitchUser();
+    }
+
+    // Inicializa usuarios
+    ensureOwner();
+    var CURRENT_USER_ID = currentUserId();
+    var CURRENT_USER = findUser(CURRENT_USER_ID) || {id:'owner', name:'Dueño', role:'owner'};
+
+    // Escribe user en header
+    var userNameSpan = $('currentUserName');
+    if (userNameSpan) userNameSpan.textContent = CURRENT_USER.name + ' ('+CURRENT_USER.role+')';
+    $('btnSwitchUser').onclick = promptSwitchUser;
+    $('btnLogout').onclick = doLogout;
+
+    /* =======================
+       STORAGE por USUARIO
+       ======================= */
+    var STORAGE_KEY = STORAGE_BASE + CURRENT_USER_ID; // <- per-user
+
+    function readFences(){
+      try{ var a=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); return (a && typeof a.length==='number')?a:[]; }
+      catch(_){ return []; }
+    }
     function writeFences(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr||[])); }catch(_){} }
 
-    // ===== Estado / referencias =====
+    /* =======================
+       APP DE GEOCERCAS (igual que antes)
+       ======================= */
     var map, group, activeId=null;
     var drawing=false, editing=false;
     var tmpMarkers=[], tmpPolyline=null, tmpPoly=null;
@@ -128,6 +250,23 @@
     function enable(n,on){ if(n) n.disabled=!on; }
     function showNameBar(on){ if(UI.nameBar) UI.nameBar.style.display = on ? 'flex' : 'none'; }
 
+    function applyRolePermissions(){
+      var isStaff = (CURRENT_USER.role === 'staff');
+      // Staff: solo lectura
+      var createBtns = [UI.newBtn, UI.finBtn, UI.cancelBtn, UI.byCoordsBtn];
+      var editBtns   = [UI.editBtn, UI.saveEditBtn, UI.cancelEditBtn, UI.renameBtn, UI.delBtn];
+      var ioBtns     = [UI.exportBtn, UI.importInput];
+
+      for (var i=0;i<createBtns.length;i++){ if (createBtns[i]) createBtns[i].disabled = isStaff; }
+      for (var j=0;j<editBtns.length;j++){ if (editBtns[j]) editBtns[j].disabled = isStaff; }
+      for (var k=0;k<ioBtns.length;k++){
+        if (ioBtns[k]){
+          if (ioBtns[k].tagName==='INPUT') ioBtns[k].disabled = isStaff;
+          else ioBtns[k].disabled = isStaff;
+        }
+      }
+    }
+
     function setIdle(){
       drawing=false; editing=false;
       enable(UI.newBtn,true);
@@ -139,6 +278,7 @@
       enable(UI.renameBtn, !!activeId);
       enable(UI.delBtn, !!activeId);
       showNameBar(false);
+      applyRolePermissions();
     }
     function setDrawing(){
       drawing=true; editing=false;
@@ -151,6 +291,7 @@
       enable(UI.renameBtn,false);
       enable(UI.delBtn,false);
       showNameBar(false);
+      applyRolePermissions();
     }
     function setEditing(){
       drawing=false; editing=true;
@@ -163,6 +304,7 @@
       enable(UI.renameBtn,false);
       enable(UI.delBtn,false);
       showNameBar(false);
+      applyRolePermissions();
     }
 
     // ===== Inicializar mapa =====
@@ -210,7 +352,8 @@
     }
     function startDrawing(){
       if(editing){ alert('Termina/cancela la edición primero.'); return; }
-      clearTemp(); setDrawing(); map.on('click', onMapClickAdd);
+      clearTemp(); setDrawing();
+      map.on('click', onMapClickAdd);
     }
     function cancelDrawing(){ map.off('click',onMapClickAdd); clearTemp(); setIdle(); }
     function finalizeDrawing(){
@@ -257,7 +400,8 @@
       for(i=0;i<items.length;i++){
         items[i].onclick=(function(id){return function(){ activeId=id; zoomToActive(); setIdle(); drawAll(); };})(items[i].getAttribute('data-id'));
       }
-      enable(UI.editBtn, !!activeId); enable(UI.renameBtn, !!activeId); enable(UI.delBtn, !!activeId);
+      // Permisos pueden deshabilitar botones aunque haya selección
+      applyRolePermissions();
     }
     function zoomToActive(){
       var f=findActive(); if(f && f.__layer){ try{ map.fitBounds(f.__layer.getBounds(),{padding:[24,24]}); }catch(_){ } }
@@ -268,6 +412,7 @@
 
     // ===== Edición =====
     function enterEdit(){
+      if (CURRENT_USER.role==='staff'){ alert('El personal no puede editar.'); return; }
       if(!activeId){ alert('Selecciona una geocerca.'); return; }
       var f=findActive(); if(!f || !f.__layer) return;
       setEditing();
@@ -286,6 +431,7 @@
       }
     }
     function saveEdit(){
+      if (CURRENT_USER.role==='staff'){ alert('El personal no puede editar.'); return; }
       if(!activeId) return;
       var f=findActive(); if(!f || !f.__layer) return;
       var cur=[],i; for(i=0;i<editMarkers.length;i++){ cur.push(editMarkers[i].getLatLng()); }
@@ -303,6 +449,7 @@
 
     // ===== CRUD =====
     function renameFence(){
+      if (CURRENT_USER.role==='staff'){ alert('El personal no puede renombrar.'); return; }
       if(!activeId) return;
       var arr=readFences(),i,f=null; for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ f=arr[i]; break; } }
       if(!f) return;
@@ -310,6 +457,7 @@
       f.name=nn; writeFences(arr); drawAll();
     }
     function deleteFence(){
+      if (CURRENT_USER.role==='staff'){ alert('El personal no puede eliminar.'); return; }
       if(!activeId) return;
       var arr=readFences(),i,f=null; for(i=0;i<arr.length;i++){ if(arr[i].id===activeId){ f=arr[i]; break; } }
       if(!f) return;
@@ -334,6 +482,7 @@
       return pts;
     }
     function createByCoords(){
+      if (CURRENT_USER.role==='staff'){ alert('El personal no puede crear geocercas.'); return; }
       var example="Pega coordenadas Lat,Lng (una por línea o separadas con ';'):\n"+
                   "-1.23456, -78.12345\n-1.23400 -78.12000\n"+
                   "-1,23456  -78,12345   (coma decimal)\n"+
@@ -350,6 +499,7 @@
 
     // ===== Importar / Exportar =====
     function exportGeo(){
+      if (CURRENT_USER.role==='staff'){ alert('El personal no puede exportar.'); return; }
       var fences=readFences(), fc={type:'FeatureCollection', features:[]};
       for(var i=0;i<fences.length;i++){
         var f=fences[i], coords=[],j;
@@ -361,6 +511,7 @@
       var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='geocercas.geojson'; a.click(); URL.revokeObjectURL(a.href);
     }
     function importGeo(e){
+      if (CURRENT_USER.role==='staff'){ alert('El personal no puede importar.'); e.target.value=''; return; }
       var f=e.target.files && e.target.files[0]; if(!f) return;
       var reader=new FileReader();
       reader.onload=function(){
