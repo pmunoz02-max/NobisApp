@@ -107,14 +107,15 @@
     setState("drawing");
   }
   function addPoint(e){
-    let m=L.circleMarker(e.latlng,{radius:5,color:"#6366f1",fillColor:"#818cf8",fillOpacity:1}).addTo(map);
-    tmpMarkers.push(m);
-    let pts=tmpMarkers.map(m=>m.getLatLng());
-    if(tmpPolyline) tmpPolyline.setLatLngs(pts); else tmpPolyline=L.polyline(pts,{color:"#6366f1",dashArray:"4 4"}).addTo(map);
-    if(pts.length>=3){
-      $("finishBtn").disabled=false;
-      if(tmpPoly) tmpPoly.setLatLngs(pts); else tmpPoly=L.polygon(pts,{color:"#a78bfa",weight:2,fillOpacity:.2}).addTo(map);
-    }
+  let m = L.circleMarker(e.latlng,{radius:5,color:"#6366f1",fillColor:"#818cf8",fillOpacity:1}).addTo(map);
+  tmpMarkers.push(m);
+  let pts = tmpMarkers.map(m=>m.getLatLng());
+  if(tmpPolyline) tmpPolyline.setLatLngs(pts);
+  else tmpPolyline = L.polyline(pts,{color:"#6366f1",dashArray:"4 4"}).addTo(map);
+
+  if(pts.length>=3){
+    if(tmpPoly) tmpPoly.setLatLngs(pts);
+    else tmpPoly = L.polygon(pts,{color:"#a78bfa",weight:2,fillOpacity:.2}).addTo(map);
   }
   function cancelDraw(){ map.off("click",addPoint); clearTemp(); setState("idle"); }
   function finishDraw(){
@@ -185,15 +186,20 @@
 
   // ===== Estado =====
   function setState(st){
-    $("newBtn").disabled=(st!=="idle");
-    $("finishBtn").disabled=(st!=="drawing");
-    $("cancelBtn").disabled=(st!=="drawing");
-    $("editBtn").disabled=(!activeId||st!=="idle");
-    $("saveEditBtn").disabled=(st!=="editing");
-    $("cancelEditBtn").disabled=(st!=="editing");
-    $("renameBtn").disabled=(!activeId||st!=="idle");
-    $("deleteBtn").disabled=(!activeId||st!=="idle");
+  $("newBtn").disabled = (st !== "idle");
+  // El botón Finalizar debe estar disponible solo en dibujo y cuando hay >=3 puntos
+  if(st === "drawing" && tmpMarkers.length >= 3){
+    $("finishBtn").disabled = false;
+  } else {
+    $("finishBtn").disabled = true;
   }
+  $("cancelBtn").disabled = (st !== "drawing");
+  $("editBtn").disabled = (!activeId || st !== "idle");
+  $("saveEditBtn").disabled = (st !== "editing");
+  $("cancelEditBtn").disabled = (st !== "editing");
+  $("renameBtn").disabled = (!activeId || st !== "idle");
+  $("deleteBtn").disabled = (!activeId || st !== "idle");
+}
 
   // ===== Start =====
   window.addEventListener("load", initMap);
