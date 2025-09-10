@@ -59,30 +59,74 @@
     function write(a){localStorage.setItem(STORAGE_KEY,JSON.stringify(a||[]));}
     function uid(){return "f_"+Math.random().toString(36).slice(2,9);}
 
-    function initMap(){
-      map = L.map("map").setView([-1.73, -77.91], 15);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
-      group=L.layerGroup().addTo(map);
+    function initMap() {
+  map = L.map("map").setView([-1.73, -77.91], 15);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "© OpenStreetMap"
+  }).addTo(map);
+  group = L.layerGroup().addTo(map);
 
-      map.on("mousemove", e=>{
-        document.getElementById("coords").innerText="Lat: "+e.latlng.lat.toFixed(5)+", Lng: "+e.latlng.lng.toFixed(5);
-      });
+  // Mostrar coordenadas en vivo
+  map.on("mousemove", e => {
+    document.getElementById("coords").innerText =
+      "Lat: " + e.latlng.lat.toFixed(5) + ", Lng: " + e.latlng.lng.toFixed(5);
+  });
 
-      // Botones
-      document.getElementById("newBtn").onclick=startDraw;
-      document.getElementById("finishBtn").onclick=finishDraw;
-      document.getElementById("cancelBtn").onclick=cancelDraw;
-      document.getElementById("editBtn").onclick=enterEdit;
-      document.getElementById("saveEditBtn").onclick=saveEdit;
-      document.getElementById("cancelEditBtn").onclick=()=>exitEdit(false);
-      document.getElementById("renameBtn").onclick=renameFence;
-      document.getElementById("deleteBtn").onclick=deleteFence;
-      document.getElementById("coordsBtn").onclick=createByCoords;
-      document.getElementById("exportBtn").onclick=exportGeo;
-      document.getElementById("importInput").onchange=importGeo;
+  // Botones
+  document.getElementById("newBtn").onclick = startDraw;
+  document.getElementById("finishBtn").onclick = finishDraw;
+  document.getElementById("cancelBtn").onclick = cancelDraw;
+  document.getElementById("editBtn").onclick = enterEdit;
+  document.getElementById("saveEditBtn").onclick = saveEdit;
+  document.getElementById("cancelEditBtn").onclick = () => exitEdit(false);
+  document.getElementById("renameBtn").onclick = renameFence;
+  document.getElementById("deleteBtn").onclick = deleteFence;
+  document.getElementById("coordsBtn").onclick = createByCoords;
+  document.getElementById("exportBtn").onclick = exportGeo;
+  document.getElementById("importInput").onchange = importGeo;
 
-      renderAll();
-    }
+  renderAll();
+}
+
+// --- Edición de polígonos ---
+function enterEdit() {
+  if (!activeId) return;
+  let arr = read();
+  let f = arr.find(x => x.id === activeId);
+  if (!f) return;
+
+  editMarkers = [];
+  f.latlngs.forEach((p, i) => {
+    let m = L.marker(p, { draggable: true }).addTo(map);
+    m.on("drag", () => {
+      f.latlngs = editMarkers.map(mm => mm.getLatLng());
+      f.__layer.setLatLngs(f.latlngs);
+    });
+    editMarkers.push(m);
+  });
+
+  setState("editing");
+}
+
+function saveEdit() {
+  if (!activeId) return;
+  let arr = read();
+  let f = arr.find(x => x.id === activeId);
+  if (!f) return;
+
+  f.latlngs = editMarkers.map(m => m.getLatLng());
+  write(arr);
+  exitEdit(true);
+}
+
+function exitEdit(redraw) {
+  editMarkers.forEach(m => map.removeLayer(m));
+  editMarkers = [];
+  if (redraw) renderAll();
+  setState("idle");
+}
+
 
     function startDraw(){
       clearTemp();
