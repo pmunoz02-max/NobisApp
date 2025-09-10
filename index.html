@@ -9,49 +9,20 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      font-family: Arial, sans-serif;
-    }
-    .app {
-      display: grid;
-      grid-template-columns: 300px 1fr;
-      height: 100%;
-    }
-    aside {
-      background: #f9f9f9;
-      padding: 10px;
-      border-right: 1px solid #ccc;
-    }
-    #map {
-      width: 100%;
-      height: 100vh; /* aseguro que siempre se vea */
-    }
-    button {
-      display: block;
-      width: 100%;
-      margin: 5px 0;
-      padding: 8px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    #coords {
-      position: absolute;
-      bottom: 10px;
-      left: 320px;
-      background: rgba(255,255,255,0.8);
-      padding: 5px 10px;
-      border-radius: 4px;
-      font-size: 13px;
-      box-shadow: 0 0 3px rgba(0,0,0,0.3);
-    }
+    body, html {margin:0; padding:0; height:100%; font-family: Arial, sans-serif;}
+    .app {display:grid; grid-template-columns:300px 1fr; height:100%;}
+    aside {background:#f9f9f9; padding:10px; border-right:1px solid #ccc; overflow:auto;}
+    #map {width:100%; height:100%;}
+    button {display:block; width:100%; margin:5px 0; padding:8px; font-size:14px; cursor:pointer;}
+    button:disabled {opacity:.5; cursor:not-allowed;}
+    #coords {position:absolute; bottom:10px; left:310px; background:rgba(255,255,255,0.9); padding:4px 8px; border:1px solid #ccc; border-radius:4px; font-size:12px;}
+    ul {list-style:none; padding:0; margin:0; border:1px solid #ddd; border-radius:6px; max-height:200px; overflow:auto;}
+    li {padding:6px 8px; border-bottom:1px solid #eee; cursor:pointer;}
+    li:last-child {border-bottom:none;}
   </style>
 </head>
 <body>
   <div class="app">
-    <!-- Panel lateral -->
     <aside>
       <h3>Acciones</h3>
       <button id="newBtn">Nueva</button>
@@ -68,8 +39,6 @@
       <h3>Geocercas</h3>
       <ul id="fenceList"></ul>
     </aside>
-
-    <!-- Mapa -->
     <main>
       <div id="map"></div>
       <div id="coords">Lat: -, Lng: -</div>
@@ -80,28 +49,149 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    let map, drawnItems, activePolygon = null;
+    let map, group;
+    let tmpMarkers=[], tmpPolyline=null, tmpPoly=null;
+    let editMarkers=[];
+    let activeId=null;
 
-    function initMap() {
-      map = L.map("map").setView([-1.73, -77.91], 14);
+    const STORAGE_KEY="NobisApp_geocercas";
+    function read(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]");}catch(_){return[];}}
+    function write(a){localStorage.setItem(STORAGE_KEY,JSON.stringify(a||[]));}
+    function uid(){return "f_"+Math.random().toString(36).slice(2,9);}
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: "© OpenStreetMap"
-      }).addTo(map);
+    function initMap(){
+      map = L.map("map").setView([-1.73, -77.91], 15);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
+      group=L.layerGroup().addTo(map);
 
-      drawnItems = L.featureGroup().addTo(map);
-
-      // Mostrar coordenadas al mover el mouse
-      map.on("mousemove", function(e) {
-        document.getElementById("coords").innerText =
-          "Lat: " + e.latlng.lat.toFixed(5) + ", Lng: " + e.latlng.lng.toFixed(5);
+      map.on("mousemove", e=>{
+        document.getElementById("coords").innerText="Lat: "+e.latlng.lat.toFixed(5)+", Lng: "+e.latlng.lng.toFixed(5);
       });
+
+      // Botones
+      document.getElementById("newBtn").onclick=startDraw;
+      document.getElementById("finishBtn").onclick=finishDraw;
+      document.getElementById("cancelBtn").onclick=cancelDraw;
+      document.getElementById("editBtn").onclick=enterEdit;
+      document.getElementById("saveEditBtn").onclick=saveEdit;
+      document.getElementById("cancelEditBtn").onclick=()=>exitEdit(false);
+      document.getElementById("renameBtn").onclick=renameFence;
+      document.getElementById("deleteBtn").onclick=deleteFence;
+      document.getElementById("coordsBtn").onclick=createByCoords;
+      document.getElementById("exportBtn").onclick=exportGeo;
+      document.getElementById("importInput").onchange=importGeo;
+
+      renderAll();
     }
 
-    document.addEventListener("DOMContentLoaded", function () {
-      initMap();
-    });
+    function startDraw(){
+      clearTemp();
+      tmpMarkers=[];
+      map.on("click",addPoint);
+      setState("drawing");
+    }
+    function addPoint(e){
+      let m=L.circleMarker(e.latlng,{radius:5,color:"#6366f1",fillColor:"#818cf8",fillOpacity:1}).addTo(map);
+      tmpMarkers.push(m);
+      let pts=tmpMarkers.map(m=>m.getLatLng());
+      if(tmpPolyline) tmpPolyline.setLatLngs(pts);
+      else tmpPolyline=L.polyline(pts,{color:"#6366f1",dashArray:"4 4"}).addTo(map);
+      if(pts.length>=3){
+        if(tmpPoly) tmpPoly.setLatLngs(pts);
+        else tmpPoly=L.polygon(pts,{color:"#a78bfa",weight:2,fillOpacity:.2}).addTo(map);
+        document.getElementById("finishBtn").disabled=false;
+      }
+    }
+    function cancelDraw(){
+      map.off("click",addPoint); clearTemp(); setState("idle");
+    }
+    function finishDraw(){
+      let pts=tmpMarkers.map(m=>m.getLatLng());
+      if(pts.length<3) return alert("Agrega mínimo 3 puntos");
+      let name=prompt("Nombre de la geocerca:")||"Geocerca";
+      let arr=read(); arr.push({id:uid(),name,latlngs:pts}); write(arr);
+      map.off("click",addPoint); clearTemp(); renderAll(); setState("idle");
+    }
+    function clearTemp(){
+      tmpMarkers.forEach(m=>map.removeLayer(m)); tmpMarkers=[];
+      if(tmpPolyline){map.removeLayer(tmpPolyline); tmpPolyline=null;}
+      if(tmpPoly){map.removeLayer(tmpPoly); tmpPoly=null;}
+    }
+
+    function renderAll(){
+      group.clearLayers();
+      let arr=read(); let list=document.getElementById("fenceList"); list.innerHTML="";
+      arr.forEach(f=>{
+        let poly=L.polygon(f.latlngs,{color:"#7c3aed",weight:2,fillOpacity:.15}).addTo(group);
+        poly.bindTooltip(f.name,{permanent:true,direction:"center"});
+        poly.on("click",()=>{activeId=f.id; renderAll();});
+        let li=document.createElement("li"); li.textContent=f.name; li.onclick=()=>{activeId=f.id; renderAll(); zoomTo(f);};
+        if(f.id===activeId) li.style.fontWeight="bold";
+        list.appendChild(li);
+      });
+      setState("idle");
+    }
+    function zoomTo(f){ if(f&&f.latlngs) map.fitBounds(L.polygon(f.latlngs).getBounds(),{padding:[20,20]}); }
+
+    function enterEdit(){
+      if(!activeId) return;
+      let arr=read(); let f=arr.find(x=>x.id===activeId); if(!f) return;
+      editMarkers=[]; f.latlngs.forEach((p,i)=>{
+        let m=L.marker(p,{draggable:true}).addTo(map);
+        m.on("drag",()=>{ f.latlngs=editMarkers.map(mm=>mm.getLatLng()); poly.setLatLngs(f.latlngs); });
+        editMarkers.push(m);
+      });
+      setState("editing");
+    }
+    function saveEdit(){
+      if(!activeId) return;
+      let arr=read(); let f=arr.find(x=>x.id===activeId); if(!f) return;
+      f.latlngs=editMarkers.map(m=>m.getLatLng()); write(arr);
+      exitEdit(true);
+    }
+    function exitEdit(redraw){ editMarkers.forEach(m=>map.removeLayer(m)); editMarkers=[]; if(redraw) renderAll(); setState("idle"); }
+
+    function renameFence(){ if(!activeId) return; let arr=read(); let f=arr.find(x=>x.id===activeId); let nn=prompt("Nuevo nombre:",f.name)||f.name; f.name=nn; write(arr); renderAll();}
+    function deleteFence(){ if(!activeId) return; let arr=read().filter(x=>x.id!==activeId); write(arr); activeId=null; renderAll(); }
+
+    function createByCoords(){
+      let raw=prompt("Pega coordenadas Lat,Lng separadas por ';' o saltos de línea:"); if(!raw) return;
+      let pts=[]; raw.split(/[;\n]+/).forEach(seg=>{
+        let m=seg.match(/-?\d+(\.\d+)?/g); if(m&&m.length>=2){ let a=parseFloat(m[0]),b=parseFloat(m[1]); if(Math.abs(a)<=90) pts.push([a,b]); else pts.push([b,a]); }
+      });
+      if(pts.length<3) return alert("Se requieren al menos 3 puntos");
+      let name=prompt("Nombre de la geocerca:")||"Geocerca"; let arr=read(); arr.push({id:uid(),name,latlngs:pts}); write(arr); renderAll();
+    }
+
+    function exportGeo(){
+      let arr=read(); let fc={type:"FeatureCollection",features:[]};
+      arr.forEach(f=>{
+        let coords=f.latlngs.map(p=>[p.lng||p[1],p.lat||p[0]]);
+        coords.push(coords[0]);
+        fc.features.push({type:"Feature",properties:{id:f.id,name:f.name},geometry:{type:"Polygon",coordinates:[coords]}});
+      });
+      let blob=new Blob([JSON.stringify(fc)],{type:"application/geo+json"}); let a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="geocercas.geojson"; a.click();
+    }
+    function importGeo(e){
+      let f=e.target.files[0]; if(!f) return;
+      let r=new FileReader(); r.onload=()=>{ try{ let gj=JSON.parse(r.result); let arr=read();
+        (gj.features||[]).forEach(ft=>{ if(ft.geometry&&ft.geometry.type==="Polygon"){ let ring=ft.geometry.coordinates[0]; let pts=ring.map(c=>({lat:c[1],lng:c[0]})); if(pts.length>=3) arr.push({id:uid(),name:ft.properties.name||"Geo importada",latlngs:pts}); } });
+        write(arr); renderAll(); }catch(_){alert("GeoJSON inválido");} };
+      r.readAsText(f);
+    }
+
+    function setState(st){
+      document.getElementById("newBtn").disabled=(st!=="idle");
+      document.getElementById("finishBtn").disabled=(st!=="drawing"||tmpMarkers.length<3);
+      document.getElementById("cancelBtn").disabled=(st!=="drawing");
+      document.getElementById("editBtn").disabled=(!activeId||st!=="idle");
+      document.getElementById("saveEditBtn").disabled=(st!=="editing");
+      document.getElementById("cancelEditBtn").disabled=(st!=="editing");
+      document.getElementById("renameBtn").disabled=(!activeId||st!=="idle");
+      document.getElementById("deleteBtn").disabled=(!activeId||st!=="idle");
+    }
+
+    document.addEventListener("DOMContentLoaded", initMap);
   </script>
 </body>
 </html>
