@@ -42,6 +42,7 @@
       <h3>Acciones</h3>
       <div class="controls">
         <button id="newBtn">Nueva</button>
+        <button id="finishBtn"></button>
         <button id="finishBtn" class="primary" disabled>Finalizar</button>
         <button id="cancelBtn" disabled>Cancelar</button>
         <button id="editBtn" disabled>Editar</button>
@@ -82,6 +83,8 @@
     map = L.map("map").setView([-1.73, -77.91], 15);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);
     group=L.layerGroup().addTo(map);
+    document.getElementById("finishBtn").onclick = finishDraw;
+
 
     // Botones
     $("newBtn").onclick=startDraw;
@@ -124,6 +127,10 @@
   // Revalida el estado cada vez que se agrega un punto
   setState("drawing");
 }
+if (tmpMarkers.length >= 3) {
+  document.getElementById("finishBtn").disabled = false;
+}
+
 
 function cancelDraw(){
   map.off("click",addPoint);
@@ -224,6 +231,7 @@ function clearTemp(){
 
   // ===== Start =====
   window.addEventListener("load", initMap);
+
   </script>
 </body>
 </html>
