@@ -107,9 +107,12 @@
     setState("drawing");
   }
   function addPoint(e){
-  let m = L.circleMarker(e.latlng,{radius:5,color:"#6366f1",fillColor:"#818cf8",fillOpacity:1}).addTo(map);
+  let m = L.circleMarker(e.latlng,{
+    radius:5,color:"#6366f1",fillColor:"#818cf8",fillOpacity:1
+  }).addTo(map);
   tmpMarkers.push(m);
   let pts = tmpMarkers.map(m=>m.getLatLng());
+
   if(tmpPolyline) tmpPolyline.setLatLngs(pts);
   else tmpPolyline = L.polyline(pts,{color:"#6366f1",dashArray:"4 4"}).addTo(map);
 
@@ -117,16 +120,34 @@
     if(tmpPoly) tmpPoly.setLatLngs(pts);
     else tmpPoly = L.polygon(pts,{color:"#a78bfa",weight:2,fillOpacity:.2}).addTo(map);
   }
-  function cancelDraw(){ map.off("click",addPoint); clearTemp(); setState("idle"); }
-  function finishDraw(){
-    let pts=tmpMarkers.map(m=>m.getLatLng());
-    if(pts.length<3) return alert("Agrega al menos 3 puntos");
-    let name=prompt("Nombre de la geocerca:")||"Geocerca";
-    let arr=read(); arr.push({id:uid(),name,latlngs:pts}); write(arr);
-    map.off("click",addPoint); clearTemp(); renderAll(); setState("idle");
-  }
-  function clearTemp(){ tmpMarkers.forEach(m=>map.removeLayer(m)); tmpMarkers=[]; if(tmpPolyline){map.removeLayer(tmpPolyline);} if(tmpPoly){map.removeLayer(tmpPoly);} }
 
+  // Revalida el estado cada vez que se agrega un punto
+  setState("drawing");
+}
+
+function cancelDraw(){
+  map.off("click",addPoint);
+  clearTemp();
+  setState("idle");
+}
+
+function finishDraw(){
+  let pts=tmpMarkers.map(m=>m.getLatLng());
+  if(pts.length<3) return alert("Agrega al menos 3 puntos");
+  let name=prompt("Nombre de la geocerca:")||"Geocerca";
+  let arr=read(); arr.push({id:uid(),name,latlngs:pts}); write(arr);
+  map.off("click",addPoint);
+  clearTemp();
+  renderAll();
+  setState("idle");
+}
+
+function clearTemp(){
+  tmpMarkers.forEach(m=>map.removeLayer(m));
+  tmpMarkers=[];
+  if(tmpPolyline){ map.removeLayer(tmpPolyline); tmpPolyline=null; }
+  if(tmpPoly){ map.removeLayer(tmpPoly); tmpPoly=null; }
+}
   // ===== Render =====
   function renderAll(){
     group.clearLayers();
