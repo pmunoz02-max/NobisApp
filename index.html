@@ -24,7 +24,12 @@
     button:disabled { opacity:.5; cursor:not-allowed; }
     .primary { background:#4f46e5; color:#fff; border-color:#4338ca; }
     .danger { background:#ef4444; color:#fff; border-color:#dc2626; }
-    #map { height:100%; width:100%; }
+   #map {
+  height: 100%;
+  min-height: 500px; /* 🔧 garantiza que siempre se vea */
+  width: 100%;
+}
+#map {
     ul { list-style:none; padding:0; margin:0; border:1px solid #ddd; border-radius:6px; max-height:200px; overflow:auto; }
     li { padding:6px 8px; border-bottom:1px solid #eee; cursor:pointer; }
     li:last-child { border-bottom:none; }
@@ -63,8 +68,10 @@
         • También puedes crear por coordenadas con "Geocerca (Lat/Lng)".
       </p>
     </aside>
-    <main><div id="map"></div></main>
-  </div>
+    <main>
+  <div id="map" style="height:100vh; width:100%;"></div>
+</main>
+
 
   <script>
   // ===== Utils =====
@@ -85,6 +92,10 @@
     maxZoom: 19,
     attribution: "&copy; OpenStreetMap"
   }).addTo(map);
+  document.addEventListener("DOMContentLoaded", function () {
+  initMap();
+});
+
 
   // Botones
   document.getElementById("newBtn").onclick = startDraw;
@@ -130,7 +141,6 @@
     document.getElementById("finishBtn").disabled = false;
   }
 }
-
 
   // Revalida el estado cada vez que se agrega un punto
   setState("drawing");
