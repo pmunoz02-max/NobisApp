@@ -111,20 +111,26 @@
     map.on("click", addPoint);
     setState("drawing");
   }
-  function addPoint(e){
+  function addPoint(e) {
   let m = L.circleMarker(e.latlng,{
     radius:5,color:"#6366f1",fillColor:"#818cf8",fillOpacity:1
   }).addTo(map);
+
   tmpMarkers.push(m);
   let pts = tmpMarkers.map(m=>m.getLatLng());
 
-  if(tmpPolyline) tmpPolyline.setLatLngs(pts);
+  if (tmpPolyline) tmpPolyline.setLatLngs(pts);
   else tmpPolyline = L.polyline(pts,{color:"#6366f1",dashArray:"4 4"}).addTo(map);
 
-  if(pts.length>=3){
-    if(tmpPoly) tmpPoly.setLatLngs(pts);
+  if (pts.length >= 3) {
+    if (tmpPoly) tmpPoly.setLatLngs(pts);
     else tmpPoly = L.polygon(pts,{color:"#a78bfa",weight:2,fillOpacity:.2}).addTo(map);
+
+    // 🔧 Aquí activamos el botón Finalizar
+    document.getElementById("finishBtn").disabled = false;
   }
+}
+
 
   // Revalida el estado cada vez que se agrega un punto
   setState("drawing");
