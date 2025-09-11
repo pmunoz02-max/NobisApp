@@ -63,43 +63,41 @@ let tempLine=null, tempPoly=null;
 let editMarkers = [];
 let editBackup = null;
 
+// === Helpers de estado ===
+function setIdle(){
+  document.getElementById("editBtn").disabled = !activeId;
+  document.getElementById("saveEditBtn").disabled = true;
+  document.getElementById("cancelEditBtn").disabled = true;
+}
+function setEditing(){
+  document.getElementById("editBtn").disabled = true;
+  document.getElementById("saveEditBtn").disabled = false;
+  document.getElementById("cancelEditBtn").disabled = false;
+}
+function writeFences(arr){ fences=arr; }
+
 // === Crear por Lat/Lng ===
 document.getElementById("byCoordsBtn").onclick=()=>{
-  let raw=prompt(
-    "Pega coordenadas Lat,Lng (una por línea o separadas con ';'):\n" +
-    "Ejemplo:\n-1.2345,-78.1234\n-1.2350,-78.1200\n-1.2360,-78.1210"
-  );
+  let raw=prompt("Pega coordenadas Lat,Lng separadas por salto de línea o ';'");
   if(!raw) return;
-
-  let pts=[];
-  let lines=raw.split(/[\n;]/);
-  lines.forEach(l=>{
-    let parts=l.trim().split(/[, ]+/);
-    if(parts.length>=2){
-      let lat=parseFloat(parts[0].replace(",","."));
-      let lng=parseFloat(parts[1].replace(",","."));
-      if(!isNaN(lat)&&!isNaN(lng)){
-        // corrección automática si vienen como lon,lat
-        if(Math.abs(lat)>90){ let t=lat; lat=lng; lng=t; }
-        pts.push([lat,lng]);
-      }
+  let pts=[]; raw.split(/[\n;]/).forEach(l=>{
+    let p=l.trim().split(/[, ]+/);
+    if(p.length>=2){
+      let lat=parseFloat(p[0]); let lng=parseFloat(p[1]);
+      if(Math.abs(lat)>90){ [lat,lng]=[lng,lat]; }
+      if(!isNaN(lat)&&!isNaN(lng)) pts.push([lat,lng]);
     }
   });
-
-  if(pts.length<3){ 
-    alert("Se requieren al menos 3 coordenadas válidas."); 
-    return; 
-  }
-
+  if(pts.length<3){ alert("Se requieren al menos 3 coordenadas"); return; }
   let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
   if(!name) return;
-
   let f={id:Date.now().toString(), name:name, latlngs:pts.map(p=>L.latLng(p[0],p[1]))};
   fences.push(f);
   activeId=f.id;
   drawAll();
   map.fitBounds(f.__layer.getBounds());
 };
+
 // === Edición de Geocercas ===
 function enterEdit() {
   if (!activeId) { alert("Selecciona una geocerca primero"); return; }
@@ -113,7 +111,7 @@ function enterEdit() {
   let latlngs = f.__layer.getLatLngs()[0];
   editBackup = latlngs.map(p=>L.latLng(p.lat,p.lng));
 
-  latlngs.forEach((pt, idx)=>{
+  latlngs.forEach(pt=>{
     let m = L.marker(pt,{draggable:true});
     m.on("drag",()=>{
       let cur = editMarkers.map(mm=>mm.getLatLng());
@@ -130,13 +128,10 @@ function saveEdit() {
   if (!activeId) return;
   let f = fences.find(ff=>ff.id===activeId);
   if (!f || !f.__layer) return;
-
   let cur = editMarkers.map(m=>m.getLatLng());
   if (cur.length<3){ alert("Mínimo 3 vértices."); return; }
-
   f.latlngs = cur;
   writeFences(fences);
-
   exitEdit(true);
 }
 
@@ -151,15 +146,11 @@ function exitEdit(redraw) {
 // inicializar mapa
 function initMap(){
   map=L.map('map').setView([-1.73,-77.91],14);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'&copy; OpenStreetMap'
-  }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
   group=L.layerGroup().addTo(map);
 
-  // mostrar coords al mover mouse
   map.on("mousemove",e=>{
-    document.getElementById("coords").textContent=
-      `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
+    document.getElementById("coords").textContent=`Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
   });
 
   drawAll();
@@ -184,19 +175,15 @@ function renderList(){
     let li=document.createElement("li");
     li.textContent=f.name;
     li.style.cursor="pointer";
-    li.onclick=()=>{ activeId=f.id; drawAll(); };
+    li.onclick=()=>{ activeId=f.id; drawAll(); setIdle(); };
     ul.appendChild(li);
   });
+  setIdle();
 }
-document.getElementById("editBtn").onclick = enterEdit;
-document.getElementById("saveEditBtn").onclick = saveEdit;
-document.getElementById("cancelEditBtn").onclick = ()=>exitEdit(false);
-
 
 // === Crear geocerca manual ===
 document.getElementById("newBtn").onclick=()=>{
-  drawing=true;
-  tempPoints=[];
+  drawing=true; tempPoints=[]; 
   if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
   if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
   map.on("click",addTempPoint);
@@ -221,8 +208,7 @@ document.getElementById("finishBtn").onclick=()=>{
   let f={id:Date.now().toString(), name:name, latlngs:tempPoints};
   fences.push(f);
   map.off("click",addTempPoint);
-  drawing=false;
-  tempPoints=[]; 
+  drawing=false; tempPoints=[]; 
   if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
   if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
   document.getElementById("finishBtn").disabled=true;
@@ -231,8 +217,7 @@ document.getElementById("finishBtn").onclick=()=>{
 };
 
 document.getElementById("cancelBtn").onclick=()=>{
-  drawing=false;
-  tempPoints=[]; 
+  drawing=false; tempPoints=[]; 
   if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
   if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
   map.off("click",addTempPoint);
@@ -272,6 +257,11 @@ function renderPersonal(f){
   });
   div.appendChild(ul);
 }
+
+// enganchar botones edición
+document.getElementById("editBtn").onclick = enterEdit;
+document.getElementById("saveEditBtn").onclick = saveEdit;
+document.getElementById("cancelEditBtn").onclick = ()=>exitEdit(false);
 
 initMap();
 </script>
