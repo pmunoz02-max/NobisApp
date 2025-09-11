@@ -40,9 +40,15 @@
   </aside>
 
   <main>
-    <div id="map"></div>
-    <div class="coords" id="coords"></div>
+  
+<div id="mouseCoords" style="position:absolute; bottom:10px; left:280px; 
+     background:white; border:1px solid #ccc; padding:4px 8px; 
+     font-size:12px; border-radius:4px;">
+  Lat: -, Lng: -
+</div>
+
   </main>
+  
 
   <script>
     let map, group;
@@ -66,7 +72,11 @@
       loadFences();
       drawAll();
     }
-
+// Mostrar coordenadas dinámicas al mover el mouse
+map.on("mousemove", function(e) {
+  document.getElementById("mouseCoords").innerText =
+    "Lat: " + e.latlng.lat.toFixed(6) + ", Lng: " + e.latlng.lng.toFixed(6);
+});
     // === Dibujar
     function startDrawing(){
       if(editing){ alert("Termina la edición primero."); return; }
