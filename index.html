@@ -105,30 +105,44 @@ function finishDrawing(){
 }
 function cancelDrawing(){ map.off("click",addPoint); drawing=false; tmpPoints=[]; drawAll(); }
 function finalizeDrawing() {
-  if (tempPoints.length < 3) {
-    alert("Agrega al menos 3 puntos");
+  if (!drawing) return;
+
+  var pts = [];
+  for (var i = 0; i < tmpMarkers.length; i++) {
+    pts.push(tmpMarkers[i].getLatLng());
+  }
+
+  if (pts.length < 3) {
+    alert("Agrega al menos 3 puntos.");
     return;
   }
 
-  let name = prompt("Nombre de la geocerca:", "Geocerca " + (fences.length + 1));
+  // 🔒 Asegurar cierre del polígono
+  if (!pts[0].equals(pts[pts.length - 1])) {
+    pts.push(pts[0]);
+  }
+
+  // Guardar con nombre
+  var name = prompt("Nombre de la geocerca:", "Geocerca " + (fences.length + 1));
   if (!name) name = "Geocerca " + (fences.length + 1);
 
-  let latlngs = tempPoints.map(p => p.getLatLng());
+  var id = uid();
+  var latlngs = pts.map(function (p) {
+    return { lat: p.lat, lng: p.lng };
+  });
 
-  // guardar en memoria
-  let id = "g" + Date.now();
-  fences.push({ id, name, latlngs });
+  fences.push({ id: id, name: name, latlngs: latlngs });
+  saveFences();
 
-  // guardar en localStorage
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(fences));
-
-  // limpiar temporales
-  clearTempDrawing();
-
-  // redibujar
-  activeId = id;
+  clearTemp();
   drawAll();
+  drawing = false;
+
+  enable(UI.newBtn, true);
+  enable(UI.finishBtn, false);
+  enable(UI.cancelBtn, false);
 }
+
 
 // === Edición
 function startEdit(){
