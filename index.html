@@ -40,13 +40,13 @@
       <ul id="fenceList"></ul>
     </aside>
     <main>
-      <div id="map"></div>
-      <div id="coords">Lat: -, Lng: -</div>
-    </main>
+     <main>
+  <div id="map" style="height:90vh; width:100%;"></div>
+  <div id="coords" style="padding:6px; font-size:12px; background:#fff; border-top:1px solid #ccc;">
+    Mueve el mouse sobre el mapa para ver coordenadas
   </div>
-<div id="coords" style="padding:6px; font-size:12px; background:#fff; border-top:1px solid #ccc;">
-  Mueve el mouse sobre el mapa para ver coordenadas
-</div>
+</main>
+
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -283,6 +283,29 @@ function exitEdit(redraw) {
     }
 
     document.addEventListener("DOMContentLoaded", initMap);
+    function initMap() {
+  map = L.map("map").setView([-1.7307, -77.9122], 15);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+
+  group = L.layerGroup().addTo(map);
+
+  // Mostrar coordenadas al mover el mouse
+  map.on("mousemove", function (e) {
+    document.getElementById("coords").innerText =
+      "Lat: " + e.latlng.lat.toFixed(6) + ", Lng: " + e.latlng.lng.toFixed(6);
+  });
+
+  drawAll();
+  setIdle();
+}
+document.addEventListener("DOMContentLoaded", function () {
+  initMap();
+});
+
   </script>
 </body>
 </html>
