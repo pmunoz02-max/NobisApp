@@ -104,6 +104,31 @@ function finishDrawing(){
   drawAll();
 }
 function cancelDrawing(){ map.off("click",addPoint); drawing=false; tmpPoints=[]; drawAll(); }
+function finalizeDrawing() {
+  if (tempPoints.length < 3) {
+    alert("Agrega al menos 3 puntos");
+    return;
+  }
+
+  let name = prompt("Nombre de la geocerca:", "Geocerca " + (fences.length + 1));
+  if (!name) name = "Geocerca " + (fences.length + 1);
+
+  let latlngs = tempPoints.map(p => p.getLatLng());
+
+  // guardar en memoria
+  let id = "g" + Date.now();
+  fences.push({ id, name, latlngs });
+
+  // guardar en localStorage
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(fences));
+
+  // limpiar temporales
+  clearTempDrawing();
+
+  // redibujar
+  activeId = id;
+  drawAll();
+}
 
 // === Edición
 function startEdit(){
