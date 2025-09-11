@@ -11,8 +11,8 @@
 
   <style>
     body { margin:0; font-family: Arial, sans-serif; display:flex; height:100vh; }
-    aside { width:260px; background:#f8f8f8; padding:10px; overflow-y:auto; }
-    main { flex:1; position: relative; }  /* 👈 necesario para coords */
+    aside { width:280px; background:#f8f8f8; padding:10px; overflow-y:auto; }
+    main { flex:1; position: relative; }
     #map { height:100%; width:100%; }
     button { display:block; width:100%; margin:4px 0; padding:6px; }
     ul { list-style:none; padding:0; }
@@ -28,11 +28,13 @@
       border-radius: 4px;
       z-index: 1000;
     }
+    h3 { margin-top:15px; margin-bottom:8px; font-size:15px; }
+    hr { margin:12px 0; }
   </style>
 </head>
 <body>
   <aside>
-    <h3>Acciones</h3>
+    <h3>Geocercas</h3>
     <button id="newBtn">Nueva</button>
     <button id="finishBtn" disabled>Finalizar</button>
     <button id="cancelBtn" disabled>Cancelar</button>
@@ -44,9 +46,33 @@
     <button id="byCoordsBtn">Geocerca (Lat/Lng)</button>
     <button id="exportBtn">Exportar GeoJSON</button>
     <input type="file" id="importInput" accept=".json,.geojson" />
-
-    <h3>Geocercas</h3>
     <ul id="fenceList"></ul>
+
+    <hr>
+
+    <h3>Gestión de Personal</h3>
+    <button id="addPersonBtn">Añadir personal</button>
+    <button id="listPersonBtn">Ver personal</button>
+    <div id="personList"></div>
+
+    <hr>
+
+    <h3>Actividades</h3>
+    <button id="addActivityBtn">Añadir actividad</button>
+    <button id="listActivityBtn">Ver actividades</button>
+    <div id="activityList"></div>
+
+    <hr>
+
+    <h3>Costo de Mano de Obra</h3>
+    <button id="calcLaborBtn">Calcular costos</button>
+    <div id="laborCost"></div>
+
+    <hr>
+
+    <h3>Reportes</h3>
+    <button id="genReportBtn">Generar reporte</button>
+    <div id="reportSection"></div>
   </aside>
 
   <main>
@@ -185,6 +211,14 @@
       document.getElementById("editBtn").onclick=startEdit;
       document.getElementById("saveEditBtn").onclick=saveEdit;
       document.getElementById("cancelEditBtn").onclick=stopEdit;
+
+      // Botones de módulos adicionales
+      document.getElementById("addPersonBtn").onclick = ()=>alert("Añadir personal (pendiente)");
+      document.getElementById("listPersonBtn").onclick = ()=>alert("Listado de personal (pendiente)");
+      document.getElementById("addActivityBtn").onclick = ()=>alert("Añadir actividad (pendiente)");
+      document.getElementById("listActivityBtn").onclick = ()=>alert("Listado de actividades (pendiente)");
+      document.getElementById("calcLaborBtn").onclick = ()=>alert("Calcular costos de mano de obra (pendiente)");
+      document.getElementById("genReportBtn").onclick = ()=>alert("Generar reporte (pendiente)");
     });
   </script>
 </body>
