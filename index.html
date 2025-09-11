@@ -12,22 +12,22 @@
   <style>
     body { margin:0; font-family: Arial, sans-serif; display:flex; height:100vh; }
     aside { width:260px; background:#f8f8f8; padding:10px; overflow-y:auto; }
-    main { flex:1; }
+    main { flex:1; position: relative; }  /* 👈 necesario para coords */
     #map { height:100%; width:100%; }
     button { display:block; width:100%; margin:4px 0; padding:6px; }
     ul { list-style:none; padding:0; }
     li { padding:4px; border-bottom:1px solid #ddd; cursor:pointer; }
     .coords {
-  position: absolute;
-  bottom: 10px;
-  left: 280px;
-  background: rgba(255,255,255,0.9);
-  padding: 4px 8px;
-  font-size: 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  z-index: 1000;
-}
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.9);
+      padding: 4px 8px;
+      font-size: 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
@@ -50,7 +50,8 @@
   </aside>
 
   <main>
-    main { flex:1; position: relative; }
+    <div id="map"></div>
+    <div class="coords" id="coords">Lat: -, Lng: -</div>
   </main>
 
   <script>
@@ -69,9 +70,13 @@
       map=L.map("map").setView([-1.7279,-77.9076],15);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
       group=L.layerGroup().addTo(map);
+
+      // Mostrar coordenadas al mover mouse
       map.on("mousemove", e=>{
-        document.getElementById("coords").textContent=`Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
+        document.getElementById("coords").textContent=
+          `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
       });
+
       loadFences();
       drawAll();
     }
@@ -142,50 +147,28 @@
 
     // === Edición
     function startEdit(){
-  if(!activeId){ alert("Selecciona una geocerca."); return; }
-  let f=fences.find(x=>x.id===activeId); if(!f) return;
-
-  stopEdit();
-  editing=true; editMarkers=[];
-
-  f.latlngs.forEach(pt=>{
-    let m=L.marker(pt,{draggable:true}).addTo(map);
-    m.on("drag",()=>{
-      let nuevos = editMarkers.map(mm => mm.getLatLng());
-      f._layer.setLatLngs([nuevos]);   // actualizar visualmente
-    });
-    editMarkers.push(m);
-  });
-
-  document.getElementById("saveEditBtn").disabled=false;
-  document.getElementById("cancelEditBtn").disabled=false;
-}
-  function saveEdit(){
-  if(!activeId) return;
-  let f = fences.find(x => x.id === activeId);
-  if(!f) return;
-
-  // 1. Tomar las posiciones nuevas desde los marcadores
-  let nuevos = editMarkers.map(m => m.getLatLng());
-
-  // 2. Asegurar que el polígono quede cerrado
-  if (!nuevos[0].equals(nuevos[nuevos.length-1])) {
-    nuevos.push(nuevos[0]);
-  }
-
-  // 3. Guardarlas en el objeto de la geocerca
-  f.latlngs = nuevos;
-
-  // 4. Persistir en localStorage
-  saveFences();
-
-  // 5. Cerrar edición y redibujar
-  stopEdit();
-  drawAll();
-  alert("Cambios guardados en la geocerca: " + f.name);
-}
-
-
+      if(!activeId){ alert("Selecciona una geocerca."); return; }
+      let f=fences.find(x=>x.id===activeId); if(!f) return;
+      stopEdit();
+      editing=true; editMarkers=[];
+      f.latlngs.forEach((pt,idx)=>{
+        let m=L.marker(pt,{draggable:true}).addTo(map);
+        m.on("drag",()=>{ f.latlngs=editMarkers.map(mm=>mm.getLatLng()); f._layer.setLatLngs([f.latlngs]); });
+        editMarkers.push(m);
+      });
+      document.getElementById("saveEditBtn").disabled=false;
+      document.getElementById("cancelEditBtn").disabled=false;
+    }
+    function saveEdit(){
+      if(!activeId) return;
+      let f=fences.find(x=>x.id===activeId); if(!f) return;
+      let nuevos=editMarkers.map(m=>m.getLatLng());
+      if(!nuevos[0].equals(nuevos[nuevos.length-1])) nuevos.push(nuevos[0]);
+      f.latlngs=nuevos;
+      saveFences();
+      stopEdit(); drawAll();
+      alert("Cambios guardados en: "+f.name);
+    }
     function stopEdit(){
       editMarkers.forEach(m=>map.removeLayer(m)); editMarkers=[];
       editing=false;
