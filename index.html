@@ -206,6 +206,39 @@ function initMap(){
   drawAll();
 }
 document.addEventListener("DOMContentLoaded",initMap);
+function setIdle(){
+  document.getElementById("newBtn").disabled = false;
+  document.getElementById("finishBtn").disabled = true;
+  document.getElementById("cancelBtn").disabled = true;
+  document.getElementById("editBtn").disabled = !activeId;
+  document.getElementById("saveEditBtn").disabled = true;
+  document.getElementById("cancelEditBtn").disabled = true;
+  document.getElementById("renameBtn").disabled = !activeId;
+  document.getElementById("deleteBtn").disabled = !activeId;
+}
+
+function setDrawing(){
+  document.getElementById("newBtn").disabled = true;
+  document.getElementById("finishBtn").disabled = true;
+  document.getElementById("cancelBtn").disabled = false;
+  document.getElementById("editBtn").disabled = true;
+  document.getElementById("saveEditBtn").disabled = true;
+  document.getElementById("cancelEditBtn").disabled = true;
+  document.getElementById("renameBtn").disabled = true;
+  document.getElementById("deleteBtn").disabled = true;
+}
+
+function setEditing(){
+  document.getElementById("newBtn").disabled = true;
+  document.getElementById("finishBtn").disabled = true;
+  document.getElementById("cancelBtn").disabled = true;
+  document.getElementById("editBtn").disabled = true;
+  document.getElementById("saveEditBtn").disabled = false;
+  document.getElementById("cancelEditBtn").disabled = false;
+  document.getElementById("renameBtn").disabled = true;
+  document.getElementById("deleteBtn").disabled = true;
+}
+
 </script>
 </body>
 </html>
