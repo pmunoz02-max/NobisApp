@@ -68,11 +68,15 @@ function setIdle(){
   document.getElementById("editBtn").disabled = !activeId;
   document.getElementById("saveEditBtn").disabled = true;
   document.getElementById("cancelEditBtn").disabled = true;
+  document.getElementById("renameBtn").disabled = !activeId;
+  document.getElementById("deleteBtn").disabled = !activeId;
 }
 function setEditing(){
   document.getElementById("editBtn").disabled = true;
   document.getElementById("saveEditBtn").disabled = false;
   document.getElementById("cancelEditBtn").disabled = false;
+  document.getElementById("renameBtn").disabled = true;
+  document.getElementById("deleteBtn").disabled = true;
 }
 function writeFences(arr){ fences=arr; }
 
@@ -103,14 +107,10 @@ function enterEdit() {
   if (!activeId) { alert("Selecciona una geocerca primero"); return; }
   let f = fences.find(ff=>ff.id===activeId);
   if (!f || !f.__layer) return;
-
-  // limpiar ediciones previas
   if (editMarkers) editMarkers.forEach(m=>map.removeLayer(m));
   editMarkers = [];
-
   let latlngs = f.__layer.getLatLngs()[0];
   editBackup = latlngs.map(p=>L.latLng(p.lat,p.lng));
-
   latlngs.forEach(pt=>{
     let m = L.marker(pt,{draggable:true});
     m.on("drag",()=>{
@@ -120,7 +120,6 @@ function enterEdit() {
     editMarkers.push(m);
     m.addTo(map);
   });
-
   setEditing();
 }
 
@@ -143,16 +142,37 @@ function exitEdit(redraw) {
   setIdle();
 }
 
+// === Renombrar y Eliminar ===
+document.getElementById("renameBtn").onclick=()=>{
+  if(!activeId) return;
+  let f=fences.find(x=>x.id===activeId);
+  if(!f) return;
+  let nuevo=prompt("Nuevo nombre para la geocerca:", f.name);
+  if(nuevo && nuevo.trim()){
+    f.name=nuevo.trim();
+    drawAll();
+  }
+};
+
+document.getElementById("deleteBtn").onclick=()=>{
+  if(!activeId) return;
+  let f=fences.find(x=>x.id===activeId);
+  if(!f) return;
+  if(confirm("¿Eliminar geocerca '"+f.name+"'?")){
+    fences=fences.filter(x=>x.id!==activeId);
+    activeId=null;
+    drawAll();
+  }
+};
+
 // inicializar mapa
 function initMap(){
   map=L.map('map').setView([-1.73,-77.91],14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
   group=L.layerGroup().addTo(map);
-
   map.on("mousemove",e=>{
     document.getElementById("coords").textContent=`Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
   });
-
   drawAll();
 }
 
