@@ -17,7 +17,17 @@
     button { display:block; width:100%; margin:4px 0; padding:6px; }
     ul { list-style:none; padding:0; }
     li { padding:4px; border-bottom:1px solid #ddd; cursor:pointer; }
-    .coords { position:absolute; bottom:5px; left:270px; background:white; padding:4px; font-size:12px; }
+    .coords {
+  position: absolute;
+  bottom: 10px;
+  left: 280px;
+  background: rgba(255,255,255,0.9);
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  z-index: 1000;
+}
   </style>
 </head>
 <body>
@@ -40,15 +50,8 @@
   </aside>
 
   <main>
-  
-<div id="mouseCoords" style="position:absolute; bottom:10px; left:280px; 
-     background:white; border:1px solid #ccc; padding:4px 8px; 
-     font-size:12px; border-radius:4px;">
-  Lat: -, Lng: -
-</div>
-
+    main { flex:1; position: relative; }
   </main>
-  
 
   <script>
     let map, group;
@@ -72,11 +75,7 @@
       loadFences();
       drawAll();
     }
-// Mostrar coordenadas dinámicas al mover el mouse
-map.on("mousemove", function(e) {
-  document.getElementById("mouseCoords").innerText =
-    "Lat: " + e.latlng.lat.toFixed(6) + ", Lng: " + e.latlng.lng.toFixed(6);
-});
+
     // === Dibujar
     function startDrawing(){
       if(editing){ alert("Termina la edición primero."); return; }
@@ -207,3 +206,4 @@ map.on("mousemove", function(e) {
   </script>
 </body>
 </html>
+
