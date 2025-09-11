@@ -165,6 +165,48 @@
         ul.appendChild(li);
       });
     }
+// === Edición con el mouse ===
+function startEdit() {
+  if (!activeId) { alert("Selecciona una geocerca."); return; }
+  let f = fences.find(x => x.id === activeId);
+  if (!f) return;
+
+  editing = true;
+  editMarkers = [];
+  f.__layer = L.polygon(f.latlngs, {color:"red", fillOpacity:0.2}).addTo(map);
+
+  f.latlngs.forEach((pt, idx) => {
+    let m = L.marker(pt, {draggable:true}).addTo(map);
+    m.on("drag", function(e) {
+      f.latlngs[idx] = e.target.getLatLng();
+      f.__layer.setLatLngs([f.latlngs]);
+    });
+    editMarkers.push(m);
+  });
+
+  document.getElementById("saveEditBtn").disabled = false;
+  document.getElementById("cancelEditBtn").disabled = false;
+}
+
+function saveEdit() {
+  if (!activeId) return;
+  let f = fences.find(x => x.id === activeId);
+  if (!f) return;
+
+  saveFences();
+  stopEdit();
+  drawAll();
+}
+
+function stopEdit() {
+  editMarkers.forEach(m => map.removeLayer(m));
+  editMarkers = [];
+  editing = false;
+  drawAll();
+
+  document.getElementById("saveEditBtn").disabled = true;
+  document.getElementById("cancelEditBtn").disabled = true;
+}
 
     // === Eventos UI
     document.addEventListener("DOMContentLoaded", ()=>{
@@ -173,6 +215,16 @@
       document.getElementById("finishBtn").onclick = finalizeDrawing;
       document.getElementById("cancelBtn").onclick = cancelDrawing;
     });
+    document.addEventListener("DOMContentLoaded", ()=>{
+  initMap();
+  document.getElementById("newBtn").onclick = startDrawing;
+  document.getElementById("finishBtn").onclick = finalizeDrawing;
+  document.getElementById("cancelBtn").onclick = cancelDrawing;
+});
+  document.getElementById("editBtn").onclick = startEdit;
+  document.getElementById("saveEditBtn").onclick = saveEdit;
+  document.getElementById("cancelEditBtn").onclick = stopEdit;
+
   </script>
 </body>
 </html>
