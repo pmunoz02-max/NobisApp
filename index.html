@@ -44,6 +44,9 @@
       <div id="coords">Lat: -, Lng: -</div>
     </main>
   </div>
+<div id="coords" style="padding:6px; font-size:12px; background:#fff; border-top:1px solid #ccc;">
+  Mueve el mouse sobre el mapa para ver coordenadas
+</div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -51,22 +54,66 @@
   <script>
     let map, group;
     let tmpMarkers=[], tmpPolyline=null, tmpPoly=null;
-    let editMarkers=[];
-    let activeId=null;
+   let editMarkers = [];
 
-    const STORAGE_KEY="NobisApp_geocercas";
-    function read(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]");}catch(_){return[];}}
-    function write(a){localStorage.setItem(STORAGE_KEY,JSON.stringify(a||[]));}
-    function uid(){return "f_"+Math.random().toString(36).slice(2,9);}
+// Mostrar coordenadas en vivo
+map.on("mousemove", e => {
+  document.getElementById("coords").innerText =
+    "Lat: " + e.latlng.lat.toFixed(6) + ", Lng: " + e.latlng.lng.toFixed(6);
+});
 
-    function initMap() {
-  map = L.map("map").setView([-1.73, -77.91], 15);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "© OpenStreetMap"
-  }).addTo(map);
-  group = L.layerGroup().addTo(map);
+// --- Entrar en modo edición ---
+function enterEdit() {
+  if (!activeId) {
+    alert("Selecciona una geocerca primero.");
+    return;
+  }
+  let arr = readFences();
+  let f = arr.find(x => x.id === activeId);
+  if (!f || !f.__layer) return;
 
+  // Quitar marcadores anteriores
+  editMarkers.forEach(m => map.removeLayer(m));
+  editMarkers = [];
+
+  // Crear marcadores en cada vértice
+  f.__layer.getLatLngs()[0].forEach((pt, i) => {
+    let m = L.marker(pt, { draggable: true }).addTo(map);
+    m.on("drag", () => {
+      let nuevos = editMarkers.map(mm => mm.getLatLng());
+      f.__layer.setLatLngs([nuevos]);
+    });
+    editMarkers.push(m);
+  });
+
+  setEditing();
+}
+
+// --- Guardar cambios ---
+function saveEdit() {
+  if (!activeId) return;
+  let arr = readFences();
+  let f = arr.find(x => x.id === activeId);
+  if (!f) return;
+
+  let nuevos = editMarkers.map(m => m.getLatLng());
+  if (nuevos.length < 3) {
+    alert("Una geocerca debe tener al menos 3 vértices.");
+    return;
+  }
+  f.latlngs = nuevos;
+  writeFences(arr);
+
+  exitEdit(true);
+}
+
+// --- Salir del modo edición ---
+function exitEdit(redraw) {
+  editMarkers.forEach(m => map.removeLayer(m));
+  editMarkers = [];
+  if (redraw) drawAll();
+  setIdle();
+}
   // Mostrar coordenadas en vivo
   map.on("mousemove", e => {
     document.getElementById("coords").innerText =
