@@ -219,32 +219,40 @@
       document.getElementById("editBtn").onclick=startEdit;
       document.getElementById("saveEditBtn").onclick=saveEdit;
       document.getElementById("cancelEditBtn").onclick=stopEdit;
+// Botones de módulos adicionales (con geocerca activa)
+document.getElementById("addPersonBtn").onclick=()=>{
+  let f=fences.find(x=>x.id===activeId);
+  if(!f) return;
+  let nombre=prompt("Nombre del personal a añadir:");
+  if(nombre && nombre.trim()){
+    f.personal.push(nombre.trim());
+    saveFences();
+    renderPersonal(f);
+  }
+};
 
-      // Botones de módulos adicionales (con geocerca activa)
-      document.getElementById("addPersonBtn").onclick=()=>{
-        let f=fences.find(x=>x.id===activeId);
-        alert("Añadir personal a: "+f.name);
-      };
-      document.getElementById("listPersonBtn").onclick=()=>{
-        let f=fences.find(x=>x.id===activeId);
-        alert("Personal en: "+f.name+" → "+JSON.stringify(f.personal));
-      };
-      document.getElementById("addActivityBtn").onclick=()=>{
-        let f=fences.find(x=>x.id===activeId);
-        alert("Añadir actividad a: "+f.name);
-      };
-      document.getElementById("listActivityBtn").onclick=()=>{
-        let f=fences.find(x=>x.id===activeId);
-        alert("Actividades en: "+f.name+" → "+JSON.stringify(f.actividades));
-      };
-      document.getElementById("calcLaborBtn").onclick=()=>{
-        let f=fences.find(x=>x.id===activeId);
-        alert("Calcular costos de mano de obra en: "+f.name);
-      };
-      document.getElementById("genReportBtn").onclick=()=>{
-        let f=fences.find(x=>x.id===activeId);
-        alert("Generar reporte de: "+f.name);
-      };
+document.getElementById("listPersonBtn").onclick=()=>{
+  let f=fences.find(x=>x.id===activeId);
+  if(!f) return;
+  renderPersonal(f);
+};
+
+// Función para mostrar el personal en el panel
+function renderPersonal(f){
+  let div=document.getElementById("personList");
+  div.innerHTML="";
+  if(!f.personal.length){
+    div.textContent="(Sin personal registrado)";
+    return;
+  }
+  let ul=document.createElement("ul");
+  f.personal.forEach(p=>{
+    let li=document.createElement("li");
+    li.textContent=p;
+    ul.appendChild(li);
+  });
+  div.appendChild(ul);
+};
 
       // Deshabilitar al inicio
       ["addPersonBtn","listPersonBtn","addActivityBtn","listActivityBtn","calcLaborBtn","genReportBtn"]
