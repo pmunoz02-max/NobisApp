@@ -60,6 +60,43 @@ let activeId=null;
 let drawing=false;
 let tempPoints=[]; 
 let tempLine=null, tempPoly=null;
+// === Crear por Lat/Lng ===
+document.getElementById("byCoordsBtn").onclick=()=>{
+  let raw=prompt(
+    "Pega coordenadas Lat,Lng (una por línea o separadas con ';'):\n" +
+    "Ejemplo:\n-1.2345,-78.1234\n-1.2350,-78.1200\n-1.2360,-78.1210"
+  );
+  if(!raw) return;
+
+  let pts=[];
+  let lines=raw.split(/[\n;]/);
+  lines.forEach(l=>{
+    let parts=l.trim().split(/[, ]+/);
+    if(parts.length>=2){
+      let lat=parseFloat(parts[0].replace(",","."));
+      let lng=parseFloat(parts[1].replace(",","."));
+      if(!isNaN(lat)&&!isNaN(lng)){
+        // corrección automática si vienen como lon,lat
+        if(Math.abs(lat)>90){ let t=lat; lat=lng; lng=t; }
+        pts.push([lat,lng]);
+      }
+    }
+  });
+
+  if(pts.length<3){ 
+    alert("Se requieren al menos 3 coordenadas válidas."); 
+    return; 
+  }
+
+  let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
+  if(!name) return;
+
+  let f={id:Date.now().toString(), name:name, latlngs:pts.map(p=>L.latLng(p[0],p[1]))};
+  fences.push(f);
+  activeId=f.id;
+  drawAll();
+  map.fitBounds(f.__layer.getBounds());
+};
 
 // inicializar mapa
 function initMap(){
