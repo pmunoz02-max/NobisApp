@@ -57,6 +57,10 @@ let map, group;
 let fences=[];
 let activeId=null;
 
+let drawing=false;
+let tempPoints=[]; 
+let tempLine=null, tempPoly=null;
+
 // inicializar mapa
 function initMap(){
   map=L.map('map').setView([-1.73,-77.91],14);
@@ -98,6 +102,53 @@ function renderList(){
   });
 }
 
+// === Crear geocerca manual ===
+document.getElementById("newBtn").onclick=()=>{
+  drawing=true;
+  tempPoints=[];
+  if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
+  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
+  map.on("click",addTempPoint);
+  document.getElementById("finishBtn").disabled=false;
+  document.getElementById("cancelBtn").disabled=false;
+};
+
+function addTempPoint(e){
+  tempPoints.push(e.latlng);
+  if(tempLine){ tempLine.setLatLngs(tempPoints); }
+  else{ tempLine=L.polyline(tempPoints,{color:"blue",dashArray:"5,5"}).addTo(map); }
+  if(tempPoints.length>=3){
+    if(tempPoly){ tempPoly.setLatLngs(tempPoints); }
+    else{ tempPoly=L.polygon(tempPoints,{color:"blue",weight:1,fillOpacity:0.1}).addTo(map); }
+  }
+}
+
+document.getElementById("finishBtn").onclick=()=>{
+  if(tempPoints.length<3){ alert("Se requieren al menos 3 puntos."); return; }
+  let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
+  if(!name) return;
+  let f={id:Date.now().toString(), name:name, latlngs:tempPoints};
+  fences.push(f);
+  map.off("click",addTempPoint);
+  drawing=false;
+  tempPoints=[]; 
+  if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
+  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
+  document.getElementById("finishBtn").disabled=true;
+  document.getElementById("cancelBtn").disabled=true;
+  drawAll();
+};
+
+document.getElementById("cancelBtn").onclick=()=>{
+  drawing=false;
+  tempPoints=[]; 
+  if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
+  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
+  map.off("click",addTempPoint);
+  document.getElementById("finishBtn").disabled=true;
+  document.getElementById("cancelBtn").disabled=true;
+};
+
 // === Gestión de personal ===
 document.getElementById("addPersonBtn").onclick=()=>{
   let f=fences.find(x=>x.id===activeId);
@@ -115,7 +166,6 @@ document.getElementById("listPersonBtn").onclick=()=>{
   renderPersonal(f);
 };
 
-// === Mostrar personal en el panel ===
 function renderPersonal(f){
   let div=document.getElementById("personList");
   div.innerHTML="";
