@@ -133,25 +133,44 @@
 
     // === Edición
     function startEdit(){
-      if(!activeId){ alert("Selecciona una geocerca."); return; }
-      let f=fences.find(x=>x.id===activeId); if(!f) return;
-      stopEdit();
-      editing=true; editMarkers=[];
-      f.latlngs.forEach((pt,idx)=>{
-        let m=L.marker(pt,{draggable:true}).addTo(map);
-        m.on("drag",()=>{ f.latlngs=editMarkers.map(mm=>mm.getLatLng()); f._layer.setLatLngs([f.latlngs]); });
-        editMarkers.push(m);
-      });
-      document.getElementById("saveEditBtn").disabled=false;
-      document.getElementById("cancelEditBtn").disabled=false;
-    }
+  if(!activeId){ alert("Selecciona una geocerca."); return; }
+  let f=fences.find(x=>x.id===activeId); if(!f) return;
+
+  stopEdit();
+  editing=true; editMarkers=[];
+
+  f.latlngs.forEach(pt=>{
+    let m=L.marker(pt,{draggable:true}).addTo(map);
+    m.on("drag",()=>{
+      let nuevos = editMarkers.map(mm => mm.getLatLng());
+      f._layer.setLatLngs([nuevos]);   // actualizar visualmente
+    });
+    editMarkers.push(m);
+  });
+
+  document.getElementById("saveEditBtn").disabled=false;
+  document.getElementById("cancelEditBtn").disabled=false;
+}
     function saveEdit(){
-      if(!activeId) return;
-      let f=fences.find(x=>x.id===activeId); if(!f) return;
-      f.latlngs=editMarkers.map(m=>m.getLatLng());
-      saveFences();
-      stopEdit(); drawAll();
-    }
+  if(!activeId) return;
+  let f = fences.find(x => x.id === activeId);
+  if(!f) return;
+
+  // 1. Tomar las posiciones nuevas desde los marcadores
+  let nuevos = editMarkers.map(m => m.getLatLng());
+
+  // 2. Guardarlas en el objeto de la geocerca
+  f.latlngs = nuevos;
+
+  // 3. Persistir en localStorage
+  saveFences();
+
+  // 4. Cerrar edición y redibujar
+  stopEdit();
+  drawAll();
+  alert("Cambios guardados en la geocerca: " + f.name);
+}
+
     function stopEdit(){
       editMarkers.forEach(m=>map.removeLayer(m)); editMarkers=[];
       editing=false;
