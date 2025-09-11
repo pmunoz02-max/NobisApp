@@ -151,7 +151,7 @@
   document.getElementById("saveEditBtn").disabled=false;
   document.getElementById("cancelEditBtn").disabled=false;
 }
-    function saveEdit(){
+  function saveEdit(){
   if(!activeId) return;
   let f = fences.find(x => x.id === activeId);
   if(!f) return;
@@ -159,17 +159,23 @@
   // 1. Tomar las posiciones nuevas desde los marcadores
   let nuevos = editMarkers.map(m => m.getLatLng());
 
-  // 2. Guardarlas en el objeto de la geocerca
+  // 2. Asegurar que el polígono quede cerrado
+  if (!nuevos[0].equals(nuevos[nuevos.length-1])) {
+    nuevos.push(nuevos[0]);
+  }
+
+  // 3. Guardarlas en el objeto de la geocerca
   f.latlngs = nuevos;
 
-  // 3. Persistir en localStorage
+  // 4. Persistir en localStorage
   saveFences();
 
-  // 4. Cerrar edición y redibujar
+  // 5. Cerrar edición y redibujar
   stopEdit();
   drawAll();
   alert("Cambios guardados en la geocerca: " + f.name);
 }
+
 
     function stopEdit(){
       editMarkers.forEach(m=>map.removeLayer(m)); editMarkers=[];
