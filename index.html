@@ -60,6 +60,9 @@ let activeId=null;
 let drawing=false;
 let tempPoints=[]; 
 let tempLine=null, tempPoly=null;
+let editMarkers = [];
+let editBackup = null;
+
 // === Crear por Lat/Lng ===
 document.getElementById("byCoordsBtn").onclick=()=>{
   let raw=prompt(
@@ -97,6 +100,53 @@ document.getElementById("byCoordsBtn").onclick=()=>{
   drawAll();
   map.fitBounds(f.__layer.getBounds());
 };
+// === Edición de Geocercas ===
+function enterEdit() {
+  if (!activeId) { alert("Selecciona una geocerca primero"); return; }
+  let f = fences.find(ff=>ff.id===activeId);
+  if (!f || !f.__layer) return;
+
+  // limpiar ediciones previas
+  if (editMarkers) editMarkers.forEach(m=>map.removeLayer(m));
+  editMarkers = [];
+
+  let latlngs = f.__layer.getLatLngs()[0];
+  editBackup = latlngs.map(p=>L.latLng(p.lat,p.lng));
+
+  latlngs.forEach((pt, idx)=>{
+    let m = L.marker(pt,{draggable:true});
+    m.on("drag",()=>{
+      let cur = editMarkers.map(mm=>mm.getLatLng());
+      f.__layer.setLatLngs([cur]);
+    });
+    editMarkers.push(m);
+    m.addTo(map);
+  });
+
+  setEditing();
+}
+
+function saveEdit() {
+  if (!activeId) return;
+  let f = fences.find(ff=>ff.id===activeId);
+  if (!f || !f.__layer) return;
+
+  let cur = editMarkers.map(m=>m.getLatLng());
+  if (cur.length<3){ alert("Mínimo 3 vértices."); return; }
+
+  f.latlngs = cur;
+  writeFences(fences);
+
+  exitEdit(true);
+}
+
+function exitEdit(redraw) {
+  if (editMarkers) editMarkers.forEach(m=>map.removeLayer(m));
+  editMarkers = [];
+  editBackup = null;
+  if (redraw) drawAll();
+  setIdle();
+}
 
 // inicializar mapa
 function initMap(){
@@ -138,6 +188,10 @@ function renderList(){
     ul.appendChild(li);
   });
 }
+document.getElementById("editBtn").onclick = enterEdit;
+document.getElementById("saveEditBtn").onclick = saveEdit;
+document.getElementById("cancelEditBtn").onclick = ()=>exitEdit(false);
+
 
 // === Crear geocerca manual ===
 document.getElementById("newBtn").onclick=()=>{
