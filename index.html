@@ -97,7 +97,6 @@
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
       group=L.layerGroup().addTo(map);
 
-      // Mostrar coordenadas al mover mouse
       map.on("mousemove", e=>{
         document.getElementById("coords").textContent=
           `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
@@ -136,7 +135,7 @@
       let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
       if(!name) name="Geocerca "+(fences.length+1);
       let id=uid();
-      fences.push({id,name,latlngs:pts});
+      fences.push({id,name,latlngs:pts, personal:[], actividades:[], costos:[], reportes:[]});
       saveFences();
       clearTemp(); drawAll(); drawing=false;
       document.getElementById("finishBtn").disabled=true;
@@ -169,6 +168,15 @@
       document.getElementById("editBtn").disabled=!activeId;
       document.getElementById("renameBtn").disabled=!activeId;
       document.getElementById("deleteBtn").disabled=!activeId;
+
+      // Habilitar / deshabilitar módulos adicionales
+      let enabled = !!activeId;
+      document.getElementById("addPersonBtn").disabled=!enabled;
+      document.getElementById("listPersonBtn").disabled=!enabled;
+      document.getElementById("addActivityBtn").disabled=!enabled;
+      document.getElementById("listActivityBtn").disabled=!enabled;
+      document.getElementById("calcLaborBtn").disabled=!enabled;
+      document.getElementById("genReportBtn").disabled=!enabled;
     }
 
     // === Edición
@@ -212,13 +220,35 @@
       document.getElementById("saveEditBtn").onclick=saveEdit;
       document.getElementById("cancelEditBtn").onclick=stopEdit;
 
-      // Botones de módulos adicionales
-      document.getElementById("addPersonBtn").onclick = ()=>alert("Añadir personal (pendiente)");
-      document.getElementById("listPersonBtn").onclick = ()=>alert("Listado de personal (pendiente)");
-      document.getElementById("addActivityBtn").onclick = ()=>alert("Añadir actividad (pendiente)");
-      document.getElementById("listActivityBtn").onclick = ()=>alert("Listado de actividades (pendiente)");
-      document.getElementById("calcLaborBtn").onclick = ()=>alert("Calcular costos de mano de obra (pendiente)");
-      document.getElementById("genReportBtn").onclick = ()=>alert("Generar reporte (pendiente)");
+      // Botones de módulos adicionales (con geocerca activa)
+      document.getElementById("addPersonBtn").onclick=()=>{
+        let f=fences.find(x=>x.id===activeId);
+        alert("Añadir personal a: "+f.name);
+      };
+      document.getElementById("listPersonBtn").onclick=()=>{
+        let f=fences.find(x=>x.id===activeId);
+        alert("Personal en: "+f.name+" → "+JSON.stringify(f.personal));
+      };
+      document.getElementById("addActivityBtn").onclick=()=>{
+        let f=fences.find(x=>x.id===activeId);
+        alert("Añadir actividad a: "+f.name);
+      };
+      document.getElementById("listActivityBtn").onclick=()=>{
+        let f=fences.find(x=>x.id===activeId);
+        alert("Actividades en: "+f.name+" → "+JSON.stringify(f.actividades));
+      };
+      document.getElementById("calcLaborBtn").onclick=()=>{
+        let f=fences.find(x=>x.id===activeId);
+        alert("Calcular costos de mano de obra en: "+f.name);
+      };
+      document.getElementById("genReportBtn").onclick=()=>{
+        let f=fences.find(x=>x.id===activeId);
+        alert("Generar reporte de: "+f.name);
+      };
+
+      // Deshabilitar al inicio
+      ["addPersonBtn","listPersonBtn","addActivityBtn","listActivityBtn","calcLaborBtn","genReportBtn"]
+        .forEach(id => document.getElementById(id).disabled = true);
     });
   </script>
 </body>
