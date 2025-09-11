@@ -1,311 +1,212 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Geocercas (Nobis)</title>
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
-    body, html {margin:0; padding:0; height:100%; font-family: Arial, sans-serif;}
-    .app {display:grid; grid-template-columns:300px 1fr; height:100%;}
-    aside {background:#f9f9f9; padding:10px; border-right:1px solid #ccc; overflow:auto;}
-    #map {width:100%; height:100%;}
-    button {display:block; width:100%; margin:5px 0; padding:8px; font-size:14px; cursor:pointer;}
-    button:disabled {opacity:.5; cursor:not-allowed;}
-    #coords {position:absolute; bottom:10px; left:310px; background:rgba(255,255,255,0.9); padding:4px 8px; border:1px solid #ccc; border-radius:4px; font-size:12px;}
-    ul {list-style:none; padding:0; margin:0; border:1px solid #ddd; border-radius:6px; max-height:200px; overflow:auto;}
-    li {padding:6px 8px; border-bottom:1px solid #eee; cursor:pointer;}
-    li:last-child {border-bottom:none;}
+    body { margin:0; display:flex; height:100vh; font-family:Arial, sans-serif;}
+    aside { width:260px; background:#f9f9f9; border-right:1px solid #ddd; padding:10px; overflow-y:auto;}
+    main { flex:1; display:flex; flex-direction:column;}
+    #map { flex:1; }
+    #coords { padding:6px; font-size:13px; background:#fff; border-top:1px solid #ccc;}
+    h2 { font-size:15px; margin:10px 0;}
+    button { display:block; width:100%; margin:4px 0; padding:6px; cursor:pointer;}
+    button:disabled { opacity:.5; cursor:not-allowed;}
+    ul { list-style:none; padding:0; margin:0;}
+    ul li { padding:4px; border-bottom:1px solid #eee; cursor:pointer;}
   </style>
 </head>
 <body>
-  <div class="app">
-    <aside>
-      <h3>Acciones</h3>
-      <button id="newBtn">Nueva</button>
-      <button id="finishBtn" disabled>Finalizar</button>
-      <button id="cancelBtn" disabled>Cancelar</button>
-      <button id="editBtn" disabled>Editar</button>
-      <button id="saveEditBtn" disabled>Guardar cambios</button>
-      <button id="cancelEditBtn" disabled>Cancelar edición</button>
-      <button id="renameBtn" disabled>Renombrar</button>
-      <button id="deleteBtn" disabled>Eliminar</button>
-      <button id="coordsBtn">Geocerca (Lat/Lng)</button>
-      <button id="exportBtn">Exportar GeoJSON</button>
-      <input type="file" id="importInput" accept=".geojson,.json"/>
-      <h3>Geocercas</h3>
-      <ul id="fenceList"></ul>
-    </aside>
-    <main>
-     <main>
-  <div id="map" style="height:90vh; width:100%;"></div>
-  <div id="coords" style="padding:6px; font-size:12px; background:#fff; border-top:1px solid #ccc;">
-    Mueve el mouse sobre el mapa para ver coordenadas
-  </div>
-</main>
+  <aside>
+    <h2>Acciones</h2>
+    <button id="newBtn">Nueva</button>
+    <button id="finishBtn" disabled>Finalizar</button>
+    <button id="cancelBtn" disabled>Cancelar</button>
+    <button id="editBtn" disabled>Editar</button>
+    <button id="saveEditBtn" disabled>Guardar cambios</button>
+    <button id="cancelEditBtn" disabled>Cancelar edición</button>
+    <button id="renameBtn" disabled>Renombrar</button>
+    <button id="deleteBtn" disabled>Eliminar</button>
+    <button id="latlngBtn">Geocerca (Lat/Lng)</button>
+    <button id="exportBtn">Exportar GeoJSON</button>
+    <input id="importInput" type="file" accept=".geojson,.json"/>
 
+    <h2>Geocercas</h2>
+    <ul id="fenceList"></ul>
+  </aside>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <main>
+    <div id="map"></div>
+    <div id="coords">Mueve el mouse sobre el mapa</div>
+  </main>
 
-  <script>
-    let map, group;
-    let tmpMarkers=[], tmpPolyline=null, tmpPoly=null;
-   let editMarkers = [];
+<script>
+let map, group;
+let activeId=null;
+let drawing=false, editing=false;
+let tmpPoints=[];
+let editMarkers=[];
+let fences=JSON.parse(localStorage.getItem("fences")||"[]");
 
-// Mostrar coordenadas en vivo
-map.on("mousemove", e => {
-  document.getElementById("coords").innerText =
-    "Lat: " + e.latlng.lat.toFixed(6) + ", Lng: " + e.latlng.lng.toFixed(6);
-});
+function saveFences(){ localStorage.setItem("fences", JSON.stringify(fences)); }
 
-// --- Entrar en modo edición ---
-function enterEdit() {
-  if (!activeId) {
-    alert("Selecciona una geocerca primero.");
-    return;
-  }
-  let arr = readFences();
-  let f = arr.find(x => x.id === activeId);
-  if (!f || !f.__layer) return;
+function drawAll(){
+  group.clearLayers();
+  fences.forEach(f=>{
+    let poly=L.polygon(f.latlngs,{color:"purple"}).addTo(group);
+    poly.bindTooltip(f.name,{permanent:true,direction:"center"});
+    poly.on("click",()=>{ activeId=f.id; renderList(); });
+    f._layer=poly;
+  });
+  renderList();
+}
 
-  // Quitar marcadores anteriores
-  editMarkers.forEach(m => map.removeLayer(m));
-  editMarkers = [];
+function renderList(){
+  let ul=document.getElementById("fenceList");
+  ul.innerHTML="";
+  fences.forEach(f=>{
+    let li=document.createElement("li");
+    li.textContent=f.name;
+    li.onclick=()=>{ activeId=f.id; map.fitBounds(f._layer.getBounds()); renderList(); };
+    ul.appendChild(li);
+  });
+  document.getElementById("editBtn").disabled=!activeId;
+  document.getElementById("renameBtn").disabled=!activeId;
+  document.getElementById("deleteBtn").disabled=!activeId;
+}
 
-  // Crear marcadores en cada vértice
-  f.__layer.getLatLngs()[0].forEach((pt, i) => {
-    let m = L.marker(pt, { draggable: true }).addTo(map);
-    m.on("drag", () => {
-      let nuevos = editMarkers.map(mm => mm.getLatLng());
-      f.__layer.setLatLngs([nuevos]);
+// === Dibujo manual
+function startDrawing(){
+  drawing=true; tmpPoints=[];
+  map.on("click", addPoint);
+  document.getElementById("finishBtn").disabled=true;
+  document.getElementById("cancelBtn").disabled=false;
+}
+function addPoint(e){
+  tmpPoints.push(e.latlng);
+  if(tmpPoints.length>=3){ document.getElementById("finishBtn").disabled=false; }
+  L.polyline(tmpPoints,{color:"blue",dashArray:"4"}).addTo(group);
+}
+function finishDrawing(){
+  if(tmpPoints.length<3){ alert("Min 3 puntos"); return; }
+  let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
+  if(!name) return;
+  let id=Date.now().toString();
+  fences.push({id,name,latlngs:tmpPoints});
+  saveFences();
+  map.off("click", addPoint); drawing=false; tmpPoints=[];
+  drawAll();
+}
+function cancelDrawing(){ map.off("click",addPoint); drawing=false; tmpPoints=[]; drawAll(); }
+
+// === Edición
+function startEdit(){
+  if(!activeId) return;
+  editing=true;
+  document.getElementById("saveEditBtn").disabled=false;
+  document.getElementById("cancelEditBtn").disabled=false;
+  let f=fences.find(x=>x.id===activeId);
+  if(!f) return;
+  editMarkers=[];
+  f.latlngs.forEach((p,i)=>{
+    let m=L.marker(p,{draggable:true}).addTo(map);
+    m.on("drag",()=>{
+      f.latlngs=editMarkers.map(mm=>mm.getLatLng());
+      f._layer.setLatLngs(f.latlngs);
     });
     editMarkers.push(m);
   });
-
-  setEditing();
+}
+function saveEdit(){
+  if(!activeId) return;
+  let f=fences.find(x=>x.id===activeId);
+  if(!f) return;
+  f.latlngs=editMarkers.map(m=>m.getLatLng());
+  saveFences();
+  cancelEdit();
+  drawAll();
+}
+function cancelEdit(){
+  editMarkers.forEach(m=>map.removeLayer(m));
+  editMarkers=[]; editing=false;
+  document.getElementById("saveEditBtn").disabled=true;
+  document.getElementById("cancelEditBtn").disabled=true;
 }
 
-// --- Guardar cambios ---
-function saveEdit() {
-  if (!activeId) return;
-  let arr = readFences();
-  let f = arr.find(x => x.id === activeId);
-  if (!f) return;
-
-  let nuevos = editMarkers.map(m => m.getLatLng());
-  if (nuevos.length < 3) {
-    alert("Una geocerca debe tener al menos 3 vértices.");
-    return;
-  }
-  f.latlngs = nuevos;
-  writeFences(arr);
-
-  exitEdit(true);
+// === CRUD
+function deleteFence(){
+  if(!activeId) return;
+  fences=fences.filter(f=>f.id!==activeId);
+  saveFences(); activeId=null; drawAll();
+}
+function renameFence(){
+  let f=fences.find(x=>x.id===activeId); if(!f) return;
+  let nn=prompt("Nuevo nombre:",f.name); if(nn){ f.name=nn; saveFences(); drawAll();}
 }
 
-// --- Salir del modo edición ---
-function exitEdit(redraw) {
-  editMarkers.forEach(m => map.removeLayer(m));
-  editMarkers = [];
-  if (redraw) drawAll();
-  setIdle();
+// === Crear por LatLng
+function createByLatLng(){
+  let raw=prompt("Pega coordenadas Lat,Lng separadas por ;\nEj: -1.23,-77.9; -1.24,-77.91; -1.25,-77.92");
+  if(!raw) return;
+  let pts=[];
+  raw.split(";").forEach(s=>{
+    let p=s.split(",");
+    if(p.length==2){ pts.push({lat:parseFloat(p[0]),lng:parseFloat(p[1])}); }
+  });
+  if(pts.length<3) return alert("Min 3 coordenadas");
+  let name=prompt("Nombre de la geocerca:","GeoLatLng "+(fences.length+1));
+  fences.push({id:Date.now().toString(),name,latlngs:pts}); saveFences(); drawAll();
 }
-  // Mostrar coordenadas en vivo
-  map.on("mousemove", e => {
-    document.getElementById("coords").innerText =
-      "Lat: " + e.latlng.lat.toFixed(5) + ", Lng: " + e.latlng.lng.toFixed(5);
+
+// === Export/Import
+function exportGeo(){
+  let blob=new Blob([JSON.stringify(fences,null,2)],{type:"application/json"});
+  let a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download="geocercas.geojson"; a.click();
+}
+function importGeo(e){
+  let file=e.target.files[0]; if(!file) return;
+  let r=new FileReader();
+  r.onload=function(){ 
+    let arr=JSON.parse(r.result); if(Array.isArray(arr)){ fences=arr; saveFences(); drawAll(); }
+  };
+  r.readAsText(file);
+}
+
+// === Inicialización
+function initMap(){
+  map=L.map("map").setView([-1.73,-77.91],15);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+  group=L.layerGroup().addTo(map);
+
+  // Coordenadas al mover mouse
+  map.on("mousemove", e=>{
+    document.getElementById("coords").innerText="Lat: "+e.latlng.lat.toFixed(6)+", Lng: "+e.latlng.lng.toFixed(6);
   });
 
   // Botones
-  document.getElementById("newBtn").onclick = startDraw;
-  document.getElementById("finishBtn").onclick = finishDraw;
-  document.getElementById("cancelBtn").onclick = cancelDraw;
-  document.getElementById("editBtn").onclick = enterEdit;
-  document.getElementById("saveEditBtn").onclick = saveEdit;
-  document.getElementById("cancelEditBtn").onclick = () => exitEdit(false);
-  document.getElementById("renameBtn").onclick = renameFence;
-  document.getElementById("deleteBtn").onclick = deleteFence;
-  document.getElementById("coordsBtn").onclick = createByCoords;
-  document.getElementById("exportBtn").onclick = exportGeo;
-  document.getElementById("importInput").onchange = importGeo;
-
-  renderAll();
-}
-
-// --- Edición de polígonos ---
-function enterEdit() {
-  if (!activeId) return;
-  let arr = read();
-  let f = arr.find(x => x.id === activeId);
-  if (!f) return;
-
-  editMarkers = [];
-  f.latlngs.forEach((p, i) => {
-    let m = L.marker(p, { draggable: true }).addTo(map);
-    m.on("drag", () => {
-      f.latlngs = editMarkers.map(mm => mm.getLatLng());
-      f.__layer.setLatLngs(f.latlngs);
-    });
-    editMarkers.push(m);
-  });
-
-  setState("editing");
-}
-
-function saveEdit() {
-  if (!activeId) return;
-  let arr = read();
-  let f = arr.find(x => x.id === activeId);
-  if (!f) return;
-
-  f.latlngs = editMarkers.map(m => m.getLatLng());
-  write(arr);
-  exitEdit(true);
-}
-
-function exitEdit(redraw) {
-  editMarkers.forEach(m => map.removeLayer(m));
-  editMarkers = [];
-  if (redraw) renderAll();
-  setState("idle");
-}
-
-
-    function startDraw(){
-      clearTemp();
-      tmpMarkers=[];
-      map.on("click",addPoint);
-      setState("drawing");
-    }
-    function addPoint(e){
-      let m=L.circleMarker(e.latlng,{radius:5,color:"#6366f1",fillColor:"#818cf8",fillOpacity:1}).addTo(map);
-      tmpMarkers.push(m);
-      let pts=tmpMarkers.map(m=>m.getLatLng());
-      if(tmpPolyline) tmpPolyline.setLatLngs(pts);
-      else tmpPolyline=L.polyline(pts,{color:"#6366f1",dashArray:"4 4"}).addTo(map);
-      if(pts.length>=3){
-        if(tmpPoly) tmpPoly.setLatLngs(pts);
-        else tmpPoly=L.polygon(pts,{color:"#a78bfa",weight:2,fillOpacity:.2}).addTo(map);
-        document.getElementById("finishBtn").disabled=false;
-      }
-    }
-    function cancelDraw(){
-      map.off("click",addPoint); clearTemp(); setState("idle");
-    }
-    function finishDraw(){
-      let pts=tmpMarkers.map(m=>m.getLatLng());
-      if(pts.length<3) return alert("Agrega mínimo 3 puntos");
-      let name=prompt("Nombre de la geocerca:")||"Geocerca";
-      let arr=read(); arr.push({id:uid(),name,latlngs:pts}); write(arr);
-      map.off("click",addPoint); clearTemp(); renderAll(); setState("idle");
-    }
-    function clearTemp(){
-      tmpMarkers.forEach(m=>map.removeLayer(m)); tmpMarkers=[];
-      if(tmpPolyline){map.removeLayer(tmpPolyline); tmpPolyline=null;}
-      if(tmpPoly){map.removeLayer(tmpPoly); tmpPoly=null;}
-    }
-
-    function renderAll(){
-      group.clearLayers();
-      let arr=read(); let list=document.getElementById("fenceList"); list.innerHTML="";
-      arr.forEach(f=>{
-        let poly=L.polygon(f.latlngs,{color:"#7c3aed",weight:2,fillOpacity:.15}).addTo(group);
-        poly.bindTooltip(f.name,{permanent:true,direction:"center"});
-        poly.on("click",()=>{activeId=f.id; renderAll();});
-        let li=document.createElement("li"); li.textContent=f.name; li.onclick=()=>{activeId=f.id; renderAll(); zoomTo(f);};
-        if(f.id===activeId) li.style.fontWeight="bold";
-        list.appendChild(li);
-      });
-      setState("idle");
-    }
-    function zoomTo(f){ if(f&&f.latlngs) map.fitBounds(L.polygon(f.latlngs).getBounds(),{padding:[20,20]}); }
-
-    function enterEdit(){
-      if(!activeId) return;
-      let arr=read(); let f=arr.find(x=>x.id===activeId); if(!f) return;
-      editMarkers=[]; f.latlngs.forEach((p,i)=>{
-        let m=L.marker(p,{draggable:true}).addTo(map);
-        m.on("drag",()=>{ f.latlngs=editMarkers.map(mm=>mm.getLatLng()); poly.setLatLngs(f.latlngs); });
-        editMarkers.push(m);
-      });
-      setState("editing");
-    }
-    function saveEdit(){
-      if(!activeId) return;
-      let arr=read(); let f=arr.find(x=>x.id===activeId); if(!f) return;
-      f.latlngs=editMarkers.map(m=>m.getLatLng()); write(arr);
-      exitEdit(true);
-    }
-    function exitEdit(redraw){ editMarkers.forEach(m=>map.removeLayer(m)); editMarkers=[]; if(redraw) renderAll(); setState("idle"); }
-
-    function renameFence(){ if(!activeId) return; let arr=read(); let f=arr.find(x=>x.id===activeId); let nn=prompt("Nuevo nombre:",f.name)||f.name; f.name=nn; write(arr); renderAll();}
-    function deleteFence(){ if(!activeId) return; let arr=read().filter(x=>x.id!==activeId); write(arr); activeId=null; renderAll(); }
-
-    function createByCoords(){
-      let raw=prompt("Pega coordenadas Lat,Lng separadas por ';' o saltos de línea:"); if(!raw) return;
-      let pts=[]; raw.split(/[;\n]+/).forEach(seg=>{
-        let m=seg.match(/-?\d+(\.\d+)?/g); if(m&&m.length>=2){ let a=parseFloat(m[0]),b=parseFloat(m[1]); if(Math.abs(a)<=90) pts.push([a,b]); else pts.push([b,a]); }
-      });
-      if(pts.length<3) return alert("Se requieren al menos 3 puntos");
-      let name=prompt("Nombre de la geocerca:")||"Geocerca"; let arr=read(); arr.push({id:uid(),name,latlngs:pts}); write(arr); renderAll();
-    }
-
-    function exportGeo(){
-      let arr=read(); let fc={type:"FeatureCollection",features:[]};
-      arr.forEach(f=>{
-        let coords=f.latlngs.map(p=>[p.lng||p[1],p.lat||p[0]]);
-        coords.push(coords[0]);
-        fc.features.push({type:"Feature",properties:{id:f.id,name:f.name},geometry:{type:"Polygon",coordinates:[coords]}});
-      });
-      let blob=new Blob([JSON.stringify(fc)],{type:"application/geo+json"}); let a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="geocercas.geojson"; a.click();
-    }
-    function importGeo(e){
-      let f=e.target.files[0]; if(!f) return;
-      let r=new FileReader(); r.onload=()=>{ try{ let gj=JSON.parse(r.result); let arr=read();
-        (gj.features||[]).forEach(ft=>{ if(ft.geometry&&ft.geometry.type==="Polygon"){ let ring=ft.geometry.coordinates[0]; let pts=ring.map(c=>({lat:c[1],lng:c[0]})); if(pts.length>=3) arr.push({id:uid(),name:ft.properties.name||"Geo importada",latlngs:pts}); } });
-        write(arr); renderAll(); }catch(_){alert("GeoJSON inválido");} };
-      r.readAsText(f);
-    }
-
-    function setState(st){
-      document.getElementById("newBtn").disabled=(st!=="idle");
-      document.getElementById("finishBtn").disabled=(st!=="drawing"||tmpMarkers.length<3);
-      document.getElementById("cancelBtn").disabled=(st!=="drawing");
-      document.getElementById("editBtn").disabled=(!activeId||st!=="idle");
-      document.getElementById("saveEditBtn").disabled=(st!=="editing");
-      document.getElementById("cancelEditBtn").disabled=(st!=="editing");
-      document.getElementById("renameBtn").disabled=(!activeId||st!=="idle");
-      document.getElementById("deleteBtn").disabled=(!activeId||st!=="idle");
-    }
-
-    document.addEventListener("DOMContentLoaded", initMap);
-    function initMap() {
-  map = L.map("map").setView([-1.7307, -77.9122], 15);
-
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap contributors"
-  }).addTo(map);
-
-  group = L.layerGroup().addTo(map);
-
-  // Mostrar coordenadas al mover el mouse
-  map.on("mousemove", function (e) {
-    document.getElementById("coords").innerText =
-      "Lat: " + e.latlng.lat.toFixed(6) + ", Lng: " + e.latlng.lng.toFixed(6);
-  });
+  document.getElementById("newBtn").onclick=startDrawing;
+  document.getElementById("finishBtn").onclick=finishDrawing;
+  document.getElementById("cancelBtn").onclick=cancelDrawing;
+  document.getElementById("editBtn").onclick=startEdit;
+  document.getElementById("saveEditBtn").onclick=saveEdit;
+  document.getElementById("cancelEditBtn").onclick=cancelEdit;
+  document.getElementById("deleteBtn").onclick=deleteFence;
+  document.getElementById("renameBtn").onclick=renameFence;
+  document.getElementById("latlngBtn").onclick=createByLatLng;
+  document.getElementById("exportBtn").onclick=exportGeo;
+  document.getElementById("importInput").onchange=importGeo;
 
   drawAll();
-  setIdle();
 }
-document.addEventListener("DOMContentLoaded", function () {
-  initMap();
-});
-
-  </script>
+document.addEventListener("DOMContentLoaded",initMap);
+</script>
 </body>
 </html>
+
