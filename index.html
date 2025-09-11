@@ -10,21 +10,19 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
-    body { margin:0; display:flex; height:100vh; font-family:Arial, sans-serif;}
-    aside { width:260px; background:#f9f9f9; border-right:1px solid #ddd; padding:10px; overflow-y:auto;}
-    main { flex:1; display:flex; flex-direction:column;}
-    #map { flex:1; }
-    #coords { padding:6px; font-size:13px; background:#fff; border-top:1px solid #ccc;}
-    h2 { font-size:15px; margin:10px 0;}
-    button { display:block; width:100%; margin:4px 0; padding:6px; cursor:pointer;}
-    button:disabled { opacity:.5; cursor:not-allowed;}
-    ul { list-style:none; padding:0; margin:0;}
-    ul li { padding:4px; border-bottom:1px solid #eee; cursor:pointer;}
+    body { margin:0; font-family: Arial, sans-serif; display:flex; height:100vh; }
+    aside { width:260px; background:#f8f8f8; padding:10px; overflow-y:auto; }
+    main { flex:1; }
+    #map { height:100%; width:100%; }
+    button { display:block; width:100%; margin:4px 0; padding:6px; }
+    ul { list-style:none; padding:0; }
+    li { padding:4px; border-bottom:1px solid #ddd; cursor:pointer; }
+    .coords { position:absolute; bottom:5px; left:270px; background:white; padding:4px; font-size:12px; }
   </style>
 </head>
 <body>
   <aside>
-    <h2>Acciones</h2>
+    <h3>Acciones</h3>
     <button id="newBtn">Nueva</button>
     <button id="finishBtn" disabled>Finalizar</button>
     <button id="cancelBtn" disabled>Cancelar</button>
@@ -33,252 +31,148 @@
     <button id="cancelEditBtn" disabled>Cancelar edición</button>
     <button id="renameBtn" disabled>Renombrar</button>
     <button id="deleteBtn" disabled>Eliminar</button>
-    <button id="latlngBtn">Geocerca (Lat/Lng)</button>
+    <button id="byCoordsBtn">Geocerca (Lat/Lng)</button>
     <button id="exportBtn">Exportar GeoJSON</button>
-    <input id="importInput" type="file" accept=".geojson,.json"/>
+    <input type="file" id="importInput" accept=".json,.geojson" />
 
-    <h2>Geocercas</h2>
+    <h3>Geocercas</h3>
     <ul id="fenceList"></ul>
   </aside>
 
   <main>
     <div id="map"></div>
-    <div id="coords">Mueve el mouse sobre el mapa</div>
+    <div class="coords" id="coords"></div>
   </main>
 
-<script>
-let map, group;
-let activeId=null;
-let drawing=false, editing=false;
-let tmpPoints=[];
-let editMarkers=[];
-let fences=JSON.parse(localStorage.getItem("fences")||"[]");
+  <script>
+    // === Estado
+    let map, group;
+    let drawing = false;
+    let editing = false;
+    let activeId = null;
+    let tmpMarkers = [], tmpPolyline = null, tmpPoly = null;
+    let editMarkers = [];
+    let fences = [];
 
-function saveFences(){ localStorage.setItem("fences", JSON.stringify(fences)); }
+    // === Utilidades
+    function uid() { return 'f_' + Math.random().toString(36).substr(2,9); }
+    function saveFences() { localStorage.setItem("fences", JSON.stringify(fences)); }
+    function loadFences() {
+      let data = localStorage.getItem("fences");
+      fences = data ? JSON.parse(data) : [];
+    }
 
-function drawAll(){
-  group.clearLayers();
-  fences.forEach(f=>{
-    let poly=L.polygon(f.latlngs,{color:"purple"}).addTo(group);
-    poly.bindTooltip(f.name,{permanent:true,direction:"center"});
-    poly.on("click",()=>{ activeId=f.id; renderList(); });
-    f._layer=poly;
-  });
-  renderList();
-}
+    // === Inicializar
+    function initMap() {
+      map = L.map("map").setView([-1.7279, -77.9076], 15);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap"
+      }).addTo(map);
 
-function renderList(){
-  let ul=document.getElementById("fenceList");
-  ul.innerHTML="";
-  fences.forEach(f=>{
-    let li=document.createElement("li");
-    li.textContent=f.name;
-    li.onclick=()=>{ activeId=f.id; map.fitBounds(f._layer.getBounds()); renderList(); };
-    ul.appendChild(li);
-  });
-  document.getElementById("editBtn").disabled=!activeId;
-  document.getElementById("renameBtn").disabled=!activeId;
-  document.getElementById("deleteBtn").disabled=!activeId;
-}
+      group = L.layerGroup().addTo(map);
 
-// === Dibujo manual
-function startDrawing(){
-  drawing=true; tmpPoints=[];
-  map.on("click", addPoint);
-  document.getElementById("finishBtn").disabled=true;
-  document.getElementById("cancelBtn").disabled=false;
-}
-function addPoint(e){
-  tmpPoints.push(e.latlng);
-  if(tmpPoints.length>=3){ document.getElementById("finishBtn").disabled=false; }
-  L.polyline(tmpPoints,{color:"blue",dashArray:"4"}).addTo(group);
-}
-function finishDrawing(){
-  if(tmpPoints.length<3){ alert("Min 3 puntos"); return; }
-  let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
-  if(!name) return;
-  let id=Date.now().toString();
-  fences.push({id,name,latlngs:tmpPoints});
-  saveFences();
-  map.off("click", addPoint); drawing=false; tmpPoints=[];
-  drawAll();
-}
-function cancelDrawing(){ map.off("click",addPoint); drawing=false; tmpPoints=[]; drawAll(); }
-function finalizeDrawing() {
-  if (!drawing) return;
+      // Mostrar coords bajo el mouse
+      map.on("mousemove", function(e) {
+        document.getElementById("coords").textContent =
+          `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
+      });
 
-  var pts = [];
-  for (var i = 0; i < tmpMarkers.length; i++) {
-    pts.push(tmpMarkers[i].getLatLng());
-  }
+      loadFences();
+      drawAll();
+    }
 
-  if (pts.length < 3) {
-    alert("Agrega al menos 3 puntos.");
-    return;
-  }
+    // === Dibujar
+    function startDrawing() {
+      if (editing) { alert("Termina la edición primero."); return; }
+      clearTemp();
+      drawing = true;
+      tmpMarkers = [];
+      map.on("click", onMapClickAdd);
+      document.getElementById("finishBtn").disabled = true;
+      document.getElementById("cancelBtn").disabled = false;
+    }
 
-  // 🔒 Asegurar cierre del polígono
-  if (!pts[0].equals(pts[pts.length - 1])) {
-    pts.push(pts[0]);
-  }
+    function onMapClickAdd(e) {
+      if (!drawing) return;
+      let m = L.circleMarker(e.latlng,{radius:5,color:'blue'}).addTo(map);
+      tmpMarkers.push(m);
+      let pts = tmpMarkers.map(mk => mk.getLatLng());
+      if (tmpPolyline) tmpPolyline.setLatLngs(pts);
+      else tmpPolyline = L.polyline(pts,{color:'blue',dashArray:"4 4"}).addTo(map);
 
-  // Guardar con nombre
-  var name = prompt("Nombre de la geocerca:", "Geocerca " + (fences.length + 1));
-  if (!name) name = "Geocerca " + (fences.length + 1);
+      if (pts.length >= 3) {
+        document.getElementById("finishBtn").disabled = false;
+        if (tmpPoly) tmpPoly.setLatLngs(pts);
+        else tmpPoly = L.polygon(pts,{color:'purple',fillOpacity:0.3}).addTo(map);
+      }
+    }
 
-  var id = uid();
-  var latlngs = pts.map(function (p) {
-    return { lat: p.lat, lng: p.lng };
-  });
+    function finalizeDrawing() {
+      if (!drawing) return;
+      let pts = tmpMarkers.map(mk => mk.getLatLng());
+      if (pts.length < 3) { alert("Agrega al menos 3 puntos."); return; }
 
-  fences.push({ id: id, name: name, latlngs: latlngs });
-  saveFences();
+      // 🔒 Cerrar polígono
+      if (!pts[0].equals(pts[pts.length-1])) pts.push(pts[0]);
 
-  clearTemp();
-  drawAll();
-  drawing = false;
+      let name = prompt("Nombre de la geocerca:", "Geocerca " + (fences.length+1));
+      if (!name) name = "Geocerca " + (fences.length+1);
 
-  enable(UI.newBtn, true);
-  enable(UI.finishBtn, false);
-  enable(UI.cancelBtn, false);
-}
+      let id = uid();
+      fences.push({id:id, name:name, latlngs:pts});
+      saveFences();
 
+      clearTemp();
+      drawAll();
+      drawing = false;
+      document.getElementById("finishBtn").disabled = true;
+      document.getElementById("cancelBtn").disabled = true;
+    }
 
-// === Edición
-function startEdit(){
-  if(!activeId) return;
-  editing=true;
-  document.getElementById("saveEditBtn").disabled=false;
-  document.getElementById("cancelEditBtn").disabled=false;
-  let f=fences.find(x=>x.id===activeId);
-  if(!f) return;
-  editMarkers=[];
-  f.latlngs.forEach((p,i)=>{
-    let m=L.marker(p,{draggable:true}).addTo(map);
-    m.on("drag",()=>{
-      f.latlngs=editMarkers.map(mm=>mm.getLatLng());
-      f._layer.setLatLngs(f.latlngs);
+    function cancelDrawing() {
+      clearTemp();
+      drawing = false;
+      document.getElementById("finishBtn").disabled = true;
+      document.getElementById("cancelBtn").disabled = true;
+    }
+
+    function clearTemp() {
+      tmpMarkers.forEach(m => map.removeLayer(m));
+      tmpMarkers = [];
+      if (tmpPolyline) { map.removeLayer(tmpPolyline); tmpPolyline=null; }
+      if (tmpPoly) { map.removeLayer(tmpPoly); tmpPoly=null; }
+    }
+
+    // === Renderizar geocercas
+    function drawAll() {
+      group.clearLayers();
+      fences.forEach(f => {
+        let poly = L.polygon(f.latlngs,{color:"purple",fillOpacity:0.3}).addTo(group);
+        poly.bindTooltip(f.name,{permanent:true,direction:"center"});
+        poly.on("click", ()=>{ activeId=f.id; refreshList(); });
+      });
+      refreshList();
+    }
+
+    function refreshList() {
+      let ul = document.getElementById("fenceList");
+      ul.innerHTML = "";
+      fences.forEach(f => {
+        let li=document.createElement("li");
+        li.textContent=f.name;
+        li.onclick=function(){ activeId=f.id; drawAll(); };
+        ul.appendChild(li);
+      });
+    }
+
+    // === Eventos UI
+    document.addEventListener("DOMContentLoaded", ()=>{
+      initMap();
+      document.getElementById("newBtn").onclick = startDrawing;
+      document.getElementById("finishBtn").onclick = finalizeDrawing;
+      document.getElementById("cancelBtn").onclick = cancelDrawing;
     });
-    editMarkers.push(m);
-  });
-}
-function saveEdit(){
-  if(!activeId) return;
-  let f=fences.find(x=>x.id===activeId);
-  if(!f) return;
-  f.latlngs=editMarkers.map(m=>m.getLatLng());
-  saveFences();
-  cancelEdit();
-  drawAll();
-}
-function cancelEdit(){
-  editMarkers.forEach(m=>map.removeLayer(m));
-  editMarkers=[]; editing=false;
-  document.getElementById("saveEditBtn").disabled=true;
-  document.getElementById("cancelEditBtn").disabled=true;
-}
-
-// === CRUD
-function deleteFence(){
-  if(!activeId) return;
-  fences=fences.filter(f=>f.id!==activeId);
-  saveFences(); activeId=null; drawAll();
-}
-function renameFence(){
-  let f=fences.find(x=>x.id===activeId); if(!f) return;
-  let nn=prompt("Nuevo nombre:",f.name); if(nn){ f.name=nn; saveFences(); drawAll();}
-}
-
-// === Crear por LatLng
-function createByLatLng(){
-  let raw=prompt("Pega coordenadas Lat,Lng separadas por ;\nEj: -1.23,-77.9; -1.24,-77.91; -1.25,-77.92");
-  if(!raw) return;
-  let pts=[];
-  raw.split(";").forEach(s=>{
-    let p=s.split(",");
-    if(p.length==2){ pts.push({lat:parseFloat(p[0]),lng:parseFloat(p[1])}); }
-  });
-  if(pts.length<3) return alert("Min 3 coordenadas");
-  let name=prompt("Nombre de la geocerca:","GeoLatLng "+(fences.length+1));
-  fences.push({id:Date.now().toString(),name,latlngs:pts}); saveFences(); drawAll();
-}
-
-// === Export/Import
-function exportGeo(){
-  let blob=new Blob([JSON.stringify(fences,null,2)],{type:"application/json"});
-  let a=document.createElement("a");
-  a.href=URL.createObjectURL(blob); a.download="geocercas.geojson"; a.click();
-}
-function importGeo(e){
-  let file=e.target.files[0]; if(!file) return;
-  let r=new FileReader();
-  r.onload=function(){ 
-    let arr=JSON.parse(r.result); if(Array.isArray(arr)){ fences=arr; saveFences(); drawAll(); }
-  };
-  r.readAsText(file);
-}
-
-// === Inicialización
-function initMap(){
-  map=L.map("map").setView([-1.73,-77.91],15);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
-  group=L.layerGroup().addTo(map);
-
-  // Coordenadas al mover mouse
-  map.on("mousemove", e=>{
-    document.getElementById("coords").innerText="Lat: "+e.latlng.lat.toFixed(6)+", Lng: "+e.latlng.lng.toFixed(6);
-  });
-
-  // Botones
-  document.getElementById("newBtn").onclick=startDrawing;
-  document.getElementById("finishBtn").onclick=finishDrawing;
-  document.getElementById("cancelBtn").onclick=cancelDrawing;
-  document.getElementById("editBtn").onclick=startEdit;
-  document.getElementById("saveEditBtn").onclick=saveEdit;
-  document.getElementById("cancelEditBtn").onclick=cancelEdit;
-  document.getElementById("deleteBtn").onclick=deleteFence;
-  document.getElementById("renameBtn").onclick=renameFence;
-  document.getElementById("latlngBtn").onclick=createByLatLng;
-  document.getElementById("exportBtn").onclick=exportGeo;
-  document.getElementById("importInput").onchange=importGeo;
-
-  drawAll();
-}
-document.addEventListener("DOMContentLoaded",initMap);
-function setIdle(){
-  document.getElementById("newBtn").disabled = false;
-  document.getElementById("finishBtn").disabled = true;
-  document.getElementById("cancelBtn").disabled = true;
-  document.getElementById("editBtn").disabled = !activeId;
-  document.getElementById("saveEditBtn").disabled = true;
-  document.getElementById("cancelEditBtn").disabled = true;
-  document.getElementById("renameBtn").disabled = !activeId;
-  document.getElementById("deleteBtn").disabled = !activeId;
-}
-
-function setDrawing(){
-  document.getElementById("newBtn").disabled = true;
-  document.getElementById("finishBtn").disabled = true;
-  document.getElementById("cancelBtn").disabled = false;
-  document.getElementById("editBtn").disabled = true;
-  document.getElementById("saveEditBtn").disabled = true;
-  document.getElementById("cancelEditBtn").disabled = true;
-  document.getElementById("renameBtn").disabled = true;
-  document.getElementById("deleteBtn").disabled = true;
-}
-
-function setEditing(){
-  document.getElementById("newBtn").disabled = true;
-  document.getElementById("finishBtn").disabled = true;
-  document.getElementById("cancelBtn").disabled = true;
-  document.getElementById("editBtn").disabled = true;
-  document.getElementById("saveEditBtn").disabled = false;
-  document.getElementById("cancelEditBtn").disabled = false;
-  document.getElementById("renameBtn").disabled = true;
-  document.getElementById("deleteBtn").disabled = true;
-}
-
-</script>
+  </script>
 </body>
 </html>
-
