@@ -165,21 +165,36 @@
         ul.appendChild(li);
       });
     }
+    document.getElementById("editBtn").disabled = !activeId;
+
 // === Edición con el mouse ===
 function startEdit() {
   if (!activeId) { alert("Selecciona una geocerca."); return; }
   let f = fences.find(x => x.id === activeId);
   if (!f) return;
 
+  // Eliminar cualquier capa previa de edición
+  stopEdit();
+
   editing = true;
   editMarkers = [];
-  f.__layer = L.polygon(f.latlngs, {color:"red", fillOpacity:0.2}).addTo(map);
+
+  // Buscar la capa original del polígono en el grupo
+  let layer = null;
+  group.eachLayer(l => {
+    if (l instanceof L.Polygon) {
+      let coords = JSON.stringify(l.getLatLngs()[0]);
+      let fcoords = JSON.stringify(f.latlngs);
+      if (coords === fcoords) layer = l;
+    }
+  });
+  f.__layer = layer;
 
   f.latlngs.forEach((pt, idx) => {
     let m = L.marker(pt, {draggable:true}).addTo(map);
     m.on("drag", function(e) {
       f.latlngs[idx] = e.target.getLatLng();
-      f.__layer.setLatLngs([f.latlngs]);
+      if (f.__layer) f.__layer.setLatLngs([f.latlngs]);
     });
     editMarkers.push(m);
   });
@@ -187,6 +202,7 @@ function startEdit() {
   document.getElementById("saveEditBtn").disabled = false;
   document.getElementById("cancelEditBtn").disabled = false;
 }
+
 
 function saveEdit() {
   if (!activeId) return;
@@ -197,6 +213,7 @@ function saveEdit() {
   stopEdit();
   drawAll();
 }
+
 
 function stopEdit() {
   editMarkers.forEach(m => map.removeLayer(m));
