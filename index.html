@@ -44,17 +44,6 @@
       <button id="addPersonBtn">Añadir personal</button>
       <button id="listPersonBtn">Ver personal</button>
       <div id="personList" style="margin-top:8px; font-size:13px; color:#374151;"></div>
-
-      <h3>Actividades</h3>
-      <button id="addActivityBtn">Añadir actividad</button>
-      <button id="listActivityBtn">Ver actividades</button>
-      <div id="activityList" style="margin-top:8px; font-size:13px; color:#374151;"></div>
-
-      <h3>Costo de Mano de Obra</h3>
-      <button id="calcCostBtn">Calcular costos</button>
-
-      <h3>Reportes</h3>
-      <button id="reportBtn">Generar reporte</button>
     </div>
 
     <div>
@@ -126,6 +115,7 @@ document.getElementById("listPersonBtn").onclick=()=>{
   renderPersonal(f);
 };
 
+// === Mostrar personal en el panel ===
 function renderPersonal(f){
   let div=document.getElementById("personList");
   div.innerHTML="";
