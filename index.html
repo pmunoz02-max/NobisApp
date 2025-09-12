@@ -64,16 +64,31 @@ let editMarkers = [];
 let editBackup = null;
 
 // === Persistencia en localStorage ===
-function saveToStorage(){
-  localStorage.setItem("nobis_fences", JSON.stringify(fences));
-}
-function loadFromStorage(){
-  let raw=localStorage.getItem("nobis_fences");
-  if(raw){ 
-    try{ fences=JSON.parse(raw); }
-    catch(e){ fences=[]; }
+function saveFence(fence) {
+  let fences = JSON.parse(localStorage.getItem("geocercas")) || [];
+  // Buscar si ya existe
+  let index = fences.findIndex(f => f.id === fence.id);
+  if (index >= 0) {
+    fences[index] = fence; // actualiza existente
+  } else {
+    fences.push(fence); // añade nueva
   }
+  localStorage.setItem("geocercas", JSON.stringify(fences));
 }
+
+function loadFences() {
+  let fences = JSON.parse(localStorage.getItem("geocercas")) || [];
+  fences.forEach(fence => {
+    let polygon = L.polygon(fence.latlngs, { color: "purple" }).addTo(group);
+    polygon.bindTooltip(fence.name, { permanent: true, direction: "center" });
+    fence._layer = polygon;
+    polygon.on("click", () => {
+      activeFence = fence;
+      renderList();
+    });
+  });
+}
+
 
 // === Helpers de estado ===
 function setIdle(){
