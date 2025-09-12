@@ -6,7 +6,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     body {margin:0;display:flex;height:100vh;font-family:sans-serif}
-    #sidebar {width:300px;overflow-y:auto;padding:10px;background:#f8f9fa;border-right:1px solid #ddd}
+    #sidebar {width:320px;overflow-y:auto;padding:10px;background:#f8f9fa;border-right:1px solid #ddd}
     #map {flex:1}
     button {margin:2px;padding:5px 8px}
     ul {padding-left:20px}
@@ -98,8 +98,7 @@ function updateUI(){
   document.getElementById("editBtn").disabled=!has;
   document.getElementById("renameBtn").disabled=!has;
   document.getElementById("deleteBtn").disabled=!has;
-
-  // ✅ Ahora los botones de personal siempre habilitados
+  // Botones de personal siempre habilitados
   document.getElementById("addPersonBtn").disabled=false;
   document.getElementById("viewPersonBtn").disabled=false;
 }
@@ -218,10 +217,10 @@ function importGeoJSON(e){
 
 // === Gestión de Personal ===
 function addPerson(){
-  let f=fences.find(x=>x.id===activeId); if(!f)return;
+  let f=fences.find(x=>x.id===activeId); if(!f){alert("Selecciona una geocerca primero");return;}
   let nombre=prompt("Nombre del personal:");
   if(!nombre)return;
-  f.personal.push({id:Date.now().toString(),nombre,estado:"inactivo"});
+  f.personal.push({id:Date.now().toString(),nombre,estado:"inactivo",desde:"",hasta:""});
   saveData(); viewPerson();
 }
 function viewPerson(){
@@ -229,10 +228,11 @@ function viewPerson(){
   cont.innerHTML="";
   let f=fences.find(x=>x.id===activeId); if(!f)return;
   f.personal.forEach(p=>{
+    let fechas = (p.desde && p.hasta) ? ` (${p.desde} → ${p.hasta})` : "";
     let div=document.createElement("div");
     div.className="person-card";
-    div.innerHTML=`<b>${p.nombre}</b> (${p.estado})
-      <button onclick="editPerson('${f.id}','${p.id}')">Cambiar estado</button>`;
+    div.innerHTML=`<b>${p.nombre}</b> - ${p.estado}${fechas}
+      <button onclick="editPerson('${f.id}','${p.id}')">Editar</button>`;
     cont.appendChild(div);
   });
 }
@@ -245,12 +245,12 @@ function editPerson(fid,pid){
     <div>Editar: <b>${p.nombre}</b></div>
     <label>Estado:
       <select id="estadoSel">
-        <option value="activo">Activo</option>
-        <option value="inactivo">Inactivo</option>
+        <option value="activo" ${p.estado==="activo"?"selected":""}>Activo</option>
+        <option value="inactivo" ${p.estado==="inactivo"?"selected":""}>Inactivo</option>
       </select>
     </label><br>
-    <label>Desde: <input type="date" id="desde"></label><br>
-    <label>Hasta: <input type="date" id="hasta"></label><br>
+    <label>Desde: <input type="date" id="desde" value="${p.desde||""}"></label><br>
+    <label>Hasta: <input type="date" id="hasta" value="${p.hasta||""}"></label><br>
     <button onclick="savePerson('${fid}','${pid}')">Guardar</button>
     <button onclick="viewPerson()">Cancelar</button>
   `;
@@ -263,6 +263,18 @@ function savePerson(fid,pid){
   p.desde=document.getElementById("desde").value;
   p.hasta=document.getElementById("hasta").value;
   saveData(); viewPerson();
+}
+
+// === Obtener personal activo por fecha ===
+function getActivePersonnel(fechaStr){
+  let fecha=new Date(fechaStr);
+  let f=fences.find(x=>x.id===activeId); if(!f)return [];
+  return f.personal.filter(p=>{
+    if(p.estado!=="activo") return false;
+    if(p.desde && new Date(p.desde)>fecha) return false;
+    if(p.hasta && new Date(p.hasta)<fecha) return false;
+    return true;
+  });
 }
 
 init();
