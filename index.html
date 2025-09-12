@@ -11,7 +11,7 @@
 
   <style>
     body { margin:0; font-family: system-ui, Arial, sans-serif; }
-    .app { display:grid; grid-template-columns:300px 1fr; height:100vh; }
+    .app { display:grid; grid-template-columns:320px 1fr; height:100vh; }
     .sidebar { background:#f9fafb; border-right:1px solid #ddd; padding:8px; overflow-y:auto; }
     .sidebar h3 { margin-top:16px; margin-bottom:6px; font-size:14px; color:#111; }
     button { margin:2px 0; padding:4px 6px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:12px; }
@@ -40,8 +40,9 @@
       <ul id="fenceList"></ul>
 
       <h3>Gestión de Personal</h3>
-      <button id="addPersonBtn">Añadir personal</button>
-      <button id="listPersonBtn">Ver personal</button>
+      <button id="newPersonBtn">Nuevo trabajador</button>
+      <button id="assignPersonBtn">Asignar a geocerca</button>
+      <button id="listPersonBtn">Ver personal asignado</button>
       <div id="personList" style="margin-top:8px; font-size:13px; color:#374151;"></div>
     </div>
 
@@ -54,6 +55,7 @@
 <script>
 let map, group;
 let fences=[];
+let personnel=[]; // lista global de trabajadores
 let activeId=null;
 
 let drawing=false;
@@ -66,19 +68,22 @@ function saveToStorage(){
     id: f.id,
     name: f.name,
     latlngs: f.latlngs.map(p=>({lat:p.lat, lng:p.lng})),
-    personal: f.personal || []
+    asignaciones: f.asignaciones || []
   }));
   localStorage.setItem("geocercas", JSON.stringify(cleanFences));
+  localStorage.setItem("personnel", JSON.stringify(personnel));
 }
 function loadFromStorage(){
-  let raw=localStorage.getItem("geocercas");
-  if(raw){
-    fences=JSON.parse(raw).map(f=>({
+  let rawF=localStorage.getItem("geocercas");
+  if(rawF){
+    fences=JSON.parse(rawF).map(f=>({
       ...f,
       latlngs: f.latlngs.map(p=>({lat:p.lat, lng:p.lng})),
-      personal: f.personal || []
+      asignaciones: f.asignaciones || []
     }));
   }
+  let rawP=localStorage.getItem("personnel");
+  if(rawP){ personnel=JSON.parse(rawP); }
 }
 
 // === Inicializar mapa ===
@@ -139,7 +144,7 @@ document.getElementById("finishBtn").onclick=()=>{
   if(tempPoints.length<3){ alert("Se requieren al menos 3 puntos."); return; }
   let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
   if(!name) return;
-  let f={id:Date.now().toString(), name:name, latlngs:tempPoints, personal:[]};
+  let f={id:Date.now().toString(), name:name, latlngs:tempPoints, asignaciones:[]};
   fences.push(f);
   saveToStorage();
   map.off("click",addTempPoint);
@@ -159,34 +164,48 @@ document.getElementById("cancelBtn").onclick=()=>{
   document.getElementById("cancelBtn").disabled=true;
 };
 
-// === Gestión de personal ===
-document.getElementById("addPersonBtn").onclick=()=>{
+// === Gestión global de personal ===
+document.getElementById("newPersonBtn").onclick=()=>{
+  let nombre=prompt("Nombre del trabajador:");
+  if(!nombre) return;
+  let id=Date.now().toString();
+  personnel.push({id, nombre});
+  saveToStorage();
+  alert("Trabajador creado: "+nombre);
+};
+document.getElementById("assignPersonBtn").onclick=()=>{
   let f=fences.find(x=>x.id===activeId);
   if(!f){ alert("Selecciona una geocerca activa."); return; }
-  let nombre=prompt("Nombre del personal:");
-  if(!nombre) return;
-  f.personal.push({nombre:nombre, estado:"inactivo", desde:"", hasta:""});
+  if(!personnel.length){ alert("No hay trabajadores registrados."); return; }
+  let nombres=personnel.map((p,i)=>`${i+1}. ${p.nombre}`).join("\n");
+  let idx=parseInt(prompt("Elige trabajador por número:\n"+nombres))-1;
+  if(isNaN(idx) || idx<0 || idx>=personnel.length) return;
+  let p=personnel[idx];
+  f.asignaciones.push({pid:p.id, estado:"inactivo", desde:"", hasta:""});
   saveToStorage();
-  renderPersonal(f);
+  renderAssigned(f);
 };
 document.getElementById("listPersonBtn").onclick=()=>{
   let f=fences.find(x=>x.id===activeId);
   if(!f){ alert("Selecciona una geocerca activa."); return; }
-  renderPersonal(f);
+  renderAssigned(f);
 };
 
-function renderPersonal(f){
+// === Renderizar asignaciones por geocerca ===
+function renderAssigned(f){
   let div=document.getElementById("personList");
   div.innerHTML="";
-  if(!f.personal || !f.personal.length){
-    div.textContent="(Sin personal registrado)";
+  if(!f.asignaciones || !f.asignaciones.length){
+    div.textContent="(Sin personal asignado)";
     return;
   }
-  f.personal.forEach((p,i)=>{
-    let fechas = (p.desde && p.hasta) ? ` (${p.desde} → ${p.hasta})` : "";
+  f.asignaciones.forEach((a,i)=>{
+    let pers=personnel.find(pp=>pp.id===a.pid);
+    let nombre=pers?pers.nombre:"[Desconocido]";
+    let fechas = (a.desde && a.hasta) ? ` (${a.desde} → ${a.hasta})` : "";
     let row=document.createElement("div");
     row.className="person-row";
-    row.innerHTML=`<span>${i+1}. ${p.nombre} → ${p.estado}${fechas}</span>`;
+    row.innerHTML=`<span>${i+1}. ${nombre} → ${a.estado}${fechas}</span>`;
     let btn=document.createElement("button");
     btn.textContent="Editar";
     btn.onclick=()=>showStatusForm(f,i);
@@ -200,30 +219,31 @@ function showStatusForm(f, idx){
   let div=document.getElementById("personList");
   let form=document.createElement("div");
   form.className="person-form";
-  let p=f.personal[idx];
+  let a=f.asignaciones[idx];
+  let pers=personnel.find(pp=>pp.id===a.pid);
   form.innerHTML=`
-    <strong>${p.nombre}</strong><br>
+    <strong>${pers?pers.nombre:"[Desconocido]"}</strong><br>
     <label>Estado:
       <select id="estadoSel">
-        <option value="activo" ${p.estado==="activo"?"selected":""}>Activo</option>
-        <option value="inactivo" ${p.estado==="inactivo"?"selected":""}>Inactivo</option>
+        <option value="activo" ${a.estado==="activo"?"selected":""}>Activo</option>
+        <option value="inactivo" ${a.estado==="inactivo"?"selected":""}>Inactivo</option>
       </select>
     </label><br>
-    <label>Desde: <input type="date" id="desdeInp" value="${p.desde||""}"></label><br>
-    <label>Hasta: <input type="date" id="hastaInp" value="${p.hasta||""}"></label><br>
+    <label>Desde: <input type="date" id="desdeInp" value="${a.desde||""}"></label><br>
+    <label>Hasta: <input type="date" id="hastaInp" value="${a.hasta||""}"></label><br>
     <button id="saveStatusBtn">Guardar</button>
     <button id="cancelStatusBtn">Cancelar</button>
   `;
   div.appendChild(form);
 
   document.getElementById("saveStatusBtn").onclick=()=>{
-    p.estado=document.getElementById("estadoSel").value;
-    p.desde=document.getElementById("desdeInp").value;
-    p.hasta=document.getElementById("hastaInp").value;
+    a.estado=document.getElementById("estadoSel").value;
+    a.desde=document.getElementById("desdeInp").value;
+    a.hasta=document.getElementById("hastaInp").value;
     saveToStorage();
-    renderPersonal(f);
+    renderAssigned(f);
   };
-  document.getElementById("cancelStatusBtn").onclick=()=>renderPersonal(f);
+  document.getElementById("cancelStatusBtn").onclick=()=>renderAssigned(f);
 }
 
 initMap();
