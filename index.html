@@ -22,13 +22,15 @@
     .person-row { display:flex; justify-content:space-between; align-items:center; margin:2px 0; font-size:13px; }
     .person-form { background:#eef; padding:6px; margin:6px 0; border-radius:4px; }
     .person-form input, .person-form select { margin:2px 0; width:100%; padding:4px; font-size:12px; }
+    .global-person { margin:6px 0; padding:6px; border:1px solid #ccc; border-radius:4px; background:#fff; }
+    .assignments { font-size:12px; margin-left:10px; color:#444; }
   </style>
 </head>
 <body>
   <div class="app">
     <div class="sidebar">
       <h3>Acciones</h3>
-      <button id="newBtn">Nueva</button>
+      <button id="newBtn">Nueva geocerca</button>
       <button id="finishBtn" disabled>Finalizar</button>
       <button id="cancelBtn" disabled>Cancelar</button>
       <button id="renameBtn" disabled>Renombrar</button>
@@ -43,6 +45,7 @@
       <button id="newPersonBtn">Nuevo trabajador</button>
       <button id="assignPersonBtn">Asignar a geocerca</button>
       <button id="listPersonBtn">Ver personal asignado</button>
+      <button id="globalPersonBtn">Ver todos los trabajadores</button>
       <div id="personList" style="margin-top:8px; font-size:13px; color:#374151;"></div>
     </div>
 
@@ -190,6 +193,9 @@ document.getElementById("listPersonBtn").onclick=()=>{
   if(!f){ alert("Selecciona una geocerca activa."); return; }
   renderAssigned(f);
 };
+document.getElementById("globalPersonBtn").onclick=()=>{
+  renderGlobalPersonnel();
+};
 
 // === Renderizar asignaciones por geocerca ===
 function renderAssigned(f){
@@ -246,9 +252,38 @@ function showStatusForm(f, idx){
   document.getElementById("cancelStatusBtn").onclick=()=>renderAssigned(f);
 }
 
+// === Vista global de personal ===
+function renderGlobalPersonnel(){
+  let div=document.getElementById("personList");
+  div.innerHTML="<h4>Todo el personal registrado</h4>";
+  if(!personnel.length){
+    div.innerHTML+="<p>(No hay trabajadores registrados)</p>";
+    return;
+  }
+  personnel.forEach(p=>{
+    let cont=document.createElement("div");
+    cont.className="global-person";
+    cont.innerHTML=`<b>${p.nombre}</b>`;
+    let asigns=[];
+    fences.forEach(f=>{
+      f.asignaciones.forEach(a=>{
+        if(a.pid===p.id){
+          asigns.push(`${f.name}: ${a.estado} (${a.desde||"-"} → ${a.hasta||"-"})`);
+        }
+      });
+    });
+    let list=document.createElement("div");
+    list.className="assignments";
+    list.innerHTML= asigns.length? asigns.join("<br>") : "(No asignado a ninguna geocerca)";
+    cont.appendChild(list);
+    div.appendChild(cont);
+  });
+}
+
 initMap();
 </script>
 </body>
 </html>
+
 
 
