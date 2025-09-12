@@ -1,283 +1,239 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Geocercas (Nobis)</title>
+
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <style>
-    body {margin:0;display:flex;height:100vh;font-family:sans-serif}
-    #sidebar {width:320px;overflow-y:auto;padding:10px;background:#f8f9fa;border-right:1px solid #ddd}
-    #map {flex:1}
-    button {margin:2px;padding:5px 8px}
-    ul {padding-left:20px}
-    .activeFence {font-weight:bold;color:#6c2eb9}
-    .person-card {border:1px solid #ccc;padding:5px;margin:5px 0;border-radius:4px;background:#fff}
-    .edit-panel {background:#eef;border-radius:4px;padding:6px;margin:5px 0}
+    body { margin:0; font-family: system-ui, Arial, sans-serif; }
+    .app { display:grid; grid-template-columns:300px 1fr; height:100vh; }
+    .sidebar { background:#f9fafb; border-right:1px solid #ddd; padding:8px; overflow-y:auto; }
+    .sidebar h3 { margin-top:16px; margin-bottom:6px; font-size:14px; color:#111; }
+    button { margin:2px 0; padding:4px 6px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:12px; }
+    button:disabled { opacity:0.5; cursor:not-allowed; }
+    #map { width:100%; height:100%; }
+    #coords { font-size:12px; color:#333; padding:4px; }
+    ul { margin:4px 0; padding-left:18px; }
+    .person-row { display:flex; justify-content:space-between; align-items:center; margin:2px 0; font-size:13px; }
+    .person-form { background:#eef; padding:6px; margin:6px 0; border-radius:4px; }
+    .person-form input, .person-form select { margin:2px 0; width:100%; padding:4px; font-size:12px; }
   </style>
 </head>
 <body>
-<div id="sidebar">
-  <h3>Acciones</h3>
-  <button id="newBtn">Nueva</button>
-  <button id="finishBtn" disabled>Finalizar</button>
-  <button id="cancelBtn" disabled>Cancelar</button>
-  <button id="editBtn" disabled>Editar</button>
-  <button id="saveEditBtn" disabled>Guardar cambios</button>
-  <button id="cancelEditBtn" disabled>Cancelar edición</button>
-  <button id="renameBtn" disabled>Renombrar</button>
-  <button id="deleteBtn" disabled>Eliminar</button>
-  <button id="latlngBtn">Geocerca (Lat/Lng)</button>
-  <button id="exportBtn">Exportar GeoJSON</button>
-  <input type="file" id="importInput"/>
+  <div class="app">
+    <div class="sidebar">
+      <h3>Acciones</h3>
+      <button id="newBtn">Nueva</button>
+      <button id="finishBtn" disabled>Finalizar</button>
+      <button id="cancelBtn" disabled>Cancelar</button>
+      <button id="editBtn" disabled>Editar</button>
+      <button id="saveEditBtn" disabled>Guardar cambios</button>
+      <button id="cancelEditBtn" disabled>Cancelar edición</button>
+      <button id="renameBtn" disabled>Renombrar</button>
+      <button id="deleteBtn" disabled>Eliminar</button>
+      <button id="byCoordsBtn">Geocerca (Lat/Lng)</button>
+      <button id="exportBtn">Exportar GeoJSON</button>
+      <input type="file" id="importInput" accept=".geojson,.json"/>
 
-  <h3>Geocercas</h3>
-  <ul id="fenceList"></ul>
+      <h3>Geocercas</h3>
+      <ul id="fenceList"></ul>
 
-  <h3>Gestión de Personal</h3>
-  <button id="addPersonBtn">Añadir personal</button>
-  <button id="viewPersonBtn">Ver personal</button>
-  <div id="personList"></div>
-</div>
+      <h3>Gestión de Personal</h3>
+      <button id="addPersonBtn">Añadir personal</button>
+      <button id="listPersonBtn">Ver personal</button>
+      <div id="personList" style="margin-top:8px; font-size:13px; color:#374151;"></div>
+    </div>
 
-<div id="map"></div>
+    <div>
+      <div id="map"></div>
+      <div id="coords">Lat: -, Lng: -</div>
+    </div>
+  </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 let map, group;
-let fences = JSON.parse(localStorage.getItem("fences")||"[]");
-let activeId = null;
-let drawing = false, editing=false;
-let tmpPoints=[], tmpPolyline=null, tmpPolygon=null;
-let editMarkers=[];
+let fences=[];
+let activeId=null;
 
-// === Inicializar mapa ===
-function init(){
-  map = L.map("map").setView([-1.73,-77.91], 14);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
-  group = L.layerGroup().addTo(map);
+let drawing=false;
+let tempPoints=[]; 
+let tempLine=null, tempPoly=null;
 
-  document.getElementById("newBtn").onclick=startDrawing;
-  document.getElementById("finishBtn").onclick=finalizeDrawing;
-  document.getElementById("cancelBtn").onclick=cancelDrawing;
-  document.getElementById("editBtn").onclick=enterEdit;
-  document.getElementById("saveEditBtn").onclick=saveEdit;
-  document.getElementById("cancelEditBtn").onclick=()=>exitEdit(false);
-  document.getElementById("renameBtn").onclick=renameFence;
-  document.getElementById("deleteBtn").onclick=deleteFence;
-  document.getElementById("latlngBtn").onclick=createByLatLng;
-  document.getElementById("exportBtn").onclick=exportGeoJSON;
-  document.getElementById("importInput").onchange=importGeoJSON;
-  document.getElementById("addPersonBtn").onclick=addPerson;
-  document.getElementById("viewPersonBtn").onclick=viewPerson;
-
-  drawAll();
+// === Persistencia ===
+function saveToStorage(){
+  localStorage.setItem("geocercas", JSON.stringify(fences));
 }
-function saveData(){ localStorage.setItem("fences", JSON.stringify(fences)); }
-
-function drawAll(){
-  group.clearLayers();
-  let list=document.getElementById("fenceList");
-  list.innerHTML="";
-  fences.forEach(f=>{
-    let poly=L.polygon(f.latlngs,{color:"#6c2eb9",fillOpacity:0.3}).addTo(group);
-    poly.bindTooltip(f.name,{permanent:true,direction:"center"});
-    poly.on("click",()=>{ activeId=f.id; updateUI(); });
-    f._layer=poly;
-
-    let li=document.createElement("li");
-    li.textContent=f.name;
-    if(f.id===activeId) li.classList.add("activeFence");
-    li.onclick=()=>{activeId=f.id;updateUI();};
-    list.appendChild(li);
-  });
-  updateUI();
-}
-
-function updateUI(){
-  let has=!!activeId;
-  document.getElementById("editBtn").disabled=!has;
-  document.getElementById("renameBtn").disabled=!has;
-  document.getElementById("deleteBtn").disabled=!has;
-  // Botones de personal siempre habilitados
-  document.getElementById("addPersonBtn").disabled=false;
-  document.getElementById("viewPersonBtn").disabled=false;
-}
-
-// === Dibujo geocerca ===
-function startDrawing(){
-  drawing=true; tmpPoints=[];
-  tmpPolyline&&map.removeLayer(tmpPolyline); tmpPolygon&&map.removeLayer(tmpPolygon);
-  map.on("click",onClickAddPoint);
-  document.getElementById("finishBtn").disabled=false;
-  document.getElementById("cancelBtn").disabled=false;
-}
-function onClickAddPoint(e){
-  tmpPoints.push(e.latlng);
-  if(tmpPolyline) tmpPolyline.setLatLngs(tmpPoints);
-  else tmpPolyline=L.polyline(tmpPoints,{color:"blue",dashArray:"5,5"}).addTo(map);
-  if(tmpPoints.length>=3){
-    if(tmpPolygon) tmpPolygon.setLatLngs(tmpPoints);
-    else tmpPolygon=L.polygon(tmpPoints,{color:"purple",fillOpacity:0.2}).addTo(map);
+function loadFromStorage(){
+  let raw=localStorage.getItem("geocercas");
+  if(raw){
+    fences=JSON.parse(raw).map(f=>({
+      ...f,
+      latlngs:f.latlngs.map(p=>L.latLng(p.lat,p.lng))
+    }));
   }
 }
-function finalizeDrawing(){
-  if(tmpPoints.length<3){alert("Mínimo 3 puntos");return;}
-  let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
-  let id=Date.now().toString();
-  fences.push({id,name,latlngs:tmpPoints,personal:[]});
-  saveData();
-  map.off("click",onClickAddPoint);
-  tmpPoints=[];tmpPolyline=null;tmpPolygon=null;
-  activeId=id;
+
+// === Estado ===
+function setIdle(){
+  document.getElementById("editBtn").disabled = !activeId;
+  document.getElementById("saveEditBtn").disabled = true;
+  document.getElementById("cancelEditBtn").disabled = true;
+  document.getElementById("renameBtn").disabled = !activeId;
+  document.getElementById("deleteBtn").disabled = !activeId;
+}
+
+// === Inicializar mapa ===
+function initMap(){
+  map=L.map('map').setView([-1.73,-77.91],14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
+  group=L.layerGroup().addTo(map);
+  map.on("mousemove",e=>{
+    document.getElementById("coords").textContent=`Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
+  });
+  loadFromStorage();
   drawAll();
 }
-function cancelDrawing(){ map.off("click",onClickAddPoint); drawAll(); }
 
-// === Edición básica ===
-function enterEdit(){
-  let f=fences.find(x=>x.id===activeId); if(!f)return;
-  editing=true;
-  let lls=f._layer.getLatLngs()[0];
-  editMarkers=lls.map(p=>{
-    let m=L.marker(p,{draggable:true}).addTo(map);
-    m.on("drag",()=>{ f._layer.setLatLngs([editMarkers.map(mm=>mm.getLatLng())]); });
-    return m;
-  });
-  document.getElementById("saveEditBtn").disabled=false;
-  document.getElementById("cancelEditBtn").disabled=false;
-}
-function saveEdit(){
-  let f=fences.find(x=>x.id===activeId); if(!f)return;
-  let coords=editMarkers.map(m=>m.getLatLng());
-  f.latlngs=coords; saveData();
-  exitEdit(true);
-}
-function exitEdit(redraw){
-  editMarkers.forEach(m=>map.removeLayer(m));
-  editMarkers=[]; editing=false;
-  document.getElementById("saveEditBtn").disabled=true;
-  document.getElementById("cancelEditBtn").disabled=true;
-  if(redraw) drawAll();
-}
-
-// === Renombrar/Eliminar ===
-function renameFence(){
-  let f=fences.find(x=>x.id===activeId); if(!f)return;
-  let nn=prompt("Nuevo nombre:",f.name); if(!nn)return;
-  f.name=nn; saveData(); drawAll();
-}
-function deleteFence(){
-  fences=fences.filter(f=>f.id!==activeId);
-  activeId=null; saveData(); drawAll();
-}
-
-// === LatLng ===
-function createByLatLng(){
-  let raw=prompt("Coordenadas lat,lng separadas por ;\nEj: -1.73,-77.91;-1.74,-77.90;-1.75,-77.92");
-  if(!raw)return;
-  let pts=raw.split(";").map(p=>{
-    let [a,b]=p.split(",");return {lat:parseFloat(a),lng:parseFloat(b)};
-  }).filter(p=>!isNaN(p.lat)&&!isNaN(p.lng));
-  if(pts.length<3){alert("Mínimo 3 puntos válidos");return;}
-  let name=prompt("Nombre:","Geocerca "+(fences.length+1));
-  let id=Date.now().toString();
-  fences.push({id,name,latlngs:pts,personal:[]});
-  saveData(); activeId=id; drawAll();
-}
-
-// === Importar / Exportar ===
-function exportGeoJSON(){
-  let fc={type:"FeatureCollection",features:[]};
+// === Dibujar geocercas ===
+function drawAll(){
+  group.clearLayers();
   fences.forEach(f=>{
-    let coords=f.latlngs.map(p=>[p.lng,p.lat]); coords.push(coords[0]);
-    fc.features.push({type:"Feature",properties:{id:f.id,name:f.name},geometry:{type:"Polygon",coordinates:[coords]}});
+    let poly=L.polygon(f.latlngs,{color:'#6b21a8',weight:2,fillOpacity:0.3}).addTo(group);
+    poly.bindTooltip(f.name,{permanent:true,direction:"center"});
+    poly.on("click",()=>{ activeId=f.id; renderList(); });
+    f.__layer=poly;
   });
-  let blob=new Blob([JSON.stringify(fc)],{type:"application/geo+json"});
-  let a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="geocercas.geojson"; a.click();
+  renderList();
 }
-function importGeoJSON(e){
-  let file=e.target.files[0]; if(!file)return;
-  let r=new FileReader();
-  r.onload=()=>{
-    try{
-      let gj=JSON.parse(r.result);
-      (gj.features||[]).forEach(ft=>{
-        if(ft.geometry.type==="Polygon"){
-          let ring=ft.geometry.coordinates[0];
-          let pts=ring.map(c=>({lat:c[1],lng:c[0]}));
-          let id=Date.now().toString()+Math.random();
-          fences.push({id,name:ft.properties.name||"Importada",latlngs:pts,personal:[]});
-        }
-      });
-      saveData(); drawAll();
-    }catch(err){alert("GeoJSON inválido");}
-  };
-  r.readAsText(file);
+function renderList(){
+  let ul=document.getElementById("fenceList");
+  ul.innerHTML="";
+  fences.forEach(f=>{
+    let li=document.createElement("li");
+    li.textContent=f.name;
+    li.style.cursor="pointer";
+    li.onclick=()=>{ activeId=f.id; drawAll(); setIdle(); };
+    ul.appendChild(li);
+  });
+  setIdle();
 }
 
-// === Gestión de Personal ===
-function addPerson(){
-  let f=fences.find(x=>x.id===activeId); if(!f){alert("Selecciona una geocerca primero");return;}
-  let nombre=prompt("Nombre del personal:");
-  if(!nombre)return;
-  f.personal.push({id:Date.now().toString(),nombre,estado:"inactivo",desde:"",hasta:""});
-  saveData(); viewPerson();
+// === Crear geocercas manual ===
+document.getElementById("newBtn").onclick=()=>{
+  drawing=true; tempPoints=[]; 
+  if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
+  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
+  map.on("click",addTempPoint);
+  document.getElementById("finishBtn").disabled=false;
+  document.getElementById("cancelBtn").disabled=false;
+};
+function addTempPoint(e){
+  tempPoints.push(e.latlng);
+  if(tempLine){ tempLine.setLatLngs(tempPoints); }
+  else{ tempLine=L.polyline(tempPoints,{color:"blue",dashArray:"5,5"}).addTo(map); }
+  if(tempPoints.length>=3){
+    if(tempPoly){ tempPoly.setLatLngs(tempPoints); }
+    else{ tempPoly=L.polygon(tempPoints,{color:"blue",weight:1,fillOpacity:0.1}).addTo(map); }
+  }
 }
-function viewPerson(){
-  let cont=document.getElementById("personList");
-  cont.innerHTML="";
-  let f=fences.find(x=>x.id===activeId); if(!f)return;
-  f.personal.forEach(p=>{
+document.getElementById("finishBtn").onclick=()=>{
+  if(tempPoints.length<3){ alert("Se requieren al menos 3 puntos."); return; }
+  let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
+  if(!name) return;
+  let f={id:Date.now().toString(), name:name, latlngs:tempPoints, personal:[]};
+  fences.push(f);
+  saveToStorage();
+  map.off("click",addTempPoint);
+  drawing=false; tempPoints=[]; 
+  if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
+  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
+  document.getElementById("finishBtn").disabled=true;
+  document.getElementById("cancelBtn").disabled=true;
+  drawAll();
+};
+document.getElementById("cancelBtn").onclick=()=>{
+  drawing=false; tempPoints=[]; 
+  if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
+  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
+  map.off("click",addTempPoint);
+  document.getElementById("finishBtn").disabled=true;
+  document.getElementById("cancelBtn").disabled=true;
+};
+
+// === Gestión de personal ===
+document.getElementById("addPersonBtn").onclick=()=>{
+  let f=fences.find(x=>x.id===activeId);
+  if(!f){ alert("Selecciona una geocerca activa."); return; }
+  let nombre=prompt("Nombre del personal:");
+  if(!nombre) return;
+  if(!f.personal) f.personal=[];
+  f.personal.push({nombre:nombre, estado:"inactivo", desde:"", hasta:""});
+  saveToStorage();
+  renderPersonal(f);
+};
+document.getElementById("listPersonBtn").onclick=()=>{
+  let f=fences.find(x=>x.id===activeId);
+  if(!f){ alert("Selecciona una geocerca activa."); return; }
+  renderPersonal(f);
+};
+
+function renderPersonal(f){
+  let div=document.getElementById("personList");
+  div.innerHTML="";
+  if(!f.personal || !f.personal.length){
+    div.textContent="(Sin personal registrado)";
+    return;
+  }
+  f.personal.forEach((p,i)=>{
     let fechas = (p.desde && p.hasta) ? ` (${p.desde} → ${p.hasta})` : "";
-    let div=document.createElement("div");
-    div.className="person-card";
-    div.innerHTML=`<b>${p.nombre}</b> - ${p.estado}${fechas}
-      <button onclick="editPerson('${f.id}','${p.id}')">Editar</button>`;
-    cont.appendChild(div);
+    let row=document.createElement("div");
+    row.className="person-row";
+    row.innerHTML=`<span>${i+1}. ${p.nombre} → ${p.estado}${fechas}</span>`;
+    let btn=document.createElement("button");
+    btn.textContent="Editar";
+    btn.onclick=()=>showStatusForm(f,i);
+    row.appendChild(btn);
+    div.appendChild(row);
   });
 }
-function editPerson(fid,pid){
-  let f=fences.find(x=>x.id===fid); if(!f)return;
-  let p=f.personal.find(pp=>pp.id===pid); if(!p)return;
-  let panel=document.createElement("div");
-  panel.className="edit-panel";
-  panel.innerHTML=`
-    <div>Editar: <b>${p.nombre}</b></div>
+
+// === Formulario lateral para estado ===
+function showStatusForm(f, idx){
+  let div=document.getElementById("personList");
+  let form=document.createElement("div");
+  form.className="person-form";
+  let p=f.personal[idx];
+  form.innerHTML=`
+    <strong>${p.nombre}</strong><br>
     <label>Estado:
       <select id="estadoSel">
         <option value="activo" ${p.estado==="activo"?"selected":""}>Activo</option>
         <option value="inactivo" ${p.estado==="inactivo"?"selected":""}>Inactivo</option>
       </select>
     </label><br>
-    <label>Desde: <input type="date" id="desde" value="${p.desde||""}"></label><br>
-    <label>Hasta: <input type="date" id="hasta" value="${p.hasta||""}"></label><br>
-    <button onclick="savePerson('${fid}','${pid}')">Guardar</button>
-    <button onclick="viewPerson()">Cancelar</button>
+    <label>Desde: <input type="date" id="desdeInp" value="${p.desde||""}"></label><br>
+    <label>Hasta: <input type="date" id="hastaInp" value="${p.hasta||""}"></label><br>
+    <button id="saveStatusBtn">Guardar</button>
+    <button id="cancelStatusBtn">Cancelar</button>
   `;
-  document.getElementById("personList").appendChild(panel);
-}
-function savePerson(fid,pid){
-  let f=fences.find(x=>x.id===fid); if(!f)return;
-  let p=f.personal.find(pp=>pp.id===pid); if(!p)return;
-  p.estado=document.getElementById("estadoSel").value;
-  p.desde=document.getElementById("desde").value;
-  p.hasta=document.getElementById("hasta").value;
-  saveData(); viewPerson();
+  div.appendChild(form);
+
+  document.getElementById("saveStatusBtn").onclick=()=>{
+    p.estado=document.getElementById("estadoSel").value;
+    p.desde=document.getElementById("desdeInp").value;
+    p.hasta=document.getElementById("hastaInp").value;
+    saveToStorage();
+    renderPersonal(f);
+  };
+  document.getElementById("cancelStatusBtn").onclick=()=>renderPersonal(f);
 }
 
-// === Obtener personal activo por fecha ===
-function getActivePersonnel(fechaStr){
-  let fecha=new Date(fechaStr);
-  let f=fences.find(x=>x.id===activeId); if(!f)return [];
-  return f.personal.filter(p=>{
-    if(p.estado!=="activo") return false;
-    if(p.desde && new Date(p.desde)>fecha) return false;
-    if(p.hasta && new Date(p.hasta)<fecha) return false;
-    return true;
-  });
-}
-
-init();
+initMap();
 </script>
 </body>
 </html>
