@@ -34,8 +34,8 @@
   <ul id="fenceList"></ul>
 
   <h3>Gestión de Personal</h3>
-  <button id="addPersonBtn" disabled>Añadir personal</button>
-  <button id="viewPersonBtn" disabled>Ver personal</button>
+  <button id="addPersonBtn">Añadir personal</button>
+  <button id="viewPersonBtn">Ver personal</button>
   <div id="personList"></div>
 </div>
 
@@ -98,9 +98,10 @@ function updateUI(){
   document.getElementById("editBtn").disabled=!has;
   document.getElementById("renameBtn").disabled=!has;
   document.getElementById("deleteBtn").disabled=!has;
-  document.getElementById("addPersonBtn").disabled=!has;
-  document.getElementById("viewPersonBtn").disabled=!has;
-  // ❌ se eliminó la llamada recursiva a drawAll()
+
+  // ✅ Ahora los botones de personal siempre habilitados
+  document.getElementById("addPersonBtn").disabled=false;
+  document.getElementById("viewPersonBtn").disabled=false;
 }
 
 // === Dibujo geocerca ===
