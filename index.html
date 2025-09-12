@@ -110,7 +110,7 @@ function loadFromStorage(){
   if(rawA){ actividadesDisponibles=JSON.parse(rawA); }
 }
 
-// === Inicializar mapa (igual que antes) ===
+// === Inicializar mapa ===
 function initMap(){
   map=L.map('map').setView([-1.73,-77.91],14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
@@ -122,7 +122,7 @@ function initMap(){
   drawAll();
 }
 
-// === Dibujar geocercas (igual que antes) ===
+// === Dibujar geocercas ===
 function drawAll(){
   group.clearLayers();
   fences.forEach(f=>{
@@ -146,7 +146,7 @@ function renderList(){
   });
 }
 
-// === Módulo de reportes ===
+// === Reportes ===
 document.getElementById("reportBtn").onclick=()=>{
   renderReportes();
 };
@@ -182,17 +182,19 @@ function renderReportes(){
   `;
   div.appendChild(form);
 
-  // Contenedor resultados
   let cont=document.createElement("div");
   cont.id="repResultados";
   div.appendChild(cont);
 
-  document.getElementById("genRepBtn").onclick=()=>{
-    generarReporte();
-  };
-  document.getElementById("expRepBtn").onclick=()=>{
-    exportarReporteCSV();
-  };
+  document.getElementById("genRepBtn").onclick=()=>{ generarReporte(); };
+  document.getElementById("expRepBtn").onclick=()=>{ exportarReporteCSV(); };
+}
+
+function diasEntre(f1,f2){
+  let d1=new Date(f1);
+  let d2=new Date(f2);
+  if(isNaN(d1)||isNaN(d2)) return 0;
+  return Math.floor((d2-d1)/(1000*60*60*24))+1;
 }
 
 function generarReporte(){
@@ -203,7 +205,6 @@ function generarReporte(){
   let hasta=document.getElementById("repHasta").value;
   let tipo=document.getElementById("repTipo").value;
 
-  // Filtrar datos
   let rows=[];
   fences.filter(f=>!geocSel.length || geocSel.includes(f.id)).forEach(f=>{
     (f.costos||[]).forEach(c=>{
@@ -212,13 +213,16 @@ function generarReporte(){
       if(desde && c.desde && c.desde<desde) return;
       if(hasta && c.hasta && c.hasta>hasta) return;
       let pers=personnel.find(p=>p.id===c.pid);
+      let dias=c.desde&&c.hasta? diasEntre(c.desde,c.hasta):0;
+      let total=dias>0? dias*c.costoDia: c.costoDia;
       rows.push({
         geocerca:f.name,
         persona:pers?pers.nombre:"[Desconocido]",
         actividad:c.actividad,
         costoDia:c.costoDia,
         desde:c.desde||"",
-        hasta:c.hasta||""
+        hasta:c.hasta||"",
+        total
       });
     });
   });
@@ -230,33 +234,32 @@ function generarReporte(){
 
   if(tipo==="tabla"){
     let table=document.createElement("table");
-    table.innerHTML="<tr><th>Geocerca</th><th>Persona</th><th>Actividad</th><th>Costo/día</th><th>Desde</th><th>Hasta</th></tr>";
+    table.innerHTML="<tr><th>Geocerca</th><th>Persona</th><th>Actividad</th><th>Costo/día</th><th>Desde</th><th>Hasta</th><th>Costo Total</th></tr>";
     rows.forEach(r=>{
-      table.innerHTML+=`<tr><td>${r.geocerca}</td><td>${r.persona}</td><td>${r.actividad}</td><td>$${r.costoDia}</td><td>${r.desde}</td><td>${r.hasta}</td></tr>`;
+      table.innerHTML+=`<tr><td>${r.geocerca}</td><td>${r.persona}</td><td>${r.actividad}</td><td>$${r.costoDia}</td><td>${r.desde}</td><td>${r.hasta}</td><td>$${r.total}</td></tr>`;
     });
     cont.appendChild(table);
   } else {
     let canvas=document.createElement("canvas");
     cont.appendChild(canvas);
     let labels=rows.map(r=>r.persona+"-"+r.actividad);
-    let data=rows.map(r=>r.costoDia);
+    let data=rows.map(r=>r.total);
     new Chart(canvas,{
       type:tipo,
-      data:{ labels, datasets:[{label:"Costo/día", data}] },
+      data:{ labels, datasets:[{label:"Costo total", data}] },
       options:{ responsive:true, plugins:{legend:{display:true}} }
     });
   }
 
-  // Guardar datos de último reporte
   window.__lastReport=rows;
 }
 
 function exportarReporteCSV(){
   let rows=window.__lastReport||[];
   if(!rows.length){ alert("Genera primero un reporte"); return; }
-  let csv="Geocerca,Persona,Actividad,CostoDia,Desde,Hasta\n";
+  let csv="Geocerca,Persona,Actividad,CostoDia,Desde,Hasta,CostoTotal\n";
   rows.forEach(r=>{
-    csv+=`${r.geocerca},${r.persona},${r.actividad},${r.costoDia},${r.desde},${r.hasta}\n`;
+    csv+=`${r.geocerca},${r.persona},${r.actividad},${r.costoDia},${r.desde},${r.hasta},${r.total}\n`;
   });
   let blob=new Blob([csv],{type:"text/csv"});
   let a=document.createElement("a");
