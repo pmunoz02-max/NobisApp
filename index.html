@@ -31,12 +31,8 @@
       <button id="newBtn">Nueva</button>
       <button id="finishBtn" disabled>Finalizar</button>
       <button id="cancelBtn" disabled>Cancelar</button>
-      <button id="editBtn" disabled>Editar</button>
-      <button id="saveEditBtn" disabled>Guardar cambios</button>
-      <button id="cancelEditBtn" disabled>Cancelar edición</button>
       <button id="renameBtn" disabled>Renombrar</button>
       <button id="deleteBtn" disabled>Eliminar</button>
-      <button id="byCoordsBtn">Geocerca (Lat/Lng)</button>
       <button id="exportBtn">Exportar GeoJSON</button>
       <input type="file" id="importInput" accept=".geojson,.json"/>
 
@@ -66,25 +62,18 @@ let tempLine=null, tempPoly=null;
 
 // === Persistencia ===
 function saveToStorage(){
-  localStorage.setItem("geocercas", JSON.stringify(fences));
+  // Guardamos coordenadas como objetos simples {lat, lng}
+  let cleanFences = fences.map(f=>({
+    ...f,
+    latlngs: f.latlngs.map(p=>({lat:p.lat, lng:p.lng}))
+  }));
+  localStorage.setItem("geocercas", JSON.stringify(cleanFences));
 }
 function loadFromStorage(){
   let raw=localStorage.getItem("geocercas");
   if(raw){
-    fences=JSON.parse(raw).map(f=>({
-      ...f,
-      latlngs:f.latlngs.map(p=>L.latLng(p.lat,p.lng))
-    }));
+    fences=JSON.parse(raw);
   }
-}
-
-// === Estado ===
-function setIdle(){
-  document.getElementById("editBtn").disabled = !activeId;
-  document.getElementById("saveEditBtn").disabled = true;
-  document.getElementById("cancelEditBtn").disabled = true;
-  document.getElementById("renameBtn").disabled = !activeId;
-  document.getElementById("deleteBtn").disabled = !activeId;
 }
 
 // === Inicializar mapa ===
@@ -117,10 +106,9 @@ function renderList(){
     let li=document.createElement("li");
     li.textContent=f.name;
     li.style.cursor="pointer";
-    li.onclick=()=>{ activeId=f.id; drawAll(); setIdle(); };
+    li.onclick=()=>{ activeId=f.id; drawAll(); };
     ul.appendChild(li);
   });
-  setIdle();
 }
 
 // === Crear geocercas manual ===
