@@ -43,6 +43,7 @@
       <h3>Gestión de Personal</h3>
       <button id="addPersonBtn">Añadir personal</button>
       <button id="listPersonBtn">Ver personal</button>
+      <button id="statusPersonBtn">Designar estado</button>
       <div id="personList" style="margin-top:8px; font-size:13px; color:#374151;"></div>
     </div>
 
@@ -74,11 +75,15 @@ function saveToStorage(){
 }
 
 function loadFromStorage(){
-  let stored = JSON.parse(localStorage.getItem("geocercas")) || [];
-  fences = stored.map(f=>({
-    ...f,
-    latlngs: f.latlngs.map(p=>L.latLng(p.lat,p.lng))
-  }));
+  let raw = localStorage.getItem("geocercas");
+  if (raw) {
+    try {
+      fences = JSON.parse(raw).map(f=>({
+        ...f,
+        latlngs: f.latlngs.map(p=>L.latLng(p.lat,p.lng))
+      }));
+    } catch (e) { fences=[]; }
+  }
 }
 
 // === Helpers de estado ===
@@ -96,29 +101,6 @@ function setEditing(){
   document.getElementById("renameBtn").disabled = true;
   document.getElementById("deleteBtn").disabled = true;
 }
-
-// === Crear por Lat/Lng ===
-document.getElementById("byCoordsBtn").onclick=()=>{
-  let raw=prompt("Pega coordenadas Lat,Lng separadas por salto de línea o ';'");
-  if(!raw) return;
-  let pts=[]; raw.split(/[\n;]/).forEach(l=>{
-    let p=l.trim().split(/[, ]+/);
-    if(p.length>=2){
-      let lat=parseFloat(p[0]); let lng=parseFloat(p[1]);
-      if(Math.abs(lat)>90){ [lat,lng]=[lng,lat]; }
-      if(!isNaN(lat)&&!isNaN(lng)) pts.push([lat,lng]);
-    }
-  });
-  if(pts.length<3){ alert("Se requieren al menos 3 coordenadas"); return; }
-  let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
-  if(!name) return;
-  let f={id:Date.now().toString(), name:name, latlngs:pts.map(p=>L.latLng(p[0],p[1]))};
-  fences.push(f);
-  saveToStorage();
-  activeId=f.id;
-  drawAll();
-  map.fitBounds(f.__layer.getBounds());
-};
 
 // === Edición de Geocercas ===
 function enterEdit() {
@@ -185,7 +167,7 @@ document.getElementById("deleteBtn").onclick=()=>{
   }
 };
 
-// inicializar mapa
+// === Inicializar mapa ===
 function initMap(){
   map=L.map('map').setView([-1.73,-77.91],14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
@@ -197,7 +179,7 @@ function initMap(){
   drawAll();
 }
 
-// dibujar todas
+// === Dibujar geocercas ===
 function drawAll(){
   group.clearLayers();
   fences.forEach(f=>{
@@ -246,7 +228,7 @@ document.getElementById("finishBtn").onclick=()=>{
   if(tempPoints.length<3){ alert("Se requieren al menos 3 puntos."); return; }
   let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
   if(!name) return;
-  let f={id:Date.now().toString(), name:name, latlngs:tempPoints};
+  let f={id:Date.now().toString(), name:name, latlngs:tempPoints, personal:[]};
   fences.push(f);
   saveToStorage();
   map.off("click",addTempPoint);
@@ -274,7 +256,7 @@ document.getElementById("addPersonBtn").onclick=()=>{
   let p=prompt("Nombre del personal:");
   if(!p) return;
   if(!f.personal) f.personal=[];
-  f.personal.push(p);
+  f.personal.push({nombre:p});
   saveToStorage();
   alert(`Añadido personal a: ${f.name}`);
 };
@@ -282,6 +264,29 @@ document.getElementById("addPersonBtn").onclick=()=>{
 document.getElementById("listPersonBtn").onclick=()=>{
   let f=fences.find(x=>x.id===activeId);
   if(!f){ alert("Selecciona una geocerca activa."); return; }
+  renderPersonal(f);
+};
+
+// === Nuevo: Designar estado de personal ===
+document.getElementById("statusPersonBtn").onclick=()=>{
+  let f=fences.find(x=>x.id===activeId);
+  if(!f || !f.personal || !f.personal.length){
+    alert("No hay personal en esta geocerca."); return;
+  }
+  let nombres = f.personal.map((p,i)=>`${i+1}. ${p.nombre}`).join("\n");
+  let idx = prompt("Selecciona el número del personal:\n"+nombres);
+  if(!idx) return;
+  idx=parseInt(idx)-1;
+  if(idx<0 || idx>=f.personal.length) return;
+
+  let estado = prompt("Estado (Activo/Inactivo):", f.personal[idx].estado || "Activo");
+  let desde = prompt("Desde (YYYY-MM-DD):", f.personal[idx].desde || "");
+  let hasta = prompt("Hasta (YYYY-MM-DD):", f.personal[idx].hasta || "");
+
+  f.personal[idx].estado = estado;
+  f.personal[idx].desde = desde;
+  f.personal[idx].hasta = hasta;
+  saveToStorage();
   renderPersonal(f);
 };
 
@@ -294,8 +299,9 @@ function renderPersonal(f){
   }
   let ul=document.createElement("ul");
   f.personal.forEach((p,i)=>{
+    let estadoTxt = p.estado ? ` → ${p.estado} (${p.desde||"?"} - ${p.hasta||"?"})` : "";
     let li=document.createElement("li");
-    li.textContent=`${i+1}. ${p}`;
+    li.textContent=`${i+1}. ${p.nombre}${estadoTxt}`;
     ul.appendChild(li);
   });
   div.appendChild(ul);
