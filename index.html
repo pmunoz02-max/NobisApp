@@ -19,10 +19,7 @@
     #map { width:100%; height:100%; }
     #coords { font-size:12px; color:#333; padding:4px; }
     ul { margin:4px 0; padding-left:18px; }
-    .person-row { display:flex; justify-content:space-between; align-items:center; margin:2px 0; font-size:13px; padding:2px 4px; border-radius:3px; }
-    .person-row.activo { background:#d1fae5; color:#065f46; }   /* verde */
-    .person-row.inactivo { background:#fee2e2; color:#991b1b; } /* rojo */
-    .person-row.neutro { background:#f3f4f6; color:#374151; }   /* gris */
+    .person-row { display:flex; justify-content:space-between; align-items:center; margin:2px 0; font-size:13px; }
     .person-form { background:#eef; padding:6px; margin:6px 0; border-radius:4px; }
     .person-form input, .person-form select { margin:2px 0; width:100%; padding:4px; font-size:12px; }
   </style>
@@ -117,13 +114,11 @@ function drawAll(){
   fences.forEach(f=>{
     let poly=L.polygon(f.latlngs,{color:'#6b21a8',weight:2,fillOpacity:0.3}).addTo(group);
     poly.bindTooltip(f.name,{permanent:true,direction:"center"});
-    ("click",()=>{ activeId=f.id; renderList(); });
+    poly.on("click",()=>{ activeId=f.id; renderList(); });
     f.__layer=poly;
-  })poly.on("click",()=>{
-  activeId=f.id;
+  });
   renderList();
-  renderPersonal(f);
-});
+}
 function renderList(){
   let ul=document.getElementById("fenceList");
   ul.innerHTML="";
@@ -131,13 +126,11 @@ function renderList(){
     let li=document.createElement("li");
     li.textContent=f.name;
     li.style.cursor="pointer";
-    li.onclick=()=>{
-  activeId=f.id;
-  drawAll();
+    li.onclick=()=>{ activeId=f.id; drawAll(); setIdle(); };
+    ul.appendChild(li);
+  });
   setIdle();
-  renderPersonal(f);
-};
-
+}
 
 // === Crear geocercas manual ===
 document.getElementById("newBtn").onclick=()=>{
@@ -205,22 +198,11 @@ function renderPersonal(f){
     div.textContent="(Sin personal registrado)";
     return;
   }
-
-  let today=new Date().toISOString().slice(0,10);
-
   f.personal.forEach((p,i)=>{
-    let clase="neutro";
-    if(p.estado && p.desde && p.hasta){
-      if(today>=p.desde && today<=p.hasta){
-        clase=(p.estado==="Activo")?"activo":"inactivo";
-      }
-    }
     let estadoTxt = p.estado ? ` → ${p.estado} (${p.desde||"?"} - ${p.hasta||"?"})` : " (sin estado)";
-
     let row=document.createElement("div");
-    row.className=`person-row ${clase}`;
-    // 👇 Siempre mostrar claramente el nombre
-    row.innerHTML=`<span><strong>${p.nombre}</strong>${estadoTxt}</span>`;
+    row.className="person-row";
+    row.innerHTML=`<span>${i+1}. ${p.nombre}${estadoTxt}</span>`;
     let btn=document.createElement("button");
     btn.textContent="Cambiar estado";
     btn.onclick=()=>showStatusForm(f,i);
@@ -235,7 +217,7 @@ function showStatusForm(f, idx){
   let form=document.createElement("div");
   form.className="person-form";
   form.innerHTML=`
-    <strong>Editar: ${f.personal[idx].nombre}</strong><br>
+    <strong>${f.personal[idx].nombre}</strong><br>
     <label>Estado:
       <select id="estadoSel">
         <option ${f.personal[idx].estado==="Activo"?"selected":""}>Activo</option>
@@ -263,4 +245,5 @@ initMap();
 </script>
 </body>
 </html>
+
 
