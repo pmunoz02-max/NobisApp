@@ -146,6 +146,14 @@ function renderList(){
   });
 }
 
+// === Utilidades ===
+function diasEntre(f1,f2){
+  let d1=new Date(f1);
+  let d2=new Date(f2);
+  if(isNaN(d1)||isNaN(d2)) return 0;
+  return Math.floor((d2-d1)/(1000*60*60*24))+1;
+}
+
 // === Reportes ===
 document.getElementById("reportBtn").onclick=()=>{
   renderReportes();
@@ -157,7 +165,6 @@ function renderReportes(){
 
   if(!fences.length){ div.innerHTML+="<p>(No hay datos)</p>"; return; }
 
-  // Filtros
   let geocOpts=fences.map(f=>`<option value="${f.id}">${f.name}</option>`).join("");
   let persOpts=personnel.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join("");
   let actOpts=actividadesDisponibles.map(a=>`<option value="${a}">${a}</option>`).join("");
@@ -172,7 +179,7 @@ function renderReportes(){
     <label>Salida:
       <select id="repTipo">
         <option value="tabla">Tabla</option>
-        <option value="bar">Gráfico de barras</option>
+        <option value="bar">Gráfico de barras (agrupado por geocerca)</option>
         <option value="pie">Gráfico de torta</option>
         <option value="line">Gráfico de líneas</option>
       </select>
@@ -188,13 +195,6 @@ function renderReportes(){
 
   document.getElementById("genRepBtn").onclick=()=>{ generarReporte(); };
   document.getElementById("expRepBtn").onclick=()=>{ exportarReporteCSV(); };
-}
-
-function diasEntre(f1,f2){
-  let d1=new Date(f1);
-  let d2=new Date(f2);
-  if(isNaN(d1)||isNaN(d2)) return 0;
-  return Math.floor((d2-d1)/(1000*60*60*24))+1;
 }
 
 function generarReporte(){
@@ -239,7 +239,23 @@ function generarReporte(){
       table.innerHTML+=`<tr><td>${r.geocerca}</td><td>${r.persona}</td><td>${r.actividad}</td><td>$${r.costoDia}</td><td>${r.desde}</td><td>${r.hasta}</td><td>$${r.total}</td></tr>`;
     });
     cont.appendChild(table);
+  } else if(tipo==="bar"){
+    // Agrupado por geocerca
+    let grouped={};
+    rows.forEach(r=>{
+      grouped[r.geocerca]=(grouped[r.geocerca]||0)+r.total;
+    });
+    let labels=Object.keys(grouped);
+    let data=Object.values(grouped);
+    let canvas=document.createElement("canvas");
+    cont.appendChild(canvas);
+    new Chart(canvas,{
+      type:"bar",
+      data:{ labels, datasets:[{label:"Costo total por geocerca", data}] },
+      options:{ responsive:true, plugins:{legend:{display:true}} }
+    });
   } else {
+    // pie y line usan el detalle
     let canvas=document.createElement("canvas");
     cont.appendChild(canvas);
     let labels=rows.map(r=>r.persona+"-"+r.actividad);
@@ -272,4 +288,3 @@ initMap();
 </script>
 </body>
 </html>
-
