@@ -1,271 +1,170 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Geocercas (Nobis)</title>
-
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    body { margin:0; font-family: system-ui, Arial, sans-serif; }
-    .app { display:grid; grid-template-columns:300px 1fr; height:100vh; }
-    .sidebar { background:#f9fafb; border-right:1px solid #ddd; padding:8px; overflow-y:auto; }
-    .sidebar h3 { margin-top:16px; margin-bottom:6px; font-size:14px; color:#111; }
-    button { margin:2px 0; padding:4px 6px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:12px; }
-    button:disabled { opacity:0.5; cursor:not-allowed; }
-    #map { width:100%; height:100%; }
-    #coords { font-size:12px; color:#333; padding:4px; }
-    ul { margin:4px 0; padding-left:18px; }
-    .person-row { display:flex; justify-content:space-between; align-items:center; margin:2px 0; font-size:13px; padding:2px 4px; border-radius:3px; }
-    .person-row.activo { background:#d1fae5; color:#065f46; }   /* verde */
-    .person-row.inactivo { background:#fee2e2; color:#991b1b; } /* rojo */
-    .person-row.neutro { background:#f3f4f6; color:#374151; }   /* gris */
-    .person-form { background:#eef; padding:6px; margin:6px 0; border-radius:4px; }
-    .person-form input, .person-form select { margin:2px 0; width:100%; padding:4px; font-size:12px; }
+    body { margin:0; display:flex; height:100vh; font-family:sans-serif; }
+    #sidebar { width:280px; overflow-y:auto; padding:8px; background:#f8f8f8; border-right:1px solid #ccc; }
+    #map { flex:1; }
+    h3 { margin-top:12px; }
+    button { margin:2px 0; display:block; width:100%; }
+    ul { padding-left:18px; }
+    .person-form { background:#eef; padding:6px; margin:4px 0; border-radius:6px; }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div class="sidebar">
-      <h3>Acciones</h3>
-      <button id="newBtn">Nueva</button>
-      <button id="finishBtn" disabled>Finalizar</button>
-      <button id="cancelBtn" disabled>Cancelar</button>
-      <button id="editBtn" disabled>Editar</button>
-      <button id="saveEditBtn" disabled>Guardar cambios</button>
-      <button id="cancelEditBtn" disabled>Cancelar edición</button>
-      <button id="renameBtn" disabled>Renombrar</button>
-      <button id="deleteBtn" disabled>Eliminar</button>
-      <button id="byCoordsBtn">Geocerca (Lat/Lng)</button>
-      <button id="exportBtn">Exportar GeoJSON</button>
-      <input type="file" id="importInput" accept=".geojson,.json"/>
+  <div id="sidebar">
+    <h3>Acciones</h3>
+    <button id="newBtn">Nueva</button>
+    <button id="finishBtn" disabled>Finalizar</button>
+    <button id="cancelBtn" disabled>Cancelar</button>
+    <button id="editBtn" disabled>Editar</button>
+    <button id="saveEditBtn" disabled>Guardar cambios</button>
+    <button id="cancelEditBtn" disabled>Cancelar edición</button>
+    <button id="renameBtn" disabled>Renombrar</button>
+    <button id="deleteBtn" disabled>Eliminar</button>
+    <button id="coordsBtn">Geocerca (Lat/Lng)</button>
+    <button id="exportBtn">Exportar GeoJSON</button>
+    <input type="file" id="importInput" />
 
-      <h3>Geocercas</h3>
-      <ul id="fenceList"></ul>
+    <h3>Geocercas</h3>
+    <ul id="fenceList"></ul>
 
-      <h3>Gestión de Personal</h3>
-      <button id="addPersonBtn">Añadir personal</button>
-      <button id="listPersonBtn">Ver personal</button>
-      <div id="personList" style="margin-top:8px; font-size:13px; color:#374151;"></div>
-    </div>
-
-    <div>
-      <div id="map"></div>
-      <div id="coords">Lat: -, Lng: -</div>
-    </div>
+    <h3>Gestión de Personal</h3>
+    <button id="addPersonalBtn" disabled>Añadir personal</button>
+    <button id="viewPersonalBtn" disabled>Ver personal</button>
+    <div id="personList"></div>
   </div>
 
-<script>
-let map, group;
-let fences=[];
-let activeId=null;
+  <div id="map"></div>
 
-let drawing=false;
-let tempPoints=[]; 
-let tempLine=null, tempPoly=null;
-let editMarkers = [];
-let editBackup = null;
-
-// === Persistencia ===
-function saveToStorage(){
-  localStorage.setItem("geocercas", JSON.stringify(fences));
-}
-function loadFromStorage(){
-  let raw=localStorage.getItem("geocercas");
-  if(raw){
-    fences=JSON.parse(raw).map(f=>({
-      ...f,
-      latlngs:f.latlngs.map(p=>L.latLng(p.lat,p.lng))
-    }));
-  }
-}
-
-// === Estado ===
-function setIdle(){
-  document.getElementById("editBtn").disabled = !activeId;
-  document.getElementById("saveEditBtn").disabled = true;
-  document.getElementById("cancelEditBtn").disabled = true;
-  document.getElementById("renameBtn").disabled = !activeId;
-  document.getElementById("deleteBtn").disabled = !activeId;
-}
-function setEditing(){
-  document.getElementById("editBtn").disabled = true;
-  document.getElementById("saveEditBtn").disabled = false;
-  document.getElementById("cancelEditBtn").disabled = false;
-  document.getElementById("renameBtn").disabled = true;
-  document.getElementById("deleteBtn").disabled = true;
-}
-
-// === Inicializar mapa ===
-function initMap(){
-  map=L.map('map').setView([-1.73,-77.91],14);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
-  group=L.layerGroup().addTo(map);
-  map.on("mousemove",e=>{
-    document.getElementById("coords").textContent=`Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
-  });
-  loadFromStorage();
-  drawAll();
-}
-
-// === Dibujar geocercas ===
-function drawAll(){
-  group.clearLayers();
-  fences.forEach(f=>{
-    let poly=L.polygon(f.latlngs,{color:'#6b21a8',weight:2,fillOpacity:0.3}).addTo(group);
-    poly.bindTooltip(f.name,{permanent:true,direction:"center"});
-    poly.on("click",()=>{
-      activeId=f.id;
-      renderList();
-      renderPersonal(f); // 👈 refrescar personal al seleccionar
-    });
-    f.__layer=poly;
-  });
-  renderList();
-}
-function renderList(){
-  let ul=document.getElementById("fenceList");
-  ul.innerHTML="";
-  fences.forEach(f=>{
-    let li=document.createElement("li");
-    li.textContent=f.name;
-    li.style.cursor="pointer";
-    li.onclick=()=>{
-      activeId=f.id;
-      drawAll();
-      setIdle();
-      renderPersonal(f); // 👈 refrescar personal al cambiar por lista
-    };
-    ul.appendChild(li);
-  });
-  setIdle();
-}
-
-// === Crear geocercas manual ===
-document.getElementById("newBtn").onclick=()=>{
-  drawing=true; tempPoints=[]; 
-  if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
-  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
-  map.on("click",addTempPoint);
-  document.getElementById("finishBtn").disabled=false;
-  document.getElementById("cancelBtn").disabled=false;
-};
-function addTempPoint(e){
-  tempPoints.push(e.latlng);
-  if(tempLine){ tempLine.setLatLngs(tempPoints); }
-  else{ tempLine=L.polyline(tempPoints,{color:"blue",dashArray:"5,5"}).addTo(map); }
-  if(tempPoints.length>=3){
-    if(tempPoly){ tempPoly.setLatLngs(tempPoints); }
-    else{ tempPoly=L.polygon(tempPoints,{color:"blue",weight:1,fillOpacity:0.1}).addTo(map); }
-  }
-}
-document.getElementById("finishBtn").onclick=()=>{
-  if(tempPoints.length<3){ alert("Se requieren al menos 3 puntos."); return; }
-  let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
-  if(!name) return;
-  let f={id:Date.now().toString(), name:name, latlngs:tempPoints, personal:[]};
-  fences.push(f);
-  saveToStorage();
-  map.off("click",addTempPoint);
-  drawing=false; tempPoints=[]; 
-  if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
-  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
-  document.getElementById("finishBtn").disabled=true;
-  document.getElementById("cancelBtn").disabled=true;
-  drawAll();
-};
-document.getElementById("cancelBtn").onclick=()=>{
-  drawing=false; tempPoints=[]; 
-  if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
-  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null; }
-  map.off("click",addTempPoint);
-  document.getElementById("finishBtn").disabled=true;
-  document.getElementById("cancelBtn").disabled=true;
-};
-
-// === Gestión de personal ===
-document.getElementById("addPersonBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);
-  if(!f){ alert("Selecciona una geocerca activa."); return; }
-  let p=prompt("Nombre del personal:");
-  if(!p) return;
-  if(!f.personal) f.personal=[];
-  f.personal.push({nombre:p});
-  saveToStorage();
-  renderPersonal(f);
-};
-document.getElementById("listPersonBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);
-  if(!f){ alert("Selecciona una geocerca activa."); return; }
-  renderPersonal(f);
-};
-
-function renderPersonal(f){
-  let div=document.getElementById("personList");
-  div.innerHTML="";
-  if(!f.personal || !f.personal.length){
-    div.textContent="(Sin personal registrado)";
-    return;
-  }
-
-  let today=new Date().toISOString().slice(0,10);
-
-  f.personal.forEach((p,i)=>{
-    let clase="neutro";
-    if(p.estado && p.desde && p.hasta){
-      if(today>=p.desde && today<=p.hasta){
-        clase=(p.estado==="Activo")?"activo":"inactivo";
-      }
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // === Storage ===
+    function saveToStorage(){
+      localStorage.setItem("geofences", JSON.stringify(fences));
     }
-    let estadoTxt = p.estado ? ` → ${p.estado} (${p.desde||"?"} - ${p.hasta||"?"})` : " (sin estado)";
+    function loadFromStorage(){
+      return JSON.parse(localStorage.getItem("geofences")||"[]");
+    }
 
-    let row=document.createElement("div");
-    row.className=`person-row ${clase}`;
-    row.innerHTML=`<span><strong>${p.nombre}</strong>${estadoTxt}</span>`;
-    let btn=document.createElement("button");
-    btn.textContent="Cambiar estado";
-    btn.onclick=()=>showStatusForm(f,i);
-    row.appendChild(btn);
-    div.appendChild(row);
-  });
-}
+    // === Estado ===
+    let map, drawnLayer;
+    let fences = loadFromStorage();
+    let activeFence = null;
 
-// === Formulario lateral para estado ===
-function showStatusForm(f, idx){
-  let div=document.getElementById("personList");
-  let form=document.createElement("div");
-  form.className="person-form";
-  form.innerHTML=`
-    <strong>Editar: ${f.personal[idx].nombre}</strong><br>
-    <label>Estado:
-      <select id="estadoSel">
-        <option ${f.personal[idx].estado==="Activo"?"selected":""}>Activo</option>
-        <option ${f.personal[idx].estado==="Inactivo"?"selected":""}>Inactivo</option>
-      </select>
-    </label><br>
-    <label>Desde: <input type="date" id="desdeInp" value="${f.personal[idx].desde||""}"></label><br>
-    <label>Hasta: <input type="date" id="hastaInp" value="${f.personal[idx].hasta||""}"></label><br>
-    <button id="saveStatusBtn">Guardar</button>
-    <button id="cancelStatusBtn">Cancelar</button>
-  `;
-  div.appendChild(form);
+    function initMap(){
+      map = L.map("map").setView([-1.73,-77.91], 13);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+        attribution:"&copy; OpenStreetMap"
+      }).addTo(map);
+      renderFences();
+    }
 
-  document.getElementById("saveStatusBtn").onclick=()=>{
-    f.personal[idx].estado=document.getElementById("estadoSel").value;
-    f.personal[idx].desde=document.getElementById("desdeInp").value;
-    f.personal[idx].hasta=document.getElementById("hastaInp").value;
-    saveToStorage();
-    renderPersonal(f);
-  };
-  document.getElementById("cancelStatusBtn").onclick=()=>renderPersonal(f);
-}
+    // === Render geocercas ===
+    function renderFences(){
+      if(drawnLayer) drawnLayer.clearLayers();
+      else drawnLayer=L.layerGroup().addTo(map);
+      document.getElementById("fenceList").innerHTML="";
+      fences.forEach((f,i)=>{
+        let poly=L.polygon(f.latlngs,{color:"purple"}).addTo(drawnLayer);
+        poly.bindTooltip(f.name,{permanent:true,direction:"center"});
+        poly.on("click",()=>{activeFence=f; refreshButtons(); renderPersonal(f);});
+        let li=document.createElement("li");
+        li.textContent=f.name;
+        li.onclick=()=>{activeFence=f; refreshButtons(); renderPersonal(f);};
+        document.getElementById("fenceList").appendChild(li);
+      });
+      refreshButtons();
+    }
 
-initMap();
-</script>
+    function refreshButtons(){
+      let has=!!activeFence;
+      document.getElementById("editBtn").disabled=!has;
+      document.getElementById("renameBtn").disabled=!has;
+      document.getElementById("deleteBtn").disabled=!has;
+      document.getElementById("addPersonalBtn").disabled=!has;
+      document.getElementById("viewPersonalBtn").disabled=!has;
+    }
+
+    // === Gestión de Personal ===
+    document.getElementById("addPersonalBtn").onclick=()=>{
+      if(!activeFence) return;
+      let nombre=prompt("Nombre del personal:");
+      if(!nombre) return;
+      if(!activeFence.personal) activeFence.personal=[];
+      activeFence.personal.push({nombre,estado:"Inactivo",desde:"",hasta:""});
+      saveToStorage();
+      renderPersonal(activeFence);
+    };
+
+    document.getElementById("viewPersonalBtn").onclick=()=>{
+      if(activeFence) renderPersonal(activeFence);
+    };
+
+    function renderPersonal(f){
+      let div=document.getElementById("personList");
+      div.innerHTML="";
+      if(!f.personal||!f.personal.length){
+        div.innerHTML="<i>Sin personal asignado</i>";
+        return;
+      }
+      f.personal.forEach((p,idx)=>{
+        let row=document.createElement("div");
+        row.textContent=`${p.nombre} (${p.estado||"sin estado"}) `;
+        let btn=document.createElement("button");
+        btn.textContent="Cambiar estado";
+        btn.onclick=()=>showStatusForm(f,idx);
+        row.appendChild(btn);
+        div.appendChild(row);
+      });
+    }
+
+    function showStatusForm(f, idx){
+      let div=document.getElementById("personList");
+      let form=document.createElement("div");
+      form.className="person-form";
+
+      // IDs únicos
+      let estadoId=`estadoSel_${idx}`;
+      let desdeId=`desdeInp_${idx}`;
+      let hastaId=`hastaInp_${idx}`;
+      let saveId=`saveStatusBtn_${idx}`;
+      let cancelId=`cancelStatusBtn_${idx}`;
+
+      form.innerHTML=`
+        <strong>Editar: ${f.personal[idx].nombre}</strong><br>
+        <label>Estado:
+          <select id="${estadoId}">
+            <option ${f.personal[idx].estado==="Activo"?"selected":""}>Activo</option>
+            <option ${f.personal[idx].estado==="Inactivo"?"selected":""}>Inactivo</option>
+          </select>
+        </label><br>
+        <label>Desde: <input type="date" id="${desdeId}" value="${f.personal[idx].desde||""}"></label><br>
+        <label>Hasta: <input type="date" id="${hastaId}" value="${f.personal[idx].hasta||""}"></label><br>
+        <button id="${saveId}">Guardar</button>
+        <button id="${cancelId}">Cancelar</button>
+      `;
+      div.appendChild(form);
+
+      document.getElementById(saveId).onclick=()=>{
+        f.personal[idx].estado=document.getElementById(estadoId).value;
+        f.personal[idx].desde=document.getElementById(desdeId).value;
+        f.personal[idx].hasta=document.getElementById(hastaId).value;
+        saveToStorage();
+        renderPersonal(f);
+      };
+      document.getElementById(cancelId).onclick=()=>renderPersonal(f);
+    }
+
+    // === Inicializar ===
+    initMap();
+  </script>
 </body>
 </html>
+
 
 
