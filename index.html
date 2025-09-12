@@ -117,11 +117,13 @@ function drawAll(){
   fences.forEach(f=>{
     let poly=L.polygon(f.latlngs,{color:'#6b21a8',weight:2,fillOpacity:0.3}).addTo(group);
     poly.bindTooltip(f.name,{permanent:true,direction:"center"});
-    poly.on("click",()=>{ activeId=f.id; renderList(); });
+    ("click",()=>{ activeId=f.id; renderList(); });
     f.__layer=poly;
-  });
+  })poly.on("click",()=>{
+  activeId=f.id;
   renderList();
-}
+  renderPersonal(f);
+});
 function renderList(){
   let ul=document.getElementById("fenceList");
   ul.innerHTML="";
@@ -129,11 +131,13 @@ function renderList(){
     let li=document.createElement("li");
     li.textContent=f.name;
     li.style.cursor="pointer";
-    li.onclick=()=>{ activeId=f.id; drawAll(); setIdle(); };
-    ul.appendChild(li);
-  });
+    li.onclick=()=>{
+  activeId=f.id;
+  drawAll();
   setIdle();
-}
+  renderPersonal(f);
+};
+
 
 // === Crear geocercas manual ===
 document.getElementById("newBtn").onclick=()=>{
