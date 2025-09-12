@@ -100,7 +100,7 @@ function updateUI(){
   document.getElementById("deleteBtn").disabled=!has;
   document.getElementById("addPersonBtn").disabled=!has;
   document.getElementById("viewPersonBtn").disabled=!has;
-  drawAll();
+  // ❌ se eliminó la llamada recursiva a drawAll()
 }
 
 // === Dibujo geocerca ===
