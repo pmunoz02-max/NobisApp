@@ -64,31 +64,22 @@ let editMarkers = [];
 let editBackup = null;
 
 // === Persistencia en localStorage ===
-function saveFence(fence) {
-  let fences = JSON.parse(localStorage.getItem("geocercas")) || [];
-  // Buscar si ya existe
-  let index = fences.findIndex(f => f.id === fence.id);
-  if (index >= 0) {
-    fences[index] = fence; // actualiza existente
-  } else {
-    fences.push(fence); // añade nueva
-  }
-  localStorage.setItem("geocercas", JSON.stringify(fences));
+function saveToStorage(){
+  localStorage.setItem("geocercas", JSON.stringify(fences.map(f=>({
+    id: f.id,
+    name: f.name,
+    latlngs: f.latlngs,
+    personal: f.personal || []
+  }))));
 }
 
-function loadFences() {
-  let fences = JSON.parse(localStorage.getItem("geocercas")) || [];
-  fences.forEach(fence => {
-    let polygon = L.polygon(fence.latlngs, { color: "purple" }).addTo(group);
-    polygon.bindTooltip(fence.name, { permanent: true, direction: "center" });
-    fence._layer = polygon;
-    polygon.on("click", () => {
-      activeFence = fence;
-      renderList();
-    });
-  });
+function loadFromStorage(){
+  let stored = JSON.parse(localStorage.getItem("geocercas")) || [];
+  fences = stored.map(f=>({
+    ...f,
+    latlngs: f.latlngs.map(p=>L.latLng(p.lat,p.lng))
+  }));
 }
-
 
 // === Helpers de estado ===
 function setIdle(){
@@ -105,7 +96,6 @@ function setEditing(){
   document.getElementById("renameBtn").disabled = true;
   document.getElementById("deleteBtn").disabled = true;
 }
-function writeFences(arr){ fences=arr; saveToStorage(); }
 
 // === Crear por Lat/Lng ===
 document.getElementById("byCoordsBtn").onclick=()=>{
@@ -158,7 +148,7 @@ function saveEdit() {
   let cur = editMarkers.map(m=>m.getLatLng());
   if (cur.length<3){ alert("Mínimo 3 vértices."); return; }
   f.latlngs = cur;
-  writeFences(fences);
+  saveToStorage();
   exitEdit(true);
 }
 
