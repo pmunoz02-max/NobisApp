@@ -62,17 +62,22 @@ let tempLine=null, tempPoly=null;
 
 // === Persistencia ===
 function saveToStorage(){
-  // Guardamos coordenadas como objetos simples {lat, lng}
   let cleanFences = fences.map(f=>({
-    ...f,
-    latlngs: f.latlngs.map(p=>({lat:p.lat, lng:p.lng}))
+    id: f.id,
+    name: f.name,
+    latlngs: f.latlngs.map(p=>({lat:p.lat, lng:p.lng})),
+    personal: f.personal || []
   }));
   localStorage.setItem("geocercas", JSON.stringify(cleanFences));
 }
 function loadFromStorage(){
   let raw=localStorage.getItem("geocercas");
   if(raw){
-    fences=JSON.parse(raw);
+    fences=JSON.parse(raw).map(f=>({
+      ...f,
+      latlngs: f.latlngs.map(p=>({lat:p.lat, lng:p.lng})),
+      personal: f.personal || []
+    }));
   }
 }
 
@@ -107,6 +112,7 @@ function renderList(){
     li.textContent=f.name;
     li.style.cursor="pointer";
     li.onclick=()=>{ activeId=f.id; drawAll(); };
+    if(f.id===activeId) li.style.fontWeight="bold";
     ul.appendChild(li);
   });
 }
@@ -159,7 +165,6 @@ document.getElementById("addPersonBtn").onclick=()=>{
   if(!f){ alert("Selecciona una geocerca activa."); return; }
   let nombre=prompt("Nombre del personal:");
   if(!nombre) return;
-  if(!f.personal) f.personal=[];
   f.personal.push({nombre:nombre, estado:"inactivo", desde:"", hasta:""});
   saveToStorage();
   renderPersonal(f);
