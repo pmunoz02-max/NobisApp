@@ -9,6 +9,9 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+  <!-- Chart.js para reportes -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     body { margin:0; font-family: system-ui, Arial, sans-serif; }
     .app { display:grid; grid-template-columns:320px 1fr; height:100vh; }
@@ -19,12 +22,12 @@
     #map { width:100%; height:100%; }
     #coords { font-size:12px; color:#333; padding:4px; }
     ul { margin:4px 0; padding-left:18px; }
-    .person-row { display:flex; justify-content:space-between; align-items:center; margin:2px 0; font-size:13px; }
+    .person-row, .activity-row, .cost-row { font-size:13px; margin:4px 0; padding:4px; border:1px solid #ccc; border-radius:4px; background:#fff; }
     .person-form { background:#eef; padding:6px; margin:6px 0; border-radius:4px; }
     .person-form input, .person-form select { margin:2px 0; width:100%; padding:4px; font-size:12px; }
-    .global-person { margin:6px 0; padding:6px; border:1px solid #ccc; border-radius:4px; background:#fff; }
-    .assignments { font-size:12px; margin-left:10px; color:#444; }
-    .activity-row, .cost-row { font-size:13px; margin:4px 0; padding:4px; border:1px solid #ccc; border-radius:4px; background:#fff; }
+    table { border-collapse: collapse; width:100%; margin-top:10px; font-size:13px; }
+    table, th, td { border:1px solid #ccc; padding:4px; }
+    th { background:#eee; }
   </style>
 </head>
 <body>
@@ -54,6 +57,9 @@
       <h3>Gestión de Costos</h3>
       <button id="costBtn">Gestionar costos</button>
 
+      <h3>Reportes</h3>
+      <button id="reportBtn">Generar reportes</button>
+
       <div id="personList" style="margin-top:8px; font-size:13px; color:#374151;"></div>
     </div>
 
@@ -71,7 +77,6 @@ let activeId=null;
 let drawing=false;
 let tempPoints=[]; 
 let tempLine=null, tempPoly=null;
-
 let actividadesDisponibles=["Riego","Poda","Fertilización"];
 
 // === Persistencia ===
@@ -105,7 +110,7 @@ function loadFromStorage(){
   if(rawA){ actividadesDisponibles=JSON.parse(rawA); }
 }
 
-// === Inicializar mapa ===
+// === Inicializar mapa (igual que antes) ===
 function initMap(){
   map=L.map('map').setView([-1.73,-77.91],14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
@@ -117,7 +122,7 @@ function initMap(){
   drawAll();
 }
 
-// === Dibujar geocercas ===
+// === Dibujar geocercas (igual que antes) ===
 function drawAll(){
   group.clearLayers();
   fences.forEach(f=>{
@@ -141,74 +146,127 @@ function renderList(){
   });
 }
 
-// === Crear geocercas manual (igual que antes) ===
-// ... OMITIDO: se mantiene igual que versión previa ...
-
-// === Gestión de personal y actividades (igual que antes) ===
-// ... OMITIDO: se mantiene igual que versión previa ...
-
-// === Módulo de costos ===
-document.getElementById("costBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);
-  if(!f){ alert("Selecciona una geocerca activa."); return; }
-  renderCosts(f);
+// === Módulo de reportes ===
+document.getElementById("reportBtn").onclick=()=>{
+  renderReportes();
 };
 
-function renderCosts(f){
+function renderReportes(){
   let div=document.getElementById("personList");
-  div.innerHTML="<h4>Gestión de Costos</h4>";
+  div.innerHTML="<h4>Generador de Reportes</h4>";
 
-  if(!f.asignaciones.length || !f.actividades.length){
-    div.innerHTML+="<p>(Se requiere personal asignado y actividades registradas)</p>";
-    return;
-  }
+  if(!fences.length){ div.innerHTML+="<p>(No hay datos)</p>"; return; }
 
-  // Formulario nuevo costo
+  // Filtros
+  let geocOpts=fences.map(f=>`<option value="${f.id}">${f.name}</option>`).join("");
+  let persOpts=personnel.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join("");
+  let actOpts=actividadesDisponibles.map(a=>`<option value="${a}">${a}</option>`).join("");
   let form=document.createElement("div");
   form.className="person-form";
-  let persOpts=f.asignaciones.map(a=>{
-    let pers=personnel.find(pp=>pp.id===a.pid);
-    return `<option value="${a.pid}">${pers?pers.nombre:"[Desconocido]"}</option>`;
-  }).join("");
-  let actOpts=f.actividades.map(a=>`<option value="${a.actividad}">${a.actividad}</option>`).join("");
   form.innerHTML=`
-    <label>Persona: <select id="costoPersona">${persOpts}</select></label><br>
-    <label>Actividad: <select id="costoActividad">${actOpts}</select></label><br>
-    <label>Costo por día: <input type="number" id="costoDia" min="0"></label><br>
-    <label>Desde: <input type="date" id="costoDesde"></label><br>
-    <label>Hasta: <input type="date" id="costoHasta"></label><br>
-    <button id="saveCostoBtn">Guardar Costo</button>
+    <label>Geocercas:<br><select id="repGeoc" multiple>${geocOpts}</select></label><br>
+    <label>Personas:<br><select id="repPers" multiple>${persOpts}</select></label><br>
+    <label>Actividades:<br><select id="repActs" multiple>${actOpts}</select></label><br>
+    <label>Desde: <input type="date" id="repDesde"></label><br>
+    <label>Hasta: <input type="date" id="repHasta"></label><br>
+    <label>Salida:
+      <select id="repTipo">
+        <option value="tabla">Tabla</option>
+        <option value="bar">Gráfico de barras</option>
+        <option value="pie">Gráfico de torta</option>
+        <option value="line">Gráfico de líneas</option>
+      </select>
+    </label><br>
+    <button id="genRepBtn">Generar</button>
+    <button id="expRepBtn">Exportar CSV</button>
   `;
   div.appendChild(form);
 
-  document.getElementById("saveCostoBtn").onclick=()=>{
-    let pid=document.getElementById("costoPersona").value;
-    let actividad=document.getElementById("costoActividad").value;
-    let costoDia=parseFloat(document.getElementById("costoDia").value);
-    let desde=document.getElementById("costoDesde").value;
-    let hasta=document.getElementById("costoHasta").value;
-    if(isNaN(costoDia) || costoDia<=0){ alert("Ingresa un costo válido"); return; }
-    f.costos.push({pid, actividad, costoDia, desde, hasta});
-    saveToStorage();
-    renderCosts(f);
-  };
+  // Contenedor resultados
+  let cont=document.createElement("div");
+  cont.id="repResultados";
+  div.appendChild(cont);
 
-  // Listado de costos
-  if(f.costos && f.costos.length){
-    f.costos.forEach((c,i)=>{
-      let pers=personnel.find(pp=>pp.id===c.pid);
-      let nombre=pers?pers.nombre:"[Desconocido]";
-      let row=document.createElement("div");
-      row.className="cost-row";
-      row.innerHTML=`${i+1}. ${nombre} → ${c.actividad} → $${c.costoDia}/día (${c.desde||"-"} → ${c.hasta||"-"})`;
-      div.appendChild(row);
+  document.getElementById("genRepBtn").onclick=()=>{
+    generarReporte();
+  };
+  document.getElementById("expRepBtn").onclick=()=>{
+    exportarReporteCSV();
+  };
+}
+
+function generarReporte(){
+  let geocSel=Array.from(document.getElementById("repGeoc").selectedOptions).map(o=>o.value);
+  let persSel=Array.from(document.getElementById("repPers").selectedOptions).map(o=>o.value);
+  let actSel=Array.from(document.getElementById("repActs").selectedOptions).map(o=>o.value);
+  let desde=document.getElementById("repDesde").value;
+  let hasta=document.getElementById("repHasta").value;
+  let tipo=document.getElementById("repTipo").value;
+
+  // Filtrar datos
+  let rows=[];
+  fences.filter(f=>!geocSel.length || geocSel.includes(f.id)).forEach(f=>{
+    (f.costos||[]).forEach(c=>{
+      if(persSel.length && !persSel.includes(c.pid)) return;
+      if(actSel.length && !actSel.includes(c.actividad)) return;
+      if(desde && c.desde && c.desde<desde) return;
+      if(hasta && c.hasta && c.hasta>hasta) return;
+      let pers=personnel.find(p=>p.id===c.pid);
+      rows.push({
+        geocerca:f.name,
+        persona:pers?pers.nombre:"[Desconocido]",
+        actividad:c.actividad,
+        costoDia:c.costoDia,
+        desde:c.desde||"",
+        hasta:c.hasta||""
+      });
+    });
+  });
+
+  let cont=document.getElementById("repResultados");
+  cont.innerHTML="";
+
+  if(!rows.length){ cont.innerHTML="<p>(Sin resultados)</p>"; return; }
+
+  if(tipo==="tabla"){
+    let table=document.createElement("table");
+    table.innerHTML="<tr><th>Geocerca</th><th>Persona</th><th>Actividad</th><th>Costo/día</th><th>Desde</th><th>Hasta</th></tr>";
+    rows.forEach(r=>{
+      table.innerHTML+=`<tr><td>${r.geocerca}</td><td>${r.persona}</td><td>${r.actividad}</td><td>$${r.costoDia}</td><td>${r.desde}</td><td>${r.hasta}</td></tr>`;
+    });
+    cont.appendChild(table);
+  } else {
+    let canvas=document.createElement("canvas");
+    cont.appendChild(canvas);
+    let labels=rows.map(r=>r.persona+"-"+r.actividad);
+    let data=rows.map(r=>r.costoDia);
+    new Chart(canvas,{
+      type:tipo,
+      data:{ labels, datasets:[{label:"Costo/día", data}] },
+      options:{ responsive:true, plugins:{legend:{display:true}} }
     });
   }
+
+  // Guardar datos de último reporte
+  window.__lastReport=rows;
+}
+
+function exportarReporteCSV(){
+  let rows=window.__lastReport||[];
+  if(!rows.length){ alert("Genera primero un reporte"); return; }
+  let csv="Geocerca,Persona,Actividad,CostoDia,Desde,Hasta\n";
+  rows.forEach(r=>{
+    csv+=`${r.geocerca},${r.persona},${r.actividad},${r.costoDia},${r.desde},${r.hasta}\n`;
+  });
+  let blob=new Blob([csv],{type:"text/csv"});
+  let a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="reporte.csv";
+  a.click();
 }
 
 initMap();
 </script>
 </body>
 </html>
-
 
