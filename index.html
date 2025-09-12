@@ -202,10 +202,9 @@ function renderPersonal(f){
     return;
   }
 
-  let today=new Date().toISOString().slice(0,10); // YYYY-MM-DD
+  let today=new Date().toISOString().slice(0,10);
 
   f.personal.forEach((p,i)=>{
-    // determinar estado visual
     let clase="neutro";
     if(p.estado && p.desde && p.hasta){
       if(today>=p.desde && today<=p.hasta){
@@ -216,7 +215,8 @@ function renderPersonal(f){
 
     let row=document.createElement("div");
     row.className=`person-row ${clase}`;
-    row.innerHTML=`<span>${i+1}. ${p.nombre}${estadoTxt}</span>`;
+    // 👇 Siempre mostrar claramente el nombre
+    row.innerHTML=`<span><strong>${p.nombre}</strong>${estadoTxt}</span>`;
     let btn=document.createElement("button");
     btn.textContent="Cambiar estado";
     btn.onclick=()=>showStatusForm(f,i);
@@ -231,7 +231,7 @@ function showStatusForm(f, idx){
   let form=document.createElement("div");
   form.className="person-form";
   form.innerHTML=`
-    <strong>${f.personal[idx].nombre}</strong><br>
+    <strong>Editar: ${f.personal[idx].nombre}</strong><br>
     <label>Estado:
       <select id="estadoSel">
         <option ${f.personal[idx].estado==="Activo"?"selected":""}>Activo</option>
