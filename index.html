@@ -11,14 +11,17 @@
 
   <style>
     body { margin:0; font-family: system-ui, Arial, sans-serif; }
-    .app { display:grid; grid-template-columns:280px 1fr; height:100vh; }
+    .app { display:grid; grid-template-columns:300px 1fr; height:100vh; }
     .sidebar { background:#f9fafb; border-right:1px solid #ddd; padding:8px; overflow-y:auto; }
     .sidebar h3 { margin-top:16px; margin-bottom:6px; font-size:14px; color:#111; }
-    button { display:block; width:100%; margin:4px 0; padding:6px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; }
+    button { margin:2px 0; padding:4px 6px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:12px; }
     button:disabled { opacity:0.5; cursor:not-allowed; }
     #map { width:100%; height:100%; }
     #coords { font-size:12px; color:#333; padding:4px; }
     ul { margin:4px 0; padding-left:18px; }
+    .person-row { display:flex; justify-content:space-between; align-items:center; margin:2px 0; font-size:13px; }
+    .person-form { background:#eef; padding:6px; margin:6px 0; border-radius:4px; }
+    .person-form input, .person-form select { margin:2px 0; width:100%; padding:4px; font-size:12px; }
   </style>
 </head>
 <body>
@@ -43,7 +46,6 @@
       <h3>Gestión de Personal</h3>
       <button id="addPersonBtn">Añadir personal</button>
       <button id="listPersonBtn">Ver personal</button>
-      <button id="statusPersonBtn">Designar estado</button>
       <div id="personList" style="margin-top:8px; font-size:13px; color:#374151;"></div>
     </div>
 
@@ -64,29 +66,21 @@ let tempLine=null, tempPoly=null;
 let editMarkers = [];
 let editBackup = null;
 
-// === Persistencia en localStorage ===
+// === Persistencia ===
 function saveToStorage(){
-  localStorage.setItem("geocercas", JSON.stringify(fences.map(f=>({
-    id: f.id,
-    name: f.name,
-    latlngs: f.latlngs,
-    personal: f.personal || []
-  }))));
+  localStorage.setItem("geocercas", JSON.stringify(fences));
 }
-
 function loadFromStorage(){
-  let raw = localStorage.getItem("geocercas");
-  if (raw) {
-    try {
-      fences = JSON.parse(raw).map(f=>({
-        ...f,
-        latlngs: f.latlngs.map(p=>L.latLng(p.lat,p.lng))
-      }));
-    } catch (e) { fences=[]; }
+  let raw=localStorage.getItem("geocercas");
+  if(raw){
+    fences=JSON.parse(raw).map(f=>({
+      ...f,
+      latlngs:f.latlngs.map(p=>L.latLng(p.lat,p.lng))
+    }));
   }
 }
 
-// === Helpers de estado ===
+// === Estado ===
 function setIdle(){
   document.getElementById("editBtn").disabled = !activeId;
   document.getElementById("saveEditBtn").disabled = true;
@@ -101,71 +95,6 @@ function setEditing(){
   document.getElementById("renameBtn").disabled = true;
   document.getElementById("deleteBtn").disabled = true;
 }
-
-// === Edición de Geocercas ===
-function enterEdit() {
-  if (!activeId) { alert("Selecciona una geocerca primero"); return; }
-  let f = fences.find(ff=>ff.id===activeId);
-  if (!f || !f.__layer) return;
-  if (editMarkers) editMarkers.forEach(m=>map.removeLayer(m));
-  editMarkers = [];
-  let latlngs = f.__layer.getLatLngs()[0];
-  editBackup = latlngs.map(p=>L.latLng(p.lat,p.lng));
-  latlngs.forEach(pt=>{
-    let m = L.marker(pt,{draggable:true});
-    m.on("drag",()=>{
-      let cur = editMarkers.map(mm=>mm.getLatLng());
-      f.__layer.setLatLngs([cur]);
-    });
-    editMarkers.push(m);
-    m.addTo(map);
-  });
-  setEditing();
-}
-
-function saveEdit() {
-  if (!activeId) return;
-  let f = fences.find(ff=>ff.id===activeId);
-  if (!f || !f.__layer) return;
-  let cur = editMarkers.map(m=>m.getLatLng());
-  if (cur.length<3){ alert("Mínimo 3 vértices."); return; }
-  f.latlngs = cur;
-  saveToStorage();
-  exitEdit(true);
-}
-
-function exitEdit(redraw) {
-  if (editMarkers) editMarkers.forEach(m=>map.removeLayer(m));
-  editMarkers = [];
-  editBackup = null;
-  if (redraw) drawAll();
-  setIdle();
-}
-
-// === Renombrar y Eliminar ===
-document.getElementById("renameBtn").onclick=()=>{
-  if(!activeId) return;
-  let f=fences.find(x=>x.id===activeId);
-  if(!f) return;
-  let nuevo=prompt("Nuevo nombre para la geocerca:", f.name);
-  if(nuevo && nuevo.trim()){
-    f.name=nuevo.trim();
-    saveToStorage();
-    drawAll();
-  }
-};
-
-document.getElementById("deleteBtn").onclick=()=>{
-  if(!activeId) return;
-  let f=fences.find(x=>x.id===activeId);
-  if(!f) return;
-  if(confirm("¿Eliminar geocerca '"+f.name+"'?")){
-    fences=fences.filter(x=>x.id!==activeId);
-    saveToStorage();
-    activeId=null;
-    drawAll();
-  }
-};
 
 // === Inicializar mapa ===
 function initMap(){
@@ -190,7 +119,6 @@ function drawAll(){
   });
   renderList();
 }
-
 function renderList(){
   let ul=document.getElementById("fenceList");
   ul.innerHTML="";
@@ -204,7 +132,7 @@ function renderList(){
   setIdle();
 }
 
-// === Crear geocerca manual ===
+// === Crear geocercas manual ===
 document.getElementById("newBtn").onclick=()=>{
   drawing=true; tempPoints=[]; 
   if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
@@ -213,7 +141,6 @@ document.getElementById("newBtn").onclick=()=>{
   document.getElementById("finishBtn").disabled=false;
   document.getElementById("cancelBtn").disabled=false;
 };
-
 function addTempPoint(e){
   tempPoints.push(e.latlng);
   if(tempLine){ tempLine.setLatLngs(tempPoints); }
@@ -223,7 +150,6 @@ function addTempPoint(e){
     else{ tempPoly=L.polygon(tempPoints,{color:"blue",weight:1,fillOpacity:0.1}).addTo(map); }
   }
 }
-
 document.getElementById("finishBtn").onclick=()=>{
   if(tempPoints.length<3){ alert("Se requieren al menos 3 puntos."); return; }
   let name=prompt("Nombre de la geocerca:","Geocerca "+(fences.length+1));
@@ -239,7 +165,6 @@ document.getElementById("finishBtn").onclick=()=>{
   document.getElementById("cancelBtn").disabled=true;
   drawAll();
 };
-
 document.getElementById("cancelBtn").onclick=()=>{
   drawing=false; tempPoints=[]; 
   if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
@@ -258,35 +183,11 @@ document.getElementById("addPersonBtn").onclick=()=>{
   if(!f.personal) f.personal=[];
   f.personal.push({nombre:p});
   saveToStorage();
-  alert(`Añadido personal a: ${f.name}`);
+  renderPersonal(f);
 };
-
 document.getElementById("listPersonBtn").onclick=()=>{
   let f=fences.find(x=>x.id===activeId);
   if(!f){ alert("Selecciona una geocerca activa."); return; }
-  renderPersonal(f);
-};
-
-// === Nuevo: Designar estado de personal ===
-document.getElementById("statusPersonBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);
-  if(!f || !f.personal || !f.personal.length){
-    alert("No hay personal en esta geocerca."); return;
-  }
-  let nombres = f.personal.map((p,i)=>`${i+1}. ${p.nombre}`).join("\n");
-  let idx = prompt("Selecciona el número del personal:\n"+nombres);
-  if(!idx) return;
-  idx=parseInt(idx)-1;
-  if(idx<0 || idx>=f.personal.length) return;
-
-  let estado = prompt("Estado (Activo/Inactivo):", f.personal[idx].estado || "Activo");
-  let desde = prompt("Desde (YYYY-MM-DD):", f.personal[idx].desde || "");
-  let hasta = prompt("Hasta (YYYY-MM-DD):", f.personal[idx].hasta || "");
-
-  f.personal[idx].estado = estado;
-  f.personal[idx].desde = desde;
-  f.personal[idx].hasta = hasta;
-  saveToStorage();
   renderPersonal(f);
 };
 
@@ -297,22 +198,51 @@ function renderPersonal(f){
     div.textContent="(Sin personal registrado)";
     return;
   }
-  let ul=document.createElement("ul");
   f.personal.forEach((p,i)=>{
-    let estadoTxt = p.estado ? ` → ${p.estado} (${p.desde||"?"} - ${p.hasta||"?"})` : "";
-    let li=document.createElement("li");
-    li.textContent=`${i+1}. ${p.nombre}${estadoTxt}`;
-    ul.appendChild(li);
+    let estadoTxt = p.estado ? ` → ${p.estado} (${p.desde||"?"} - ${p.hasta||"?"})` : " (sin estado)";
+    let row=document.createElement("div");
+    row.className="person-row";
+    row.innerHTML=`<span>${i+1}. ${p.nombre}${estadoTxt}</span>`;
+    let btn=document.createElement("button");
+    btn.textContent="Cambiar estado";
+    btn.onclick=()=>showStatusForm(f,i);
+    row.appendChild(btn);
+    div.appendChild(row);
   });
-  div.appendChild(ul);
 }
 
-// enganchar botones edición
-document.getElementById("editBtn").onclick = enterEdit;
-document.getElementById("saveEditBtn").onclick = saveEdit;
-document.getElementById("cancelEditBtn").onclick = ()=>exitEdit(false);
+// === Formulario lateral para estado ===
+function showStatusForm(f, idx){
+  let div=document.getElementById("personList");
+  let form=document.createElement("div");
+  form.className="person-form";
+  form.innerHTML=`
+    <strong>${f.personal[idx].nombre}</strong><br>
+    <label>Estado:
+      <select id="estadoSel">
+        <option ${f.personal[idx].estado==="Activo"?"selected":""}>Activo</option>
+        <option ${f.personal[idx].estado==="Inactivo"?"selected":""}>Inactivo</option>
+      </select>
+    </label><br>
+    <label>Desde: <input type="date" id="desdeInp" value="${f.personal[idx].desde||""}"></label><br>
+    <label>Hasta: <input type="date" id="hastaInp" value="${f.personal[idx].hasta||""}"></label><br>
+    <button id="saveStatusBtn">Guardar</button>
+    <button id="cancelStatusBtn">Cancelar</button>
+  `;
+  div.appendChild(form);
+
+  document.getElementById("saveStatusBtn").onclick=()=>{
+    f.personal[idx].estado=document.getElementById("estadoSel").value;
+    f.personal[idx].desde=document.getElementById("desdeInp").value;
+    f.personal[idx].hasta=document.getElementById("hastaInp").value;
+    saveToStorage();
+    renderPersonal(f);
+  };
+  document.getElementById("cancelStatusBtn").onclick=()=>renderPersonal(f);
+}
 
 initMap();
 </script>
 </body>
 </html>
+
