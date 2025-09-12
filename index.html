@@ -25,6 +25,8 @@
     .person-row, .activity-row, .cost-row { font-size:13px; margin:4px 0; padding:4px; border:1px solid #ccc; border-radius:4px; background:#fff; }
     .person-form { background:#eef; padding:6px; margin:6px 0; border-radius:4px; }
     .person-form input, .person-form select { margin:2px 0; width:100%; padding:4px; font-size:12px; }
+    .global-person { margin:6px 0; padding:6px; border:1px solid #ccc; border-radius:4px; background:#fff; }
+    .assignments { font-size:12px; margin-left:10px; color:#444; }
     table { border-collapse: collapse; width:100%; margin-top:10px; font-size:13px; }
     table, th, td { border:1px solid #ccc; padding:4px; }
     th { background:#eee; }
@@ -146,142 +148,59 @@ function renderList(){
   });
 }
 
-// === Utilidades ===
-function diasEntre(f1,f2){
-  let d1=new Date(f1);
-  let d2=new Date(f2);
-  if(isNaN(d1)||isNaN(d2)) return 0;
-  return Math.floor((d2-d1)/(1000*60*60*24))+1;
-}
-
-// === Reportes ===
-document.getElementById("reportBtn").onclick=()=>{
-  renderReportes();
+// === Gestión de personal: NUEVO TELEFONO ===
+document.getElementById("newPersonBtn").onclick=()=>{
+  let nombre=prompt("Nombre del trabajador:");
+  if(!nombre) return;
+  let telefono=prompt("Número de teléfono:");
+  let id=Date.now().toString();
+  personnel.push({id, nombre, telefono});
+  saveToStorage();
+  alert("Trabajador creado: "+nombre);
 };
 
-function renderReportes(){
+document.getElementById("assignPersonBtn").onclick=()=>{
+  let f=fences.find(x=>x.id===activeId);
+  if(!f){ alert("Selecciona una geocerca activa."); return; }
+  if(!personnel.length){ alert("No hay trabajadores registrados."); return; }
+  let nombres=personnel.map((p,i)=>`${i+1}. ${p.nombre} (${p.telefono||"-"})`).join("\n");
+  let idx=parseInt(prompt("Elige trabajador por número:\n"+nombres))-1;
+  if(isNaN(idx) || idx<0 || idx>=personnel.length) return;
+  let p=personnel[idx];
+  f.asignaciones.push({pid:p.id, estado:"inactivo", desde:"", hasta:""});
+  saveToStorage();
+};
+
+document.getElementById("globalPersonBtn").onclick=()=>{
+  renderGlobalPersonnel();
+};
+
+// === Vista global de personal (ahora con teléfono) ===
+function renderGlobalPersonnel(){
   let div=document.getElementById("personList");
-  div.innerHTML="<h4>Generador de Reportes</h4>";
-
-  if(!fences.length){ div.innerHTML+="<p>(No hay datos)</p>"; return; }
-
-  let geocOpts=fences.map(f=>`<option value="${f.id}">${f.name}</option>`).join("");
-  let persOpts=personnel.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join("");
-  let actOpts=actividadesDisponibles.map(a=>`<option value="${a}">${a}</option>`).join("");
-  let form=document.createElement("div");
-  form.className="person-form";
-  form.innerHTML=`
-    <label>Geocercas:<br><select id="repGeoc" multiple>${geocOpts}</select></label><br>
-    <label>Personas:<br><select id="repPers" multiple>${persOpts}</select></label><br>
-    <label>Actividades:<br><select id="repActs" multiple>${actOpts}</select></label><br>
-    <label>Desde: <input type="date" id="repDesde"></label><br>
-    <label>Hasta: <input type="date" id="repHasta"></label><br>
-    <label>Salida:
-      <select id="repTipo">
-        <option value="tabla">Tabla</option>
-        <option value="bar">Gráfico de barras (agrupado por geocerca)</option>
-        <option value="pie">Gráfico de torta</option>
-        <option value="line">Gráfico de líneas</option>
-      </select>
-    </label><br>
-    <button id="genRepBtn">Generar</button>
-    <button id="expRepBtn">Exportar CSV</button>
-  `;
-  div.appendChild(form);
-
-  let cont=document.createElement("div");
-  cont.id="repResultados";
-  div.appendChild(cont);
-
-  document.getElementById("genRepBtn").onclick=()=>{ generarReporte(); };
-  document.getElementById("expRepBtn").onclick=()=>{ exportarReporteCSV(); };
-}
-
-function generarReporte(){
-  let geocSel=Array.from(document.getElementById("repGeoc").selectedOptions).map(o=>o.value);
-  let persSel=Array.from(document.getElementById("repPers").selectedOptions).map(o=>o.value);
-  let actSel=Array.from(document.getElementById("repActs").selectedOptions).map(o=>o.value);
-  let desde=document.getElementById("repDesde").value;
-  let hasta=document.getElementById("repHasta").value;
-  let tipo=document.getElementById("repTipo").value;
-
-  let rows=[];
-  fences.filter(f=>!geocSel.length || geocSel.includes(f.id)).forEach(f=>{
-    (f.costos||[]).forEach(c=>{
-      if(persSel.length && !persSel.includes(c.pid)) return;
-      if(actSel.length && !actSel.includes(c.actividad)) return;
-      if(desde && c.desde && c.desde<desde) return;
-      if(hasta && c.hasta && c.hasta>hasta) return;
-      let pers=personnel.find(p=>p.id===c.pid);
-      let dias=c.desde&&c.hasta? diasEntre(c.desde,c.hasta):0;
-      let total=dias>0? dias*c.costoDia: c.costoDia;
-      rows.push({
-        geocerca:f.name,
-        persona:pers?pers.nombre:"[Desconocido]",
-        actividad:c.actividad,
-        costoDia:c.costoDia,
-        desde:c.desde||"",
-        hasta:c.hasta||"",
-        total
+  div.innerHTML="<h4>Todo el personal registrado</h4>";
+  if(!personnel.length){
+    div.innerHTML+="<p>(No hay trabajadores registrados)</p>";
+    return;
+  }
+  personnel.forEach(p=>{
+    let cont=document.createElement("div");
+    cont.className="global-person";
+    cont.innerHTML=`<b>${p.nombre}</b> - Tel: ${p.telefono||"-"}`;
+    let asigns=[];
+    fences.forEach(f=>{
+      f.asignaciones.forEach(a=>{
+        if(a.pid===p.id){
+          asigns.push(`${f.name}: ${a.estado} (${a.desde||"-"} → ${a.hasta||"-"})`);
+        }
       });
     });
+    let list=document.createElement("div");
+    list.className="assignments";
+    list.innerHTML= asigns.length? asigns.join("<br>") : "(No asignado a ninguna geocerca)";
+    cont.appendChild(list);
+    div.appendChild(cont);
   });
-
-  let cont=document.getElementById("repResultados");
-  cont.innerHTML="";
-
-  if(!rows.length){ cont.innerHTML="<p>(Sin resultados)</p>"; return; }
-
-  if(tipo==="tabla"){
-    let table=document.createElement("table");
-    table.innerHTML="<tr><th>Geocerca</th><th>Persona</th><th>Actividad</th><th>Costo/día</th><th>Desde</th><th>Hasta</th><th>Costo Total</th></tr>";
-    rows.forEach(r=>{
-      table.innerHTML+=`<tr><td>${r.geocerca}</td><td>${r.persona}</td><td>${r.actividad}</td><td>$${r.costoDia}</td><td>${r.desde}</td><td>${r.hasta}</td><td>$${r.total}</td></tr>`;
-    });
-    cont.appendChild(table);
-  } else if(tipo==="bar"){
-    // Agrupado por geocerca
-    let grouped={};
-    rows.forEach(r=>{
-      grouped[r.geocerca]=(grouped[r.geocerca]||0)+r.total;
-    });
-    let labels=Object.keys(grouped);
-    let data=Object.values(grouped);
-    let canvas=document.createElement("canvas");
-    cont.appendChild(canvas);
-    new Chart(canvas,{
-      type:"bar",
-      data:{ labels, datasets:[{label:"Costo total por geocerca", data}] },
-      options:{ responsive:true, plugins:{legend:{display:true}} }
-    });
-  } else {
-    // pie y line usan el detalle
-    let canvas=document.createElement("canvas");
-    cont.appendChild(canvas);
-    let labels=rows.map(r=>r.persona+"-"+r.actividad);
-    let data=rows.map(r=>r.total);
-    new Chart(canvas,{
-      type:tipo,
-      data:{ labels, datasets:[{label:"Costo total", data}] },
-      options:{ responsive:true, plugins:{legend:{display:true}} }
-    });
-  }
-
-  window.__lastReport=rows;
-}
-
-function exportarReporteCSV(){
-  let rows=window.__lastReport||[];
-  if(!rows.length){ alert("Genera primero un reporte"); return; }
-  let csv="Geocerca,Persona,Actividad,CostoDia,Desde,Hasta,CostoTotal\n";
-  rows.forEach(r=>{
-    csv+=`${r.geocerca},${r.persona},${r.actividad},${r.costoDia},${r.desde},${r.hasta},${r.total}\n`;
-  });
-  let blob=new Blob([csv],{type:"text/csv"});
-  let a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="reporte.csv";
-  a.click();
 }
 
 initMap();
