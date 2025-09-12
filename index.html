@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Chart.js para reportes -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
@@ -22,28 +22,14 @@
     #map { width:100%; height:100%; }
     #coords { font-size:12px; color:#333; padding:4px; }
     ul { margin:4px 0; padding-left:18px; }
-    .person-row, .activity-row, .cost-row { font-size:13px; margin:4px 0; padding:4px; border:1px solid #ccc; border-radius:4px; background:#fff; }
-    .person-form { background:#eef; padding:6px; margin:6px 0; border-radius:4px; }
-    .person-form input, .person-form select { margin:2px 0; width:100%; padding:4px; font-size:12px; }
+    .person-row { font-size:13px; margin:4px 0; padding:4px; border:1px solid #ccc; border-radius:4px; background:#fff; }
     .global-person { margin:6px 0; padding:6px; border:1px solid #ccc; border-radius:4px; background:#fff; }
     .assignments { font-size:12px; margin-left:10px; color:#444; }
-    table { border-collapse: collapse; width:100%; margin-top:10px; font-size:13px; }
-    table, th, td { border:1px solid #ccc; padding:4px; }
-    th { background:#eee; }
   </style>
 </head>
 <body>
   <div class="app">
     <div class="sidebar">
-      <h3>Acciones</h3>
-      <button id="newBtn">Nueva geocerca</button>
-      <button id="finishBtn" disabled>Finalizar</button>
-      <button id="cancelBtn" disabled>Cancelar</button>
-      <button id="renameBtn" disabled>Renombrar</button>
-      <button id="deleteBtn" disabled>Eliminar</button>
-      <button id="exportBtn">Exportar GeoJSON</button>
-      <input type="file" id="importInput" accept=".geojson,.json"/>
-
       <h3>Geocercas</h3>
       <ul id="fenceList"></ul>
 
@@ -62,7 +48,7 @@
       <h3>Reportes</h3>
       <button id="reportBtn">Generar reportes</button>
 
-      <div id="personList" style="margin-top:8px; font-size:13px; color:#374151;"></div>
+      <div id="personList" style="margin-top:8px; font-size:13px;"></div>
     </div>
 
     <div>
@@ -73,52 +59,41 @@
 
 <script>
 let map, group;
-let fences=[];
-let personnel=[]; 
+let fences=[], personnel=[];
 let activeId=null;
-let drawing=false;
-let tempPoints=[]; 
-let tempLine=null, tempPoly=null;
 let actividadesDisponibles=["Riego","Poda","Fertilización"];
 
 // === Persistencia ===
 function saveToStorage(){
-  let cleanFences = fences.map(f=>({
-    id: f.id,
-    name: f.name,
-    latlngs: f.latlngs.map(p=>({lat:p.lat, lng:p.lng})),
-    asignaciones: f.asignaciones || [],
-    actividades: f.actividades || [],
-    costos: f.costos || []
+  let cleanFences=fences.map(f=>({
+    id:f.id, name:f.name,
+    latlngs:f.latlngs.map(p=>({lat:p.lat,lng:p.lng})),
+    asignaciones:f.asignaciones||[],
+    actividades:f.actividades||[],
+    costos:f.costos||[]
   }));
-  localStorage.setItem("geocercas", JSON.stringify(cleanFences));
-  localStorage.setItem("personnel", JSON.stringify(personnel));
-  localStorage.setItem("actividadesDisponibles", JSON.stringify(actividadesDisponibles));
+  localStorage.setItem("geocercas",JSON.stringify(cleanFences));
+  localStorage.setItem("personnel",JSON.stringify(personnel));
+  localStorage.setItem("actividadesDisponibles",JSON.stringify(actividadesDisponibles));
 }
 function loadFromStorage(){
   let rawF=localStorage.getItem("geocercas");
   if(rawF){
-    fences=JSON.parse(rawF).map(f=>({
-      ...f,
-      latlngs: f.latlngs.map(p=>({lat:p.lat, lng:p.lng})),
-      asignaciones: f.asignaciones || [],
-      actividades: f.actividades || [],
-      costos: f.costos || []
-    }));
+    fences=JSON.parse(rawF).map(f=>({...f,latlngs:f.latlngs.map(p=>({lat:p.lat,lng:p.lng}))}));
   }
   let rawP=localStorage.getItem("personnel");
-  if(rawP){ personnel=JSON.parse(rawP); }
+  if(rawP) personnel=JSON.parse(rawP);
   let rawA=localStorage.getItem("actividadesDisponibles");
-  if(rawA){ actividadesDisponibles=JSON.parse(rawA); }
+  if(rawA) actividadesDisponibles=JSON.parse(rawA);
 }
 
 // === Inicializar mapa ===
 function initMap(){
   map=L.map('map').setView([-1.73,-77.91],14);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
   group=L.layerGroup().addTo(map);
   map.on("mousemove",e=>{
-    document.getElementById("coords").textContent=`Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
+    document.getElementById("coords").textContent=`Lat:${e.latlng.lat.toFixed(6)}, Lng:${e.latlng.lng.toFixed(6)}`;
   });
   loadFromStorage();
   drawAll();
@@ -128,10 +103,9 @@ function initMap(){
 function drawAll(){
   group.clearLayers();
   fences.forEach(f=>{
-    let poly=L.polygon(f.latlngs,{color:'#6b21a8',weight:2,fillOpacity:0.3}).addTo(group);
+    let poly=L.polygon(f.latlngs,{color:'#6b21a8',fillOpacity:0.3}).addTo(group);
     poly.bindTooltip(f.name,{permanent:true,direction:"center"});
     poly.on("click",()=>{ activeId=f.id; renderList(); });
-    f.__layer=poly;
   });
   renderList();
 }
@@ -148,57 +122,61 @@ function renderList(){
   });
 }
 
-// === Gestión de personal: NUEVO TELEFONO ===
+// === GESTIÓN DE PERSONAL (con teléfono) ===
 document.getElementById("newPersonBtn").onclick=()=>{
   let nombre=prompt("Nombre del trabajador:");
   if(!nombre) return;
   let telefono=prompt("Número de teléfono:");
   let id=Date.now().toString();
-  personnel.push({id, nombre, telefono});
+  personnel.push({id,nombre,telefono});
   saveToStorage();
   alert("Trabajador creado: "+nombre);
 };
 
 document.getElementById("assignPersonBtn").onclick=()=>{
   let f=fences.find(x=>x.id===activeId);
-  if(!f){ alert("Selecciona una geocerca activa."); return; }
-  if(!personnel.length){ alert("No hay trabajadores registrados."); return; }
+  if(!f){alert("Selecciona una geocerca activa.");return;}
+  if(!personnel.length){alert("No hay trabajadores registrados.");return;}
   let nombres=personnel.map((p,i)=>`${i+1}. ${p.nombre} (${p.telefono||"-"})`).join("\n");
-  let idx=parseInt(prompt("Elige trabajador por número:\n"+nombres))-1;
-  if(isNaN(idx) || idx<0 || idx>=personnel.length) return;
+  let idx=parseInt(prompt("Elige trabajador:\n"+nombres))-1;
+  if(isNaN(idx)||idx<0||idx>=personnel.length) return;
   let p=personnel[idx];
-  f.asignaciones.push({pid:p.id, estado:"inactivo", desde:"", hasta:""});
+  f.asignaciones=f.asignaciones||[];
+  f.asignaciones.push({pid:p.id,estado:"inactivo",desde:"",hasta:""});
   saveToStorage();
+  renderAssigned(f);
+};
+
+document.getElementById("listPersonBtn").onclick=()=>{
+  let f=fences.find(x=>x.id===activeId);
+  if(!f){alert("Selecciona una geocerca activa.");return;}
+  renderAssigned(f);
 };
 
 document.getElementById("globalPersonBtn").onclick=()=>{
   renderGlobalPersonnel();
 };
 
-// === Vista global de personal (ahora con teléfono) ===
+// === Mostrar personal de geocerca ===
+function renderAssigned(f){
+  let div=document.getElementById("personList");
+  div.innerHTML="<h4>Personal asignado</h4>";
+  if(!f.asignaciones||!f.asignaciones.length){div.innerHTML+="<p>(Sin personal)</p>";return;}
+  f.asignaciones.forEach(a=>{
+    let pers=personnel.find(pp=>pp.id===a.pid);
+    div.innerHTML+=`<div class="person-row"><b>${pers?pers.nombre:"?"}</b> (${pers?pers.telefono||"-":"-"}) → ${a.estado}</div>`;
+  });
+}
+
+// === Mostrar personal global ===
 function renderGlobalPersonnel(){
   let div=document.getElementById("personList");
-  div.innerHTML="<h4>Todo el personal registrado</h4>";
-  if(!personnel.length){
-    div.innerHTML+="<p>(No hay trabajadores registrados)</p>";
-    return;
-  }
+  div.innerHTML="<h4>Todo el personal</h4>";
+  if(!personnel.length){div.innerHTML+="<p>(No hay trabajadores)</p>";return;}
   personnel.forEach(p=>{
     let cont=document.createElement("div");
     cont.className="global-person";
-    cont.innerHTML=`<b>${p.nombre}</b> - Tel: ${p.telefono||"-"}`;
-    let asigns=[];
-    fences.forEach(f=>{
-      f.asignaciones.forEach(a=>{
-        if(a.pid===p.id){
-          asigns.push(`${f.name}: ${a.estado} (${a.desde||"-"} → ${a.hasta||"-"})`);
-        }
-      });
-    });
-    let list=document.createElement("div");
-    list.className="assignments";
-    list.innerHTML= asigns.length? asigns.join("<br>") : "(No asignado a ninguna geocerca)";
-    cont.appendChild(list);
+    cont.innerHTML=`<b>${p.nombre}</b> - Tel:${p.telefono||"-"}`;
     div.appendChild(cont);
   });
 }
