@@ -16,7 +16,7 @@
     // ✅ Configuración EmailJS
     const PUBLIC_KEY = "qSmyIiQYgJVnpllgS";      // tu Public Key real
     const TEMPLATE_ID = "template_k4gnktv";      // tu Template ID real
-    const SERVICE_ID = "service_fuhd91q";        // tu Service ID real
+    const SERVICE_ID  = "service_fuhd91q";       // tu Service ID real
 
     (function(){
       emailjs.init(PUBLIC_KEY);
@@ -133,16 +133,16 @@ function crearAdmin(){
   console.log("DEBUG → Token generado:", token);
   console.log("DEBUG → Activation link:", activationLink);
 
-  // Enviar correo con EmailJS
-  emailjs.send(SERVICE_ID, TEMPLATE_ID,{
-    to_email: email,
-    activation_link: activationLink
-  }).then((res)=>{
-    console.log("DEBUG → EmailJS éxito:", res);
-    alert("✅ Correo de activación enviado a " + email);
+  // Enviar correo con EmailJS (con PUBLIC_KEY)
+  emailjs.send(SERVICE_ID, TEMPLATE_ID, {
+      to_email: email,
+      activation_link: activationLink
+  }, PUBLIC_KEY).then((res)=>{
+      console.log("DEBUG → EmailJS éxito:", res);
+      alert("✅ Correo de activación enviado a " + email);
   }).catch(err=>{
-    console.error("DEBUG → EmailJS error:", err);
-    alert("❌ Error al enviar correo. Revisa la consola (F12).");
+      console.error("DEBUG → EmailJS error:", err);
+      alert("❌ Error al enviar correo: " + JSON.stringify(err));
   });
 }
 
