@@ -116,7 +116,23 @@
       <div id="module-costos" class="module">
         <h2>Costos</h2>
         <p>Geocerca activa: <span id="costos-geocerca">Ninguna</span></p>
-        <button onclick="addCosto()">Agregar Costo</button>
+
+        <form id="costo-form" onsubmit="guardarCosto(event)">
+          <label>Actividad:</label>
+          <select id="costoActividad" required></select>
+
+          <label>Responsable:</label>
+          <select id="costoResponsable" required></select>
+
+          <label>Concepto:</label>
+          <input type="text" id="costoConcepto" required>
+
+          <label>Valor ($):</label>
+          <input type="number" id="costoValor" min="0" step="0.01" required>
+
+          <button type="submit">Agregar</button>
+        </form>
+
         <ul id="costos-list"></ul>
       </div>
 
@@ -190,7 +206,7 @@ function updateActiveGeocerca(){
   document.getElementById("costos-geocerca").textContent=name;
   document.getElementById("reportes-geocerca").textContent=name;
   renderModuleData("personal"); renderModuleData("actividades"); renderModuleData("costos");
-  renderResponsables();
+  renderResponsables(); renderCostosForm();
 }
 
 // === Módulo Personal ===
@@ -208,7 +224,7 @@ function guardarPersonal(e){
   saveToStorage(); renderModuleData("personal");
 
   document.getElementById("personal-form").reset();
-  renderResponsables();
+  renderResponsables(); renderCostosForm();
 }
 
 // === Módulo Actividades ===
@@ -248,17 +264,54 @@ function guardarActividad(e){
   saveToStorage(); renderModuleData("actividades");
 
   document.getElementById("actividad-form").reset();
-  renderResponsables();
+  renderResponsables(); renderCostosForm();
 }
 
 // === Módulo Costos ===
-function addCosto(){
+function renderCostosForm(){
+  let actSelect=document.getElementById("costoActividad");
+  let perSelect=document.getElementById("costoResponsable");
+
+  if(!actSelect || !perSelect) return;
+  actSelect.innerHTML="";
+  perSelect.innerHTML="";
+
+  if(activeId && db.actividades[activeId]){
+    db.actividades[activeId].forEach(a=>{
+      let opt=document.createElement("option");
+      opt.value=a.actividad;
+      opt.textContent=`${a.actividad} (${a.fechaInicio} → ${a.fechaFin})`;
+      actSelect.appendChild(opt);
+    });
+  }
+
+  if(activeId && db.personal[activeId]){
+    db.personal[activeId].filter(p=>p.estado==="Activo").forEach(p=>{
+      let opt=document.createElement("option");
+      opt.value=p.nombre;
+      opt.textContent=`${p.nombre} (${p.rol})`;
+      perSelect.appendChild(opt);
+    });
+  }
+}
+
+function guardarCosto(e){
+  e.preventDefault();
   if(!activeId){alert("Selecciona una geocerca");return;}
-  let concepto=prompt("Concepto:"); let valor=parseFloat(prompt("Valor:"));
+
+  let actividad=document.getElementById("costoActividad").value;
+  let responsable=document.getElementById("costoResponsable").value;
+  let concepto=document.getElementById("costoConcepto").value.trim();
+  let valor=parseFloat(document.getElementById("costoValor").value);
+
   if(isNaN(valor)) return;
+
   if(!db.costos[activeId]) db.costos[activeId]=[];
-  db.costos[activeId].push({concepto,valor});
+  db.costos[activeId].push({actividad,responsable,concepto,valor});
   saveToStorage(); renderModuleData("costos");
+
+  document.getElementById("costo-form").reset();
+  renderCostosForm();
 }
 
 // === Módulo Reportes ===
@@ -296,7 +349,7 @@ function renderModuleData(module){
     let list=document.getElementById("costos-list"); list.innerHTML="";
     (db.costos[activeId]||[]).forEach(c=>{
       let li=document.createElement("li");
-      li.textContent=`${c.concepto}: $${c.valor}`;
+      li.textContent=`${c.actividad} - ${c.concepto}: $${c.valor} (Resp: ${c.responsable})`;
       list.appendChild(li);
     });
   }
@@ -306,3 +359,4 @@ initMap();
 </script>
 </body>
 </html>
+
