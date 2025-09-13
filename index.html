@@ -1,129 +1,99 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Nobis App Multiusuario</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h2, h3 { color: #2c3e50; }
-    input, select { margin: 5px; padding: 5px; }
-    button { margin: 5px; padding: 6px 12px; cursor: pointer; }
-    #map { height: 400px; margin-top: 20px; }
-  </style>
-  <!-- Librería oficial EmailJS -->
-  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@2.6.4/dist/email.min.js"></script>
+    <meta charset="UTF-8">
+    <title>Nobis App Multiusuario</title>
+    <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+    <script>
+        (function(){
+            // Inicializar EmailJS con tu PUBLIC KEY
+            emailjs.init("qSmyIiQYgJVnpllqS");
+        })();
+    </script>
 </head>
 <body>
-  <h2>Administración</h2>
+    <h2>Administración</h2>
 
-  <div>
-    <label>Email de login:</label>
-    <input type="email" id="loginEmail" placeholder="tuemail@dominio.com">
-    <button onclick="login()">Ingresar</button>
-  </div>
+    <div>
+        <label>Email de login:</label>
+        <input type="email" id="loginEmail" placeholder="tucorreo@dominio.com">
+        <button onclick="login()">Ingresar</button>
+    </div>
 
-  <p><b>Nivel actual:</b> <span id="nivelActual">No autenticado</span></p>
+    <p><b>Nivel actual:</b> Dueño</p>
 
-  <h3>Crear nuevo Administrador</h3>
-  <input type="email" id="newAdminEmail" placeholder="nuevoadmin@dominio.com">
-  <button onclick="crearAdmin()">Crear Admin</button>
+    <div>
+        <h3>Crear nuevo Administrador</h3>
+        <input type="email" id="newAdminEmail" placeholder="nuevoadmin@dominio.com">
+        <button onclick="crearAdmin()">Crear Admin</button>
+    </div>
 
-  <h3>Prueba de Correo</h3>
-  <button onclick="enviarCorreoPrueba()">Enviar correo de prueba</button>
+    <div>
+        <h3>Prueba de Correo</h3>
+        <button onclick="correoPrueba()">Enviar correo de prueba</button>
+    </div>
 
-  <h3>Administradores activos</h3>
-  <ul id="adminsActivos"></ul>
+    <div>
+        <h3>Administradores activos</h3>
+        <ul id="adminList">
+            <li>pmunoz02@gmail.com</li>
+        </ul>
+    </div>
 
-  <div id="map">[Aquí va el mapa con geocercas y módulos de tu app]</div>
+    <p>[Aquí va el mapa con geocercas y módulos de tu app]</p>
 
-  <script>
-    // Inicializar EmailJS con tu Public Key
-    (function(){
-      emailjs.init("qSmyIiQYgJVnpllqS"); // <--- tu PUBLIC KEY
-    })();
+    <script>
+        // Función de login (placeholder)
+        function login() {
+            const email = document.getElementById("loginEmail").value;
+            alert("Funcionalidad de login aún en desarrollo. Usuario: " + email);
+        }
 
-    const SERVICE_ID = "service_fuhd91q";   // <--- tu SERVICE ID
-    const TEMPLATE_ID = "template_k4gnktv"; // <--- tu TEMPLATE ID
+        // Crear un nuevo administrador y enviar invitación
+        function crearAdmin() {
+            const adminEmail = document.getElementById("newAdminEmail").value;
+            if (!adminEmail) {
+                alert("Por favor ingresa un correo válido.");
+                return;
+            }
 
-    // Mostrar lista de administradores
-    function mostrarAdmins() {
-      const admins = JSON.parse(localStorage.getItem("admins")) || [];
-      const lista = document.getElementById("adminsActivos");
-      lista.innerHTML = admins.length
-        ? admins.map(a => `<li>${a}</li>`).join("")
-        : "<li>No hay administradores activos</li>";
-    }
+            const token = Math.random().toString(36).substr(2, 8);
+            const activationLink = `https://pmunoz02-max.github.io/NobisApp/?activate=${encodeURIComponent(adminEmail)}&token=${token}`;
 
-    // Login
-    function login() {
-      const email = document.getElementById("loginEmail").value.trim();
-      const owner = "fenice.ecuador@gmail.com"; // Dueño fijo
-      const admins = JSON.parse(localStorage.getItem("admins")) || [];
+            console.log("DEBUG → Creando admin:", adminEmail);
+            console.log("DEBUG → Token generado:", token);
+            console.log("DEBUG → Activation link:", activationLink);
 
-      if (email === owner) {
-        document.getElementById("nivelActual").innerText = "Dueño";
-        alert("✅ Bienvenido Dueño");
-      } else if (admins.includes(email)) {
-        document.getElementById("nivelActual").innerText = "Administrador";
-        alert("✅ Bienvenido Administrador");
-      } else {
-        document.getElementById("nivelActual").innerText = "Usuario";
-        alert("⚠️ Acceso como usuario básico (Nivel 3)");
-      }
-    }
+            // Enviar correo con EmailJS
+            emailjs.send("service_fuhd91q", "template_k4gnktv", {
+                to_email: adminEmail,
+                from_name: "Nobis App",
+                message: `Has sido invitado como Administrador en Nobis App.
+                          Activa tu cuenta aquí: ${activationLink}`
+            })
+            .then(function(response) {
+                alert("✅ Invitación enviada a " + adminEmail);
+                document.getElementById("adminList").innerHTML += `<li>${adminEmail}</li>`;
+            }, function(error) {
+                console.error("EmailJS error:", error);
+                alert("❌ Error al enviar invitación. Revisa la consola.");
+            });
+        }
 
-    // Crear nuevo admin
-    function crearAdmin() {
-      const email = document.getElementById("newAdminEmail").value.trim();
-      if (!email) {
-        alert("Por favor, ingresa un email válido.");
-        return;
-      }
-
-      let admins = JSON.parse(localStorage.getItem("admins")) || [];
-      if (!admins.includes(email)) {
-        admins.push(email);
-        localStorage.setItem("admins", JSON.stringify(admins));
-        mostrarAdmins();
-      }
-
-      // Enviar correo de invitación
-      const token = Math.random().toString(36).substring(2, 10);
-      const activationLink = `${window.location.origin}${window.location.pathname}?activate=${encodeURIComponent(email)}&token=${token}`;
-
-      const templateParams = {
-        email: email,                  // debe coincidir con {{email}} en tu plantilla
-        activation_link: activationLink
-      };
-
-      emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams)
-        .then(() => {
-          alert("✅ Invitación enviada a: " + email);
-        })
-        .catch(err => {
-          console.error("EmailJS error:", err);
-          alert("❌ Error al enviar invitación. Revisa la consola.");
-        });
-    }
-
-    // Enviar correo de prueba
-    function enviarCorreoPrueba() {
-      const templateParams = {
-        email: "fenice.ecuador@gmail.com", // cambiar si quieres otra dirección
-        activation_link: "https://pmuoz02-max.github.io/NobisApp/"
-      };
-
-      emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams)
-        .then(() => {
-          alert("✅ Correo de prueba enviado correctamente");
-        })
-        .catch(err => {
-          console.error("EmailJS prueba error:", err);
-          alert("❌ Error en correo de prueba. Revisa la consola.");
-        });
-    }
-
-    window.onload = mostrarAdmins;
-  </script>
+        // Enviar correo de prueba
+        function correoPrueba() {
+            emailjs.send("service_fuhd91q", "template_k4gnktv", {
+                to_email: "pmunoz02@gmail.com",
+                from_name: "Nobis App",
+                message: "Este es un correo de prueba desde Nobis App 🚀"
+            })
+            .then(function(response) {
+                alert("✅ Correo de prueba enviado correctamente.");
+            }, function(error) {
+                console.error("EmailJS prueba error:", error);
+                alert("❌ Error en correo de prueba. Revisa la consola.");
+            });
+        }
+    </script>
 </body>
 </html>
