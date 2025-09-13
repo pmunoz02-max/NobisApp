@@ -9,9 +9,6 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <style>
     body { margin:0; font-family: system-ui, Arial, sans-serif; }
     .app { display:grid; grid-template-columns:320px 1fr; height:100vh; }
@@ -22,12 +19,6 @@
     #map { width:100%; height:100%; }
     #coords { font-size:12px; color:#333; padding:4px; }
     ul { margin:4px 0; padding-left:18px; }
-    .person-row, .activity-row, .cost-row { font-size:13px; margin:4px 0; padding:4px; border:1px solid #ccc; border-radius:4px; background:#fff; }
-    .global-person { margin:6px 0; padding:6px; border:1px solid #ccc; border-radius:4px; background:#fff; }
-    .assignments { font-size:12px; margin-left:10px; color:#444; }
-    table { border-collapse: collapse; width:100%; margin-top:10px; font-size:13px; }
-    table, th, td { border:1px solid #ccc; padding:4px; }
-    th { background:#eee; }
   </style>
 </head>
 <body>
@@ -46,23 +37,6 @@
 
       <h3>Geocercas</h3>
       <ul id="fenceList"></ul>
-
-      <h3>Gestión de Personal</h3>
-      <button id="newPersonBtn">Nuevo trabajador</button>
-      <button id="assignPersonBtn">Asignar a geocerca</button>
-      <button id="listPersonBtn">Ver personal asignado</button>
-      <button id="globalPersonBtn">Ver todo el personal</button>
-
-      <h3>Gestión de Actividades</h3>
-      <button id="activityBtn">Gestionar actividades</button>
-
-      <h3>Gestión de Costos</h3>
-      <button id="costBtn">Gestionar costos</button>
-
-      <h3>Reportes</h3>
-      <button id="reportBtn">Generar reportes</button>
-
-      <div id="personList" style="margin-top:8px; font-size:13px;"></div>
     </div>
 
     <div>
@@ -73,40 +47,32 @@
 
 <script>
 let map, group;
-let fences=[], personnel=[];
+let fences=[];
 let activeId=null;
 let drawing=false, tempPoints=[], tempLine=null, tempPoly=null;
-let actividadesDisponibles=["Riego","Poda","Fertilización"];
 
 // === Persistencia ===
 function saveToStorage(){
   let cleanFences=fences.map(f=>({
     id:f.id,name:f.name,
-    latlngs:f.latlngs.map(p=>({lat:p.lat,lng:p.lng})),
-    asignaciones:f.asignaciones||[],
-    actividades:f.actividades||[],
-    costos:f.costos||[]
+    latlngs:f.latlngs.map(p=>({lat:p.lat,lng:p.lng}))
   }));
   localStorage.setItem("geocercas",JSON.stringify(cleanFences));
-  localStorage.setItem("personnel",JSON.stringify(personnel));
-  localStorage.setItem("actividadesDisponibles",JSON.stringify(actividadesDisponibles));
 }
 function loadFromStorage(){
   let rawF=localStorage.getItem("geocercas");
   if(rawF){fences=JSON.parse(rawF).map(f=>({...f,latlngs:f.latlngs.map(p=>({lat:p.lat,lng:p.lng}))}));}
-  let rawP=localStorage.getItem("personnel");
-  if(rawP) personnel=JSON.parse(rawP);
-  let rawA=localStorage.getItem("actividadesDisponibles");
-  if(rawA) actividadesDisponibles=JSON.parse(rawA);
 }
 
 // === Inicializar mapa ===
 function initMap(){
   map=L.map('map').setView([-1.73,-77.91],14);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {attribution:'&copy; OpenStreetMap'}).addTo(map);
   group=L.layerGroup().addTo(map);
   map.on("mousemove",e=>{
-    document.getElementById("coords").textContent=`Lat:${e.latlng.lat.toFixed(6)}, Lng:${e.latlng.lng.toFixed(6)}`;
+    document.getElementById("coords").textContent=
+      `Lat:${e.latlng.lat.toFixed(6)}, Lng:${e.latlng.lng.toFixed(6)}`;
   });
   loadFromStorage();drawAll();
 }
@@ -134,7 +100,7 @@ function renderList(){
   });
 }
 
-// === Geocercas: crear con clics ===
+// === Crear con clics ===
 document.getElementById("newBtn").onclick=()=>{
   drawing=true; tempPoints=[];
   map.on("click",addTempPoint);
@@ -153,19 +119,21 @@ function addTempPoint(e){
 document.getElementById("finishBtn").onclick=()=>{
   if(tempPoints.length<3){alert("Mínimo 3 puntos");return;}
   let name=prompt("Nombre de geocerca:","Geocerca "+(fences.length+1));
-  fences.push({id:Date.now().toString(),name,latlngs:tempPoints,asignaciones:[],actividades:[],costos:[]});
+  fences.push({id:Date.now().toString(),name,latlngs:tempPoints});
   saveToStorage();map.off("click",addTempPoint);
   tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
-  document.getElementById("finishBtn").disabled=true;document.getElementById("cancelBtn").disabled=true;
+  document.getElementById("finishBtn").disabled=true;
+  document.getElementById("cancelBtn").disabled=true;
   drawAll();
 };
 document.getElementById("cancelBtn").onclick=()=>{
   map.off("click",addTempPoint);
   tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
-  document.getElementById("finishBtn").disabled=true;document.getElementById("cancelBtn").disabled=true;
+  document.getElementById("finishBtn").disabled=true;
+  document.getElementById("cancelBtn").disabled=true;
 };
 
-// === Geocercas: crear con Lat/Lng ===
+// === Crear con Lat/Lng ===
 document.getElementById("coordBtn").onclick=()=>{
   let input=prompt("Ingresa coordenadas (lat,lng por línea):\nEjemplo:\n-1.73,-77.91\n-1.74,-77.92\n-1.72,-77.93");
   if(!input) return;
@@ -176,11 +144,11 @@ document.getElementById("coordBtn").onclick=()=>{
   if(coords.length<3){alert("Se requieren al menos 3 puntos");return;}
   let name=prompt("Nombre de geocerca:","Geocerca "+(fences.length+1));
   if(!name)return;
-  fences.push({id:Date.now().toString(),name,latlngs:coords,asignaciones:[],actividades:[],costos:[]});
+  fences.push({id:Date.now().toString(),name,latlngs:coords});
   saveToStorage();drawAll();
 };
 
-// === Geocercas: editar moviendo vértices ===
+// === Editar geocerca ===
 document.getElementById("editBtn").onclick=()=>{
   let f=fences.find(x=>x.id===activeId);
   if(!f){alert("Selecciona una geocerca");return;}
@@ -193,8 +161,39 @@ document.getElementById("editBtn").onclick=()=>{
     });
     f.__markers.push(m);
   });
-  alert("Arrastra los puntos para editar la geocerca.\nLos cambios se guardan automáticamente.");
+  alert("Arrastra los puntos para editar.\nSe guarda automáticamente.");
 };
+
+// === Renombrar / Eliminar ===
+document.getElementById("renameBtn").onclick=()=>{
+  let f=fences.find(x=>x.id===activeId);
+  if(!f){alert("Selecciona geocerca");return;}
+  let n=prompt("Nuevo nombre:",f.name);
+  if(n){f.name=n;saveToStorage();drawAll();}
+};
+document.getElementById("deleteBtn").onclick=()=>{
+  fences=fences.filter(f=>f.id!==activeId);activeId=null;
+  saveToStorage();drawAll();
+};
+
+// === Exportar / Importar ===
+document.getElementById("exportBtn").onclick=()=>{
+  let blob=new Blob([JSON.stringify(fences)],{type:"application/json"});
+  let a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="geocercas.json";
+  a.click();
+};
+document.getElementById("importInput").onchange=e=>{
+  let fr=new FileReader();
+  fr.onload=()=>{
+    try{fences=JSON.parse(fr.result);saveToStorage();drawAll();}
+    catch{alert("Archivo inválido");}
+  };
+  fr.readAsText(e.target.files[0]);
+};
+
+initMap();
 </script>
 </body>
 </html>
