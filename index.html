@@ -15,7 +15,7 @@
     .sidebar { background:#f9fafb; border-right:1px solid #ddd; padding:8px; overflow-y:auto; }
     .sidebar h3 { margin-top:16px; margin-bottom:6px; font-size:14px; color:#111; }
     button { margin:2px 0; padding:4px 6px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:12px; }
-    input { margin:2px 0; padding:4px; width:95%; font-size:12px; }
+    input, select { margin:2px 0; padding:4px; width:95%; font-size:12px; }
     #map { width:100%; height:300px; }
     #coords { font-size:12px; color:#333; padding:4px; }
     ul { margin:4px 0; padding-left:18px; }
@@ -70,6 +70,10 @@
           <input type="text" id="nombrePersonal" placeholder="Nombre" required>
           <input type="text" id="rolPersonal" placeholder="Rol" required>
           <input type="tel" id="telPersonal" placeholder="+593..." pattern="^\\+\\d{7,15}$" required>
+          <select id="estadoPersonal">
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
+          </select>
           <button type="submit">Agregar</button>
         </form>
 
@@ -80,7 +84,14 @@
       <div id="module-actividades" class="module">
         <h2>Gestión de Actividades</h2>
         <p>Geocerca activa: <span id="actividades-geocerca">Ninguna</span></p>
-        <button onclick="addActividad()">Agregar Actividad</button>
+
+        <form id="actividad-form" onsubmit="guardarActividad(event)">
+          <input type="text" id="actividadNombre" placeholder="Actividad" required>
+          <input type="date" id="actividadFecha" required>
+          <select id="actividadResponsable" required></select>
+          <button type="submit">Agregar</button>
+        </form>
+
         <ul id="actividades-list"></ul>
       </div>
 
@@ -162,6 +173,7 @@ function updateActiveGeocerca(){
   document.getElementById("costos-geocerca").textContent=name;
   document.getElementById("reportes-geocerca").textContent=name;
   renderModuleData("personal"); renderModuleData("actividades"); renderModuleData("costos");
+  renderResponsables();
 }
 
 // === Crear geocerca con clics ===
@@ -273,7 +285,7 @@ document.getElementById("importInput").onchange=e=>{
   fr.readAsText(e.target.files[0]);
 };
 
-// === Módulos ===
+// === Módulo Personal ===
 function guardarPersonal(e){
   e.preventDefault();
   if(!activeId){alert("Selecciona una geocerca");return;}
@@ -281,22 +293,48 @@ function guardarPersonal(e){
   let nombre=document.getElementById("nombrePersonal").value.trim();
   let rol=document.getElementById("rolPersonal").value.trim();
   let telefono=document.getElementById("telPersonal").value.trim();
+  let estado=document.getElementById("estadoPersonal").value;
 
   if(!db.personal[activeId]) db.personal[activeId]=[];
-  db.personal[activeId].push({nombre,rol,telefono});
+  db.personal[activeId].push({nombre,rol,telefono,estado});
   saveToStorage(); renderModuleData("personal");
 
   document.getElementById("personal-form").reset();
+  renderResponsables();
 }
 
-function addActividad(){
-  if(!activeId){alert("Selecciona una geocerca");return;}
-  let actividad=prompt("Actividad:"); let responsable=prompt("Responsable:");
-  let fecha=new Date().toISOString().split("T")[0];
-  if(!db.actividades[activeId]) db.actividades[activeId]=[];
-  db.actividades[activeId].push({actividad,responsable,fecha});
-  saveToStorage(); renderModuleData("actividades");
+// === Módulo Actividades ===
+function renderResponsables(){
+  let select=document.getElementById("actividadResponsable");
+  if(!select) return;
+  select.innerHTML="";
+  if(activeId && db.personal[activeId]){
+    db.personal[activeId].filter(p=>p.estado==="Activo").forEach(p=>{
+      let opt=document.createElement("option");
+      opt.value=p.nombre;
+      opt.textContent=p.nombre+" ("+p.rol+")";
+      select.appendChild(opt);
+    });
+  }
 }
+
+function guardarActividad(e){
+  e.preventDefault();
+  if(!activeId){alert("Selecciona una geocerca");return;}
+
+  let actividad=document.getElementById("actividadNombre").value.trim();
+  let fecha=document.getElementById("actividadFecha").value;
+  let responsable=document.getElementById("actividadResponsable").value;
+
+  if(!db.actividades[activeId]) db.actividades[activeId]=[];
+  db.actividades[activeId].push({actividad,fecha,responsable});
+  saveToStorage(); renderModuleData("actividades");
+
+  document.getElementById("actividad-form").reset();
+  renderResponsables();
+}
+
+// === Módulo Costos ===
 function addCosto(){
   if(!activeId){alert("Selecciona una geocerca");return;}
   let concepto=prompt("Concepto:"); let valor=parseFloat(prompt("Valor:"));
@@ -305,6 +343,8 @@ function addCosto(){
   db.costos[activeId].push({concepto,valor});
   saveToStorage(); renderModuleData("costos");
 }
+
+// === Módulo Reportes ===
 function generarReporte(){
   if(!activeId){alert("Selecciona una geocerca");return;}
   let out=document.getElementById("report-output");
@@ -316,12 +356,14 @@ function generarReporte(){
     <p>Costos registrados: ${cos.length}, Total: $${cos.reduce((a,c)=>a+c.valor,0)}</p>
   `;
 }
+
+// === Renderizar módulos ===
 function renderModuleData(module){
   if(module==="personal"){
     let list=document.getElementById("personal-list"); list.innerHTML="";
     (db.personal[activeId]||[]).forEach(p=>{
       let li=document.createElement("li");
-      li.textContent=`${p.nombre} - ${p.rol} - ${p.telefono||"N/A"}`;
+      li.textContent=`${p.nombre} - ${p.rol} - ${p.telefono} [${p.estado}]`;
       list.appendChild(li);
     });
   }
