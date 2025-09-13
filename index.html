@@ -73,10 +73,19 @@ function initMap(){
   }).addTo(map);
   group=L.layerGroup().addTo(map);
 
-  // 🔑 Mostrar coordenadas dinámicas al mover el mouse
+  // Tooltip flotante para coordenadas del mouse
+  let mouseTooltip = L.tooltip({
+    permanent: false,
+    direction: "right",
+    offset: [15, 0]
+  }).addTo(map);
+
+  // Mostrar coordenadas dinámicas
   map.on("mousemove", e=>{
     document.getElementById("coords").textContent =
       `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
+    mouseTooltip.setLatLng(e.latlng)
+      .setContent(`${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`);
   });
 
   loadFromStorage();
