@@ -24,7 +24,6 @@
     ul { margin:4px 0; padding-left:18px; }
     .person-row, .activity-row, .cost-row { font-size:13px; margin:4px 0; padding:4px; border:1px solid #ccc; border-radius:4px; background:#fff; }
     .global-person { margin:6px 0; padding:6px; border:1px solid #ccc; border-radius:4px; background:#fff; }
-    .assignments { font-size:12px; margin-left:10px; color:#444; }
     table { border-collapse: collapse; width:100%; margin-top:10px; font-size:13px; }
     table, th, td { border:1px solid #ccc; padding:4px; }
     th { background:#eee; }
@@ -156,13 +155,15 @@ document.getElementById("finishBtn").onclick=()=>{
   fences.push({id:Date.now().toString(),name,latlngs:tempPoints,asignaciones:[],actividades:[],costos:[]});
   saveToStorage();map.off("click",addTempPoint);
   tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
-  document.getElementById("finishBtn").disabled=true;document.getElementById("cancelBtn").disabled=true;
+  document.getElementById("finishBtn").disabled=true;
+  document.getElementById("cancelBtn").disabled=true;
   drawAll();
 };
 document.getElementById("cancelBtn").onclick=()=>{
   map.off("click",addTempPoint);
   tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
-  document.getElementById("finishBtn").disabled=true;document.getElementById("cancelBtn").disabled=true;
+  document.getElementById("finishBtn").disabled=true;
+  document.getElementById("cancelBtn").disabled=true;
 };
 
 // === Crear con Lat/Lng ===
