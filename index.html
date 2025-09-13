@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nobis App + Administración + EmailJS</title>
+  <title>Nobis App + Administración + EmailJS Funcional</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -13,12 +13,10 @@
   <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
   <script>
     (function(){
-      // ⚠️ REEMPLAZA con tu Public Key de EmailJS
-      const PUBLIC_KEY = "TU_PUBLIC_KEY_AQUI";
-      if(PUBLIC_KEY === "TU_PUBLIC_KEY_AQUI"){
-        alert("⚠️ No has configurado tu PUBLIC_KEY en el código");
-      }
+      // ⚠️ Reemplaza por tu Public Key real
+      const PUBLIC_KEY = "PUBLIC_KEY_DE_EJEMPLO_12345";
       emailjs.init(PUBLIC_KEY);
+      console.log("DEBUG → EmailJS inicializado con PUBLIC_KEY:", PUBLIC_KEY);
     })();
   </script>
 
@@ -90,31 +88,19 @@ function loginUsuario(){
 
 // === Crear Admin ===
 function crearAdmin(){
-  alert("DEBUG → El botón CREAR ADMIN fue presionado"); // confirmación visual
+  alert("DEBUG → El botón CREAR ADMIN fue presionado");
 
   let email=document.getElementById("nuevoAdmin").value.trim();
   if(!email) return alert("Ingrese un email válido");
   if(roles.admins.includes(email)) return alert("Ya es admin");
 
-  // ⚠️ CONFIGURACIÓN NECESARIA
-  const TEMPLATE_ID = "TU_TEMPLATE_ID";  // pon aquí tu Template ID real
-  const PUBLIC_KEY = "TU_PUBLIC_KEY_AQUI"; // pon aquí tu Public Key real
+  // ⚠️ CONFIGURA AQUÍ TU TEMPLATE ID REAL
+  const TEMPLATE_ID = "template_admin123";  // cambia este valor por el tuyo real
 
-  if(PUBLIC_KEY === "TU_PUBLIC_KEY_AQUI"){
-    alert("⚠️ Debes configurar tu PUBLIC_KEY de EmailJS en el código");
-    return;
-  }
-  if(TEMPLATE_ID === "TU_TEMPLATE_ID"){
-    alert("⚠️ Debes configurar tu TEMPLATE_ID de EmailJS en el código");
-    return;
-  }
-
-  // Generar token
   let token = Math.random().toString(36).substring(2,10);
   roles.tokens[email]=token;
   saveRoles();
 
-  // Enlace de activación
   let activationLink = window.location.origin + window.location.pathname +
     "?activate=" + encodeURIComponent(email) + "&token=" + token;
 
@@ -122,7 +108,6 @@ function crearAdmin(){
   console.log("DEBUG → Token generado:", token);
   console.log("DEBUG → Activation link:", activationLink);
 
-  // Enviar correo
   emailjs.send("service_fuhd91q",TEMPLATE_ID,{
     to_email: email,
     activation_link: activationLink
@@ -131,7 +116,7 @@ function crearAdmin(){
     alert("✅ Correo de activación enviado a " + email);
   }).catch(err=>{
     console.error("DEBUG → EmailJS error:", err);
-    alert("❌ Error al enviar correo. Mira la consola (F12) para detalles.");
+    alert("❌ Error al enviar correo. Revisa consola (F12).");
   });
 }
 
@@ -148,6 +133,7 @@ function checkActivation(){
       saveRoles();
       alert("✅ Cuenta activada correctamente. Ya puedes ingresar como Administrador.");
       window.history.replaceState({},document.title,window.location.pathname);
+      renderAdmins();
     } else {
       alert("❌ Token inválido o ya usado.");
     }
