@@ -124,10 +124,7 @@
           <label>Responsable:</label>
           <select id="costoResponsable" required></select>
 
-          <label>Concepto:</label>
-          <input type="text" id="costoConcepto" required>
-
-          <label>Valor ($):</label>
+          <label>Valor ($/día):</label>
           <input type="number" id="costoValor" min="0" step="0.01" required>
 
           <button type="submit">Agregar</button>
@@ -301,13 +298,12 @@ function guardarCosto(e){
 
   let actividad=document.getElementById("costoActividad").value;
   let responsable=document.getElementById("costoResponsable").value;
-  let concepto=document.getElementById("costoConcepto").value.trim();
   let valor=parseFloat(document.getElementById("costoValor").value);
 
   if(isNaN(valor)) return;
 
   if(!db.costos[activeId]) db.costos[activeId]=[];
-  db.costos[activeId].push({actividad,responsable,concepto,valor});
+  db.costos[activeId].push({actividad,responsable,valor});
   saveToStorage(); renderModuleData("costos");
 
   document.getElementById("costo-form").reset();
@@ -319,11 +315,30 @@ function generarReporte(){
   if(!activeId){alert("Selecciona una geocerca");return;}
   let out=document.getElementById("report-output");
   let per=db.personal[activeId]||[], act=db.actividades[activeId]||[], cos=db.costos[activeId]||[];
+
+  let totalCostos = 0;
+  let detalle = "<h4>Costos por Actividad</h4><ul>";
+
+  cos.forEach(c=>{
+    let actMatch = act.find(a=>a.actividad===c.actividad);
+    if(actMatch){
+      let dias = (new Date(actMatch.fechaFin) - new Date(actMatch.fechaInicio)) / (1000*60*60*24) + 1;
+      let subtotal = c.valor * dias;
+      totalCostos += subtotal;
+      detalle += `<li>${c.actividad} (${actMatch.fechaInicio} → ${actMatch.fechaFin}) - ${dias} días × $${c.valor}/día = <b>$${subtotal.toFixed(2)}</b> (Resp: ${c.responsable})</li>`;
+    } else {
+      detalle += `<li>${c.actividad} - $${c.valor}/día (Resp: ${c.responsable})</li>`;
+    }
+  });
+
+  detalle += "</ul>";
+
   out.innerHTML=`
     <h4>Resumen</h4>
     <p>Personal: ${per.length}</p>
     <p>Actividades: ${act.length}</p>
-    <p>Costos registrados: ${cos.length}, Total: $${cos.reduce((a,c)=>a+c.valor,0)}</p>
+    <p>Total Costos: <b>$${totalCostos.toFixed(2)}</b></p>
+    ${detalle}
   `;
 }
 
@@ -349,7 +364,7 @@ function renderModuleData(module){
     let list=document.getElementById("costos-list"); list.innerHTML="";
     (db.costos[activeId]||[]).forEach(c=>{
       let li=document.createElement("li");
-      li.textContent=`${c.actividad} - ${c.concepto}: $${c.valor} (Resp: ${c.responsable})`;
+      li.textContent=`${c.actividad}: $${c.valor}/día (Resp: ${c.responsable})`;
       list.appendChild(li);
     });
   }
@@ -359,4 +374,3 @@ initMap();
 </script>
 </body>
 </html>
-
