@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nobis App + Administración + EmailJS con Token</title>
+  <title>Nobis App + Administración + EmailJS Validado</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -14,7 +14,11 @@
   <script>
     (function(){
       // ⚠️ Reemplaza con tu Public Key real de EmailJS
-      emailjs.init("TU_PUBLIC_KEY_AQUI");
+      const PUBLIC_KEY = "TU_PUBLIC_KEY_AQUI";
+      if(PUBLIC_KEY === "TU_PUBLIC_KEY_AQUI"){
+        console.warn("⚠️ No has configurado tu PUBLIC_KEY de EmailJS");
+      }
+      emailjs.init(PUBLIC_KEY);
     })();
   </script>
 
@@ -64,9 +68,11 @@
 let nivelActual=null;
 let roles={ owner:"fenice.ecuador@gmail.com", admins:[], workers:{}, tokens:{} };
 
+// === Guardar y cargar roles ===
 function saveRoles(){ localStorage.setItem("roles",JSON.stringify(roles)); }
 function loadRoles(){ let raw=localStorage.getItem("roles"); if(raw) roles=JSON.parse(raw); }
 
+// === Login ===
 function loginUsuario(){
   let email=document.getElementById("loginEmail").value.trim();
   if(!email) return alert("Ingrese email");
@@ -84,10 +90,23 @@ function loginUsuario(){
   actualizarUI();
 }
 
+// === Crear Admin con validaciones ===
 function crearAdmin(){
   let email=document.getElementById("nuevoAdmin").value.trim();
   if(!email) return alert("Ingrese un email válido");
   if(roles.admins.includes(email)) return alert("Ya es admin");
+
+  // Validaciones EmailJS
+  const TEMPLATE_ID = "TU_TEMPLATE_ID"; // ⚠️ cámbialo por el real
+  const PUBLIC_KEY = "TU_PUBLIC_KEY_AQUI"; // ⚠️ cámbialo por el real
+  if(PUBLIC_KEY === "TU_PUBLIC_KEY_AQUI"){
+    alert("⚠️ No has configurado tu PUBLIC_KEY de EmailJS en el index.html");
+    return;
+  }
+  if(TEMPLATE_ID === "TU_TEMPLATE_ID"){
+    alert("⚠️ No has configurado tu TEMPLATE_ID de EmailJS en el index.html");
+    return;
+  }
 
   let token = Math.random().toString(36).substring(2,10);
   roles.tokens[email]=token;
@@ -100,19 +119,19 @@ function crearAdmin(){
   console.log("DEBUG → Token generado:", token);
   console.log("DEBUG → Activation link:", activationLink);
 
-  // ⚠️ Reemplaza con tu Template ID real
-  emailjs.send("service_fuhd91q","template_admin123",{
+  emailjs.send("service_fuhd91q",TEMPLATE_ID,{
     to_email: email,
     activation_link: activationLink
   }).then((res)=>{
     console.log("DEBUG → EmailJS éxito:", res);
-    alert("Correo de activación enviado a " + email);
+    alert("✅ Correo de activación enviado a " + email);
   }).catch(err=>{
     console.error("DEBUG → EmailJS error:", err);
-    alert("Error al enviar correo. Revisa configuración de EmailJS. Mira la consola para más detalles.");
+    alert("❌ Error al enviar correo. Revisa la consola (F12) para más detalles.");
   });
 }
 
+// === Activación de administradores ===
 function checkActivation(){
   let params = new URLSearchParams(window.location.search);
   let email = params.get("activate");
@@ -123,24 +142,26 @@ function checkActivation(){
       roles.admins.push(email);
       delete roles.tokens[email];
       saveRoles();
-      alert("Cuenta activada correctamente. Ya puedes ingresar como Administrador.");
+      alert("✅ Cuenta activada correctamente. Ya puedes ingresar como Administrador.");
       window.history.replaceState({},document.title,window.location.pathname);
     } else {
-      alert("Token inválido o ya usado.");
+      alert("❌ Token inválido o ya usado.");
     }
   }
 }
 
+// === Render admins ===
 function renderAdmins(){
   let ul=document.getElementById("listaAdmins");
   ul.innerHTML="";
   roles.admins.forEach(a=>{
     let li=document.createElement("li");
-    li.textContent=a+" ";
+    li.textContent=a;
     ul.appendChild(li);
   });
 }
 
+// === UI ===
 function actualizarUI(){
   document.getElementById("nivel-usuario").textContent=
     (nivelActual===1?"Dueño":nivelActual===2?"Administrador":"Trabajador");
@@ -148,6 +169,7 @@ function actualizarUI(){
   if(nivelActual===1) renderAdmins();
 }
 
+// === Inicializar mapa ===
 function initMap(){
   let map=L.map('map').setView([-1.73,-77.91],14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
