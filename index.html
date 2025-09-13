@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nobis App Multiusuario + Administración + EmailJS + Token</title>
+  <title>Nobis App Multiusuario + Administración + Token + EmailJS</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -98,7 +98,7 @@
     </div>
 
     <div style="overflow-y:auto">
-      <!-- Aquí seguirían los módulos de geocercas, personal, actividades, costos y reportes (idénticos a tu versión anterior) -->
+      <!-- Aquí seguirían los módulos de geocercas, personal, actividades, costos y reportes -->
       <div id="module-geocercas" class="module">
         <h2>Mapa de Geocercas</h2>
         <div id="map"></div>
@@ -154,13 +154,13 @@ function crearAdmin(){
   roles.tokens[email]=token;
   saveRoles();
 
-  // Enviar email con enlace de activación
+  // Enlace de activación
   let activationLink = window.location.origin + window.location.pathname +
     "?activate=" + encodeURIComponent(email) + "&token=" + token;
 
+  // ⚠️ Reemplaza "TU_TEMPLATE_ID" con tu Template ID de EmailJS
   emailjs.send("service_fuhd91q","TU_TEMPLATE_ID",{
     to_email: email,
-    message: "Activa tu cuenta de administrador en Nobis App",
     activation_link: activationLink
   }).then(()=>{
     alert("Correo de activación enviado a " + email);
@@ -235,3 +235,4 @@ checkActivation();
 </script>
 </body>
 </html>
+
