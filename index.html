@@ -10,6 +10,7 @@
     button { margin: 5px; padding: 6px 12px; cursor: pointer; }
     #map { height: 400px; margin-top: 20px; }
   </style>
+  <!-- Librería oficial EmailJS -->
   <script src="https://cdn.jsdelivr.net/npm/emailjs-com@2.6.4/dist/email.min.js"></script>
 </head>
 <body>
@@ -26,6 +27,9 @@
   <h3>Crear nuevo Administrador</h3>
   <input type="email" id="newAdminEmail" placeholder="nuevoadmin@dominio.com">
   <button onclick="crearAdmin()">Crear Admin</button>
+
+  <h3>Prueba de Correo</h3>
+  <button onclick="enviarCorreoPrueba()">Enviar correo de prueba</button>
 
   <h3>Administradores activos</h3>
   <ul id="adminsActivos"></ul>
@@ -99,6 +103,23 @@
         .catch(err => {
           console.error("EmailJS error:", err);
           alert("❌ Error al enviar invitación. Revisa la consola.");
+        });
+    }
+
+    // Enviar correo de prueba
+    function enviarCorreoPrueba() {
+      const templateParams = {
+        email: "fenice.ecuador@gmail.com", // cambiar si quieres otra dirección
+        activation_link: "https://pmuoz02-max.github.io/NobisApp/"
+      };
+
+      emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams)
+        .then(() => {
+          alert("✅ Correo de prueba enviado correctamente");
+        })
+        .catch(err => {
+          console.error("EmailJS prueba error:", err);
+          alert("❌ Error en correo de prueba. Revisa la consola.");
         });
     }
 
