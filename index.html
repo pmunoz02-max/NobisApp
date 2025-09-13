@@ -18,7 +18,7 @@
     #map { width:100%; height:100%; }
     #coords { font-size:12px; color:#333; padding:4px; }
     ul { margin:4px 0; padding-left:18px; }
-    /* estilo para el tooltip flotante */
+    /* tooltip flotante */
     #mouseCoords {
       position: absolute;
       pointer-events: none;
@@ -28,34 +28,67 @@
       font-size: 11px;
       border-radius: 3px;
       white-space: nowrap;
-      transform: translate(10px, -20px); /* offset */
+      transform: translate(10px, -20px);
       z-index: 1000;
       display: none;
     }
+    /* navegación */
+    .nav-btn { margin:4px 2px; width:100%; font-weight:bold; }
+    .module { display:none; height:100%; }
+    .module.active { display:block; }
   </style>
 </head>
 <body>
   <div class="app">
     <div class="sidebar">
-      <h3>Gestión de Geocercas</h3>
-      <button id="newBtn">Nueva geocerca (clic en mapa)</button>
-      <button id="coordBtn">Nueva geocerca (Lat/Lng)</button>
-      <button id="finishBtn" disabled>Finalizar</button>
-      <button id="cancelBtn" disabled>Cancelar</button>
-      <button id="editBtn">Editar geocerca</button>
-      <button id="saveEditBtn" style="display:none;">Guardar cambios</button>
-      <button id="renameBtn">Renombrar</button>
-      <button id="deleteBtn">Eliminar</button>
-      <button id="exportBtn">Exportar</button>
-      <input type="file" id="importInput" accept=".json"/>
+      <h3>Módulos</h3>
+      <button class="nav-btn" onclick="showModule('geocercas')">Geocercas</button>
+      <button class="nav-btn" onclick="showModule('personal')">Gestión de Personal</button>
+      <button class="nav-btn" onclick="showModule('actividades')">Gestión de Actividades</button>
+      <button class="nav-btn" onclick="showModule('costos')">Costos</button>
+      <button class="nav-btn" onclick="showModule('reportes')">Reportes</button>
 
-      <h3>Geocercas</h3>
-      <ul id="fenceList"></ul>
+      <div id="sidebar-content"></div>
     </div>
 
     <div>
-      <div id="map"></div>
-      <div id="coords">Lat: -, Lng: -</div>
+      <!-- Geocercas -->
+      <div id="module-geocercas" class="module active">
+        <div id="map"></div>
+        <div id="coords">Lat: -, Lng: -</div>
+      </div>
+
+      <!-- Personal -->
+      <div id="module-personal" class="module">
+        <h2>Gestión de Personal</h2>
+        <p>Geocerca activa: <span id="personal-geocerca">Ninguna</span></p>
+        <button>Agregar Personal</button>
+        <ul id="personal-list"></ul>
+      </div>
+
+      <!-- Actividades -->
+      <div id="module-actividades" class="module">
+        <h2>Gestión de Actividades</h2>
+        <p>Geocerca activa: <span id="actividades-geocerca">Ninguna</span></p>
+        <button>Agregar Actividad</button>
+        <ul id="actividades-list"></ul>
+      </div>
+
+      <!-- Costos -->
+      <div id="module-costos" class="module">
+        <h2>Costos</h2>
+        <p>Geocerca activa: <span id="costos-geocerca">Ninguna</span></p>
+        <button>Agregar Costo</button>
+        <ul id="costos-list"></ul>
+      </div>
+
+      <!-- Reportes -->
+      <div id="module-reportes" class="module">
+        <h2>Reportes</h2>
+        <p>Geocerca activa: <span id="reportes-geocerca">Ninguna</span></p>
+        <button>Generar Reporte</button>
+        <div id="report-output"></div>
+      </div>
     </div>
   </div>
 
@@ -68,6 +101,39 @@ let fences=[];
 let activeId=null;
 let drawing=false, tempPoints=[], tempLine=null, tempPoly=null;
 let editMarkers=[];
+
+// === cambiar módulo ===
+function showModule(name){
+  document.querySelectorAll(".module").forEach(m=>m.classList.remove("active"));
+  document.getElementById("module-"+name).classList.add("active");
+  renderSidebar(name);
+  updateActiveGeocerca();
+}
+
+// === renderizar la barra lateral según módulo ===
+function renderSidebar(name){
+  let sidebar=document.getElementById("sidebar-content");
+  sidebar.innerHTML="";
+  if(name==="geocercas"){
+    sidebar.innerHTML=`
+      <h3>Gestión de Geocercas</h3>
+      <button id="newBtn">Nueva geocerca (clic en mapa)</button>
+      <button id="coordBtn">Nueva geocerca (Lat/Lng)</button>
+      <button id="finishBtn" disabled>Finalizar</button>
+      <button id="cancelBtn" disabled>Cancelar</button>
+      <button id="editBtn">Editar geocerca</button>
+      <button id="saveEditBtn" style="display:none;">Guardar cambios</button>
+      <button id="renameBtn">Renombrar</button>
+      <button id="deleteBtn">Eliminar</button>
+      <button id="exportBtn">Exportar</button>
+      <input type="file" id="importInput" accept=".json"/>
+      <h3>Geocercas</h3>
+      <ul id="fenceList"></ul>
+    `;
+    attachGeofenceEvents();
+    renderList();
+  }
+}
 
 // === Persistencia ===
 function saveToStorage(){
@@ -85,34 +151,23 @@ function loadFromStorage(){
 // === Inicializar mapa ===
 function initMap(){
   map=L.map('map').setView([-1.73,-77.91],14);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'&copy; OpenStreetMap'
-  }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
   group=L.layerGroup().addTo(map);
 
   let mouseCoords=document.getElementById("mouseCoords");
-
-  // Mostrar coordenadas en div y tooltip flotante
   map.on("mousemove", e=>{
-    let lat=e.latlng.lat.toFixed(6);
-    let lng=e.latlng.lng.toFixed(6);
-
-    // actualizar div inferior
+    let lat=e.latlng.lat.toFixed(6), lng=e.latlng.lng.toFixed(6);
     document.getElementById("coords").textContent=`Lat: ${lat}, Lng: ${lng}`;
-
-    // actualizar tooltip flotante
     mouseCoords.style.display="block";
     mouseCoords.textContent=`${lat}, ${lng}`;
     mouseCoords.style.left=e.originalEvent.pageX+"px";
     mouseCoords.style.top=e.originalEvent.pageY+"px";
   });
-
-  map.on("mouseout",()=>{
-    mouseCoords.style.display="none";
-  });
+  map.on("mouseout",()=>{ mouseCoords.style.display="none"; });
 
   loadFromStorage();
   drawAll();
+  renderSidebar("geocercas");
 }
 
 // === Dibujar geocercas ===
@@ -121,129 +176,140 @@ function drawAll(){
   fences.forEach(f=>{
     let poly=L.polygon(f.latlngs,{color:'#6b21a8',fillOpacity:0.3}).addTo(group);
     poly.bindTooltip(f.name,{permanent:true,direction:"center"});
-    poly.on("click",()=>{activeId=f.id;renderList();});
+    poly.on("click",()=>{activeId=f.id;renderList();updateActiveGeocerca();});
   });
   renderList();
 }
 function renderList(){
   let ul=document.getElementById("fenceList");
+  if(!ul) return;
   ul.innerHTML="";
   fences.forEach(f=>{
     let li=document.createElement("li");
     li.textContent=f.name;
     li.style.cursor="pointer";
-    li.onclick=()=>{activeId=f.id;drawAll();};
+    li.onclick=()=>{activeId=f.id;drawAll();updateActiveGeocerca();};
     if(f.id===activeId) li.style.fontWeight="bold";
     ul.appendChild(li);
   });
+  updateActiveGeocerca();
 }
 
-// === Crear con clics ===
-document.getElementById("newBtn").onclick=()=>{
-  drawing=true; tempPoints=[];
-  map.on("click",addTempPoint);
-  document.getElementById("finishBtn").disabled=false;
-  document.getElementById("cancelBtn").disabled=false;
-};
-function addTempPoint(e){
-  tempPoints.push(e.latlng);
-  if(tempLine) tempLine.setLatLngs(tempPoints);
-  else tempLine=L.polyline(tempPoints,{color:"blue",dashArray:"5,5"}).addTo(map);
-  if(tempPoints.length>=3){
-    if(tempPoly) tempPoly.setLatLngs(tempPoints);
-    else tempPoly=L.polygon(tempPoints,{color:"blue",fillOpacity:0.2}).addTo(map);
-  }
+// === actualizar geocerca activa en otros módulos ===
+function updateActiveGeocerca(){
+  let f=fences.find(x=>x.id===activeId);
+  let name=f?f.name:"Ninguna";
+  document.getElementById("personal-geocerca").textContent=name;
+  document.getElementById("actividades-geocerca").textContent=name;
+  document.getElementById("costos-geocerca").textContent=name;
+  document.getElementById("reportes-geocerca").textContent=name;
 }
-document.getElementById("finishBtn").onclick=()=>{
-  if(tempPoints.length<3){alert("Mínimo 3 puntos");return;}
-  let name=prompt("Nombre de geocerca:","Geocerca "+(fences.length+1));
-  fences.push({id:Date.now().toString(),name,latlngs:tempPoints});
-  saveToStorage();map.off("click",addTempPoint);
-  tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
-  document.getElementById("finishBtn").disabled=true;
-  document.getElementById("cancelBtn").disabled=true;
-  drawAll();
-};
-document.getElementById("cancelBtn").onclick=()=>{
-  map.off("click",addTempPoint);
-  tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
-  document.getElementById("finishBtn").disabled=true;
-  document.getElementById("cancelBtn").disabled=true;
-};
 
-// === Crear con Lat/Lng ===
-document.getElementById("coordBtn").onclick=()=>{
-  let input=prompt("Ingresa coordenadas (lat,lng por línea):");
-  if(!input) return;
-  let coords=input.split("\n").map(l=>{
-    let parts=l.split(",").map(Number);
-    return {lat:parts[0],lng:parts[1]};
-  });
-  if(coords.length<3){alert("Se requieren al menos 3 puntos");return;}
-  let name=prompt("Nombre de geocerca:","Geocerca "+(fences.length+1));
-  if(!name)return;
-  fences.push({id:Date.now().toString(),name,latlngs:coords});
-  saveToStorage();drawAll();
-};
-
-// === Editar geocerca ===
-document.getElementById("editBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);
-  if(!f){alert("Selecciona una geocerca");return;}
-  editMarkers=[];
-  f.latlngs.forEach((p,i)=>{
-    let m=L.marker(p,{draggable:true}).addTo(map);
-    m.bindTooltip(`${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`,{permanent:true,offset:[0,-20]});
-    m.on("drag",e=>{
-      f.latlngs[i]=e.target.getLatLng();
-      m.setTooltipContent(`${f.latlngs[i].lat.toFixed(5)}, ${f.latlngs[i].lng.toFixed(5)}`);
-    });
-    editMarkers.push(m);
-  });
-  document.getElementById("saveEditBtn").style.display="block";
-  alert("Arrastra los puntos y pulsa 'Guardar cambios'.");
-};
-
-// === Guardar edición ===
-document.getElementById("saveEditBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);
-  if(f){
-    editMarkers.forEach(m=>map.removeLayer(m));
-    editMarkers=[];
-    saveToStorage();
-    drawAll();
-  }
-  document.getElementById("saveEditBtn").style.display="none";
-};
-
-// === Renombrar / Eliminar ===
-document.getElementById("renameBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);
-  if(!f){alert("Selecciona geocerca");return;}
-  let n=prompt("Nuevo nombre:",f.name);
-  if(n){f.name=n;saveToStorage();drawAll();}
-};
-document.getElementById("deleteBtn").onclick=()=>{
-  fences=fences.filter(f=>f.id!==activeId);activeId=null;
-  saveToStorage();drawAll();
-};
-
-// === Exportar / Importar ===
-document.getElementById("exportBtn").onclick=()=>{
-  let blob=new Blob([JSON.stringify(fences)],{type:"application/json"});
-  let a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="geocercas.json";
-  a.click();
-};
-document.getElementById("importInput").onchange=e=>{
-  let fr=new FileReader();
-  fr.onload=()=>{
-    try{fences=JSON.parse(fr.result);saveToStorage();drawAll();}
-    catch{alert("Archivo inválido");}
+// === Eventos de geocercas ===
+function attachGeofenceEvents(){
+  document.getElementById("newBtn").onclick=()=>{
+    drawing=true; tempPoints=[];
+    map.on("click",addTempPoint);
+    document.getElementById("finishBtn").disabled=false;
+    document.getElementById("cancelBtn").disabled=false;
   };
-  fr.readAsText(e.target.files[0]);
-};
+  function addTempPoint(e){
+    tempPoints.push(e.latlng);
+    if(tempLine) tempLine.setLatLngs(tempPoints);
+    else tempLine=L.polyline(tempPoints,{color:"blue",dashArray:"5,5"}).addTo(map);
+    if(tempPoints.length>=3){
+      if(tempPoly) tempPoly.setLatLngs(tempPoints);
+      else tempPoly=L.polygon(tempPoints,{color:"blue",fillOpacity:0.2}).addTo(map);
+    }
+  }
+  window.addTempPoint=addTempPoint;
+
+  document.getElementById("finishBtn").onclick=()=>{
+    if(tempPoints.length<3){alert("Mínimo 3 puntos");return;}
+    let name=prompt("Nombre de geocerca:","Geocerca "+(fences.length+1));
+    fences.push({id:Date.now().toString(),name,latlngs:tempPoints});
+    saveToStorage();map.off("click",addTempPoint);
+    tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
+    document.getElementById("finishBtn").disabled=true;
+    document.getElementById("cancelBtn").disabled=true;
+    drawAll();
+  };
+  document.getElementById("cancelBtn").onclick=()=>{
+    map.off("click",addTempPoint);
+    tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
+    document.getElementById("finishBtn").disabled=true;
+    document.getElementById("cancelBtn").disabled=true;
+  };
+
+  document.getElementById("coordBtn").onclick=()=>{
+    let input=prompt("Ingresa coordenadas (lat,lng por línea):");
+    if(!input) return;
+    let coords=input.split("\n").map(l=>{
+      let parts=l.split(",").map(Number);
+      return {lat:parts[0],lng:parts[1]};
+    });
+    if(coords.length<3){alert("Se requieren al menos 3 puntos");return;}
+    let name=prompt("Nombre de geocerca:","Geocerca "+(fences.length+1));
+    if(!name)return;
+    fences.push({id:Date.now().toString(),name,latlngs:coords});
+    saveToStorage();drawAll();
+  };
+
+  document.getElementById("editBtn").onclick=()=>{
+    let f=fences.find(x=>x.id===activeId);
+    if(!f){alert("Selecciona una geocerca");return;}
+    editMarkers=[];
+    f.latlngs.forEach((p,i)=>{
+      let m=L.marker(p,{draggable:true}).addTo(map);
+      m.bindTooltip(`${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`,{permanent:true,offset:[0,-20]});
+      m.on("drag",e=>{
+        f.latlngs[i]=e.target.getLatLng();
+        m.setTooltipContent(`${f.latlngs[i].lat.toFixed(5)}, ${f.latlngs[i].lng.toFixed(5)}`);
+      });
+      editMarkers.push(m);
+    });
+    document.getElementById("saveEditBtn").style.display="block";
+    alert("Arrastra los puntos y pulsa 'Guardar cambios'.");
+  };
+
+  document.getElementById("saveEditBtn").onclick=()=>{
+    let f=fences.find(x=>x.id===activeId);
+    if(f){
+      editMarkers.forEach(m=>map.removeLayer(m));
+      editMarkers=[];
+      saveToStorage();
+      drawAll();
+    }
+    document.getElementById("saveEditBtn").style.display="none";
+  };
+
+  document.getElementById("renameBtn").onclick=()=>{
+    let f=fences.find(x=>x.id===activeId);
+    if(!f){alert("Selecciona geocerca");return;}
+    let n=prompt("Nuevo nombre:",f.name);
+    if(n){f.name=n;saveToStorage();drawAll();}
+  };
+  document.getElementById("deleteBtn").onclick=()=>{
+    fences=fences.filter(f=>f.id!==activeId);activeId=null;
+    saveToStorage();drawAll();
+  };
+
+  document.getElementById("exportBtn").onclick=()=>{
+    let blob=new Blob([JSON.stringify(fences)],{type:"application/json"});
+    let a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="geocercas.json";
+    a.click();
+  };
+  document.getElementById("importInput").onchange=e=>{
+    let fr=new FileReader();
+    fr.onload=()=>{
+      try{fences=JSON.parse(fr.result);saveToStorage();drawAll();}
+      catch{alert("Archivo inválido");}
+    };
+    fr.readAsText(e.target.files[0]);
+  };
+}
 
 initMap();
 </script>
