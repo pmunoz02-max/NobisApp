@@ -73,13 +73,13 @@
     // Login de administrador
     // ---------------------------
     function login() {
-      const email = document.getElementById("loginEmail").value;
+      const email = document.getElementById("loginEmail").value.trim();
       const admins = JSON.parse(localStorage.getItem("admins")) || [];
 
       if (admins.includes(email)) {
         alert("✅ Bienvenido administrador: " + email);
       } else {
-        alert("❌ Acceso denegado, no eres administrador");
+        alert("❌ Acceso denegado: este correo no está autorizado.");
       }
     }
 
@@ -87,7 +87,7 @@
     // Crear nuevo administrador
     // ---------------------------
     function crearAdmin() {
-      const email = document.getElementById("newAdminEmail").value;
+      const email = document.getElementById("newAdminEmail").value.trim();
       if (!email) {
         alert("Por favor, ingresa un email válido.");
         return;
