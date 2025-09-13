@@ -37,7 +37,7 @@
 <body>
   <div class="app">
     <div class="sidebar">
-      <h3>Geocercas</h3>
+      <h3>Gestión de Geocercas</h3>
       <button id="newBtn">Nueva geocerca (clic en mapa)</button>
       <button id="coordBtn">Nueva geocerca (Lat/Lng)</button>
       <button id="finishBtn" disabled>Finalizar</button>
@@ -156,7 +156,7 @@ function updateActiveGeocerca(){
   renderModuleData("personal"); renderModuleData("actividades"); renderModuleData("costos");
 }
 
-// === Geocercas botones ===
+// === Crear geocerca con clics ===
 document.getElementById("newBtn").onclick=()=>{
   drawing=true; tempPoints=[];
   map.on("click",addTempPoint);
@@ -189,6 +189,8 @@ document.getElementById("cancelBtn").onclick=()=>{
   document.getElementById("finishBtn").disabled=true;
   document.getElementById("cancelBtn").disabled=true;
 };
+
+// === Crear con Lat/Lng ===
 document.getElementById("coordBtn").onclick=()=>{
   let input=prompt("Ingresa coordenadas (lat,lng por línea o separadas por ;) :");
   if(!input) return;
@@ -206,6 +208,8 @@ document.getElementById("coordBtn").onclick=()=>{
   fences.push({id:Date.now().toString(),name,latlngs:coords});
   db.geocercas=fences; saveToStorage(); drawAll();
 };
+
+// === Editar geocerca ===
 document.getElementById("editBtn").onclick=()=>{
   let f=fences.find(x=>x.id===activeId);
   if(!f){alert("Selecciona una geocerca");return;}
@@ -231,6 +235,8 @@ document.getElementById("saveEditBtn").onclick=()=>{
   }
   document.getElementById("saveEditBtn").style.display="none";
 };
+
+// === Renombrar / Eliminar ===
 document.getElementById("renameBtn").onclick=()=>{
   let f=fences.find(x=>x.id===activeId);
   if(!f){alert("Selecciona geocerca");return;}
@@ -241,6 +247,8 @@ document.getElementById("deleteBtn").onclick=()=>{
   fences=fences.filter(f=>f.id!==activeId);activeId=null;
   db.geocercas=fences; saveToStorage(); drawAll();
 };
+
+// === Exportar / Importar ===
 document.getElementById("exportBtn").onclick=()=>{
   let blob=new Blob([JSON.stringify(db)],{type:"application/json"});
   let a=document.createElement("a");
