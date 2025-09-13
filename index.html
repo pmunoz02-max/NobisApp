@@ -269,9 +269,10 @@ document.getElementById("importInput").onchange=e=>{
 function addPersonal(){
   if(!activeId){alert("Selecciona una geocerca");return;}
   let nombre=prompt("Nombre:"); let rol=prompt("Rol:");
-  if(!nombre) return;
+  let telefono=prompt("Teléfono (con prefijo, ej: +593987654321):");
+  if(!nombre || !telefono) return;
   if(!db.personal[activeId]) db.personal[activeId]=[];
-  db.personal[activeId].push({nombre,rol});
+  db.personal[activeId].push({nombre,rol,telefono});
   saveToStorage(); renderModuleData("personal");
 }
 function addActividad(){
@@ -305,19 +306,25 @@ function renderModuleData(module){
   if(module==="personal"){
     let list=document.getElementById("personal-list"); list.innerHTML="";
     (db.personal[activeId]||[]).forEach(p=>{
-      let li=document.createElement("li"); li.textContent=`${p.nombre} - ${p.rol}`; list.appendChild(li);
+      let li=document.createElement("li");
+      li.textContent=`${p.nombre} - ${p.rol} - ${p.telefono||"N/A"}`;
+      list.appendChild(li);
     });
   }
   if(module==="actividades"){
     let list=document.getElementById("actividades-list"); list.innerHTML="";
     (db.actividades[activeId]||[]).forEach(a=>{
-      let li=document.createElement("li"); li.textContent=`${a.fecha}: ${a.actividad} (${a.responsable})`; list.appendChild(li);
+      let li=document.createElement("li");
+      li.textContent=`${a.fecha}: ${a.actividad} (${a.responsable})`;
+      list.appendChild(li);
     });
   }
   if(module==="costos"){
     let list=document.getElementById("costos-list"); list.innerHTML="";
     (db.costos[activeId]||[]).forEach(c=>{
-      let li=document.createElement("li"); li.textContent=`${c.concepto}: $${c.valor}`; list.appendChild(li);
+      let li=document.createElement("li");
+      li.textContent=`${c.concepto}: $${c.valor}`;
+      list.appendChild(li);
     });
   }
 }
