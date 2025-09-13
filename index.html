@@ -133,11 +133,11 @@ function crearAdmin(){
   console.log("DEBUG → Token generado:", token);
   console.log("DEBUG → Activation link:", activationLink);
 
-  // Enviar correo con EmailJS (con PUBLIC_KEY)
+  // ✅ Enviar correo con EmailJS (nuevo SDK)
   emailjs.send(SERVICE_ID, TEMPLATE_ID, {
       to_email: email,
       activation_link: activationLink
-  }, PUBLIC_KEY).then((res)=>{
+  }).then((res)=>{
       console.log("DEBUG → EmailJS éxito:", res);
       alert("✅ Correo de activación enviado a " + email);
   }).catch(err=>{
