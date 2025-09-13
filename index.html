@@ -14,8 +14,9 @@
 
   <script>
     // ✅ Configuración EmailJS
-    const PUBLIC_KEY = "qSmyIiQYgJVnpllgS";     // tu Public Key real
-    const TEMPLATE_ID = "template_k4gnktv";     // tu Template ID real
+    const PUBLIC_KEY = "qSmyIiQYgJVnpllgS";      // tu Public Key real
+    const TEMPLATE_ID = "template_k4gnktv";      // tu Template ID real
+    const SERVICE_ID = "service_fuhd91q";        // tu Service ID real
 
     (function(){
       emailjs.init(PUBLIC_KEY);
@@ -133,7 +134,7 @@ function crearAdmin(){
   console.log("DEBUG → Activation link:", activationLink);
 
   // Enviar correo con EmailJS
-  emailjs.send("service_fuhd91q",TEMPLATE_ID,{
+  emailjs.send(SERVICE_ID, TEMPLATE_ID,{
     to_email: email,
     activation_link: activationLink
   }).then((res)=>{
