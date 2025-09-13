@@ -14,8 +14,8 @@
 
   <script>
     // ✅ Configuración EmailJS
-    const PUBLIC_KEY = "qSmyIiQYgJVnpllgS";
-    const TEMPLATE_ID = "template_k4gnktv";
+    const PUBLIC_KEY = "qSmyIiQYgJVnpllgS";     // tu Public Key real
+    const TEMPLATE_ID = "template_k4gnktv";     // tu Template ID real
 
     (function(){
       emailjs.init(PUBLIC_KEY);
@@ -69,7 +69,13 @@ let roles={ owner:"fenice.ecuador@gmail.com", admins:[], workers:{}, tokens:{} }
 
 // === Guardar y cargar roles ===
 function saveRoles(){ localStorage.setItem("roles",JSON.stringify(roles)); }
-function loadRoles(){ let raw=localStorage.getItem("roles"); if(raw) roles=JSON.parse(raw); }
+function loadRoles(){
+  let raw=localStorage.getItem("roles");
+  if(raw) roles=JSON.parse(raw);
+
+  // 🔧 Fix: asegurar que tokens siempre exista
+  if(!roles.tokens) roles.tokens = {};
+}
 
 // === Login ===
 function loginUsuario(){
@@ -99,7 +105,7 @@ function crearAdmin(){
 
   // Generar token
   let token = Math.random().toString(36).substring(2,10);
-  roles.tokens[email]=token;
+  roles.tokens[email] = token;
   saveRoles();
 
   // Enlace de activación
