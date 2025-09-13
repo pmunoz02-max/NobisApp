@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nobis App + Administración + EmailJS Funcional</title>
+  <title>Nobis App + Administración + EmailJS</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -11,10 +11,13 @@
 
   <!-- EmailJS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+
   <script>
+    // ✅ Configuración EmailJS
+    const PUBLIC_KEY = "qSmyIiQYgJVnpllgS";   // tu Public Key real
+    const TEMPLATE_ID = "TU_TEMPLATE_ID_REAL"; // ⚠️ cambia este valor por el tuyo
+
     (function(){
-      // ⚠️ Reemplaza por tu Public Key real
-      const PUBLIC_KEY = "PUBLIC_KEY_DE_EJEMPLO_12345";
       emailjs.init(PUBLIC_KEY);
       console.log("DEBUG → EmailJS inicializado con PUBLIC_KEY:", PUBLIC_KEY);
     })();
@@ -94,13 +97,17 @@ function crearAdmin(){
   if(!email) return alert("Ingrese un email válido");
   if(roles.admins.includes(email)) return alert("Ya es admin");
 
-  // ⚠️ CONFIGURA AQUÍ TU TEMPLATE ID REAL
-  const TEMPLATE_ID = "template_admin123";  // cambia este valor por el tuyo real
+  if(TEMPLATE_ID === "TU_TEMPLATE_ID_REAL"){
+    alert("⚠️ Configura tu TEMPLATE_ID de EmailJS");
+    return;
+  }
 
+  // Generar token
   let token = Math.random().toString(36).substring(2,10);
   roles.tokens[email]=token;
   saveRoles();
 
+  // Enlace de activación
   let activationLink = window.location.origin + window.location.pathname +
     "?activate=" + encodeURIComponent(email) + "&token=" + token;
 
@@ -108,6 +115,7 @@ function crearAdmin(){
   console.log("DEBUG → Token generado:", token);
   console.log("DEBUG → Activation link:", activationLink);
 
+  // Enviar correo
   emailjs.send("service_fuhd91q",TEMPLATE_ID,{
     to_email: email,
     activation_link: activationLink
@@ -116,7 +124,7 @@ function crearAdmin(){
     alert("✅ Correo de activación enviado a " + email);
   }).catch(err=>{
     console.error("DEBUG → EmailJS error:", err);
-    alert("❌ Error al enviar correo. Revisa consola (F12).");
+    alert("❌ Error al enviar correo. Revisa la consola (F12).");
   });
 }
 
@@ -140,7 +148,7 @@ function checkActivation(){
   }
 }
 
-// === Mostrar admins en la lista ===
+// === Mostrar admins ===
 function renderAdmins(){
   let ul=document.getElementById("listaAdmins");
   ul.innerHTML="";
