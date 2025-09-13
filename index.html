@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nobis App Multiusuario</title>
+  <title>Nobis App Multiusuario + Administración + Reportes</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -51,6 +51,42 @@
       <button onclick="cambiarUsuario()">Cambiar Usuario</button>
       <p>Usuario activo: <b id="usuarioActivo">Ninguno</b></p>
 
+      <!-- Administración -->
+      <div id="module-admin" class="module">
+        <h2>Administración</h2>
+        <label>Email de login:</label>
+        <input type="email" id="loginEmail" placeholder="tu@email.com">
+        <button onclick="loginUsuario()">Ingresar</button>
+        <p>Nivel actual: <b id="nivel-usuario">No autenticado</b></p>
+
+        <!-- Dueño -->
+        <div id="owner-panel" style="display:none;">
+          <h3>Dueño</h3>
+          <input type="text" id="nuevoAdmin" placeholder="Email nuevo admin">
+          <button onclick="crearAdmin()">Crear Admin</button>
+          <h4>Administradores activos</h4>
+          <ul id="listaAdmins"></ul>
+        </div>
+
+        <!-- Administrador -->
+        <div id="admin-panel" style="display:none;">
+          <h3>Administrador</h3>
+          <label>Intervalo de reportes (minutos):</label>
+          <input type="number" id="intervaloReportes" min="1" value="10">
+          <button onclick="guardarIntervalo()">Guardar</button>
+          <h4>Reportes de trabajadores</h4>
+          <ul id="listaReportes"></ul>
+          <button onclick="mostrarReportesMapa()">Mostrar en Mapa</button>
+        </div>
+
+        <!-- Trabajador -->
+        <div id="trabajador-panel" style="display:none;">
+          <h3>Trabajador</h3>
+          <button onclick="enviarUbicacion()">Enviar mi ubicación</button>
+          <p id="ubicacionMsg">Aún no has enviado ubicación</p>
+        </div>
+      </div>
+
       <h3>Gestión de Geocercas</h3>
       <button id="newBtn">Nueva geocerca (clic en mapa)</button>
       <button id="coordBtn">Nueva geocerca (Lat/Lng)</button>
@@ -78,7 +114,6 @@
       <div id="module-personal" class="module">
         <h2>Gestión de Personal</h2>
         <p>Geocerca activa: <span id="personal-geocerca">Ninguna</span></p>
-
         <form id="personal-form" onsubmit="guardarPersonal(event)">
           <input type="text" id="nombrePersonal" placeholder="Nombre" required>
           <input type="text" id="rolPersonal" placeholder="Rol" required>
@@ -90,7 +125,6 @@
           </select>
           <button type="submit">Agregar</button>
         </form>
-
         <ul id="personal-list"></ul>
       </div>
 
@@ -98,7 +132,6 @@
       <div id="module-actividades" class="module">
         <h2>Gestión de Actividades</h2>
         <p>Geocerca activa: <span id="actividades-geocerca">Ninguna</span></p>
-
         <form id="actividad-form" onsubmit="guardarActividad(event)">
           <label>Actividad:</label>
           <input list="actividadOpciones" id="actividadNombre" placeholder="Escriba o seleccione..." required>
@@ -109,19 +142,14 @@
             <option value="Cosecha">
             <option value="Control de plagas">
           </datalist>
-
           <label>Inicio:</label>
           <input type="date" id="actividadFechaInicio" required>
-
           <label>Fin:</label>
           <input type="date" id="actividadFechaFin" required>
-
           <label>Responsable:</label>
           <select id="actividadResponsable" required></select>
-
           <button type="submit">Agregar</button>
         </form>
-
         <ul id="actividades-list"></ul>
       </div>
 
@@ -129,20 +157,15 @@
       <div id="module-costos" class="module">
         <h2>Costos</h2>
         <p>Geocerca activa: <span id="costos-geocerca">Ninguna</span></p>
-
         <form id="costo-form" onsubmit="guardarCosto(event)">
           <label>Actividad:</label>
           <select id="costoActividad" required></select>
-
           <label>Responsable:</label>
           <select id="costoResponsable" required></select>
-
           <label>Valor ($/día):</label>
           <input type="number" id="costoValor" min="0" step="0.01" required>
-
           <button type="submit">Agregar</button>
         </form>
-
         <ul id="costos-list"></ul>
       </div>
 
@@ -150,7 +173,6 @@
       <div id="module-reportes" class="module">
         <h2>Reportes</h2>
         <p>Geocerca activa: <span id="reportes-geocerca">Ninguna</span></p>
-
         <label>Tipo de reporte:</label>
         <select id="tipoReporte">
           <option value="tablaActividad">Costos por Actividad (Tabla)</option>
@@ -159,10 +181,8 @@
           <option value="graficoPie">Distribución de Costos (Pie)</option>
           <option value="graficoLinea">Costos en el Tiempo (Línea)</option>
         </select>
-
         <button onclick="generarReporte()">Generar</button>
         <button onclick="exportarCSV()">Exportar CSV</button>
-
         <div id="report-output"></div>
         <canvas id="chartCanvas" style="max-width:600px; margin-top:20px;"></canvas>
       </div>
@@ -172,14 +192,119 @@
   <div id="mouseCoords"></div>
 
 <script>
-let map, group;
+let map, group, reportLayer;
 let fences=[]; let activeId=null;
-let db={ geocercas:[], personal:{}, actividades:{}, costos:{}, reportes:{} };
+let db={ geocercas:[], personal:{}, actividades:{}, costos:{}, reportes:{}, reportesUbicacion:{} };
 let chartInstance=null;
-
 let currentUser=null; // usuario activo
+let nivelActual=null; // nivel de rol
 
-// === Gestión de usuarios ===
+// === Roles ===
+let roles={ owner:"dueno@app.com", admins:[], workers:{} };
+
+// === Gestión de roles ===
+function saveRoles(){ localStorage.setItem("roles",JSON.stringify(roles)); }
+function loadRoles(){ let raw=localStorage.getItem("roles"); if(raw) roles=JSON.parse(raw); }
+
+// === Login ===
+function loginUsuario(){
+  let email=document.getElementById("loginEmail").value.trim();
+  if(!email) return alert("Ingrese email");
+  if(email===roles.owner){ nivelActual=1; }
+  else if(roles.admins.includes(email)){ nivelActual=2; }
+  else if(roles.workers[email]){ nivelActual=3; }
+  else { alert("No tienes acceso"); return; }
+  actualizarUI();
+}
+
+// === Dueño: crear admin ===
+function crearAdmin(){
+  let email=document.getElementById("nuevoAdmin").value.trim();
+  if(!email) return;
+  if(roles.admins.includes(email)) return alert("Ya es admin");
+  roles.admins.push(email);
+  saveRoles();
+  renderAdmins();
+}
+
+// === Revocar admin ===
+function revocarAdmin(email){
+  roles.admins=roles.admins.filter(a=>a!==email);
+  saveRoles();
+  renderAdmins();
+}
+
+// === Render admins ===
+function renderAdmins(){
+  let ul=document.getElementById("listaAdmins");
+  ul.innerHTML="";
+  roles.admins.forEach(a=>{
+    let li=document.createElement("li");
+    li.textContent=a+" ";
+    let btn=document.createElement("button");
+    btn.textContent="Revocar";
+    btn.onclick=()=>revocarAdmin(a);
+    li.appendChild(btn);
+    ul.appendChild(li);
+  });
+}
+
+// === UI por nivel ===
+function actualizarUI(){
+  document.getElementById("nivel-usuario").textContent=
+    (nivelActual===1?"Dueño":nivelActual===2?"Administrador":"Trabajador");
+  document.getElementById("owner-panel").style.display=(nivelActual===1?"block":"none");
+  document.getElementById("admin-panel").style.display=(nivelActual===2?"block":"none");
+  document.getElementById("trabajador-panel").style.display=(nivelActual===3?"block":"none");
+  if(nivelActual===1) renderAdmins();
+}
+
+// === Administrador: intervalo ===
+function guardarIntervalo(){
+  let val=parseInt(document.getElementById("intervaloReportes").value);
+  if(isNaN(val)||val<1) return alert("Valor inválido");
+  localStorage.setItem("intervaloReportes",val);
+  alert("Intervalo guardado: "+val+" min");
+}
+
+// === Trabajador: enviar ubicación ===
+function enviarUbicacion(){
+  if(nivelActual!==3) return;
+  if(!navigator.geolocation){ alert("Geolocalización no disponible"); return; }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    let lat=pos.coords.latitude, lng=pos.coords.longitude;
+    let reporte={timestamp:Date.now(), lat, lng};
+    let email=document.getElementById("loginEmail").value.trim();
+    if(!db.reportesUbicacion[email]) db.reportesUbicacion[email]=[];
+    db.reportesUbicacion[email].push(reporte);
+    saveToStorage();
+    document.getElementById("ubicacionMsg").textContent=
+      "Último reporte: "+lat.toFixed(5)+", "+lng.toFixed(5);
+  });
+}
+
+// === Mostrar reportes en mapa (Admin) ===
+function mostrarReportesMapa(){
+  if(nivelActual!==2){ alert("Solo administradores"); return; }
+  if(reportLayer) reportLayer.clearLayers();
+  else reportLayer=L.layerGroup().addTo(map);
+
+  let lista=document.getElementById("listaReportes");
+  lista.innerHTML="";
+
+  for(let user in db.reportesUbicacion){
+    db.reportesUbicacion[user].forEach(r=>{
+      let d=new Date(r.timestamp);
+      let marker=L.circleMarker([r.lat,r.lng],{radius:6,color:"red"}).addTo(reportLayer);
+      marker.bindTooltip(user+" @ "+d.toLocaleString());
+      let li=document.createElement("li");
+      li.textContent=user+" -> "+r.lat.toFixed(5)+","+r.lng.toFixed(5)+" ("+d.toLocaleString()+")";
+      lista.appendChild(li);
+    });
+  }
+}
+
+// === Multiusuario base ===
 function initUsuarios(){
   let select=document.getElementById("userSelect");
   select.innerHTML="";
@@ -198,7 +323,7 @@ function crearUsuario(){
   if(users.includes(name)){ alert("Ese usuario ya existe"); return; }
   users.push(name);
   localStorage.setItem("usuarios",JSON.stringify(users));
-  localStorage.setItem("db_"+name,JSON.stringify({ geocercas:[], personal:{}, actividades:{}, costos:{}, reportes:{} }));
+  localStorage.setItem("db_"+name,JSON.stringify({ geocercas:[], personal:{}, actividades:{}, costos:{}, reportes:{}, reportesUbicacion:{} }));
   document.getElementById("newUserName").value="";
   initUsuarios();
   alert("Usuario creado: "+name);
@@ -213,16 +338,14 @@ function cambiarUsuario(){
   drawAll();
 }
 
-// === Persistencia por usuario ===
-function saveToStorage(){ 
-  if(currentUser) localStorage.setItem("db_"+currentUser,JSON.stringify(db)); 
-}
-function loadFromStorage(){ 
+// === Persistencia DB por usuario ===
+function saveToStorage(){ if(currentUser) localStorage.setItem("db_"+currentUser,JSON.stringify(db)); }
+function loadFromStorage(){
   if(currentUser){
-    let raw=localStorage.getItem("db_"+currentUser); 
-    if(raw) db=JSON.parse(raw); 
-    else db={ geocercas:[], personal:{}, actividades:{}, costos:{}, reportes:{} };
-    fences=db.geocercas||[]; 
+    let raw=localStorage.getItem("db_"+currentUser);
+    if(raw) db=JSON.parse(raw);
+    else db={ geocercas:[], personal:{}, actividades:{}, costos:{}, reportes:{}, reportesUbicacion:{} };
+    fences=db.geocercas||[];
   }
 }
 
@@ -242,12 +365,13 @@ function initMap(){
   drawAll();
 }
 
-// === (resto del código sin cambios de tu app) ===
-// ... aquí permanecen todas las funciones originales de geocercas, personal, actividades, costos y reportes ...
+// === (aquí permanecen todas las funciones originales de geocercas, personal, actividades, costos y reportes) ===
+// Ejemplo: drawAll, renderList, updateActiveGeocerca, renderModuleData, etc. (idéntico al código previo).
 
 // Llamadas iniciales
 initUsuarios();
 initMap();
+loadRoles();
 </script>
 </body>
 </html>
