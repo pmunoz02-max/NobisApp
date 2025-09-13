@@ -18,6 +18,20 @@
     #map { width:100%; height:100%; }
     #coords { font-size:12px; color:#333; padding:4px; }
     ul { margin:4px 0; padding-left:18px; }
+    /* estilo para el tooltip flotante */
+    #mouseCoords {
+      position: absolute;
+      pointer-events: none;
+      background: rgba(255,255,255,0.85);
+      border: 1px solid #666;
+      padding: 2px 4px;
+      font-size: 11px;
+      border-radius: 3px;
+      white-space: nowrap;
+      transform: translate(10px, -20px); /* offset */
+      z-index: 1000;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -44,6 +58,9 @@
       <div id="coords">Lat: -, Lng: -</div>
     </div>
   </div>
+
+  <!-- tooltip flotante -->
+  <div id="mouseCoords"></div>
 
 <script>
 let map, group;
@@ -73,19 +90,25 @@ function initMap(){
   }).addTo(map);
   group=L.layerGroup().addTo(map);
 
-  // Tooltip flotante para coordenadas del mouse
-  let mouseTooltip = L.tooltip({
-    permanent: false,
-    direction: "right",
-    offset: [15, 0]
-  }).addTo(map);
+  let mouseCoords=document.getElementById("mouseCoords");
 
-  // Mostrar coordenadas dinámicas
+  // Mostrar coordenadas en div y tooltip flotante
   map.on("mousemove", e=>{
-    document.getElementById("coords").textContent =
-      `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
-    mouseTooltip.setLatLng(e.latlng)
-      .setContent(`${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`);
+    let lat=e.latlng.lat.toFixed(6);
+    let lng=e.latlng.lng.toFixed(6);
+
+    // actualizar div inferior
+    document.getElementById("coords").textContent=`Lat: ${lat}, Lng: ${lng}`;
+
+    // actualizar tooltip flotante
+    mouseCoords.style.display="block";
+    mouseCoords.textContent=`${lat}, ${lng}`;
+    mouseCoords.style.left=e.originalEvent.pageX+"px";
+    mouseCoords.style.top=e.originalEvent.pageY+"px";
+  });
+
+  map.on("mouseout",()=>{
+    mouseCoords.style.display="none";
   });
 
   loadFromStorage();
@@ -99,10 +122,6 @@ function drawAll(){
     let poly=L.polygon(f.latlngs,{color:'#6b21a8',fillOpacity:0.3}).addTo(group);
     poly.bindTooltip(f.name,{permanent:true,direction:"center"});
     poly.on("click",()=>{activeId=f.id;renderList();});
-    // Dibujar coordenadas de cada vértice
-    f.latlngs.forEach(p=>{
-      L.marker(p,{icon:L.divIcon({className:'coord-label',html:`<div style="font-size:10px;background:#fff;padding:2px;border:1px solid #666;border-radius:3px;">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>`})}).addTo(group);
-    });
   });
   renderList();
 }
@@ -128,7 +147,6 @@ document.getElementById("newBtn").onclick=()=>{
 };
 function addTempPoint(e){
   tempPoints.push(e.latlng);
-  L.marker(e.latlng,{icon:L.divIcon({className:'coord-label',html:`<div style="font-size:10px;background:#fff;padding:2px;border:1px solid #666;border-radius:3px;">${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}</div>`})}).addTo(map);
   if(tempLine) tempLine.setLatLngs(tempPoints);
   else tempLine=L.polyline(tempPoints,{color:"blue",dashArray:"5,5"}).addTo(map);
   if(tempPoints.length>=3){
