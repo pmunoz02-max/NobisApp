@@ -18,6 +18,7 @@
     const TEMPLATE_ID = "template_k4gnktv";      // tu Template ID real
     const SERVICE_ID  = "service_fuhd91q";       // tu Service ID real
 
+    // ✅ Inicializar EmailJS una sola vez
     (function(){
       emailjs.init(PUBLIC_KEY);
       console.log("DEBUG → EmailJS inicializado con PUBLIC_KEY:", PUBLIC_KEY);
@@ -54,6 +55,10 @@
           <hr>
           <button onclick="resetRoles()">⚠️ Resetear Roles</button>
         </div>
+
+        <!-- Botón de prueba -->
+        <hr>
+        <button onclick="enviarCorreoPrueba()">📧 Enviar correo de prueba</button>
       </div>
     </div>
 
@@ -77,14 +82,13 @@ function loadRoles(){
   let raw=localStorage.getItem("roles");
   if(raw) roles=JSON.parse(raw);
 
-  // 🔧 Reforzar: asegurar todas las propiedades
   if(!roles.owner) roles.owner = "fenice.ecuador@gmail.com";
   if(!roles.admins) roles.admins = [];
   if(!roles.workers) roles.workers = {};
   if(!roles.tokens) roles.tokens = {};
 }
 
-// === Reset Roles (solo Dueño) ===
+// === Reset Roles ===
 function resetRoles(){
   if(confirm("⚠️ Esto borrará todos los roles y accesos guardados. ¿Continuar?")){
     localStorage.removeItem("roles");
@@ -120,12 +124,10 @@ function crearAdmin(){
   if(!email) return alert("Ingrese un email válido");
   if(roles.admins.includes(email)) return alert("Ya es admin");
 
-  // Generar token
   let token = Math.random().toString(36).substring(2,10);
   roles.tokens[email] = token;
   saveRoles();
 
-  // Enlace de activación
   let activationLink = window.location.origin + window.location.pathname +
     "?activate=" + encodeURIComponent(email) + "&token=" + token;
 
@@ -133,7 +135,7 @@ function crearAdmin(){
   console.log("DEBUG → Token generado:", token);
   console.log("DEBUG → Activation link:", activationLink);
 
-  // ✅ Enviar correo con EmailJS
+  // ✅ Enviar correo SIN pasar la publicKey
   emailjs.send(SERVICE_ID, TEMPLATE_ID, {
       to_email: email,
       activation_link: activationLink
@@ -148,7 +150,23 @@ function crearAdmin(){
   });
 }
 
-// === Activar cuenta desde link ===
+// === Test de correo ===
+function enviarCorreoPrueba(){
+  emailjs.send(SERVICE_ID, TEMPLATE_ID, {
+    to_email: "fenice.ecuador@gmail.com",
+    activation_link: "https://ejemplo.com/activacion"
+  })
+  .then((res)=>{
+    console.log("DEBUG → EmailJS prueba éxito:", res);
+    alert("✅ Correo de PRUEBA enviado correctamente.");
+  })
+  .catch(err=>{
+    console.error("DEBUG → EmailJS prueba error:", err);
+    alert("❌ Error en correo de prueba: " + JSON.stringify(err));
+  });
+}
+
+// === Activar cuenta ===
 function checkActivation(){
   let params = new URLSearchParams(window.location.search);
   let email = params.get("activate");
@@ -168,7 +186,6 @@ function checkActivation(){
   }
 }
 
-// === Mostrar admins ===
 function renderAdmins(){
   let ul=document.getElementById("listaAdmins");
   ul.innerHTML="";
@@ -179,7 +196,6 @@ function renderAdmins(){
   });
 }
 
-// === Actualizar UI ===
 function actualizarUI(){
   document.getElementById("nivel-usuario").textContent=
     (nivelActual===1?"Dueño":nivelActual===2?"Administrador":"Trabajador");
