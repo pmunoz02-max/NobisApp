@@ -33,13 +33,13 @@
   <div id="map">[Aquí va el mapa con geocercas y módulos de tu app]</div>
 
   <script>
-    // Inicializar EmailJS
+    // Inicializar EmailJS con tu Public Key
     (function(){
-      emailjs.init("qSmyIiQYgJVnpllqS"); // Public Key
+      emailjs.init("qSmyIiQYgJVnpllqS"); // <--- tu PUBLIC KEY
     })();
 
-    const SERVICE_ID = "service_fuhd91q";   // Service ID de EmailJS
-    const TEMPLATE_ID = "template_k4gnktv"; // Template ID de EmailJS
+    const SERVICE_ID = "service_fuhd91q";   // <--- tu SERVICE ID
+    const TEMPLATE_ID = "template_k4gnktv"; // <--- tu TEMPLATE ID
 
     // Mostrar lista de administradores
     function mostrarAdmins() {
@@ -88,7 +88,7 @@
       const activationLink = `${window.location.origin}${window.location.pathname}?activate=${encodeURIComponent(email)}&token=${token}`;
 
       const templateParams = {
-        email: email,
+        email: email,                  // debe coincidir con {{email}} en tu plantilla
         activation_link: activationLink
       };
 
@@ -98,7 +98,7 @@
         })
         .catch(err => {
           console.error("EmailJS error:", err);
-          alert("❌ Error al enviar invitación.");
+          alert("❌ Error al enviar invitación. Revisa la consola.");
         });
     }
 
