@@ -148,8 +148,6 @@
 <script>
 let map, group;
 let fences=[]; let activeId=null;
-let drawing=false, tempPoints=[], tempLine=null, tempPoly=null;
-let editMarkers=[];
 let db={ geocercas:[], personal:{}, actividades:{}, costos:{}, reportes:{} };
 
 // === Persistencia ===
@@ -318,6 +316,7 @@ function generarReporte(){
 
   let totalCostos = 0;
   let detalle = "<h4>Costos por Actividad</h4><ul>";
+  let porResponsable = {};
 
   cos.forEach(c=>{
     let actMatch = act.find(a=>a.actividad===c.actividad);
@@ -325,13 +324,24 @@ function generarReporte(){
       let dias = (new Date(actMatch.fechaFin) - new Date(actMatch.fechaInicio)) / (1000*60*60*24) + 1;
       let subtotal = c.valor * dias;
       totalCostos += subtotal;
+
+      // acumular por responsable
+      if(!porResponsable[c.responsable]) porResponsable[c.responsable]=0;
+      porResponsable[c.responsable]+=subtotal;
+
       detalle += `<li>${c.actividad} (${actMatch.fechaInicio} → ${actMatch.fechaFin}) - ${dias} días × $${c.valor}/día = <b>$${subtotal.toFixed(2)}</b> (Resp: ${c.responsable})</li>`;
     } else {
       detalle += `<li>${c.actividad} - $${c.valor}/día (Resp: ${c.responsable})</li>`;
     }
   });
-
   detalle += "</ul>";
+
+  // resumen por responsable
+  let resumenResp = "<h4>Costos por Responsable</h4><ul>";
+  for(let r in porResponsable){
+    resumenResp += `<li>${r}: <b>$${porResponsable[r].toFixed(2)}</b></li>`;
+  }
+  resumenResp += "</ul>";
 
   out.innerHTML=`
     <h4>Resumen</h4>
@@ -339,6 +349,7 @@ function generarReporte(){
     <p>Actividades: ${act.length}</p>
     <p>Total Costos: <b>$${totalCostos.toFixed(2)}</b></p>
     ${detalle}
+    ${resumenResp}
   `;
 }
 
