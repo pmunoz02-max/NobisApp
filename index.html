@@ -69,7 +69,6 @@
         <form id="personal-form" onsubmit="guardarPersonal(event)">
           <input type="text" id="nombrePersonal" placeholder="Nombre" required>
           <input type="text" id="rolPersonal" placeholder="Rol" required>
-          <!-- Teléfono acepta formato internacional (+593...) o local (09...) -->
           <input type="tel" id="telPersonal" placeholder="+593992572028 o 0992572028"
                  pattern="^\+?[0-9]{7,15}$" required>
           <select id="estadoPersonal">
@@ -88,13 +87,25 @@
         <p>Geocerca activa: <span id="actividades-geocerca">Ninguna</span></p>
 
         <form id="actividad-form" onsubmit="guardarActividad(event)">
-          <input type="text" id="actividadNombre" placeholder="Actividad" required>
+          <label>Actividad:</label>
+          <input list="actividadOpciones" id="actividadNombre" placeholder="Escriba o seleccione..." required>
+          <datalist id="actividadOpciones">
+            <option value="Riego">
+            <option value="Poda">
+            <option value="Fertilización">
+            <option value="Cosecha">
+            <option value="Control de plagas">
+          </datalist>
+
           <label>Inicio:</label>
           <input type="date" id="actividadFechaInicio" required>
+
           <label>Fin:</label>
           <input type="date" id="actividadFechaFin" required>
+
           <label>Responsable:</label>
           <select id="actividadResponsable" required></select>
+
           <button type="submit">Agregar</button>
         </form>
 
@@ -295,3 +306,4 @@ initMap();
 </script>
 </body>
 </html>
+l>
