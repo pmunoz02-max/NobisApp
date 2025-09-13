@@ -69,7 +69,9 @@
         <form id="personal-form" onsubmit="guardarPersonal(event)">
           <input type="text" id="nombrePersonal" placeholder="Nombre" required>
           <input type="text" id="rolPersonal" placeholder="Rol" required>
-          <input type="tel" id="telPersonal" placeholder="+593..." pattern="^\\+\\d{7,15}$" required>
+          <!-- Teléfono acepta formato internacional (+593...) o local (09...) -->
+          <input type="tel" id="telPersonal" placeholder="+593992572028 o 0992572028"
+                 pattern="^\+?[0-9]{7,15}$" required>
           <select id="estadoPersonal">
             <option value="Activo">Activo</option>
             <option value="Inactivo">Inactivo</option>
