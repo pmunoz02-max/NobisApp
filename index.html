@@ -14,8 +14,8 @@
 
   <script>
     // ✅ Configuración EmailJS
-    const PUBLIC_KEY = "qSmyIiQYgJVnpllgS";   // tu Public Key real
-    const TEMPLATE_ID = "TU_TEMPLATE_ID_REAL"; // ⚠️ cambia este valor por el tuyo
+    const PUBLIC_KEY = "qSmyIiQYgJVnpllgS";
+    const TEMPLATE_ID = "template_k4gnktv";
 
     (function(){
       emailjs.init(PUBLIC_KEY);
@@ -97,11 +97,6 @@ function crearAdmin(){
   if(!email) return alert("Ingrese un email válido");
   if(roles.admins.includes(email)) return alert("Ya es admin");
 
-  if(TEMPLATE_ID === "TU_TEMPLATE_ID_REAL"){
-    alert("⚠️ Configura tu TEMPLATE_ID de EmailJS");
-    return;
-  }
-
   // Generar token
   let token = Math.random().toString(36).substring(2,10);
   roles.tokens[email]=token;
@@ -115,7 +110,7 @@ function crearAdmin(){
   console.log("DEBUG → Token generado:", token);
   console.log("DEBUG → Activation link:", activationLink);
 
-  // Enviar correo
+  // Enviar correo con EmailJS
   emailjs.send("service_fuhd91q",TEMPLATE_ID,{
     to_email: email,
     activation_link: activationLink
