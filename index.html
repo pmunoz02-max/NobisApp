@@ -50,6 +50,8 @@
           <button onclick="crearAdmin()">Crear Admin</button>
           <h4>Administradores activos</h4>
           <ul id="listaAdmins"></ul>
+          <hr>
+          <button onclick="resetRoles()">⚠️ Resetear Roles</button>
         </div>
       </div>
     </div>
@@ -69,12 +71,26 @@ let roles={ owner:"fenice.ecuador@gmail.com", admins:[], workers:{}, tokens:{} }
 
 // === Guardar y cargar roles ===
 function saveRoles(){ localStorage.setItem("roles",JSON.stringify(roles)); }
+
 function loadRoles(){
   let raw=localStorage.getItem("roles");
   if(raw) roles=JSON.parse(raw);
 
-  // 🔧 Fix: asegurar que tokens siempre exista
+  // 🔧 Reforzar: asegurar todas las propiedades
+  if(!roles.owner) roles.owner = "fenice.ecuador@gmail.com";
+  if(!roles.admins) roles.admins = [];
+  if(!roles.workers) roles.workers = {};
   if(!roles.tokens) roles.tokens = {};
+}
+
+// === Reset Roles (solo Dueño) ===
+function resetRoles(){
+  if(confirm("⚠️ Esto borrará todos los roles y accesos guardados. ¿Continuar?")){
+    localStorage.removeItem("roles");
+    roles={ owner:"fenice.ecuador@gmail.com", admins:[], workers:{}, tokens:{} };
+    alert("✅ Roles reseteados. Refresca la página.");
+    location.reload();
+  }
 }
 
 // === Login ===
