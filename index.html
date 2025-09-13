@@ -22,26 +22,14 @@
     #map { width:100%; height:100%; }
     #coords { font-size:12px; color:#333; padding:4px; }
     ul { margin:4px 0; padding-left:18px; }
-    .person-row, .activity-row, .cost-row { font-size:13px; margin:4px 0; padding:4px; border:1px solid #ccc; border-radius:4px; background:#fff; }
+    .person-row { font-size:13px; margin:4px 0; padding:4px; border:1px solid #ccc; border-radius:4px; background:#fff; }
     .global-person { margin:6px 0; padding:6px; border:1px solid #ccc; border-radius:4px; background:#fff; }
     .assignments { font-size:12px; margin-left:10px; color:#444; }
-    table { border-collapse: collapse; width:100%; margin-top:10px; font-size:13px; }
-    table, th, td { border:1px solid #ccc; padding:4px; }
-    th { background:#eee; }
   </style>
 </head>
 <body>
   <div class="app">
     <div class="sidebar">
-      <h3>Gestión de Geocercas</h3>
-      <button id="newBtn">Nueva geocerca</button>
-      <button id="finishBtn" disabled>Finalizar</button>
-      <button id="cancelBtn" disabled>Cancelar</button>
-      <button id="renameBtn">Renombrar</button>
-      <button id="deleteBtn">Eliminar</button>
-      <button id="exportBtn">Exportar</button>
-      <input type="file" id="importInput" accept=".json"/>
-
       <h3>Geocercas</h3>
       <ul id="fenceList"></ul>
 
@@ -49,7 +37,7 @@
       <button id="newPersonBtn">Nuevo trabajador</button>
       <button id="assignPersonBtn">Asignar a geocerca</button>
       <button id="listPersonBtn">Ver personal asignado</button>
-      <button id="globalPersonBtn">Ver todo el personal</button>
+      <button id="globalPersonBtn">Ver todos los trabajadores</button>
 
       <h3>Gestión de Actividades</h3>
       <button id="activityBtn">Gestionar actividades</button>
@@ -73,13 +61,12 @@
 let map, group;
 let fences=[], personnel=[];
 let activeId=null;
-let drawing=false, tempPoints=[], tempLine=null, tempPoly=null;
 let actividadesDisponibles=["Riego","Poda","Fertilización"];
 
 // === Persistencia ===
 function saveToStorage(){
   let cleanFences=fences.map(f=>({
-    id:f.id,name:f.name,
+    id:f.id, name:f.name,
     latlngs:f.latlngs.map(p=>({lat:p.lat,lng:p.lng})),
     asignaciones:f.asignaciones||[],
     actividades:f.actividades||[],
@@ -91,7 +78,9 @@ function saveToStorage(){
 }
 function loadFromStorage(){
   let rawF=localStorage.getItem("geocercas");
-  if(rawF){fences=JSON.parse(rawF).map(f=>({...f,latlngs:f.latlngs.map(p=>({lat:p.lat,lng:p.lng}))}));}
+  if(rawF){
+    fences=JSON.parse(rawF).map(f=>({...f,latlngs:f.latlngs.map(p=>({lat:p.lat,lng:p.lng}))}));
+  }
   let rawP=localStorage.getItem("personnel");
   if(rawP) personnel=JSON.parse(rawP);
   let rawA=localStorage.getItem("actividadesDisponibles");
@@ -106,7 +95,8 @@ function initMap(){
   map.on("mousemove",e=>{
     document.getElementById("coords").textContent=`Lat:${e.latlng.lat.toFixed(6)}, Lng:${e.latlng.lng.toFixed(6)}`;
   });
-  loadFromStorage();drawAll();
+  loadFromStorage();
+  drawAll();
 }
 
 // === Dibujar geocercas ===
@@ -115,7 +105,7 @@ function drawAll(){
   fences.forEach(f=>{
     let poly=L.polygon(f.latlngs,{color:'#6b21a8',fillOpacity:0.3}).addTo(group);
     poly.bindTooltip(f.name,{permanent:true,direction:"center"});
-    poly.on("click",()=>{activeId=f.id;renderList();});
+    poly.on("click",()=>{ activeId=f.id; renderList(); });
   });
   renderList();
 }
@@ -126,205 +116,69 @@ function renderList(){
     let li=document.createElement("li");
     li.textContent=f.name;
     li.style.cursor="pointer";
-    li.onclick=()=>{activeId=f.id;drawAll();};
+    li.onclick=()=>{ activeId=f.id; drawAll(); };
     if(f.id===activeId) li.style.fontWeight="bold";
     ul.appendChild(li);
   });
 }
 
-// === Geocercas ===
-document.getElementById("newBtn").onclick=()=>{
-  drawing=true; tempPoints=[];
-  map.on("click",addTempPoint);
-  document.getElementById("finishBtn").disabled=false;
-  document.getElementById("cancelBtn").disabled=false;
-};
-function addTempPoint(e){
-  tempPoints.push(e.latlng);
-  if(tempLine) tempLine.setLatLngs(tempPoints);
-  else tempLine=L.polyline(tempPoints,{color:"blue",dashArray:"5,5"}).addTo(map);
-  if(tempPoints.length>=3){
-    if(tempPoly) tempPoly.setLatLngs(tempPoints);
-    else tempPoly=L.polygon(tempPoints,{color:"blue",fillOpacity:0.2}).addTo(map);
-  }
-}
-document.getElementById("finishBtn").onclick=()=>{
-  if(tempPoints.length<3){alert("Mínimo 3 puntos");return;}
-  let name=prompt("Nombre de geocerca:","Geocerca "+(fences.length+1));
-  fences.push({id:Date.now().toString(),name,latlngs:tempPoints,asignaciones:[],actividades:[],costos:[]});
-  saveToStorage();map.off("click",addTempPoint);
-  tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
-  document.getElementById("finishBtn").disabled=true;document.getElementById("cancelBtn").disabled=true;
-  drawAll();
-};
-document.getElementById("cancelBtn").onclick=()=>{
-  map.off("click",addTempPoint);
-  tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
-  document.getElementById("finishBtn").disabled=true;document.getElementById("cancelBtn").disabled=true;
-};
-document.getElementById("renameBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);if(!f){alert("Selecciona geocerca");return;}
-  let n=prompt("Nuevo nombre:",f.name);if(n){f.name=n;saveToStorage();drawAll();}
-};
-document.getElementById("deleteBtn").onclick=()=>{
-  fences=fences.filter(f=>f.id!==activeId);activeId=null;saveToStorage();drawAll();
-};
-document.getElementById("exportBtn").onclick=()=>{
-  let blob=new Blob([JSON.stringify(fences)],{type:"application/json"});
-  let a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="geocercas.json";a.click();
-};
-document.getElementById("importInput").onchange=e=>{
-  let fr=new FileReader();
-  fr.onload=()=>{try{fences=JSON.parse(fr.result);saveToStorage();drawAll();}catch{alert("Archivo inválido");}};
-  fr.readAsText(e.target.files[0]);
+// === GESTIÓN DE PERSONAL (con teléfono) ===
+document.getElementById("newPersonBtn").onclick=()=>{
+  let nombre=prompt("Nombre del trabajador:");
+  if(!nombre) return;
+  let telefono=prompt("Número de teléfono:");
+  let id=Date.now().toString();
+  personnel.push({id,nombre,telefono});
+  saveToStorage();
+  alert("Trabajador creado: "+nombre);
 };
 
-// === Personal ===
-document.getElementById("newPersonBtn").onclick=()=>{
-  let nombre=prompt("Nombre del trabajador:");if(!nombre)return;
-  let telefono=prompt("Número de teléfono:");
-  personnel.push({id:Date.now().toString(),nombre,telefono});
-  saveToStorage();
-};
 document.getElementById("assignPersonBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);if(!f){alert("Selecciona geocerca");return;}
-  if(!personnel.length){alert("No hay personal");return;}
-  let lista=personnel.map((p,i)=>`${i+1}. ${p.nombre} (${p.telefono||"-"})`).join("\n");
-  let idx=parseInt(prompt("Elige:\n"+lista))-1;if(idx<0||idx>=personnel.length)return;
-  f.asignaciones.push({pid:personnel[idx].id,estado:"inactivo",desde:"",hasta:""});
-  saveToStorage();renderAssigned(f);
-};
-document.getElementById("listPersonBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);if(!f){alert("Selecciona geocerca");return;}
+  let f=fences.find(x=>x.id===activeId);
+  if(!f){alert("Selecciona una geocerca activa.");return;}
+  if(!personnel.length){alert("No hay trabajadores registrados.");return;}
+  let nombres=personnel.map((p,i)=>`${i+1}. ${p.nombre} (${p.telefono||"-"})`).join("\n");
+  let idx=parseInt(prompt("Elige trabajador:\n"+nombres))-1;
+  if(isNaN(idx)||idx<0||idx>=personnel.length) return;
+  let p=personnel[idx];
+  f.asignaciones=f.asignaciones||[];
+  f.asignaciones.push({pid:p.id,estado:"inactivo",desde:"",hasta:""});
+  saveToStorage();
   renderAssigned(f);
 };
-document.getElementById("globalPersonBtn").onclick=()=>renderGlobalPersonnel();
 
+document.getElementById("listPersonBtn").onclick=()=>{
+  let f=fences.find(x=>x.id===activeId);
+  if(!f){alert("Selecciona una geocerca activa.");return;}
+  renderAssigned(f);
+};
+
+document.getElementById("globalPersonBtn").onclick=()=>{
+  renderGlobalPersonnel();
+};
+
+// === Mostrar personal de geocerca ===
 function renderAssigned(f){
-  let div=document.getElementById("personList");div.innerHTML="<h4>Personal asignado</h4>";
-  if(!f.asignaciones.length){div.innerHTML+="<p>(Ninguno)</p>";return;}
+  let div=document.getElementById("personList");
+  div.innerHTML="<h4>Personal asignado</h4>";
+  if(!f.asignaciones||!f.asignaciones.length){div.innerHTML+="<p>(Sin personal)</p>";return;}
   f.asignaciones.forEach(a=>{
-    let p=personnel.find(pp=>pp.id===a.pid);
-    div.innerHTML+=`<div class="person-row">${p?p.nombre:"?"} (${p?p.telefono||"-":"-"}) → ${a.estado}</div>`;
+    let pers=personnel.find(pp=>pp.id===a.pid);
+    div.innerHTML+=`<div class="person-row"><b>${pers?pers.nombre:"?"}</b> (${pers?pers.telefono||"-":"-"}) → ${a.estado}</div>`;
   });
 }
+
+// === Mostrar personal global ===
 function renderGlobalPersonnel(){
-  let div=document.getElementById("personList");div.innerHTML="<h4>Todo el personal</h4>";
-  personnel.forEach(p=>{div.innerHTML+=`<div class="global-person"><b>${p.nombre}</b> - Tel:${p.telefono||"-"}</div>`;});
-}
-
-// === Actividades ===
-document.getElementById("activityBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);if(!f){alert("Selecciona geocerca");return;}renderActivities(f);
-};
-function renderActivities(f){
-  let div=document.getElementById("personList");div.innerHTML="<h4>Actividades</h4>";
-  if(!f.asignaciones.length){div.innerHTML+="<p>(Asigna personal primero)</p>";return;}
-  let form=document.createElement("div");
-  form.className="person-form";
-  form.innerHTML=`
-    <label>Persona:<select id="actPers">${f.asignaciones.map(a=>{
-      let p=personnel.find(pp=>pp.id===a.pid);return `<option value="${a.pid}">${p?p.nombre:"?"}</option>`;}).join("")}</select></label><br>
-    <label>Actividad:<select id="actSel">${actividadesDisponibles.map(a=>`<option>${a}</option>`).join("")}</select>
-    <input id="newAct" placeholder="Nueva"><button id="addActBtn">+</button></label><br>
-    <label>Desde:<input type="date" id="actDesde"></label><br>
-    <label>Hasta:<input type="date" id="actHasta"></label><br>
-    <button id="saveActBtn">Guardar</button>
-  `;
-  div.appendChild(form);
-  document.getElementById("addActBtn").onclick=(e)=>{e.preventDefault();let v=document.getElementById("newAct").value.trim();
-    if(v&&!actividadesDisponibles.includes(v)){actividadesDisponibles.push(v);saveToStorage();renderActivities(f);}};
-  document.getElementById("saveActBtn").onclick=()=>{
-    f.actividades.push({pid:document.getElementById("actPers").value,actividad:document.getElementById("actSel").value,
-    desde:document.getElementById("actDesde").value,hasta:document.getElementById("actHasta").value});
-    saveToStorage();renderActivities(f);
-  };
-  f.actividades.forEach(a=>{
-    let p=personnel.find(pp=>pp.id===a.pid);
-    div.innerHTML+=`<div class="activity-row">${p?p.nombre:"?"} → ${a.actividad} (${a.desde}→${a.hasta})</div>`;
+  let div=document.getElementById("personList");
+  div.innerHTML="<h4>Todo el personal</h4>";
+  if(!personnel.length){div.innerHTML+="<p>(No hay trabajadores)</p>";return;}
+  personnel.forEach(p=>{
+    let cont=document.createElement("div");
+    cont.className="global-person";
+    cont.innerHTML=`<b>${p.nombre}</b> - Tel:${p.telefono||"-"}`;
+    div.appendChild(cont);
   });
-}
-
-// === Costos ===
-document.getElementById("costBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);if(!f){alert("Selecciona geocerca");return;}renderCosts(f);
-};
-function renderCosts(f){
-  let div=document.getElementById("personList");div.innerHTML="<h4>Costos</h4>";
-  if(!f.asignaciones.length||!f.actividades.length){div.innerHTML+="<p>(Asigna personal y actividades)</p>";return;}
-  let form=document.createElement("div");form.className="person-form";
-  form.innerHTML=`
-    <label>Persona:<select id="cPers">${f.asignaciones.map(a=>{
-      let p=personnel.find(pp=>pp.id===a.pid);return `<option value="${a.pid}">${p?p.nombre:"?"}</option>`;}).join("")}</select></label><br>
-    <label>Actividad:<select id="cAct">${f.actividades.map(a=>`<option>${a.actividad}</option>`).join("")}</select></label><br>
-    <label>Costo/día:<input type="number" id="cDia"></label><br>
-    <label>Desde:<input type="date" id="cDesde"></label><br>
-    <label>Hasta:<input type="date" id="cHasta"></label><br>
-    <button id="saveCostBtn">Guardar</button>
-  `;
-  div.appendChild(form);
-  document.getElementById("saveCostBtn").onclick=()=>{
-    f.costos.push({pid:document.getElementById("cPers").value,actividad:document.getElementById("cAct").value,
-    costoDia:parseFloat(document.getElementById("cDia").value),desde:document.getElementById("cDesde").value,hasta:document.getElementById("cHasta").value});
-    saveToStorage();renderCosts(f);
-  };
-  f.costos.forEach(c=>{
-    let p=personnel.find(pp=>pp.id===c.pid);
-    div.innerHTML+=`<div class="cost-row">${p?p.nombre:"?"} → ${c.actividad} $${c.costoDia}/día (${c.desde}→${c.hasta})</div>`;
-  });
-}
-
-// === Reportes ===
-document.getElementById("reportBtn").onclick=()=>renderReportes();
-function diasEntre(f1,f2){let d1=new Date(f1),d2=new Date(f2);if(isNaN(d1)||isNaN(d2))return 0;return Math.floor((d2-d1)/(1000*60*60*24))+1;}
-function renderReportes(){
-  let div=document.getElementById("personList");div.innerHTML="<h4>Reportes</h4>";
-  if(!fences.length){div.innerHTML+="<p>(Sin datos)</p>";return;}
-  let form=document.createElement("div");form.className="person-form";
-  form.innerHTML=`
-    <label>Salida:<select id="repTipo"><option value="tabla">Tabla</option><option value="bar">Barras</option><option value="pie">Torta</option><option value="line">Líneas</option></select></label>
-    <button id="genRepBtn">Generar</button><button id="expRepBtn">Exportar CSV</button>
-  `;
-  div.appendChild(form);
-  let cont=document.createElement("div");cont.id="repResultados";div.appendChild(cont);
-  document.getElementById("genRepBtn").onclick=()=>generarReporte();
-  document.getElementById("expRepBtn").onclick=()=>exportarReporteCSV();
-}
-function generarReporte(){
-  let tipo=document.getElementById("repTipo").value;
-  let rows=[];
-  fences.forEach(f=>{
-    (f.costos||[]).forEach(c=>{
-      let p=personnel.find(pp=>pp.id===c.pid);
-      let dias=c.desde&&c.hasta?diasEntre(c.desde,c.hasta):0;
-      let total=dias>0?dias*c.costoDia:c.costoDia;
-      rows.push({geocerca:f.name,persona:p?p.nombre:"?",actividad:c.actividad,costoDia:c.costoDia,desde:c.desde,hasta:c.hasta,total});
-    });
-  });
-  let cont=document.getElementById("repResultados");cont.innerHTML="";
-  if(!rows.length){cont.innerHTML="<p>(Sin resultados)</p>";return;}
-  if(tipo==="tabla"){
-    let t=document.createElement("table");t.innerHTML="<tr><th>Geocerca</th><th>Persona</th><th>Actividad</th><th>Costo/día</th><th>Desde</th><th>Hasta</th><th>Total</th></tr>";
-    rows.forEach(r=>{t.innerHTML+=`<tr><td>${r.geocerca}</td><td>${r.persona}</td><td>${r.actividad}</td><td>${r.costoDia}</td><td>${r.desde}</td><td>${r.hasta}</td><td>${r.total}</td></tr>`;});
-    cont.appendChild(t);
-  } else {
-    let canvas=document.createElement("canvas");cont.appendChild(canvas);
-    if(tipo==="bar"){ // agrupado por geocerca
-      let grouped={};rows.forEach(r=>{grouped[r.geocerca]=(grouped[r.geocerca]||0)+r.total;});
-      new Chart(canvas,{type:"bar",data:{labels:Object.keys(grouped),datasets:[{label:"Total por geocerca",data:Object.values(grouped)}]}});
-    } else {
-      let labels=rows.map(r=>r.persona+"-"+r.actividad),data=rows.map(r=>r.total);
-      new Chart(canvas,{type:tipo,data:{labels,datasets:[{label:"Costos",data}]}});
-    }
-  }
-  window.__lastReport=rows;
-}
-function exportarReporteCSV(){
-  let rows=window.__lastReport||[];if(!rows.length){alert("Genera primero");return;}
-  let csv="Geocerca,Persona,Actividad,CostoDia,Desde,Hasta,Total\n";
-  rows.forEach(r=>{csv+=`${r.geocerca},${r.persona},${r.actividad},${r.costoDia},${r.desde},${r.hasta},${r.total}\n`;});
-  let blob=new Blob([csv],{type:"text/csv"});let a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);a.download="reporte.csv";a.click();
 }
 
 initMap();
