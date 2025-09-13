@@ -15,7 +15,7 @@
     .sidebar { background:#f9fafb; border-right:1px solid #ddd; padding:8px; overflow-y:auto; }
     .sidebar h3 { margin-top:16px; margin-bottom:6px; font-size:14px; color:#111; }
     button { margin:2px 0; padding:4px 6px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:12px; }
-    input, select { margin:2px 0; padding:4px; width:95%; font-size:12px; }
+    input, select, label { margin:2px 0; padding:4px; font-size:12px; display:block; }
     #map { width:100%; height:300px; }
     #coords { font-size:12px; color:#333; padding:4px; }
     ul { margin:4px 0; padding-left:18px; }
@@ -87,7 +87,11 @@
 
         <form id="actividad-form" onsubmit="guardarActividad(event)">
           <input type="text" id="actividadNombre" placeholder="Actividad" required>
-          <input type="date" id="actividadFecha" required>
+          <label>Inicio:</label>
+          <input type="date" id="actividadFechaInicio" required>
+          <label>Fin:</label>
+          <input type="date" id="actividadFechaFin" required>
+          <label>Responsable:</label>
           <select id="actividadResponsable" required></select>
           <button type="submit">Agregar</button>
         </form>
@@ -176,115 +180,6 @@ function updateActiveGeocerca(){
   renderResponsables();
 }
 
-// === Crear geocerca con clics ===
-document.getElementById("newBtn").onclick=()=>{
-  drawing=true; tempPoints=[];
-  map.on("click",addTempPoint);
-  document.getElementById("finishBtn").disabled=false;
-  document.getElementById("cancelBtn").disabled=false;
-};
-function addTempPoint(e){
-  tempPoints.push(e.latlng);
-  if(tempLine) tempLine.setLatLngs(tempPoints);
-  else tempLine=L.polyline(tempPoints,{color:"blue",dashArray:"5,5"}).addTo(map);
-  if(tempPoints.length>=3){
-    if(tempPoly) tempPoly.setLatLngs(tempPoints);
-    else tempPoly=L.polygon(tempPoints,{color:"blue",fillOpacity:0.2}).addTo(map);
-  }
-}
-document.getElementById("finishBtn").onclick=()=>{
-  if(tempPoints.length<3){alert("Mínimo 3 puntos");return;}
-  let name=prompt("Nombre de geocerca:","Geocerca "+(fences.length+1));
-  let newFence={id:Date.now().toString(),name,latlngs:tempPoints};
-  fences.push(newFence); db.geocercas=fences; saveToStorage();
-  map.off("click",addTempPoint);
-  tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
-  document.getElementById("finishBtn").disabled=true;
-  document.getElementById("cancelBtn").disabled=true;
-  drawAll();
-};
-document.getElementById("cancelBtn").onclick=()=>{
-  map.off("click",addTempPoint);
-  tempPoints=[];if(tempLine){map.removeLayer(tempLine);}if(tempPoly){map.removeLayer(tempPoly);}
-  document.getElementById("finishBtn").disabled=true;
-  document.getElementById("cancelBtn").disabled=true;
-};
-
-// === Crear con Lat/Lng ===
-document.getElementById("coordBtn").onclick=()=>{
-  let input=prompt("Ingresa coordenadas (lat,lng por línea o separadas por ;) :");
-  if(!input) return;
-  let coords=input
-    .split(/[\n;]/)
-    .map(l=>l.trim())
-    .filter(l=>l.length>0)
-    .map(l=>{
-      let parts=l.split(",").map(Number);
-      return {lat:parts[0],lng:parts[1]};
-    });
-  if(coords.length<3){alert("Se requieren al menos 3 puntos");return;}
-  let name=prompt("Nombre de geocerca:","Geocerca "+(fences.length+1));
-  if(!name)return;
-  fences.push({id:Date.now().toString(),name,latlngs:coords});
-  db.geocercas=fences; saveToStorage(); drawAll();
-};
-
-// === Editar geocerca ===
-document.getElementById("editBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);
-  if(!f){alert("Selecciona una geocerca");return;}
-  editMarkers=[];
-  f.latlngs.forEach((p,i)=>{
-    let m=L.marker(p,{draggable:true}).addTo(map);
-    m.bindTooltip(`${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`,{permanent:true,offset:[0,-20]});
-    m.on("drag",e=>{
-      f.latlngs[i]=e.target.getLatLng();
-      m.setTooltipContent(`${f.latlngs[i].lat.toFixed(5)}, ${f.latlngs[i].lng.toFixed(5)}`);
-    });
-    editMarkers.push(m);
-  });
-  document.getElementById("saveEditBtn").style.display="block";
-  alert("Arrastra los puntos y pulsa 'Guardar cambios'.");
-};
-document.getElementById("saveEditBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);
-  if(f){
-    editMarkers.forEach(m=>map.removeLayer(m));
-    editMarkers=[];
-    db.geocercas=fences; saveToStorage(); drawAll();
-  }
-  document.getElementById("saveEditBtn").style.display="none";
-};
-
-// === Renombrar / Eliminar ===
-document.getElementById("renameBtn").onclick=()=>{
-  let f=fences.find(x=>x.id===activeId);
-  if(!f){alert("Selecciona geocerca");return;}
-  let n=prompt("Nuevo nombre:",f.name);
-  if(n){f.name=n;db.geocercas=fences;saveToStorage();drawAll();}
-};
-document.getElementById("deleteBtn").onclick=()=>{
-  fences=fences.filter(f=>f.id!==activeId);activeId=null;
-  db.geocercas=fences; saveToStorage(); drawAll();
-};
-
-// === Exportar / Importar ===
-document.getElementById("exportBtn").onclick=()=>{
-  let blob=new Blob([JSON.stringify(db)],{type:"application/json"});
-  let a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="db.json";
-  a.click();
-};
-document.getElementById("importInput").onchange=e=>{
-  let fr=new FileReader();
-  fr.onload=()=>{
-    try{db=JSON.parse(fr.result);fences=db.geocercas;saveToStorage();drawAll();}
-    catch{alert("Archivo inválido");}
-  };
-  fr.readAsText(e.target.files[0]);
-};
-
 // === Módulo Personal ===
 function guardarPersonal(e){
   e.preventDefault();
@@ -323,11 +218,12 @@ function guardarActividad(e){
   if(!activeId){alert("Selecciona una geocerca");return;}
 
   let actividad=document.getElementById("actividadNombre").value.trim();
-  let fecha=document.getElementById("actividadFecha").value;
+  let fechaInicio=document.getElementById("actividadFechaInicio").value;
+  let fechaFin=document.getElementById("actividadFechaFin").value;
   let responsable=document.getElementById("actividadResponsable").value;
 
   if(!db.actividades[activeId]) db.actividades[activeId]=[];
-  db.actividades[activeId].push({actividad,fecha,responsable});
+  db.actividades[activeId].push({actividad,fechaInicio,fechaFin,responsable});
   saveToStorage(); renderModuleData("actividades");
 
   document.getElementById("actividad-form").reset();
@@ -371,7 +267,7 @@ function renderModuleData(module){
     let list=document.getElementById("actividades-list"); list.innerHTML="";
     (db.actividades[activeId]||[]).forEach(a=>{
       let li=document.createElement("li");
-      li.textContent=`${a.fecha}: ${a.actividad} (${a.responsable})`;
+      li.textContent=`${a.fechaInicio} → ${a.fechaFin}: ${a.actividad} (${a.responsable})`;
       list.appendChild(li);
     });
   }
