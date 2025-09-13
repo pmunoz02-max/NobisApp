@@ -73,7 +73,7 @@ function initMap(){
   }).addTo(map);
   group=L.layerGroup().addTo(map);
 
-  // 🔑 Mostrar coordenadas
+  // 🔑 Mostrar coordenadas dinámicas al mover el mouse
   map.on("mousemove", e=>{
     document.getElementById("coords").textContent =
       `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
@@ -90,6 +90,10 @@ function drawAll(){
     let poly=L.polygon(f.latlngs,{color:'#6b21a8',fillOpacity:0.3}).addTo(group);
     poly.bindTooltip(f.name,{permanent:true,direction:"center"});
     poly.on("click",()=>{activeId=f.id;renderList();});
+    // Dibujar coordenadas de cada vértice
+    f.latlngs.forEach(p=>{
+      L.marker(p,{icon:L.divIcon({className:'coord-label',html:`<div style="font-size:10px;background:#fff;padding:2px;border:1px solid #666;border-radius:3px;">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>`})}).addTo(group);
+    });
   });
   renderList();
 }
@@ -115,6 +119,7 @@ document.getElementById("newBtn").onclick=()=>{
 };
 function addTempPoint(e){
   tempPoints.push(e.latlng);
+  L.marker(e.latlng,{icon:L.divIcon({className:'coord-label',html:`<div style="font-size:10px;background:#fff;padding:2px;border:1px solid #666;border-radius:3px;">${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}</div>`})}).addTo(map);
   if(tempLine) tempLine.setLatLngs(tempPoints);
   else tempLine=L.polyline(tempPoints,{color:"blue",dashArray:"5,5"}).addTo(map);
   if(tempPoints.length>=3){
@@ -161,7 +166,11 @@ document.getElementById("editBtn").onclick=()=>{
   editMarkers=[];
   f.latlngs.forEach((p,i)=>{
     let m=L.marker(p,{draggable:true}).addTo(map);
-    m.on("drag",e=>{ f.latlngs[i]=e.target.getLatLng(); });
+    m.bindTooltip(`${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`,{permanent:true,offset:[0,-20]});
+    m.on("drag",e=>{
+      f.latlngs[i]=e.target.getLatLng();
+      m.setTooltipContent(`${f.latlngs[i].lat.toFixed(5)}, ${f.latlngs[i].lng.toFixed(5)}`);
+    });
     editMarkers.push(m);
   });
   document.getElementById("saveEditBtn").style.display="block";
