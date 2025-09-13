@@ -3,14 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nobis App Multiusuario + Administración + Reportes</title>
+  <title>Nobis App Multiusuario + Administración + EmailJS</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Chart.js para gráficos -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- EmailJS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+  <script>
+    (function(){
+      // ⚠️ Reemplaza con tu PUBLIC_KEY de EmailJS
+      emailjs.init("TU_PUBLIC_KEY_AQUI");
+    })();
+  </script>
 
   <style>
     body { margin:0; font-family: system-ui, Arial, sans-serif; }
@@ -196,11 +205,12 @@ let map, group, reportLayer;
 let fences=[]; let activeId=null;
 let db={ geocercas:[], personal:{}, actividades:{}, costos:{}, reportes:{}, reportesUbicacion:{} };
 let chartInstance=null;
-let currentUser=null; // usuario activo
-let nivelActual=null; // nivel de rol
+let currentUser=null; 
+let nivelActual=null; 
 
 // === Roles ===
-let roles={ owner:"dueno@app.com", admins:[], workers:{} };
+// 👇 Dueño configurado a tu correo real
+let roles={ owner:"fenice.ecuador@gmail.com", admins:[], workers:{} };
 
 // === Gestión de roles ===
 function saveRoles(){ localStorage.setItem("roles",JSON.stringify(roles)); }
@@ -222,9 +232,21 @@ function crearAdmin(){
   let email=document.getElementById("nuevoAdmin").value.trim();
   if(!email) return;
   if(roles.admins.includes(email)) return alert("Ya es admin");
+
   roles.admins.push(email);
   saveRoles();
   renderAdmins();
+
+  // --- Envío de correo con EmailJS ---
+  emailjs.send("service_fuhd91q","TU_TEMPLATE_ID",{
+    to_email: email,
+    message: "Has sido autorizado como Administrador en Nobis App. Ingresa con tu correo: "+email
+  }).then(()=>{
+    alert("Autorización enviada a " + email);
+  }).catch(err=>{
+    console.error(err);
+    alert("Error al enviar correo. Revisa configuración de EmailJS");
+  });
 }
 
 // === Revocar admin ===
@@ -365,10 +387,8 @@ function initMap(){
   drawAll();
 }
 
-// === (aquí permanecen todas las funciones originales de geocercas, personal, actividades, costos y reportes) ===
-// Ejemplo: drawAll, renderList, updateActiveGeocerca, renderModuleData, etc. (idéntico al código previo).
+// === Funciones originales de geocercas, actividades, costos y reportes (idénticas a versiones anteriores) ===
 
-// Llamadas iniciales
 initUsuarios();
 initMap();
 loadRoles();
