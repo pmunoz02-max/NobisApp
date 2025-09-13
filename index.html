@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nobis App Multiusuario + Administración + Token + EmailJS</title>
+  <title>Nobis App + Administración + EmailJS con Debug</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -52,14 +52,6 @@
 <body>
   <div class="app">
     <div class="sidebar">
-      <!-- Gestión de usuarios -->
-      <h3>Usuarios</h3>
-      <select id="userSelect"></select>
-      <input type="text" id="newUserName" placeholder="Nuevo usuario">
-      <button onclick="crearUsuario()">Crear Usuario</button>
-      <button onclick="cambiarUsuario()">Cambiar Usuario</button>
-      <p>Usuario activo: <b id="usuarioActivo">Ninguno</b></p>
-
       <!-- Administración -->
       <div id="module-admin" class="module">
         <h2>Administración</h2>
@@ -76,29 +68,10 @@
           <h4>Administradores activos</h4>
           <ul id="listaAdmins"></ul>
         </div>
-
-        <!-- Administrador -->
-        <div id="admin-panel" style="display:none;">
-          <h3>Administrador</h3>
-          <label>Intervalo de reportes (minutos):</label>
-          <input type="number" id="intervaloReportes" min="1" value="10">
-          <button onclick="guardarIntervalo()">Guardar</button>
-          <h4>Reportes de trabajadores</h4>
-          <ul id="listaReportes"></ul>
-          <button onclick="mostrarReportesMapa()">Mostrar en Mapa</button>
-        </div>
-
-        <!-- Trabajador -->
-        <div id="trabajador-panel" style="display:none;">
-          <h3>Trabajador</h3>
-          <button onclick="enviarUbicacion()">Enviar mi ubicación</button>
-          <p id="ubicacionMsg">Aún no has enviado ubicación</p>
-        </div>
       </div>
     </div>
 
     <div style="overflow-y:auto">
-      <!-- Aquí seguirían los módulos de geocercas, personal, actividades, costos y reportes -->
       <div id="module-geocercas" class="module">
         <h2>Mapa de Geocercas</h2>
         <div id="map"></div>
@@ -110,18 +83,13 @@
   <div id="mouseCoords"></div>
 
 <script>
-let map, group, reportLayer;
-let fences=[]; let activeId=null;
-let db={ geocercas:[], personal:{}, actividades:{}, costos:{}, reportes:{}, reportesUbicacion:{} };
-let chartInstance=null;
-let currentUser=null; 
-let nivelActual=null; 
+let map, group;
+let nivelActual=null;
 
 // === Roles ===
-// 👇 Dueño configurado a tu correo real
 let roles={ owner:"fenice.ecuador@gmail.com", admins:[], workers:{}, tokens:{} };
 
-// === Gestión de roles ===
+// === Guardar y cargar roles ===
 function saveRoles(){ localStorage.setItem("roles",JSON.stringify(roles)); }
 function loadRoles(){ let raw=localStorage.getItem("roles"); if(raw) roles=JSON.parse(raw); }
 
@@ -143,10 +111,10 @@ function loginUsuario(){
   actualizarUI();
 }
 
-// === Dueño: crear admin con token ===
+// === Crear Admin con debug ===
 function crearAdmin(){
   let email=document.getElementById("nuevoAdmin").value.trim();
-  if(!email) return;
+  if(!email) return alert("Ingrese un email válido");
   if(roles.admins.includes(email)) return alert("Ya es admin");
 
   // Generar token
@@ -158,43 +126,21 @@ function crearAdmin(){
   let activationLink = window.location.origin + window.location.pathname +
     "?activate=" + encodeURIComponent(email) + "&token=" + token;
 
-  // ⚠️ Reemplaza "TU_TEMPLATE_ID" con tu Template ID de EmailJS
+  console.log("DEBUG → Creando admin:", email);
+  console.log("DEBUG → Token generado:", token);
+  console.log("DEBUG → Activation link:", activationLink);
+
+  // ⚠️ Reemplaza "TU_TEMPLATE_ID" con el real
   emailjs.send("service_fuhd91q","TU_TEMPLATE_ID",{
     to_email: email,
     activation_link: activationLink
-  }).then(()=>{
+  }).then((res)=>{
+    console.log("DEBUG → EmailJS éxito:", res);
     alert("Correo de activación enviado a " + email);
   }).catch(err=>{
-    console.error(err);
-    alert("Error al enviar correo. Revisa configuración de EmailJS");
+    console.error("DEBUG → EmailJS error:", err);
+    alert("Error al enviar correo. Revisa configuración de EmailJS. Mira la consola para más detalles.");
   });
-}
-
-// === Activación de administradores ===
-function checkActivation(){
-  let params = new URLSearchParams(window.location.search);
-  let email = params.get("activate");
-  let token = params.get("token");
-
-  if(email && token){
-    if(roles.tokens[email] && roles.tokens[email]===token){
-      // Activar admin
-      roles.admins.push(email);
-      delete roles.tokens[email];
-      saveRoles();
-      alert("Cuenta activada correctamente. Ya puedes ingresar como Administrador.");
-      window.history.replaceState({},document.title,window.location.pathname);
-    } else {
-      alert("Token inválido o ya usado.");
-    }
-  }
-}
-
-// === Revocar admin ===
-function revocarAdmin(email){
-  roles.admins=roles.admins.filter(a=>a!==email);
-  saveRoles();
-  renderAdmins();
 }
 
 // === Render admins ===
@@ -212,13 +158,18 @@ function renderAdmins(){
   });
 }
 
-// === UI por nivel ===
+// === Revocar ===
+function revocarAdmin(email){
+  roles.admins=roles.admins.filter(a=>a!==email);
+  saveRoles();
+  renderAdmins();
+}
+
+// === UI ===
 function actualizarUI(){
   document.getElementById("nivel-usuario").textContent=
     (nivelActual===1?"Dueño":nivelActual===2?"Administrador":"Trabajador");
   document.getElementById("owner-panel").style.display=(nivelActual===1?"block":"none");
-  document.getElementById("admin-panel").style.display=(nivelActual===2?"block":"none");
-  document.getElementById("trabajador-panel").style.display=(nivelActual===3?"block":"none");
   if(nivelActual===1) renderAdmins();
 }
 
@@ -231,7 +182,6 @@ function initMap(){
 
 initMap();
 loadRoles();
-checkActivation();
 </script>
 </body>
 </html>
