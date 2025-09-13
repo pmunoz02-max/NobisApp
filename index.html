@@ -38,6 +38,7 @@
       <button id="finishBtn" disabled>Finalizar</button>
       <button id="cancelBtn" disabled>Cancelar</button>
       <button id="editBtn">Editar geocerca</button>
+      <button id="endEditBtn" style="display:none;">Finalizar edición</button>
       <button id="renameBtn">Renombrar</button>
       <button id="deleteBtn">Eliminar</button>
       <button id="exportBtn">Exportar</button>
@@ -194,7 +195,17 @@ document.getElementById("editBtn").onclick=()=>{
     });
     f.__markers.push(m);
   });
-  alert("Arrastra los puntos para editar.\nSe guarda automáticamente.");
+  document.getElementById("endEditBtn").style.display="block";
+  alert("Arrastra los puntos y luego pulsa 'Finalizar edición'.");
+};
+document.getElementById("endEditBtn").onclick=()=>{
+  let f=fences.find(x=>x.id===activeId);
+  if(f && f.__markers){
+    f.__markers.forEach(m=>map.removeLayer(m));
+    delete f.__markers;
+  }
+  document.getElementById("endEditBtn").style.display="none";
+  saveToStorage();drawAll();
 };
 
 // === Renombrar / Eliminar ===
