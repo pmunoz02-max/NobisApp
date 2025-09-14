@@ -50,11 +50,11 @@
   <script>
     // Inicializar EmailJS con tu Public Key
     (function() {
-      emailjs.init("qSmyIiQYgJVnpll9S"); // PUBLIC KEY real
+      emailjs.init({ publicKey: "qSmyIiQYgJVnpll9S" });
       console.log("DEBUG → EmailJS inicializado");
     })();
 
-    // Array de administradores activos (se cargan de la lista en la vista)
+    // Obtener lista de administradores
     function getAdmins() {
       const admins = [];
       document.querySelectorAll("#adminList li").forEach(li => {
