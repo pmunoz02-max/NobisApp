@@ -38,10 +38,10 @@
   .pill{display:inline-block;padding:.1rem .5rem;border:1px solid var(--bd);border-radius:999px;font-size:11px}
   .disabled{opacity:.45;pointer-events:none}
   #map{width:100%;height:420px;border:1px solid var(--bd);border-radius:10px}
-  #mouse{position:absolute;background:rgba(255,255,255,.9);border:1px solid var(--bd);padding:2px 6px;
-    font-size:11px;border-radius:4px;display:none;pointer-events:none}
+  #mouse{position:absolute;background:rgba(255,255,255,.95);border:1px solid var(--bd);padding:2px 6px;
+    font-size:11px;border-radius:4px;display:none;pointer-events:none;z-index:999}
   #coordBox{position:absolute;right:12px;top:12px;background:#ffffffd9;border:1px solid var(--bd);
-    border-radius:6px;padding:4px 8px;font-size:12px}
+    border-radius:6px;padding:4px 8px;font-size:12px;z-index:998}
   ul{margin:.3rem 0 .2rem;padding-left:1.1rem}
   li{margin:.2rem 0}
   .kbd{font-family:ui-monospace,monospace;background:#f3f4f6;border:1px solid #e5e7eb;border-bottom-width:2px;padding:.1rem .3rem;border-radius:4px;font-size:11px}
@@ -211,7 +211,8 @@
 
   <!-- LADO DERECHO -->
   <main class="right">
-    <div style="position:relative;padding:12px;border-bottom:1px solid var(--bd);background:#fff">
+    <!-- 🔧 Agregamos id="mapWrap" para posicionar correctamente el tooltip del puntero -->
+    <div id="mapWrap" style="position:relative;padding:12px;border-bottom:1px solid var(--bd);background:#fff">
       <h2 style="margin:.2rem 0 .6rem">Mapa de Geocercas</h2>
       <div id="map"></div>
       <div id="mouse"></div>
@@ -368,18 +369,26 @@ function initMap(){
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);
   layerGroup=L.layerGroup().addTo(map);
 
-  // Geoman controls mínimos (no usamos el botón dibujar; gestionamos nosotros)
+  // Geoman (solo edición; el dibujo lo controlamos nosotros)
   map.pm.addControls({ position:'topleft', drawMarker:false, drawCircle:false, drawPolyline:false, drawRectangle:false, drawCircleMarker:false, drawText:false, drawPolygon:false, dragMode:false, cutPolygon:false, rotateMode:false, removalMode:false });
 
-  // Coordenadas bajo el mouse
+  // Coordenadas bajo el mouse (tooltip y caja fija)
   const mouse = document.getElementById("mouse");
   const box = document.getElementById("coordBox");
+  const wrap = document.getElementById("mapWrap");
   map.on("mousemove", e=>{
     const lat=e.latlng.lat.toFixed(6), lng=e.latlng.lng.toFixed(6);
-    mouse.style.display="block"; mouse.style.left=(e.originalEvent.pageX+10)+"px"; mouse.style.top=(e.originalEvent.pageY-20)+"px";
-    mouse.textContent=`${lat}, ${lng}`; box.textContent=`Lat: ${lat}, Lng: ${lng}`;
+    // posición relativa al contenedor del mapa
+    const rect = wrap.getBoundingClientRect();
+    const cx = e.originalEvent.clientX - rect.left + 10;
+    const cy = e.originalEvent.clientY - rect.top - 20;
+    mouse.style.display="block";
+    mouse.style.left = cx+"px";
+    mouse.style.top  = cy+"px";
+    mouse.textContent = `${lat}, ${lng}`;
+    box.textContent = `Lat: ${lat}, Lng: ${lng}`;
   });
-  map.on("mouseout", ()=>mouse.style.display="none");
+  map.on("mouseout", ()=>{ mouse.style.display="none"; });
 
   // click para dibujar
   map.on("click", e=>{
@@ -393,7 +402,6 @@ function initMap(){
   redrawAll();
 }
 function redrawAll(){
-  // limpia capa
   layerGroup.clearLayers(); fenceLayers.clear();
   (db.geocercas||[]).forEach(f=>{
     const poly=L.polygon(f.coords,{color:"#10b981",weight:2,fillOpacity:.12}).addTo(layerGroup);
@@ -407,17 +415,14 @@ function redrawAll(){
   renderPeople(); renderActs(); renderUbic();
 }
 function drawTemp(){
-  layerGroup.clearLayers(); // redibuja geocercas existentes
-  (db.geocercas||[]).forEach(f=>{
-    L.polygon(f.coords,{color:"#10b981",weight:2,fillOpacity:.12}).addTo(layerGroup);
-  });
-  if(tempCoords.length>=2){
-    L.polyline(tempCoords,{color:"#0ea5e9",dashArray:"3,4"}).addTo(layerGroup);
-  }
+  layerGroup.clearLayers();
+  (db.geocercas||[]).forEach(f=>{ L.polygon(f.coords,{color:"#10b981",weight:2,fillOpacity:.12}).addTo(layerGroup); });
+  if(tempCoords.length>=2){ L.polyline(tempCoords,{color:"#0ea5e9",dashArray:"3,4"}).addTo(layerGroup); }
 }
 function newFence(){
   if(nivel<2) return alert("Requiere rol Administrador.");
-  isDrawing=true; tempCoords=[]; document.getElementById("btnFenceCancel").disabled=false;
+  isDrawing=true; tempCoords=[];
+  document.getElementById("btnFenceCancel").disabled=false;
   document.getElementById("btnFenceFinish").disabled=true;
 }
 function finishFence(){
@@ -452,7 +457,6 @@ function createFromCoords(){
 function selectFence(id,fromMap=false){
   selectedFenceId=id;
   document.getElementById("fenceSelLbl").textContent = (db.geocercas.find(f=>f.id===id)||{}).nombre || "Ninguna";
-  // resalta en lista y mapa
   document.querySelectorAll("#fenceList li").forEach(li=>li.classList.remove("hl"));
   const li=document.querySelector(`#fenceList li[data-id="${id}"]`); if(li) li.classList.add("hl");
   fenceLayers.forEach((lay,fid)=>lay.setStyle({weight: fid===id?4:2, color: fid===id?"#f59e0b":"#10b981"}));
@@ -690,7 +694,7 @@ function calcReport(){
   }
   document.getElementById("totPers").textContent="$"+totP.toFixed(2);
 
-  // actividades (costo acumulando por registro)
+  // actividades
   const costAct=new Map(); reg.forEach(r=>{ if(!r.actId) return; const t=tarifa.get(r.trabajador)||0; costAct.set(r.actId,(costAct.get(r.actId)||0)+ (r.mins||0)/60*t ); });
   const tbA=document.querySelector("#tblAct tbody"); tbA.innerHTML=""; let totA=0;
   for(const [aid, mins] of minsAct.entries()){
