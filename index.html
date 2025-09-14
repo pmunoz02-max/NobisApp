@@ -31,7 +31,7 @@
   <input type="email" id="loginEmail" placeholder="tuemail@dominio.com">
   <button onclick="login()">Ingresar</button>
 
-  <p><strong>Nivel actual:</strong> <span id="nivel">Dueño</span></p>
+  <p><strong>Nivel actual:</strong> <span id="nivel">Invitado</span></p>
 
   <h2>Crear nuevo Administrador</h2>
   <input type="email" id="nuevoAdmin" placeholder="nuevoadmin@dominio.com">
@@ -54,19 +54,37 @@
       console.log("DEBUG → EmailJS inicializado");
     })();
 
-    // Simulación login
+    // Array de administradores activos (se cargan de la lista en la vista)
+    function getAdmins() {
+      const admins = [];
+      document.querySelectorAll("#adminList li").forEach(li => {
+        admins.push(li.textContent.trim());
+      });
+      return admins;
+    }
+
+    // Login
     function login() {
-      const email = document.getElementById("loginEmail").value;
+      const email = document.getElementById("loginEmail").value.trim();
+      const admins = getAdmins();
+
       if (!email) {
         alert("Ingrese su email");
         return;
       }
-      alert("Funcionalidad de login aún en desarrollo");
+
+      if (admins.includes(email)) {
+        document.getElementById("nivel").textContent = "Administrador";
+        alert("✅ Bienvenido administrador: " + email);
+      } else {
+        document.getElementById("nivel").textContent = "Invitado";
+        alert("❌ Acceso denegado. El email no es administrador.");
+      }
     }
 
     // Crear nuevo administrador
     function crearAdmin() {
-      const nuevoAdminEmail = document.getElementById("nuevoAdmin").value;
+      const nuevoAdminEmail = document.getElementById("nuevoAdmin").value.trim();
       if (!nuevoAdminEmail) {
         alert("Ingrese un email válido");
         return;
