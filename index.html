@@ -41,7 +41,7 @@
   #mouse{position:absolute;background:rgba(255,255,255,.95);border:1px solid var(--bd);padding:2px 6px;
     font-size:11px;border-radius:4px;display:none;pointer-events:none;z-index:999}
   #coordBox{position:absolute;right:12px;top:12px;background:#ffffffd9;border:1px solid var(--bd);
-    border-radius:6px;padding:4px 8px;font-size:12px;z-index:998}
+    border-radius:6px;padding:4px 8px;font-size:12px;z-index:998;pointer-events:none}
   ul{margin:.3rem 0 .2rem;padding-left:1.1rem}
   li{margin:.2rem 0}
   .kbd{font-family:ui-monospace,monospace;background:#f3f4f6;border:1px solid #e5e7eb;border-bottom-width:2px;padding:.1rem .3rem;border-radius:4px;font-size:11px}
@@ -211,7 +211,7 @@
 
   <!-- LADO DERECHO -->
   <main class="right">
-    <!-- 🔧 Agregamos id="mapWrap" para posicionar correctamente el tooltip del puntero -->
+    <!-- contenedor del mapa para posicionar tooltip -->
     <div id="mapWrap" style="position:relative;padding:12px;border-bottom:1px solid var(--bd);background:#fff">
       <h2 style="margin:.2rem 0 .6rem">Mapa de Geocercas</h2>
       <div id="map"></div>
@@ -267,7 +267,10 @@ function loadDB(){
   if(!currentUser) return;
   const raw = localStorage.getItem("db_"+currentUser);
   db = raw ? JSON.parse(raw) : { geocercas:[], personal:[], actividades:[], ubicaciones:[] };
-  db.actividades ||= []; db.personal ||= []; db.ubicaciones ||= [];
+  // Compatibilidad sin usar '||=' (evita errores de parseo en algunos navegadores)
+  if(!Array.isArray(db.actividades)) db.actividades=[];
+  if(!Array.isArray(db.personal)) db.personal=[];
+  if(!Array.isArray(db.ubicaciones)) db.ubicaciones=[];
 }
 
 /* ========= LOGIN / ROLES ========= */
@@ -540,12 +543,14 @@ function renderFenceList(){
 
 /* ========= Personal ========= */
 function updatePersonalFenceLabel(){
-  const name = selectedFenceId ? (db.geocercas.find(x=>x.id===selectedFenceId)||{}).nombre : (db.geocercas[0]?.nombre||"Ninguna");
+  const firstName = (db.geocercas[0] && db.geocercas[0].nombre) ? db.geocercas[0].nombre : "Ninguna";
+  const name = selectedFenceId ? ((db.geocercas.find(x=>x.id===selectedFenceId)||{}).nombre || firstName) : firstName;
   document.getElementById("personalFenceLbl").textContent = name;
 }
 function addPerson(){
   if(nivel<2) return alert("Requiere rol Administrador.");
-  const fenceId = selectedFenceId || db.geocercas[0]?.id; if(!fenceId) return alert("Crea una geocerca primero.");
+  const fenceId = selectedFenceId || (db.geocercas[0] ? db.geocercas[0].id : null);
+  if(!fenceId) return alert("Crea una geocerca primero.");
   const nombre=document.getElementById("pNombre").value.trim();
   const rol=document.getElementById("pRol").value.trim();
   const tel=document.getElementById("pTel").value.trim();
@@ -581,25 +586,25 @@ function refillActFence(){
 }
 function refillActResp(){
   const sel=document.getElementById("actRespSel");
-  const fenceId=document.getElementById("actFenceSel").value||db.geocercas[0]?.id;
-  const arr=db.personal.filter(p=>p.fenceId===fenceId);
+  const fid=document.getElementById("actFenceSel").value || (db.geocercas[0] ? db.geocercas[0].id : "");
+  const arr=db.personal.filter(p=>p.fenceId===fid);
   sel.innerHTML=`<option value="">(sin responsable)</option>` + arr.map(p=>`<option>${p.nombre}</option>`).join("");
 }
 function addActivity(){
   if(nivel<2) return alert("Requiere rol Administrador.");
-  const fenceId=document.getElementById("actFenceSel").value||db.geocercas[0]?.id;
-  if(!fenceId) return alert("Crea una geocerca primero.");
+  const fid=document.getElementById("actFenceSel").value || (db.geocercas[0] ? db.geocercas[0].id : "");
+  if(!fid) return alert("Crea una geocerca primero.");
   const nombre=document.getElementById("actNombre").value.trim(); if(!nombre) return alert("Nombre requerido");
   const responsable=document.getElementById("actRespSel").value||"";
   const presupuesto=parseFloat(document.getElementById("actPres").value)||0;
   const estado=document.getElementById("actEstado").value;
-  db.actividades.push({id:Date.now().toString(36), fenceId, nombre, estado, presupuesto, responsable});
+  db.actividades.push({id:Date.now().toString(36), fenceId:fid, nombre, estado, presupuesto, responsable});
   saveDB(); renderActs(); refillWorkerActs(); document.getElementById("actNombre").value=""; document.getElementById("actPres").value="";
 }
 function renderActs(){
   const ul=document.getElementById("actList"); ul.innerHTML="";
-  const fenceId=document.getElementById("actFenceSel").value||db.geocercas[0]?.id;
-  db.actividades.filter(a=>a.fenceId===fenceId).forEach(a=>{
+  const fid=document.getElementById("actFenceSel").value || (db.geocercas[0] ? db.geocercas[0].id : "");
+  db.actividades.filter(a=>a.fenceId===fid).forEach(a=>{
     const li=document.createElement("li");
     li.innerHTML=`<b>${a.nombre}</b> — ${a.estado} — Resp: ${a.responsable||"-"} — Presup $${(a.presupuesto||0).toFixed(2)}
     <button class="kbd" onclick="toggleAct('${a.id}')">Estado</button>
@@ -628,7 +633,7 @@ function refillWorkerFences(){
 }
 function refillWorkerActs(){
   const sel=document.getElementById("wAct"); sel.innerHTML="";
-  const fid=document.getElementById("wFence").value||db.geocercas[0]?.id;
+  const fid=document.getElementById("wFence").value || (db.geocercas[0] ? db.geocercas[0].id : "");
   const acts=db.actividades.filter(a=>a.fenceId===fid && a.estado!=="cerrada");
   sel.innerHTML=`<option value="">(sin actividad)</option>` + acts.map(a=>`<option value="${a.id}">${a.nombre}</option>`).join("");
 }
@@ -676,7 +681,8 @@ function refillReportFences(){
   if(selectedFenceId) sel.value=selectedFenceId;
 }
 function calcReport(){
-  const fid=document.getElementById("repFenceSel").value||db.geocercas[0]?.id; if(!fid) return alert("Crea una geocerca.");
+  const fid=document.getElementById("repFenceSel").value || (db.geocercas[0] ? db.geocercas[0].id : "");
+  if(!fid) return alert("Crea una geocerca.");
   const d=document.getElementById("repDesde").value, h=document.getElementById("repHasta").value;
   if(!d||!h) return alert("Indica fechas.");
   const from=new Date(d+" 00:00:00").getTime(), to=new Date(h+" 23:59:59").getTime();
