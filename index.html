@@ -9,16 +9,16 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- Turf.js para point-in-polygon -->
+<!-- Turf.js -->
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
 <style>
   :root{
-    --b:#111; --t:#333; --m:#666; --bg:#f8fafc; --bd:#ddd; --a:#0ea5e9;
+    --b:#111; --t:#333; --m:#666; --bg:#f8fafc; --bd:#ddd; --a:#0ea5e9; --ok:#059669; --err:#b91c1c;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,Arial,sans-serif;color:var(--b)}
-  .app{display:grid;grid-template-columns:320px 1fr;min-height:100vh}
+  .app{display:grid;grid-template-columns:360px 1fr;min-height:100vh}
   .left{background:var(--bg);border-right:1px solid var(--bd);padding:12px;overflow:auto}
   .right{overflow:auto}
   h2,h3{margin:.8rem 0 .3rem}
@@ -43,15 +43,18 @@
   li{margin:.2rem 0}
   .pill{display:inline-block;padding:.15rem .45rem;border-radius:999px;border:1px solid var(--bd);font-size:11px}
   .disabled{opacity:.45;pointer-events:none;filter:grayscale(.2)}
-  .ok{color:#059669}.err{color:#b91c1c}
+  .ok{color:var(--ok)}.err{color:var(--err)}
   .inline{display:inline}
   .toolbar{display:flex;gap:.4rem;flex-wrap:wrap}
   .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, monospace;background:#f3f4f6;border:1px solid #e5e7eb;border-bottom-width:2px;padding:.1rem .3rem;border-radius:4px;font-size:11px}
+  table{border-collapse:collapse}
+  th,td{border:1px solid var(--bd);padding:.3rem .4rem;font-size:12px}
+  th{text-align:left;background:#f3f4f6}
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- LADO IZQUIERDO: Administración + Usuarios + Geocercas -->
+  <!-- LADO IZQUIERDO -->
   <aside class="left">
     <h1>Administración</h1>
 
@@ -76,7 +79,7 @@
       <label>Nuevo administrador</label>
       <div class="row">
         <input id="newAdminEmail" placeholder="nuevoadmin@dominio.com" />
-        <button id="btnCrearAdmin" class="primary" style="flex:0 0 110px">Crear Admin</button>
+        <button id="btnCrearAdmin" class="primary" style="flex:0 0 120px">Crear Admin</button>
       </div>
       <div id="inviteBox" class="muted" style="margin-top:.4rem;display:none"></div>
 
@@ -116,30 +119,56 @@
       <ul id="fenceList"></ul>
     </div>
 
-    <!-- Personal -->
+    <!-- Personal (ahora con tarifa por hora) -->
     <div class="card" id="personal">
-      <h3>Gestión de Personal</h3>
+      <h3>Personal</h3>
       <div class="muted">Geocerca activa: <b id="personalFenceName">Ninguna</b></div>
       <form id="formPersonal" class="row" style="margin-top:.4rem;flex-wrap:wrap" onsubmit="return false;">
         <input id="pNombre" placeholder="Nombre" required>
         <input id="pRol" placeholder="Rol" required>
         <input id="pTel" placeholder="+593..." pattern="^\\+?[0-9]{7,15}$" required>
-        <select id="pEstado">
-          <option>Activo</option><option>Inactivo</option>
-        </select>
+        <input id="pTarifa" type="number" min="0" step="0.01" placeholder="Tarifa/hora" required>
+        <select id="pEstado"><option>Activo</option><option>Inactivo</option></select>
         <button id="btnAddPersonal" class="primary" style="flex:0 0 110px">Agregar</button>
       </form>
       <ul id="personalList"></ul>
     </div>
 
+    <!-- Actividades por geocerca -->
+    <div class="card" id="activities">
+      <h3>Actividades</h3>
+      <label>Geocerca</label>
+      <select id="actFenceSel"></select>
+
+      <div class="row" style="margin-top:.4rem">
+        <input id="actNombre" placeholder="Nombre de actividad">
+      </div>
+      <div class="row">
+        <select id="actRespSel"></select>
+        <input id="actPres" type="number" min="0" step="0.01" placeholder="Presupuesto (opcional)">
+      </div>
+      <div class="row">
+        <select id="actEstado">
+          <option value="pendiente">Pendiente</option>
+          <option value="progreso">En progreso</option>
+          <option value="cerrada">Cerrada</option>
+        </select>
+        <button id="btnAddAct" class="primary" style="flex:0 0 140px">Crear actividad</button>
+      </div>
+
+      <ul id="actList"></ul>
+    </div>
+
     <!-- Modo Trabajador -->
     <div class="card" id="workers">
       <h3>Modo Trabajador</h3>
-      <div class="muted">Reporta su ubicación dentro de su geocerca asignada a intervalos regulares.</div>
+      <div class="muted">Reporta ubicación dentro de su geocerca a intervalos fijos.</div>
       <label>Trabajador</label>
       <input id="wNombre" placeholder="Identificador (ej. Juan P.)">
-      <label>Geocerca asignada</label>
+      <label>Geocerca</label>
       <select id="wFence"></select>
+      <label>Actividad actual (opcional)</label>
+      <select id="wAct"></select>
       <label>Intervalo (minutos)</label>
       <input id="wMin" type="number" value="5" min="1">
       <div class="toolbar">
@@ -149,9 +178,26 @@
       <div id="trackStatus" class="muted"></div>
     </div>
 
+    <!-- Reportes / Costos -->
+    <div class="card" id="reports">
+      <h3>Reportes y Costos</h3>
+      <label>Geocerca</label>
+      <select id="repFenceSel"></select>
+      <div class="row">
+        <input id="repDesde" type="date">
+        <input id="repHasta" type="date">
+      </div>
+      <div class="toolbar">
+        <button id="btnCalc" class="primary">Calcular</button>
+        <button id="btnCsvPers">Exportar CSV (personas)</button>
+        <button id="btnCsvAct">Exportar CSV (actividades)</button>
+      </div>
+      <div class="muted" id="repInfo"></div>
+    </div>
+
   </aside>
 
-  <!-- LADO DERECHO: Mapa y paneles -->
+  <!-- LADO DERECHO -->
   <main class="right">
     <div class="section">
       <h2>Mapa de Geocercas</h2>
@@ -161,12 +207,31 @@
 
     <div class="section">
       <h2>Histórico de ubicaciones (trabajadores)</h2>
-      <div class="muted">Se almacenan para uso posterior en cálculos de costos.</div>
-      <table id="tblUbicaciones" style="width:100%;margin-top:.6rem;border-collapse:collapse">
+      <div class="muted">Se almacenan para cálculos de horas/costos.</div>
+      <table id="tblUbicaciones" style="width:100%;margin-top:.6rem">
         <thead>
-          <tr><th style="text-align:left">Fecha/Hora</th><th style="text-align:left">Trabajador</th><th style="text-align:left">Geocerca</th><th>Lat</th><th>Lng</th></tr>
+          <tr><th>Fecha/Hora</th><th>Trabajador</th><th>Geocerca</th><th>Actividad</th><th>Lat</th><th>Lng</th><th>mins</th></tr>
         </thead>
         <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="section" id="repTables" style="display:none">
+      <h2>Resultados</h2>
+      <h3>Costos por persona</h3>
+      <table id="tblCostosPers" style="width:100%">
+        <thead>
+          <tr><th>Persona</th><th>Horas</th><th>Tarifa</th><th>Costo</th></tr>
+        </thead><tbody></tbody>
+        <tfoot><tr><th colspan="3" style="text-align:right">Total</th><th id="totPers">$0.00</th></tr></tfoot>
+      </table>
+
+      <h3 style="margin-top:1rem">Costos por actividad</h3>
+      <table id="tblCostosAct" style="width:100%">
+        <thead>
+          <tr><th>Actividad</th><th>Horas</th><th>Costo</th></tr>
+        </thead><tbody></tbody>
+        <tfoot><tr><th colspan="2" style="text-align:right">Total</th><th id="totAct">$0.00</th></tr></tfoot>
       </table>
     </div>
   </main>
@@ -187,27 +252,27 @@ let nivel = 0; // 0 Invitado, 1 Dueño, 2 Admin
 let loginEmail = "";
 let currentUser = null;
 
-// Base del usuario activo (en localStorage: db_<user>)
 let db = {
-  geocercas: [],           // {id, nombre, coords:[[lat,lng],...]}
-  personal: [],            // {nombre, rol, tel, estado, fenceId}
-  ubicaciones: []          // {ts, trabajador, fenceId, lat, lng}
+  geocercas: [],       // {id, nombre, coords:[[lat,lng],...]}
+  personal: [],        // {nombre, rol, tel, tarifa, estado, fenceId}
+  actividades: [],     // {id,fenceId,nombre,estado,presupuesto,responsable}
+  ubicaciones: []      // {ts, trabajador, fenceId, actId|null, lat, lng, mins}
 };
 
-// Administración global (no por usuario)
 function getAdmins(){ return JSON.parse(localStorage.getItem("admins")||"[]"); }
 function setAdmins(a){ localStorage.setItem("admins", JSON.stringify(a)); }
 function getPending(){ return JSON.parse(localStorage.getItem("pendingInvites")||"{}"); }
 function setPending(o){ localStorage.setItem("pendingInvites", JSON.stringify(o)); }
 
-function saveDB(){
-  if(!currentUser) return;
-  localStorage.setItem("db_"+currentUser, JSON.stringify(db));
-}
+function saveDB(){ if(!currentUser) return; localStorage.setItem("db_"+currentUser, JSON.stringify(db)); }
 function loadDB(){
   if(!currentUser) return;
   const raw = localStorage.getItem("db_"+currentUser);
-  db = raw ? JSON.parse(raw) : { geocercas:[], personal:[], ubicaciones:[] };
+  db = raw ? JSON.parse(raw) : { geocercas:[], personal:[], actividades:[], ubicaciones:[] };
+  // migraciones mínimas
+  db.actividades ||= [];
+  db.ubicaciones ||= [];
+  db.personal ||= [];
 }
 
 /* =========================
@@ -221,10 +286,10 @@ function computeLevel(){
 function renderLevel(){
   document.getElementById("nivelActual").textContent =
     nivel===1 ? "Dueño" : (nivel===2 ? "Administrador" : "Invitado");
-  // permisos UI
-  document.getElementById("owner-tools").style.display = (nivel===1) ? "" : "none";
-  const canUseApp = (nivel>=2); // Admin o Dueño operan la app
-  [ "multiuser", "geofencing", "personal", "workers" ].forEach(id=>{
+  const ownerTools = document.getElementById("owner-tools");
+  ownerTools.style.display = (nivel===1) ? "" : "none";
+  const canUseApp = (nivel>=2);
+  ["multiuser","geofencing","personal","activities","workers","reports"].forEach(id=>{
     const el = document.getElementById(id);
     el.classList.toggle("disabled", !canUseApp);
   });
@@ -232,9 +297,8 @@ function renderLevel(){
 function login(){
   const email = document.getElementById("loginEmail").value.trim().toLowerCase();
   if(!email) return alert("Ingresa tu email");
-  loginEmail = email;
-  computeLevel();
-  renderLevel();
+  loginEmail = email; localStorage.setItem("last_login_email", loginEmail);
+  computeLevel(); renderLevel();
   if(nivel===0) alert("Acceso denegado. El email no es administrador.");
 }
 
@@ -248,7 +312,6 @@ function createAdmin(){
   const admins = getAdmins();
   if(admins.includes(email)) return alert("Ese email ya es administrador.");
   const pending = getPending();
-  // token simple
   const token = Math.random().toString(36).slice(2,10);
   pending[email] = token;
   setPending(pending);
@@ -267,8 +330,7 @@ function createAdmin(){
 function revokeAdmin(email){
   if(nivel!==1) return;
   const admins = getAdmins().filter(e=>e!==email);
-  setAdmins(admins);
-  renderAdmins();
+  setAdmins(admins); renderAdmins();
 }
 function renderAdmins(){
   const ul = document.getElementById("adminsList");
@@ -280,7 +342,6 @@ function renderAdmins(){
     ul.appendChild(li);
   });
 }
-// activación por URL
 function tryActivationFromURL(){
   const p = new URLSearchParams(location.search);
   const email = (p.get("activate")||"").toLowerCase();
@@ -288,14 +349,11 @@ function tryActivationFromURL(){
   if(!email || !token) return;
   const pending = getPending();
   if(pending[email] && pending[email]===token){
-    // activar
     const admins = getAdmins();
     if(!admins.includes(email)) admins.push(email);
     setAdmins(admins);
-    delete pending[email];
-    setPending(pending);
+    delete pending[email]; setPending(pending);
     alert("✅ Activación exitosa. Ya eres administrador.");
-    // limpiar la URL
     history.replaceState({}, "", location.pathname);
   }else{
     alert("⚠️ Enlace de activación inválido o expirado.");
@@ -304,7 +362,7 @@ function tryActivationFromURL(){
 }
 
 /* =========================
-   MULTIUSUARIO (aislar DB por usuario)
+   MULTIUSUARIO
 ========================= */
 function initUsersUI(){
   const sel = document.getElementById("userSelect");
@@ -321,7 +379,7 @@ function createUser(){
   if(users.includes(name)) return alert("Ese usuario ya existe");
   users.push(name);
   localStorage.setItem("usuarios", JSON.stringify(users));
-  localStorage.setItem("db_"+name, JSON.stringify({geocercas:[],personal:[],ubicaciones:[]}));
+  localStorage.setItem("db_"+name, JSON.stringify({geocercas:[], personal:[], actividades:[], ubicaciones:[]}));
   document.getElementById("newUserName").value = "";
   initUsersUI();
 }
@@ -329,6 +387,8 @@ function changeUser(){
   currentUser = document.getElementById("userSelect").value;
   document.getElementById("usuarioActivo").textContent = currentUser || "Ninguno";
   loadDB(); drawAll(); refillWorkerFences(); refillPersonalFence(); renderUbicaciones();
+  refillActFence(); renderActivities(); refillActResp();
+  refillReportFences();
 }
 
 /* =========================
@@ -369,8 +429,7 @@ function drawAll(){
   renderFenceList();
 }
 function drawTemp(){
-  layerGroup.clearLayers();
-  drawAll();
+  layerGroup.clearLayers(); drawAll();
   if(tempCoords.length>=2){
     L.polyline(tempCoords,{color:"#0ea5e9",dashArray:"3,4"}).addTo(layerGroup);
   }
@@ -386,20 +445,25 @@ function finishFence(){
   const id = Date.now().toString(36);
   const nombre = prompt("Nombre de la geocerca","Geocerca "+(db.geocercas.length+1))||"Geocerca";
   db.geocercas.push({id,nombre,coords:tempCoords});
-  saveDB(); isDrawing=false; tempCoords=[]; drawAll(); refillWorkerFences(); refillPersonalFence();
+  saveDB(); isDrawing=false; tempCoords=[]; drawAll(); refillWorkerFences(); refillPersonalFence(); refillActFence(); refillReportFences();
 }
 function cancelFence(){ isDrawing=false; tempCoords=[]; drawAll(); }
 function renameFence(){
   if(!db.geocercas.length) return;
-  const {id} = db.geocercas[0]; // activa la primera como ejemplo
+  const {id} = db.geocercas[0];
   const f = db.geocercas.find(x=>x.id===id);
   const nombre = prompt("Nuevo nombre",f.nombre);
-  if(nombre){ f.nombre=nombre; saveDB(); drawAll(); refillWorkerFences(); refillPersonalFence(); }
+  if(nombre){ f.nombre=nombre; saveDB(); drawAll(); refillWorkerFences(); refillPersonalFence(); refillActFence(); refillReportFences(); }
 }
 function deleteFence(){
   if(!db.geocercas.length) return;
   if(!confirm("¿Eliminar la primera geocerca listada? (demo)")) return;
-  db.geocercas.shift(); saveDB(); drawAll(); refillWorkerFences(); refillPersonalFence();
+  const rm = db.geocercas.shift();
+  // también elimina actividades/personal ligadas a esa geocerca
+  db.personal = db.personal.filter(p=>p.fenceId!==rm.id);
+  db.actividades = db.actividades.filter(a=>a.fenceId!==rm.id);
+  db.ubicaciones = db.ubicaciones.filter(u=>u.fenceId!==rm.id);
+  saveDB(); drawAll(); refillWorkerFences(); refillPersonalFence(); renderPersonal(); refillActFence(); renderActivities(); refillReportFences();
 }
 function exportFences(){
   const a = document.createElement("a");
@@ -410,7 +474,7 @@ document.addEventListener("change", e=>{
   if(e.target.id==="fImport" && e.target.files[0]){
     const fr=new FileReader();
     fr.onload=()=>{ try{
-      const arr=JSON.parse(fr.result); if(Array.isArray(arr)){ db.geocercas=arr; saveDB(); drawAll(); refillWorkerFences(); refillPersonalFence(); }
+      const arr=JSON.parse(fr.result); if(Array.isArray(arr)){ db.geocercas=arr; saveDB(); drawAll(); refillWorkerFences(); refillPersonalFence(); refillActFence(); refillReportFences(); }
       else alert("Archivo inválido");
     }catch{ alert("Archivo inválido"); } };
     fr.readAsText(e.target.files[0]);
@@ -427,7 +491,7 @@ function renderFenceList(){
 }
 
 /* =========================
-   PERSONAL
+   PERSONAL (con tarifa)
 ========================= */
 function refillPersonalFence(){
   document.getElementById("personalFenceName").textContent = db.geocercas[0]?.nombre || "Ninguna";
@@ -438,20 +502,80 @@ function addPersonal(){
   const nombre=document.getElementById("pNombre").value.trim();
   const rol=document.getElementById("pRol").value.trim();
   const tel=document.getElementById("pTel").value.trim();
+  const tarifa=parseFloat(document.getElementById("pTarifa").value)||0;
   const estado=document.getElementById("pEstado").value;
   if(!nombre||!rol||!tel) return;
-  db.personal.push({nombre,rol,tel,estado,fenceId: db.geocercas[0].id});
+  db.personal.push({nombre,rol,tel,tarifa,estado,fenceId: db.geocercas[0].id});
   saveDB(); renderPersonal();
   document.getElementById("formPersonal").reset();
 }
 function renderPersonal(){
   const ul=document.getElementById("personalList"); ul.innerHTML="";
   db.personal.forEach(p=>{
-    const li=document.createElement("li");
     const f=db.geocercas.find(x=>x.id===p.fenceId);
-    li.textContent=`${p.nombre} — ${p.rol} — ${p.estado} — ${f?f.nombre:"(sin geocerca)"}`;
+    const li=document.createElement("li");
+    li.innerHTML = `
+      <b>${p.nombre}</b> — ${p.rol} — ${p.estado} — ${f?f.nombre:"(sin geocerca)"} — Tarifa: $${(p.tarifa||0).toFixed(2)}
+      <button class="inline" onclick="editTarifa('${p.nombre}')">Editar tarifa</button>`;
     ul.appendChild(li);
   });
+  refillActResp();
+}
+function editTarifa(nombre){
+  const p=db.personal.find(x=>x.nombre===nombre); if(!p) return;
+  const t = prompt("Nueva tarifa/hora", p.tarifa||0); if(t===null) return;
+  const v = parseFloat(t); if(isNaN(v)||v<0) return alert("Valor inválido");
+  p.tarifa=v; saveDB(); renderPersonal();
+}
+
+/* =========================
+   ACTIVIDADES por geocerca
+========================= */
+function refillActFence(){
+  const sel=document.getElementById("actFenceSel");
+  sel.innerHTML = (db.geocercas||[]).map(f=>`<option value="${f.id}">${f.nombre}</option>`).join("");
+}
+function refillActResp(){
+  const sel=document.getElementById("actRespSel");
+  const fenceId=document.getElementById("actFenceSel").value||db.geocercas[0]?.id;
+  const personales=db.personal.filter(p=>p.fenceId===fenceId);
+  sel.innerHTML = `<option value="">(sin responsable)</option>` + personales.map(p=>`<option>${p.nombre}</option>`).join("");
+}
+function addActivity(){
+  if(nivel<2) return alert("Se requiere rol Administrador.");
+  const fenceId = document.getElementById("actFenceSel").value||db.geocercas[0]?.id;
+  if(!fenceId) return alert("Crea una geocerca primero.");
+  const nombre=document.getElementById("actNombre").value.trim();
+  if(!nombre) return alert("Ingresa nombre de actividad.");
+  const responsable=document.getElementById("actRespSel").value||"";
+  const presupuesto=parseFloat(document.getElementById("actPres").value)||0;
+  const estado=document.getElementById("actEstado").value;
+  db.actividades.push({id:Date.now().toString(36), fenceId, nombre, estado, presupuesto, responsable});
+  saveDB(); document.getElementById("actNombre").value=""; document.getElementById("actPres").value="";
+  renderActivities(); refillWorkerActivities();
+}
+function renderActivities(){
+  const ul=document.getElementById("actList"); ul.innerHTML="";
+  const fenceId=document.getElementById("actFenceSel").value||db.geocercas[0]?.id;
+  (db.actividades.filter(a=>a.fenceId===fenceId)).forEach(a=>{
+    const li=document.createElement("li");
+    li.innerHTML = `<b>${a.nombre}</b> — ${a.estado} — Resp: ${a.responsable||"-"} — Presup: $${(a.presupuesto||0).toFixed(2)}
+      <button class="inline" onclick="toggleAct('${a.id}')">Cambiar estado</button>
+      <button class="inline" onclick="delAct('${a.id}')">Eliminar</button>`;
+    ul.appendChild(li);
+  });
+}
+function toggleAct(id){
+  const a=db.actividades.find(x=>x.id===id); if(!a) return;
+  a.estado = (a.estado==="pendiente")?"progreso":(a.estado==="progreso"?"cerrada":"pendiente");
+  saveDB(); renderActivities(); refillWorkerActivities();
+}
+function delAct(id){
+  if(!confirm("¿Eliminar actividad?")) return;
+  db.actividades = db.actividades.filter(a=>a.id!==id);
+  // también desvincula ubicaciones con ese actId
+  db.ubicaciones.forEach(u=>{ if(u.actId===id) u.actId=null; });
+  saveDB(); renderActivities(); refillWorkerActivities(); renderUbicaciones();
 }
 
 /* =========================
@@ -463,26 +587,35 @@ function refillWorkerFences(){
   db.geocercas.forEach(f=>{
     const opt=document.createElement("option"); opt.value=f.id; opt.textContent=f.nombre; sel.appendChild(opt);
   });
+  refillWorkerActivities();
 }
+function refillWorkerActivities(){
+  const sel=document.getElementById("wAct"); sel.innerHTML="";
+  const fenceId=document.getElementById("wFence").value||db.geocercas[0]?.id;
+  const acts=db.actividades.filter(a=>a.fenceId===fenceId && a.estado!=="cerrada");
+  sel.innerHTML = `<option value="">(sin actividad)</option>` + acts.map(a=>`<option value="${a.id}">${a.nombre}</option>`).join("");
+}
+document.getElementById("wFence").addEventListener("change", refillWorkerActivities);
+
 function startTrack(){
   if(nivel<2) return alert("Se requiere rol Administrador.");
   const trabajador=document.getElementById("wNombre").value.trim();
   const fenceId=document.getElementById("wFence").value;
+  const actId=document.getElementById("wAct").value||null;
   const mins=parseInt(document.getElementById("wMin").value,10)||5;
   if(!trabajador) return alert("Ingresa el nombre del trabajador.");
   const f=db.geocercas.find(x=>x.id===fenceId); if(!f) return alert("Geocerca no válida");
 
   if(trackTimer) clearInterval(trackTimer);
   document.getElementById("trackStatus").textContent="Obteniendo ubicación…";
-  // disparo inmediato + intervalo
   const tick=()=>{
     navigator.geolocation.getCurrentPosition(pos=>{
       const lat=pos.coords.latitude, lng=pos.coords.longitude;
       const inside = pointInFence([lat,lng], f.coords);
       if(inside){
-        db.ubicaciones.push({ts:Date.now(), trabajador, fenceId, lat, lng});
+        db.ubicaciones.push({ts:Date.now(), trabajador, fenceId, actId, lat, lng, mins});
         saveDB(); renderUbicaciones();
-        document.getElementById("trackStatus").innerHTML=`<span class="ok">Dentro</span> de ${f.nombre} — ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        document.getElementById("trackStatus").innerHTML=`<span class="ok">Dentro</span> de ${f.nombre} — ${lat.toFixed(6)}, ${lng.toFixed(6)} — ${mins}m`;
       }else{
         document.getElementById("trackStatus").innerHTML=`<span class="err">Fuera</span> de ${f.nombre} — ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       }
@@ -498,21 +631,127 @@ function stopTrack(){
   document.getElementById("trackStatus").textContent="Seguimiento detenido.";
 }
 function pointInFence(pt, poly){
-  // pt=[lat,lng], poly=[[lat,lng],...]
   const p = turf.point([pt[1],pt[0]]);
   const polygon = turf.polygon([ poly.map(c=>[c[1],c[0]]) ]);
   return turf.booleanPointInPolygon(p, polygon);
 }
 function renderUbicaciones(){
   const tb=document.querySelector("#tblUbicaciones tbody"); tb.innerHTML="";
-  db.ubicaciones.slice().reverse().slice(0,200).forEach(r=>{
+  db.ubicaciones.slice().reverse().slice(0,300).forEach(r=>{
     const tr=document.createElement("tr");
     const f=db.geocercas.find(x=>x.id===r.fenceId);
+    const a=r.actId ? db.actividades.find(x=>x.id===r.actId) : null;
     const dt=new Date(r.ts).toLocaleString();
     tr.innerHTML=`<td>${dt}</td><td>${r.trabajador}</td><td>${f?f.nombre:"(id:"+r.fenceId+")"}</td>
-                  <td>${r.lat.toFixed(6)}</td><td>${r.lng.toFixed(6)}</td>`;
+                  <td>${a?a.nombre:"-"}</td><td>${r.lat.toFixed(6)}</td><td>${r.lng.toFixed(6)}</td><td>${r.mins||0}</td>`;
     tb.appendChild(tr);
   });
+}
+
+/* =========================
+   REPORTES / COSTOS
+========================= */
+function refillReportFences(){
+  const sel=document.getElementById("repFenceSel");
+  sel.innerHTML = (db.geocercas||[]).map(f=>`<option value="${f.id}">${f.nombre}</option>`).join("");
+}
+function calcReport(){
+  const fenceId=document.getElementById("repFenceSel").value||db.geocercas[0]?.id;
+  if(!fenceId) return alert("Crea una geocerca primero.");
+  const d=document.getElementById("repDesde").value;
+  const h=document.getElementById("repHasta").value;
+  if(!d||!h) return alert("Indica fechas (desde/hasta).");
+  const fromTs = new Date(d+" 00:00:00").getTime();
+  const toTs   = new Date(h+" 23:59:59").getTime();
+
+  const reg = db.ubicaciones.filter(u=>u.fenceId===fenceId && u.ts>=fromTs && u.ts<=toTs);
+  // personas
+  const minsPers = new Map(); // nombre -> minutos
+  const tarifaByName = new Map();
+  db.personal.filter(p=>p.fenceId===fenceId).forEach(p=>{
+    tarifaByName.set(p.nombre, parseFloat(p.tarifa||0));
+  });
+  // actividades
+  const minsAct = new Map(); // actId -> minutos
+  const actName = new Map();
+  db.actividades.filter(a=>a.fenceId===fenceId).forEach(a=>actName.set(a.id,a.nombre));
+
+  reg.forEach(r=>{
+    // persona
+    const m = parseInt(r.mins||0,10);
+    minsPers.set(r.trabajador, (minsPers.get(r.trabajador)||0)+m);
+    // actividad
+    if(r.actId){
+      minsAct.set(r.actId, (minsAct.get(r.actId)||0)+m);
+    }
+  });
+
+  // pintar personas
+  const tbP=document.querySelector("#tblCostosPers tbody"); tbP.innerHTML="";
+  let totP=0;
+  for(const [nombre, mins] of minsPers.entries()){
+    const horas = mins/60;
+    const tarifa = tarifaByName.get(nombre)||0;
+    const costo = horas*tarifa;
+    totP += costo;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${nombre}</td><td>${horas.toFixed(2)}</td><td>$${tarifa.toFixed(2)}</td><td>$${costo.toFixed(2)}</td>`;
+    tbP.appendChild(tr);
+  }
+  document.getElementById("totPers").textContent = "$"+totP.toFixed(2);
+
+  // pintar actividades
+  const tbA=document.querySelector("#tblCostosAct tbody"); tbA.innerHTML="";
+  let totA=0;
+  for(const [aid, mins] of minsAct.entries()){
+    const horas = mins/60;
+    // costo de actividad = suma costos de personas que reportaron con esa actividad.
+    // Aproximamos distribuyendo por tarifa del trabajador en cada registro:
+    // Para más precisión, habría que registrar tarifa en cada punto. Simplificamos:
+    const costoApprox = 0; // lo dejaremos 0 aquí y calcularemos abajo por acumulación rápida
+  }
+  // Recalcular costos por actividad con detalle:
+  const costAct=new Map(); // actId -> costo
+  reg.forEach(r=>{
+    if(!r.actId) return;
+    const tarifa = tarifaByName.get(r.trabajador)||0;
+    const horas = (r.mins||0)/60;
+    costAct.set(r.actId,(costAct.get(r.actId)||0)+horas*tarifa);
+  });
+  for(const [aid, costo] of costAct.entries()){
+    const horas = (minsAct.get(aid)||0)/60;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${actName.get(aid)||"(actividad borrada)"}</td><td>${horas.toFixed(2)}</td><td>$${costo.toFixed(2)}</td>`;
+    tbA.appendChild(tr);
+    totA += costo;
+  }
+  document.getElementById("totAct").textContent = "$"+totA.toFixed(2);
+
+  document.getElementById("repInfo").textContent = `Registros: ${reg.length} — Rango: ${d} a ${h}`;
+  document.getElementById("repTables").style.display="";
+}
+function csvEscape(s){ return `"${String(s).replace(/"/g,'""')}"`; }
+function exportCsvPersonas(){
+  const rows=[["Persona","Horas","Tarifa","Costo"]];
+  document.querySelectorAll("#tblCostosPers tbody tr").forEach(tr=>{
+    const t=[...tr.children].map(td=>td.textContent.replace(/^\$/,""));
+    rows.push(t);
+  });
+  downloadCsv("costos_personas.csv", rows);
+}
+function exportCsvActividades(){
+  const rows=[["Actividad","Horas","Costo"]];
+  document.querySelectorAll("#tblCostosAct tbody tr").forEach(tr=>{
+    const t=[...tr.children].map(td=>td.textContent.replace(/^\$/,""));
+    rows.push(t);
+  });
+  downloadCsv("costos_actividades.csv", rows);
+}
+function downloadCsv(name, rows){
+  const csv = rows.map(r=>r.map(csvEscape).join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
 }
 
 /* =========================
@@ -536,17 +775,25 @@ function wireUI(){
   document.getElementById("btnFenceRename").onclick=renameFence;
   document.getElementById("btnFenceDelete").onclick=deleteFence;
   document.getElementById("btnFenceExport").onclick=exportFences;
-  document.querySelector(".kbd input#fImport")?.addEventListener("click",e=>{});
 
   // personal
   document.getElementById("btnAddPersonal").onclick=addPersonal;
 
-  // workers
+  // actividades
+  document.getElementById("btnAddAct").onclick=addActivity;
+  document.getElementById("actFenceSel").addEventListener("change", ()=>{ refillActResp(); renderActivities(); });
+
+  // trabajadores
   document.getElementById("btnStartTrack").onclick=startTrack;
   document.getElementById("btnStopTrack").onclick=stopTrack;
+
+  // reportes
+  document.getElementById("btnCalc").onclick=calcReport;
+  document.getElementById("btnCsvPers").onclick=exportCsvPersonas;
+  document.getElementById("btnCsvAct").onclick=exportCsvActividades;
 }
 function boot(){
-  tryActivationFromURL();   // permite activar admin por link
+  tryActivationFromURL();
   wireUI();
   initUsersUI();
   if(currentUser){ loadDB(); }
@@ -557,15 +804,13 @@ function boot(){
   refillWorkerFences();
   refillPersonalFence();
   renderUbicaciones();
-  // recordar último email de login (opcional)
+  refillActFence(); renderActivities(); refillActResp();
+  refillReportFences();
+
   const last=localStorage.getItem("last_login_email");
   if(last){ document.getElementById("loginEmail").value=last; }
 }
-document.getElementById("loginEmail").addEventListener("change",e=>{
-  localStorage.setItem("last_login_email", e.target.value.trim().toLowerCase());
-});
 boot();
 </script>
 </body>
 </html>
-
