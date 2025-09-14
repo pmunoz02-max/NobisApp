@@ -34,9 +34,7 @@
 
   <!-- Lista admins -->
   <h2>Administradores activos</h2>
-  <ul id="listaAdmins">
-    <li>pmunoz02@gmail.com</li>
-  </ul>
+  <ul id="listaAdmins"></ul>
 
   <script>
     // Inicializar EmailJS
@@ -50,25 +48,37 @@
     const SERVICE_ID = "service_fuhd91q";
     const TEMPLATE_ID = "template_k4gnktv";
 
-    // Lista admins en memoria
-    let admins = ["pmunoz02@gmail.com"];
+    // Dueño inicial de la app
+    const OWNER = "fenice.ecuador@gmail.com";
+
+    // Lista inicial de administradores (solo el dueño)
+    let admins = [OWNER];
     let usuarioActivo = null;
+    let rolActivo = "Invitado";
 
     function login() {
       const email = document.getElementById("loginEmail").value.trim();
-      if (admins.includes(email)) {
+      if (email === OWNER) {
         usuarioActivo = email;
-        document.getElementById("nivelActual").innerText = "Dueño/Admin";
-        alert("Bienvenido " + email);
+        rolActivo = "Dueño";
+        document.getElementById("nivelActual").innerText = "Dueño";
+        alert("Bienvenido Dueño: " + email);
+      } else if (admins.includes(email)) {
+        usuarioActivo = email;
+        rolActivo = "Admin";
+        document.getElementById("nivelActual").innerText = "Admin";
+        alert("Bienvenido Administrador: " + email);
       } else {
+        usuarioActivo = null;
+        rolActivo = "Invitado";
         document.getElementById("nivelActual").innerText = "Invitado";
         alert("Acceso denegado. El email no es administrador.");
       }
     }
 
     function crearAdmin() {
-      if (!usuarioActivo) {
-        alert("Debes iniciar sesión como administrador.");
+      if (rolActivo !== "Dueño") {
+        alert("❌ Solo el Dueño puede crear nuevos administradores.");
         return;
       }
 
@@ -78,7 +88,6 @@
         return;
       }
 
-      // Parámetros para la plantilla
       const params = {
         to_email: nuevoEmail,
         message: "Has sido invitado como administrador en Nobis App."
@@ -122,10 +131,13 @@
       ul.innerHTML = "";
       admins.forEach(admin => {
         const li = document.createElement("li");
-        li.textContent = admin;
+        li.textContent = admin + (admin === OWNER ? " (Dueño)" : "");
         ul.appendChild(li);
       });
     }
+
+    // Mostrar lista inicial al cargar
+    actualizarListaAdmins();
   </script>
 </body>
 </html>
