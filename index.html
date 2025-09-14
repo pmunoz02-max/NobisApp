@@ -286,7 +286,7 @@ function createAdmin(){
     <button class="primary" onclick="navigator.clipboard.writeText('${link}');alert('Copiado');" style="flex:0 0 130px">Copiar</button>
     <a class="kbd" href="mailto:${email}?subject=Invitaci%C3%B3n%20Administrador&body=${encodeURIComponent(link)}">Enviar por correo</a>
   </div>`;
-  renderAdmins();
+  renderAdmins()
 }
 function renderAdmins(){
   const ul=document.getElementById("adminsList"); ul.innerHTML="";
@@ -335,10 +335,10 @@ function initMap(){
 
   map.pm.addControls({position:'topleft',drawMarker:false,drawCircle:false,drawPolyline:false,drawRectangle:false,drawCircleMarker:false,drawText:false,drawPolygon:false,dragMode:false,cutPolygon:false,rotateMode:false,removalMode:false});
 
-  // Coordenadas en tiempo real (seguras)
+  // Coordenadas en tiempo real (mapa + polígonos)
   const tip=document.getElementById("mouseTip");
   const box=document.getElementById("coordBox");
-  map.on("mousemove", (e)=>{
+  const updateMouse=(e)=>{
     const {lat,lng}=e.latlng;
     const pt = map.latLngToContainerPoint(e.latlng);
     tip.style.display="block";
@@ -347,17 +347,21 @@ function initMap(){
     const sLat=lat.toFixed(6), sLng=lng.toFixed(6);
     tip.textContent = `${sLat}, ${sLng}`;
     box.textContent = `Lat: ${sLat}, Lng: ${sLng}`;
-  });
+  };
+  map.on("mousemove", updateMouse);
+  layerGroup.on("mousemove", updateMouse);
   map.on("mouseout", ()=> tip.style.display="none");
 
-  // Clics de dibujo (sólo activos cuando isDrawing=true)
-  map.on("click", (e)=>{
+  // Clics de dibujo (mapa + polígonos)
+  const handleClick=(e)=>{
     if(!isDrawing || nivel<2) return;
     tempCoords.push([e.latlng.lat, e.latlng.lng]);
     drawTemp();
     document.getElementById("btnFenceFinish").disabled = tempCoords.length<3;
     document.getElementById("btnFenceCancel").disabled = tempCoords.length<1;
-  });
+  };
+  map.on("click", handleClick);
+  layerGroup.on("click", handleClick);
 
   redrawAll();
 }
@@ -365,7 +369,7 @@ function initMap(){
 function redrawAll(){
   layerGroup.clearLayers(); fenceLayers.clear();
   (db.geocercas||[]).forEach(f=>{
-    const poly=L.polygon(f.coords,{color:"#10b981",weight:2,fillOpacity:.12}).addTo(layerGroup);
+    const poly=L.polygon(f.coords,{color:"#f59e0b",weight:3,fillOpacity:.25,fillColor:"#10b981"}).addTo(layerGroup);
     poly.bindTooltip(f.nombre||("Geocerca "+f.id));
     poly.on("click",()=>{ if(isDrawing) return; selectFence(f.id,true); });
     fenceLayers.set(f.id, poly);
@@ -427,7 +431,7 @@ function selectFence(id,fromMap=false){
   document.getElementById("fenceSelLbl").textContent = (db.geocercas.find(f=>f.id===id)||{}).nombre || "Ninguna";
   document.querySelectorAll("#fenceList li").forEach(li=>li.classList.remove("hl"));
   const li=document.querySelector(`#fenceList li[data-id="${id}"]`); if(li) li.classList.add("hl");
-  fenceLayers.forEach((lay,fid)=>lay.setStyle({weight: fid===id?4:2, color: fid===id?"#f59e0b":"#10b981"}));
+  fenceLayers.forEach((lay,fid)=>lay.setStyle({weight: fid===id?4:3, color: "#f59e0b"}));
   if(fromMap){ map.flyToBounds(fenceLayers.get(id).getBounds(),{maxZoom:17}); }
   updatePersonalFenceLabel(); refillActFence(); renderActs();
 }
@@ -651,64 +655,4 @@ function calcReport(){
     const tr=document.createElement("tr"); tr.innerHTML=`<td>${actName.get(aid)||"(borrada)"}</td><td>${hrs.toFixed(2)}</td><td>$${c.toFixed(2)}</td>`; tbA.appendChild(tr);
   }
   document.getElementById("totAct").textContent="$"+totA.toFixed(2);
-  document.getElementById("repInfo").textContent=`Registros: ${reg.length} · Rango: ${d} a ${h}`;
-  document.getElementById("repTables").style.display="";
-}
-function csv(rows){ return rows.map(r=>r.map(s=>`"${String(s).replace(/"/g,'""')}"`).join(",")).join("\n"); }
-function dl(name,txt){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv"})); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
-function csvPers(){ const rows=[["Persona","Horas","Tarifa","Costo"]]; document.querySelectorAll("#tblPers tbody tr").forEach(tr=>rows.push([...tr.children].map(td=>td.textContent.replace(/^\$/,"")))); dl("costos_personas.csv", csv(rows)); }
-function csvAct(){ const rows=[["Actividad","Horas","Costo"]]; document.querySelectorAll("#tblAct tbody tr").forEach(tr=>rows.push([...tr.children].map(td=>td.textContent.replace(/^\$/,"")))); dl("costos_actividades.csv", csv(rows)); }
-
-/* ===== Selects/Boot ===== */
-function refillSelects(){ refillWorkerFences(); refillActFence(); refillActResp(); refillReportFences(); }
-
-function wire(){
-  document.getElementById("btnLogin").onclick=doLogin;
-  document.getElementById("btnCrearAdmin").onclick=createAdmin;
-  document.getElementById("btnCrearUsuario").onclick=createUser;
-  document.getElementById("btnCambiarUsuario").onclick=changeUser;
-
-  document.getElementById("btnFenceNew").onclick=newFence;
-  document.getElementById("btnFenceFinish").onclick=finishFence;
-  document.getElementById("btnFenceCancel").onclick=cancelFence;
-
-  document.getElementById("btnFromCoords").onclick=createFromCoords;
-
-  document.getElementById("btnFenceEdit").onclick=startEdit;
-  document.getElementById("btnFenceSave").onclick=saveEdit;
-  document.getElementById("btnFenceAbort").onclick=abortEdit;
-
-  document.getElementById("btnFenceRename").onclick=renameFence;
-  document.getElementById("btnFenceDelete").onclick=deleteFence;
-  document.getElementById("btnFenceExport").onclick=exportFences;
-
-  document.getElementById("btnAddP").onclick=addPerson;
-
-  document.getElementById("actFenceSel").addEventListener("change", ()=>{ refillActResp(); renderActs(); });
-  document.getElementById("btnAddAct").onclick=addActivity;
-
-  document.getElementById("btnStart").onclick=startTrack;
-  document.getElementById("btnStop").onclick=stopTrack;
-
-  document.getElementById("btnCalc").onclick=calcReport;
-  document.getElementById("btnCsvPers").onclick=csvPers;
-  document.getElementById("btnCsvAct").onclick=csvAct;
-}
-
-function boot(){
-  tryActivate();
-  wire();
-  initUsersUI();
-  const last=localStorage.getItem("last_login_email"); if(last) document.getElementById("loginEmail").value=last;
-  if(users()[0] && !currentUser){ currentUser=users()[0]; }
-  if(currentUser){ loadDB(); }
-  renderAdmins();
-  initMap();
-  redrawAll();
-  renderPeople(); renderActs(); renderUbic();
-  refillSelects();
-}
-boot();
-</script>
-</body>
-</html>
+  document.getElementById("repInfo").textContent=`Registros: ${reg.length} · Rango: ${d} a
