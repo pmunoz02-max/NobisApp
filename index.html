@@ -57,7 +57,7 @@
     h3{margin:12px 0 8px 0; font-size:1rem}
 
     #map{
-      height: 56vh;              /* altura fija = no desaparece */
+      height: 56vh;
       min-height: 420px;
       border-radius:12px;
       border:1px solid var(--b);
@@ -113,7 +113,6 @@
     .help{font-size:.9rem; color:var(--muted)}
     .divider{height:1px;background:var(--b); margin:8px 0}
 
-    /* icono del vértice (marcador draggable) */
     .vertex-dot{
       width:12px; height:12px;
       background:#38bdf8;
@@ -125,7 +124,7 @@
 </head>
 <body>
   <div class="wrap">
-    <!-- Lado izquierdo: Administración + Geocercas -->
+    <!-- Panel izquierdo -->
     <div class="panel">
       <h2>Administración</h2>
       <div class="help">Dueño: <strong>fenice.ecuador@gmail.com</strong></div>
@@ -137,7 +136,6 @@
         <button id="btnCancel" class="btn" disabled>Cancelar</button>
       </div>
 
-      <!-- Crear desde coordenadas (SIEMPRE visible) -->
       <div class="col" style="margin-top:12px;">
         <div class="help" style="margin-bottom:4px;">Crear desde coordenadas (<code>lat,lng</code>), una por línea:</div>
         <textarea id="taCoords" placeholder="-1.7370, -77.9185&#10;-1.7315, -77.9104&#10;-1.7315, -77.9077"></textarea>
@@ -174,7 +172,7 @@
       <div class="help" style="margin-top:6px">Seleccionada: <strong id="selName">Ninguna</strong></div>
     </div>
 
-    <!-- Lado derecho: Mapa + Historial (placeholder) -->
+    <!-- Panel derecho -->
     <div class="panel">
       <h2>Mapa de Geocercas</h2>
       <div id="map" role="region" aria-label="Mapa de geocercas"></div>
@@ -262,8 +260,14 @@ function renderAll(){
       color: '#ff9800',
       weight: 4,
       fillColor: '#a7f3d0',
-      fillOpacity: 0.35
+      fillOpacity: 0.35,
+      bubblingMouseEvents: false
     }).addTo(map);
+
+    // por si algún plugin habilita drag del path
+    if (poly.dragging && typeof poly.dragging.disable === 'function') {
+      poly.dragging.disable();
+    }
 
     poly.on('click', () => selectGeofence(g.id));
     layers.set(g.id, poly);
@@ -397,7 +401,7 @@ function createFromTextarea(){
 }
 
 /* =========================
-   Edición de vértices (arrastrables)
+   Edición de vértices (arrastrables) — FIX
 ========================= */
 const vertexIcon = L.divIcon({ className:'vertex-dot', iconSize:[12,12], iconAnchor:[6,6] });
 
@@ -409,13 +413,46 @@ function startEditing(){
   const poly = layers.get(g.id);
   if(!poly) return;
 
+  // asegurar que el polígono NO sea arrastrable si existe plugin
+  if (poly.dragging && typeof poly.dragging.disable === 'function') {
+    poly.dragging.disable();
+  }
+
   editMarkers = g.latlngs.map((p, idx)=>{
-    const mk = L.marker([p.lat, p.lng], {draggable:true, icon:vertexIcon}).addTo(map);
+    const mk = L.marker([p.lat, p.lng], {
+      draggable:true,
+      icon:vertexIcon,
+      autoPan:true,
+      autoPanPadding:[60,60],
+      autoPanSpeed: 10
+    }).addTo(map);
+
+    // Evitar que el mapa/PATH se arrastre mientras movemos el vértice
+    mk.on('dragstart', () => {
+      map.dragging.disable();
+      map.doubleClickZoom.disable();
+    });
+
     mk.on('drag', ev=>{
       const ll = ev.target.getLatLng();
+      // Actualiza ÚNICAMENTE este vértice
       g.latlngs[idx] = {lat: ll.lat, lng: ll.lng};
       poly.setLatLngs(g.latlngs);
     });
+
+    mk.on('dragend', () => {
+      map.dragging.enable();
+      map.doubleClickZoom.enable();
+      persist();               // guarda cambio de forma
+    });
+
+    // Evita que el mousedown burbujee al mapa (algunos navegadores)
+    mk.on('mousedown', (e)=>{
+      if (e.originalEvent) {
+        e.originalEvent.stopPropagation();
+      }
+    });
+
     return mk;
   });
 
