@@ -20,111 +20,39 @@
 
   <style>
     :root{
-      --bg:#f7f7f9;
-      --panel:#fff;
-      --b:#e6e6ee;
-      --brand:#2563eb;
-      --accent:#ff9800;
-      --ok:#10b981;
-      --muted:#6b7280;
+      --bg:#f7f7f9; --panel:#fff; --b:#e6e6ee;
+      --brand:#2563eb; --accent:#ff9800; --muted:#6b7280;
     }
     *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-      background:var(--bg);
-      color:#111;
-    }
-    .wrap{
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 16px;
-      display:grid;
-      grid-template-columns: 320px 1fr;
-      gap:16px;
-    }
-    @media (max-width: 1024px){
-      .wrap{grid-template-columns: 1fr}
-    }
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:#111}
+    .wrap{max-width:1280px;margin:0 auto;padding:16px;display:grid;grid-template-columns:320px 1fr;gap:16px}
+    @media (max-width:1024px){.wrap{grid-template-columns:1fr}}
+    .panel{background:var(--panel);border:1px solid var(--b);border-radius:12px;padding:14px}
+    h2{margin:6px 0 12px} h3{margin:12px 0 8px;font-size:1rem}
+    #map{height:56vh;min-height:420px;border-radius:12px;border:1px solid var(--b);background:#fafafa}
 
-    .panel{
-      background:var(--panel);
-      border:1px solid var(--b);
-      border-radius: 12px;
-      padding: 14px;
-    }
-    h2{margin:6px 0 12px 0}
-    h3{margin:12px 0 8px 0; font-size:1rem}
-
-    #map{
-      height: 56vh;
-      min-height: 420px;
-      border-radius:12px;
-      border:1px solid var(--b);
-      background:#fafafa;
-    }
-
-    .row{display:flex; gap:8px; align-items:center}
-    .col{display:flex; flex-direction:column; gap:8px}
-    input, textarea, select, button{font:inherit}
-    input[type="text"], textarea, select{
-      width:100%;
-      border:1px solid var(--b);
-      border-radius:8px;
-      padding:10px 12px;
-      background:#fff;
-    }
-    textarea{height:120px; resize:vertical}
-    .btn{
-      padding:10px 12px;
-      border:1px solid var(--b);
-      border-radius:8px;
-      background:#fff;
-      cursor:pointer;
-    }
-    .btn.primary{background:var(--brand); color:#fff; border-color:transparent}
-    .btn.warn{background:#fff7ed; border-color:#fed7aa}
-    .btn.ok{background:#ecfdf5; border-color:#a7f3d0}
-    .btn:disabled{opacity:.55; cursor:not-allowed}
-
-    .list{
-      border:1px solid var(--b);
-      border-radius:8px;
-      padding:8px;
-      max-height:160px;
-      overflow:auto;
-      background:#fff
-    }
+    .row{display:flex;gap:8px;align-items:center}
+    .col{display:flex;flex-direction:column;gap:8px}
+    input,textarea,select,button{font:inherit}
+    input[type="text"],textarea,select{width:100%;border:1px solid var(--b);border-radius:8px;padding:10px 12px;background:#fff}
+    textarea{height:120px;resize:vertical}
+    .btn{padding:10px 12px;border:1px solid var(--b);border-radius:8px;background:#fff;cursor:pointer}
+    .btn.primary{background:#2563eb;color:#fff;border-color:transparent}
+    .btn.warn{background:#fff7ed;border-color:#fed7aa}
+    .btn.ok{background:#ecfdf5;border-color:#a7f3d0}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .list{border:1px solid var(--b);border-radius:8px;padding:8px;max-height:160px;overflow:auto;background:#fff}
     .item{padding:6px 8px;border-radius:6px;cursor:pointer}
     .item:hover{background:#f3f4f6}
     .item.active{background:#e8efff}
-
-    .coordsCtl{
-      background: #0f172a;
-      color:#e2e8f0;
-      padding:6px 10px;
-      border-radius:8px;
-      font-size:.9rem;
-      border:1px solid rgba(255,255,255,.1);
-      box-shadow: 0 4px 10px rgba(0,0,0,.15);
-      user-select:none;
-    }
-
-    .help{font-size:.9rem; color:var(--muted)}
-    .divider{height:1px;background:var(--b); margin:8px 0}
-
-    .vertex-dot{
-      width:12px; height:12px;
-      background:#38bdf8;
-      border:2px solid #0ea5e9;
-      border-radius:50%;
-      box-shadow: 0 0 0 2px rgba(255,255,255,.9);
-    }
+    .coordsCtl{background:#0f172a;color:#e2e8f0;padding:6px 10px;border-radius:8px;font-size:.9rem;border:1px solid rgba(255,255,255,.1);box-shadow:0 4px 10px rgba(0,0,0,.15);user-select:none}
+    .help{font-size:.9rem;color:var(--muted)}
+    .divider{height:1px;background:var(--b);margin:8px 0}
+    .vertex-dot{width:12px;height:12px;background:#38bdf8;border:2px solid #0ea5e9;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <!-- Panel izquierdo -->
     <div class="panel">
       <h2>Administración</h2>
       <div class="help">Dueño: <strong>fenice.ecuador@gmail.com</strong></div>
@@ -137,7 +65,7 @@
       </div>
 
       <div class="col" style="margin-top:12px;">
-        <div class="help" style="margin-bottom:4px;">Crear desde coordenadas (<code>lat,lng</code>), una por línea:</div>
+        <div class="help" style="margin-bottom:4px;">Crear desde coordenadas (<code>lat,lng</code>) una por línea:</div>
         <textarea id="taCoords" placeholder="-1.7370, -77.9185&#10;-1.7315, -77.9104&#10;-1.7315, -77.9077"></textarea>
         <div class="row">
           <input id="inName" type="text" placeholder="Nombre de geocerca" />
@@ -161,21 +89,19 @@
 
       <div class="row">
         <button id="btnExport" class="btn">Exportar JSON</button>
-        <label class="btn" style="cursor:pointer;">
-          Importar
+        <label class="btn" style="cursor:pointer;">Importar
           <input id="fileImport" type="file" accept="application/json" hidden />
         </label>
       </div>
 
       <h3 style="margin-top:16px;">Lista</h3>
-      <div id="list" class="list" aria-live="polite"></div>
+      <div id="list" class="list"></div>
       <div class="help" style="margin-top:6px">Seleccionada: <strong id="selName">Ninguna</strong></div>
     </div>
 
-    <!-- Panel derecho -->
     <div class="panel">
       <h2>Mapa de Geocercas</h2>
-      <div id="map" role="region" aria-label="Mapa de geocercas"></div>
+      <div id="map"></div>
 
       <h3 style="margin-top:14px;">Histórico de ubicaciones</h3>
       <div class="help">Por ahora es un placeholder; se llenará cuando conectemos tracking.</div>
@@ -197,367 +123,253 @@
   </div>
 
 <script>
-/* =========================
-   Estado y utilidades
-========================= */
+/* ===== Estado ===== */
 const $ = sel => document.querySelector(sel);
 const storeKey = 'nobis_geofences_v2';
-
-let geofences = [];        // {id, name, latlngs: [{lat,lng},...]}
+let geofences = [];        // {id,name,latlngs:[{lat,lng}]}
 let layers = new Map();    // id -> L.Polygon
 let activeId = null;
 
-let drawing = false;
-let tempPoints = [];
-let tempLine = null;
-let tempPoly = null;
-
-let editMarkers = [];      // L.marker draggable para edición
+let drawing=false, tempPoints=[], tempLine=null, tempPoly=null;
+let editMarkers=[];
 
 function uid(){ return 'g'+Math.random().toString(36).slice(2,8) }
 function persist(){ localStorage.setItem(storeKey, JSON.stringify(geofences)) }
-function load(){
-  try{
-    geofences = JSON.parse(localStorage.getItem(storeKey) || '[]');
-    if(!Array.isArray(geofences)) geofences = [];
-  }catch(e){ geofences = [] }
-}
+function load(){ try{ geofences = JSON.parse(localStorage.getItem(storeKey)||'[]')||[] }catch{ geofences=[] } }
 
-/* =========================
-   Mapa Leaflet
-========================= */
+/* ===== Mapa ===== */
 const map = L.map('map', {zoomControl:true}).setView([-1.731, -77.91], 14);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; OpenStreetMap'
-}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap'}).addTo(map);
 
-/* Control coordenadas en vivo */
+/* Coordenadas en vivo */
 const coordsCtl = L.control({position:'topright'});
-coordsCtl.onAdd = function(){
+coordsCtl.onAdd = () => {
   const d = L.DomUtil.create('div','coordsCtl');
-  d.id = 'coordsCtl';
-  d.textContent = 'Lat: –, Lng: –';
-  return d;
+  d.id='coordsCtl'; d.textContent='Lat: –, Lng: –'; return d;
 };
 coordsCtl.addTo(map);
-map.on('mousemove', (e)=>{
+map.on('mousemove', e=>{
   const el = $('#coordsCtl');
   if(el) el.textContent = `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
 });
 setTimeout(()=> map.invalidateSize(), 200);
 
-/* =========================
-   Renderizado de geocercas
-========================= */
+/* ===== Render ===== */
 function renderAll(){
-  // limpiar capas
-  layers.forEach(poly => map.removeLayer(poly));
-  layers.clear();
-
+  layers.forEach(p=>map.removeLayer(p)); layers.clear();
   geofences.forEach(g=>{
     const poly = L.polygon(g.latlngs, {
-      color: '#ff9800',
-      weight: 4,
-      fillColor: '#a7f3d0',
-      fillOpacity: 0.35,
-      bubblingMouseEvents: false
+      color:'#ff9800', weight:4, fillColor:'#a7f3d0', fillOpacity:.35,
+      bubblingMouseEvents:false
     }).addTo(map);
-
-    // por si algún plugin habilita drag del path
-    if (poly.dragging && typeof poly.dragging.disable === 'function') {
-      poly.dragging.disable();
-    }
-
-    poly.on('click', () => selectGeofence(g.id));
+    // por si algún plugin habilita drag en paths:
+    if(poly.dragging && typeof poly.dragging.disable==='function'){ poly.dragging.disable(); }
+    poly.on('click', ()=> selectGeofence(g.id));
     layers.set(g.id, poly);
   });
-
-  renderList();
-  setSelectedLabel();
+  renderList(); setSelectedLabel();
 }
-
 function renderList(){
-  const box = $('#list');
-  box.innerHTML = '';
+  const box=$('#list'); box.innerHTML='';
   geofences.forEach(g=>{
-    const div = document.createElement('div');
-    div.className = 'item' + (g.id===activeId?' active':'');
-    div.textContent = `${g.name} (${g.latlngs.length} pts)`;
-    div.onclick = ()=> selectGeofence(g.id);
+    const div=document.createElement('div');
+    div.className='item'+(g.id===activeId?' active':'');
+    div.textContent=`${g.name} (${g.latlngs.length} pts)`;
+    div.onclick=()=>selectGeofence(g.id);
     box.appendChild(div);
   });
 }
-
 function setSelectedLabel(){
-  const g = geofences.find(x=>x.id===activeId);
-  $('#selName').textContent = g ? g.name : 'Ninguna';
-  const has = !!g;
-  $('#btnEdit').disabled = !has;
-  $('#btnRename').disabled = !has;
-  $('#btnDelete').disabled = !has;
-  $('#btnSave').disabled = !has;
+  const g=geofences.find(x=>x.id===activeId);
+  $('#selName').textContent = g? g.name : 'Ninguna';
+  const has=!!g;
+  $('#btnEdit').disabled=!has;
+  $('#btnRename').disabled=!has;
+  $('#btnDelete').disabled=!has;
+  $('#btnSave').disabled=!has;
 }
-
-/* Seleccionar geocerca por id */
 function selectGeofence(id, fit=true){
-  activeId = id;
-  renderList();
-  setSelectedLabel();
-  const poly = layers.get(id);
-  if(poly && fit){
-    map.fitBounds(poly.getBounds(), {padding:[20,20]});
-  }
-  stopEditing(); // por si estaba editando
+  activeId=id; renderList(); setSelectedLabel();
+  const poly=layers.get(id); if(poly&&fit) map.fitBounds(poly.getBounds(),{padding:[20,20]});
+  stopEditing();
 }
 
-/* =========================
-   Dibujo manual por clics
-========================= */
+/* ===== Dibujo por clics ===== */
 function startDrawing(){
-  if(drawing) return;
-  drawing = true;
-  tempPoints = [];
-  if(tempLine){ map.removeLayer(tempLine); tempLine=null }
-  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null }
-
-  $('#btnNew').disabled = true;
-  $('#btnFinish').disabled = false;
-  $('#btnCancel').disabled = false;
-
-  map.getContainer().style.cursor = 'crosshair';
+  if(drawing) return; drawing=true; tempPoints=[];
+  if(tempLine){map.removeLayer(tempLine); tempLine=null}
+  if(tempPoly){map.removeLayer(tempPoly); tempPoly=null}
+  $('#btnNew').disabled=true; $('#btnFinish').disabled=false; $('#btnCancel').disabled=false;
+  map.getContainer().style.cursor='crosshair';
   map.on('click', addTempPoint);
 }
 function addTempPoint(e){
   tempPoints.push(e.latlng);
-
   if(tempLine) map.removeLayer(tempLine);
-  tempLine = L.polyline(tempPoints, {color:'#ff9800', weight:2, dashArray:'6,6'}).addTo(map);
-
+  tempLine = L.polyline(tempPoints,{color:'#ff9800',weight:2,dashArray:'6,6'}).addTo(map);
   if(tempPoly) map.removeLayer(tempPoly);
   if(tempPoints.length>=3){
-    tempPoly = L.polygon(tempPoints, {
-      color:'#ff9800', weight:4,
-      fillColor:'#a7f3d0', fillOpacity:.35
-    }).addTo(map);
+    tempPoly = L.polygon(tempPoints,{color:'#ff9800',weight:4,fillColor:'#a7f3d0',fillOpacity:.35}).addTo(map);
   }
 }
 function finishDrawing(){
   if(!drawing) return;
-  if(tempPoints.length<3){ alert('Necesitas al menos 3 puntos.'); return; }
-  const id = uid();
-  const name = 'Geocerca ' + (geofences.length+1);
-  geofences.push({id, name, latlngs: tempPoints.map(p=>({lat:p.lat, lng:p.lng}))});
+  if(tempPoints.length<3){alert('Necesitas al menos 3 puntos.');return;}
+  const id=uid(); const name='Geocerca '+(geofences.length+1);
+  geofences.push({id,name,latlngs:tempPoints.map(p=>({lat:p.lat,lng:p.lng}))});
   persist();
-
-  map.off('click', addTempPoint);
-  if(tempLine){ map.removeLayer(tempLine); tempLine=null }
-  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null }
-  drawing=false;
-  map.getContainer().style.cursor = '';
-
-  $('#btnNew').disabled = false;
-  $('#btnFinish').disabled = true;
-  $('#btnCancel').disabled = true;
-
-  renderAll();
-  selectGeofence(id);
+  map.off('click',addTempPoint);
+  if(tempLine){map.removeLayer(tempLine)} if(tempPoly){map.removeLayer(tempPoly)}
+  tempLine=tempPoly=null; drawing=false; map.getContainer().style.cursor='';
+  $('#btnNew').disabled=false; $('#btnFinish').disabled=true; $('#btnCancel').disabled=true;
+  renderAll(); selectGeofence(id);
 }
 function cancelDrawing(){
-  if(!drawing) return;
-  drawing=false;
-  map.off('click', addTempPoint);
-  if(tempLine){ map.removeLayer(tempLine); tempLine=null }
-  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null }
-  map.getContainer().style.cursor = '';
-  $('#btnNew').disabled = false;
-  $('#btnFinish').disabled = true;
-  $('#btnCancel').disabled = true;
+  if(!drawing) return; drawing=false; map.off('click',addTempPoint);
+  if(tempLine){map.removeLayer(tempLine)} if(tempPoly){map.removeLayer(tempPoly)}
+  tempLine=tempPoly=null; map.getContainer().style.cursor='';
+  $('#btnNew').disabled=false; $('#btnFinish').disabled=true; $('#btnCancel').disabled=true;
 }
 
-/* =========================
-   Crear desde textarea
-========================= */
+/* ===== Crear desde textarea ===== */
 function createFromTextarea(){
-  const raw = $('#taCoords').value.trim();
-  if(!raw){ alert('Pega coordenadas (lat,lng), una por línea.'); return; }
-  const lines = raw.split(/\r?\n/);
-  const pts = [];
+  const raw=$('#taCoords').value.trim();
+  if(!raw){alert('Pega coordenadas (lat,lng), una por línea.');return;}
+  const lines=raw.split(/\r?\n/); const pts=[];
   for(const ln of lines){
-    const m = ln.split(',').map(x=>x.trim());
+    const m=ln.split(',').map(x=>x.trim());
     if(m.length<2) continue;
-    const lat = parseFloat(m[0]);
-    const lng = parseFloat(m[1]);
-    if(Number.isFinite(lat) && Number.isFinite(lng)) pts.push({lat, lng});
+    const lat=parseFloat(m[0]), lng=parseFloat(m[1]);
+    if(Number.isFinite(lat)&&Number.isFinite(lng)) pts.push({lat,lng});
   }
-  if(pts.length<3){ alert('Se requieren al menos 3 pares lat,lng.'); return; }
-  const id = uid();
-  const nm = ($('#inName').value.trim() || ('Geocerca '+(geofences.length+1)));
-  geofences.push({id, name:nm, latlngs: pts});
-  persist();
-  renderAll();
-  selectGeofence(id);
+  if(pts.length<3){alert('Se requieren al menos 3 pares lat,lng.');return;}
+  const id=uid(); const nm=($('#inName').value.trim()||('Geocerca '+(geofences.length+1)));
+  geofences.push({id,name:nm,latlngs:pts}); persist(); renderAll(); selectGeofence(id);
   $('#inName').value='';
 }
 
-/* =========================
-   Edición de vértices (arrastrables) — FIX
-========================= */
-const vertexIcon = L.divIcon({ className:'vertex-dot', iconSize:[12,12], iconAnchor:[6,6] });
+/* ===== Edición de vértices — FIX ===== */
+const vertexIcon = L.divIcon({className:'vertex-dot',iconSize:[12,12],iconAnchor:[6,6]});
 
 function startEditing(){
-  const g = geofences.find(x=>x.id===activeId);
-  if(!g) return;
-  stopEditing(); // limpiar si ya había
+  const g=geofences.find(x=>x.id===activeId); if(!g) return;
+  stopEditing();
 
-  const poly = layers.get(g.id);
-  if(!poly) return;
+  const poly=layers.get(g.id); if(!poly) return;
 
-  // asegurar que el polígono NO sea arrastrable si existe plugin
-  if (poly.dragging && typeof poly.dragging.disable === 'function') {
-    poly.dragging.disable();
+  // deshabilitar drag de path por si algún plugin lo activó
+  if(poly.dragging && typeof poly.dragging.disable==='function'){ poly.dragging.disable(); }
+
+  // IMPORTANTÍSIMO: evitar que el polígono capture el drag mientras editamos
+  const el = poly.getElement && poly.getElement();
+  if(el){
+    poly._prevPointerEvents = el.style.pointerEvents;
+    el.style.pointerEvents = 'none';
   }
 
-  editMarkers = g.latlngs.map((p, idx)=>{
-    const mk = L.marker([p.lat, p.lng], {
+  editMarkers = g.latlngs.map((p,idx)=>{
+    const mk = L.marker([p.lat,p.lng], {
       draggable:true,
       icon:vertexIcon,
-      autoPan:true,
-      autoPanPadding:[60,60],
-      autoPanSpeed: 10
+      autoPan:true, autoPanPadding:[60,60], autoPanSpeed:10
     }).addTo(map);
 
-    // Evitar que el mapa/PATH se arrastre mientras movemos el vértice
-    mk.on('dragstart', () => {
+    // asegurar que SOLO el marcador arrastre
+    mk.on('dragstart', ()=>{
       map.dragging.disable();
       map.doubleClickZoom.disable();
     });
-
     mk.on('drag', ev=>{
-      const ll = ev.target.getLatLng();
-      // Actualiza ÚNICAMENTE este vértice
-      g.latlngs[idx] = {lat: ll.lat, lng: ll.lng};
+      const ll=ev.target.getLatLng();
+      g.latlngs[idx]={lat:ll.lat,lng:ll.lng};
       poly.setLatLngs(g.latlngs);
     });
-
-    mk.on('dragend', () => {
+    mk.on('dragend', ()=>{
       map.dragging.enable();
       map.doubleClickZoom.enable();
-      persist();               // guarda cambio de forma
+      persist();
     });
 
-    // Evita que el mousedown burbujee al mapa (algunos navegadores)
-    mk.on('mousedown', (e)=>{
-      if (e.originalEvent) {
-        e.originalEvent.stopPropagation();
-      }
+    // cortar propagación para distintos tipos de puntero
+    ['mousedown','touchstart','pointerdown'].forEach(evName=>{
+      mk.on(evName, e=>{
+        if(e.originalEvent) e.originalEvent.stopPropagation();
+      });
     });
 
     return mk;
   });
 
-  $('#btnEdit').disabled = true;
-  $('#btnEditCancel').disabled = false;
+  $('#btnEdit').disabled=true;
+  $('#btnEditCancel').disabled=false;
 }
 function stopEditing(){
-  editMarkers.forEach(m=> map.removeLayer(m));
-  editMarkers = [];
-  $('#btnEdit').disabled = !activeId;
-  $('#btnEditCancel').disabled = true;
-}
+  editMarkers.forEach(m=>map.removeLayer(m));
+  editMarkers=[];
 
-/* =========================
-   Guardar / Renombrar / Eliminar
-========================= */
-function saveActive(){
-  const g = geofences.find(x=>x.id===activeId);
-  if(!g) return;
-  persist();
-  alert('Geocerca guardada.');
-}
-function renameActive(){
-  const g = geofences.find(x=>x.id===activeId);
-  if(!g) return;
-  const nv = prompt('Nuevo nombre:', g.name);
-  if(nv && nv.trim()){
-    g.name = nv.trim();
-    persist();
-    renderAll();
-    selectGeofence(g.id, false);
-  }
-}
-function deleteActive(){
-  const g = geofences.find(x=>x.id===activeId);
-  if(!g) return;
-  if(!confirm(`¿Eliminar "${g.name}"?`)) return;
-  geofences = geofences.filter(x=>x.id!==g.id);
-  persist();
-  activeId = null;
-  renderAll();
-  setSelectedLabel();
-}
-
-/* =========================
-   Exportar / Importar
-========================= */
-function exportJSON(){
-  const blob = new Blob([JSON.stringify(geofences, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'geocercas.json';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-$('#fileImport').addEventListener('change', (ev)=>{
-  const f = ev.target.files?.[0];
-  if(!f) return;
-  const rd = new FileReader();
-  rd.onload = ()=>{
-    try{
-      const arr = JSON.parse(rd.result);
-      if(Array.isArray(arr)){
-        geofences = arr.filter(x=>x && x.id && x.latlngs);
-        persist();
-        renderAll();
-        activeId = null;
-        setSelectedLabel();
-        alert('Importado correctamente.');
-      }else{
-        alert('Archivo inválido.');
+  // restaurar interacción del polígono seleccionado
+  if(activeId){
+    const poly = layers.get(activeId);
+    if(poly && poly.getElement){
+      const el = poly.getElement();
+      if(el){
+        el.style.pointerEvents = (poly._prevPointerEvents ?? 'auto');
+        delete poly._prevPointerEvents;
       }
-    }catch(e){
-      alert('No se pudo leer el JSON.');
     }
+  }
+
+  $('#btnEdit').disabled=!activeId;
+  $('#btnEditCancel').disabled=true;
+}
+
+/* ===== Guardar / Renombrar / Eliminar ===== */
+function saveActive(){ const g=geofences.find(x=>x.id===activeId); if(!g) return; persist(); alert('Geocerca guardada.'); }
+function renameActive(){ const g=geofences.find(x=>x.id===activeId); if(!g) return;
+  const nv=prompt('Nuevo nombre:',g.name); if(nv&&nv.trim()){ g.name=nv.trim(); persist(); renderAll(); selectGeofence(g.id,false); }
+}
+function deleteActive(){ const g=geofences.find(x=>x.id===activeId); if(!g) return;
+  if(!confirm(`¿Eliminar "${g.name}"?`)) return;
+  geofences=geofences.filter(x=>x.id!==g.id); persist(); activeId=null; renderAll(); setSelectedLabel();
+}
+
+/* ===== Export/Import ===== */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(geofences,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download='geocercas.json'; a.click(); URL.revokeObjectURL(url);
+}
+$('#fileImport').addEventListener('change', ev=>{
+  const f=ev.target.files?.[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const arr=JSON.parse(rd.result);
+      if(Array.isArray(arr)){ geofences=arr.filter(x=>x&&x.id&&x.latlngs); persist(); renderAll(); activeId=null; setSelectedLabel(); alert('Importado correctamente.'); }
+      else alert('Archivo inválido.');
+    }catch{ alert('No se pudo leer el JSON.'); }
   };
-  rd.readAsText(f);
-  ev.target.value = '';
+  rd.readAsText(f); ev.target.value='';
 });
 
-/* =========================
-   Eventos UI
-========================= */
-$('#btnNew').onclick = startDrawing;
-$('#btnFinish').onclick = finishDrawing;
-$('#btnCancel').onclick = cancelDrawing;
+/* ===== Eventos UI ===== */
+$('#btnNew').onclick=startDrawing;
+$('#btnFinish').onclick=finishDrawing;
+$('#btnCancel').onclick=cancelDrawing;
 
-$('#btnCreateFromCoords').onclick = createFromTextarea;
+$('#btnCreateFromCoords').onclick=createFromTextarea;
 
-$('#btnEdit').onclick = startEditing;
-$('#btnEditCancel').onclick = stopEditing;
+$('#btnEdit').onclick=startEditing;
+$('#btnEditCancel').onclick=stopEditing;
 
-$('#btnSave').onclick = saveActive;
-$('#btnRename').onclick = renameActive;
-$('#btnDelete').onclick = deleteActive;
+$('#btnSave').onclick=saveActive;
+$('#btnRename').onclick=renameActive;
+$('#btnDelete').onclick=deleteActive;
 
-$('#btnExport').onclick = exportJSON;
+$('#btnExport').onclick=exportJSON;
 
-/* =========================
-   Carga inicial
-========================= */
-load();
-renderAll();
-setSelectedLabel();
+/* ===== Init ===== */
+load(); renderAll(); setSelectedLabel();
 </script>
 </body>
 </html>
