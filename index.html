@@ -63,19 +63,27 @@
       return admins;
     }
 
-    // Login
+    // Login con superadmin fijo que se agrega a la lista si no existe
     function login() {
       const email = document.getElementById("loginEmail").value.trim();
       const admins = getAdmins();
+
+      const superAdmin = "fenice.ecuador@gmail.com"; // dueño de la app
 
       if (!email) {
         alert("Ingrese su email");
         return;
       }
 
-      if (admins.includes(email)) {
+      if (email === superAdmin || admins.includes(email)) {
         document.getElementById("nivel").textContent = "Administrador";
         alert("✅ Bienvenido administrador: " + email);
+
+        // Si es superadmin y no está en la lista, agregarlo automáticamente
+        if (email === superAdmin && !admins.includes(superAdmin)) {
+          document.getElementById("adminList").innerHTML += `<li>${superAdmin}</li>`;
+        }
+
       } else {
         document.getElementById("nivel").textContent = "Invitado";
         alert("❌ Acceso denegado. El email no es administrador.");
