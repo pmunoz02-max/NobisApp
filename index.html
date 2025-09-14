@@ -57,7 +57,7 @@
     h3{margin:12px 0 8px 0; font-size:1rem}
 
     #map{
-      height: 56vh;              /* ¡clave para que no “desaparezca”! */
+      height: 56vh;              /* altura fija = no desaparece */
       min-height: 420px;
       border-radius:12px;
       border:1px solid var(--b);
@@ -66,9 +66,7 @@
 
     .row{display:flex; gap:8px; align-items:center}
     .col{display:flex; flex-direction:column; gap:8px}
-    input, textarea, select, button{
-      font:inherit;
-    }
+    input, textarea, select, button{font:inherit}
     input[type="text"], textarea, select{
       width:100%;
       border:1px solid var(--b);
@@ -97,11 +95,7 @@
       overflow:auto;
       background:#fff
     }
-    .item{
-      padding:6px 8px;
-      border-radius:6px;
-      cursor:pointer;
-    }
+    .item{padding:6px 8px;border-radius:6px;cursor:pointer}
     .item:hover{background:#f3f4f6}
     .item.active{background:#e8efff}
 
@@ -116,10 +110,17 @@
       user-select:none;
     }
 
-    .help{
-      font-size:.9rem; color:var(--muted)
-    }
+    .help{font-size:.9rem; color:var(--muted)}
     .divider{height:1px;background:var(--b); margin:8px 0}
+
+    /* icono del vértice (marcador draggable) */
+    .vertex-dot{
+      width:12px; height:12px;
+      background:#38bdf8;
+      border:2px solid #0ea5e9;
+      border-radius:50%;
+      box-shadow: 0 0 0 2px rgba(255,255,255,.9);
+    }
   </style>
 </head>
 <body>
@@ -136,22 +137,20 @@
         <button id="btnCancel" class="btn" disabled>Cancelar</button>
       </div>
 
-      <details style="margin-top:8px;">
-        <summary class="help">Crear desde coordenadas (lat,lng)</summary>
-        <div class="col" style="margin-top:8px;">
-          <textarea id="taCoords" placeholder="-1.7370, -77.9185&#10;-1.7315, -77.9104&#10;-1.7315, -77.9077"></textarea>
-          <div class="row">
-            <input id="inName" type="text" placeholder="Nombre de geocerca" />
-            <button id="btnCreateFromCoords" class="btn">Crear por coordenadas</button>
-          </div>
-          <div class="help">Una coordenada por línea. Formato: <code>lat,lng</code></div>
+      <!-- Crear desde coordenadas (SIEMPRE visible) -->
+      <div class="col" style="margin-top:12px;">
+        <div class="help" style="margin-bottom:4px;">Crear desde coordenadas (<code>lat,lng</code>), una por línea:</div>
+        <textarea id="taCoords" placeholder="-1.7370, -77.9185&#10;-1.7315, -77.9104&#10;-1.7315, -77.9077"></textarea>
+        <div class="row">
+          <input id="inName" type="text" placeholder="Nombre de geocerca" />
+          <button id="btnCreateFromCoords" class="btn">Crear por coordenadas</button>
         </div>
-      </details>
+      </div>
 
       <div class="divider"></div>
 
       <div class="row">
-        <button id="btnEdit" class="btn">Editar vértices</button>
+        <button id="btnEdit" class="btn" disabled>Editar vértices</button>
         <button id="btnEditCancel" class="btn" disabled>Cancelar edición</button>
       </div>
       <div class="row" style="margin-top:8px;">
@@ -194,9 +193,7 @@
             <th style="text-align:left; padding:8px; border:1px solid var(--b);">mins</th>
           </tr>
         </thead>
-        <tbody id="histBody">
-          <!-- vacío -->
-        </tbody>
+        <tbody id="histBody"></tbody>
       </table>
     </div>
   </div>
@@ -206,8 +203,6 @@
    Estado y utilidades
 ========================= */
 const $ = sel => document.querySelector(sel);
-const $$ = sel => document.querySelectorAll(sel);
-
 const storeKey = 'nobis_geofences_v2';
 
 let geofences = [];        // {id, name, latlngs: [{lat,lng},...]}
@@ -219,7 +214,7 @@ let tempPoints = [];
 let tempLine = null;
 let tempPoly = null;
 
-let editMarkers = [];      // circleMarkers para edición
+let editMarkers = [];      // L.marker draggable para edición
 
 function uid(){ return 'g'+Math.random().toString(36).slice(2,8) }
 function persist(){ localStorage.setItem(storeKey, JSON.stringify(geofences)) }
@@ -239,7 +234,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap'
 }).addTo(map);
 
-/* Control de coordenadas en la esquina superior-derecha */
+/* Control coordenadas en vivo */
 const coordsCtl = L.control({position:'topright'});
 coordsCtl.onAdd = function(){
   const d = L.DomUtil.create('div','coordsCtl');
@@ -248,13 +243,10 @@ coordsCtl.onAdd = function(){
   return d;
 };
 coordsCtl.addTo(map);
-
 map.on('mousemove', (e)=>{
   const el = $('#coordsCtl');
   if(el) el.textContent = `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
 });
-
-/* Asegurar tamaño correcto si se carga oculto en algún momento */
 setTimeout(()=> map.invalidateSize(), 200);
 
 /* =========================
@@ -265,7 +257,6 @@ function renderAll(){
   layers.forEach(poly => map.removeLayer(poly));
   layers.clear();
 
-  // dibujar desde datos
   geofences.forEach(g=>{
     const poly = L.polygon(g.latlngs, {
       color: '#ff9800',
@@ -297,7 +288,6 @@ function renderList(){
 function setSelectedLabel(){
   const g = geofences.find(x=>x.id===activeId);
   $('#selName').textContent = g ? g.name : 'Ninguna';
-  // habilitar/deshabilitar botones
   const has = !!g;
   $('#btnEdit').disabled = !has;
   $('#btnRename').disabled = !has;
@@ -310,12 +300,11 @@ function selectGeofence(id, fit=true){
   activeId = id;
   renderList();
   setSelectedLabel();
-  // llevar vista al polígono
   const poly = layers.get(id);
   if(poly && fit){
     map.fitBounds(poly.getBounds(), {padding:[20,20]});
   }
-  stopEditing(); // si estaba en edición, la cerramos
+  stopEditing(); // por si estaba editando
 }
 
 /* =========================
@@ -335,7 +324,6 @@ function startDrawing(){
   map.getContainer().style.cursor = 'crosshair';
   map.on('click', addTempPoint);
 }
-
 function addTempPoint(e){
   tempPoints.push(e.latlng);
 
@@ -350,26 +338,20 @@ function addTempPoint(e){
     }).addTo(map);
   }
 }
-
 function finishDrawing(){
   if(!drawing) return;
-  if(tempPoints.length<3){
-    alert('Necesitas al menos 3 puntos.');
-    return;
-  }
+  if(tempPoints.length<3){ alert('Necesitas al menos 3 puntos.'); return; }
   const id = uid();
   const name = 'Geocerca ' + (geofences.length+1);
   geofences.push({id, name, latlngs: tempPoints.map(p=>({lat:p.lat, lng:p.lng}))});
   persist();
 
-  // limpiar temporales
   map.off('click', addTempPoint);
   if(tempLine){ map.removeLayer(tempLine); tempLine=null }
   if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null }
   drawing=false;
   map.getContainer().style.cursor = '';
 
-  // UI
   $('#btnNew').disabled = false;
   $('#btnFinish').disabled = true;
   $('#btnCancel').disabled = true;
@@ -377,7 +359,6 @@ function finishDrawing(){
   renderAll();
   selectGeofence(id);
 }
-
 function cancelDrawing(){
   if(!drawing) return;
   drawing=false;
@@ -395,10 +376,7 @@ function cancelDrawing(){
 ========================= */
 function createFromTextarea(){
   const raw = $('#taCoords').value.trim();
-  if(!raw){
-    alert('Pega coordenadas (lat,lng), una por línea.');
-    return;
-  }
+  if(!raw){ alert('Pega coordenadas (lat,lng), una por línea.'); return; }
   const lines = raw.split(/\r?\n/);
   const pts = [];
   for(const ln of lines){
@@ -406,14 +384,9 @@ function createFromTextarea(){
     if(m.length<2) continue;
     const lat = parseFloat(m[0]);
     const lng = parseFloat(m[1]);
-    if(Number.isFinite(lat) && Number.isFinite(lng)){
-      pts.push({lat, lng});
-    }
+    if(Number.isFinite(lat) && Number.isFinite(lng)) pts.push({lat, lng});
   }
-  if(pts.length<3){
-    alert('Se requieren al menos 3 pares lat,lng.');
-    return;
-  }
+  if(pts.length<3){ alert('Se requieren al menos 3 pares lat,lng.'); return; }
   const id = uid();
   const nm = ($('#inName').value.trim() || ('Geocerca '+(geofences.length+1)));
   geofences.push({id, name:nm, latlngs: pts});
@@ -424,29 +397,23 @@ function createFromTextarea(){
 }
 
 /* =========================
-   Edición de vértices
+   Edición de vértices (arrastrables)
 ========================= */
+const vertexIcon = L.divIcon({ className:'vertex-dot', iconSize:[12,12], iconAnchor:[6,6] });
+
 function startEditing(){
   const g = geofences.find(x=>x.id===activeId);
   if(!g) return;
   stopEditing(); // limpiar si ya había
 
-  // crear marcadores en cada vértice
   const poly = layers.get(g.id);
   if(!poly) return;
 
   editMarkers = g.latlngs.map((p, idx)=>{
-    const mk = L.circleMarker(p, {
-      radius:6, weight:2, color:'#0ea5e9', fillColor:'#38bdf8', fillOpacity:.9
-    }).addTo(map);
-    mk.options._idx = idx;
-    mk.dragging = new L.Handler.MarkerDrag(mk); // activar drag handler
-    mk.dragging.enable();
+    const mk = L.marker([p.lat, p.lng], {draggable:true, icon:vertexIcon}).addTo(map);
     mk.on('drag', ev=>{
-      const i = ev.target.options._idx;
       const ll = ev.target.getLatLng();
-      // actualizar punto en data y polígono
-      g.latlngs[i] = {lat: ll.lat, lng: ll.lng};
+      g.latlngs[idx] = {lat: ll.lat, lng: ll.lng};
       poly.setLatLngs(g.latlngs);
     });
     return mk;
@@ -455,12 +422,8 @@ function startEditing(){
   $('#btnEdit').disabled = true;
   $('#btnEditCancel').disabled = false;
 }
-
 function stopEditing(){
-  editMarkers.forEach(m=>{
-    if(m.dragging) m.dragging.disable();
-    map.removeLayer(m);
-  });
+  editMarkers.forEach(m=> map.removeLayer(m));
   editMarkers = [];
   $('#btnEdit').disabled = !activeId;
   $('#btnEditCancel').disabled = true;
@@ -475,7 +438,6 @@ function saveActive(){
   persist();
   alert('Geocerca guardada.');
 }
-
 function renameActive(){
   const g = geofences.find(x=>x.id===activeId);
   if(!g) return;
@@ -487,7 +449,6 @@ function renameActive(){
     selectGeofence(g.id, false);
   }
 }
-
 function deleteActive(){
   const g = geofences.find(x=>x.id===activeId);
   if(!g) return;
@@ -496,6 +457,7 @@ function deleteActive(){
   persist();
   activeId = null;
   renderAll();
+  setSelectedLabel();
 }
 
 /* =========================
@@ -510,7 +472,6 @@ function exportJSON(){
   a.click();
   URL.revokeObjectURL(url);
 }
-
 $('#fileImport').addEventListener('change', (ev)=>{
   const f = ev.target.files?.[0];
   if(!f) return;
