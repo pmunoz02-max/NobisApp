@@ -1,658 +1,565 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Nobis App • Administración</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nobis App • Administración</title>
 
-<!-- Leaflet + Geoman -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet-geoman-free@2.14.0/dist/leaflet-geoman.css">
-<script src="https://unpkg.com/leaflet-geoman-free@2.14.0/dist/leaflet-geoman.min.js"></script>
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
 
-<!-- Turf -->
-<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <style>
+    :root{
+      --bg:#f7f7f9;
+      --panel:#fff;
+      --b:#e6e6ee;
+      --brand:#2563eb;
+      --accent:#ff9800;
+      --ok:#10b981;
+      --muted:#6b7280;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background:var(--bg);
+      color:#111;
+    }
+    .wrap{
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px;
+      display:grid;
+      grid-template-columns: 320px 1fr;
+      gap:16px;
+    }
+    @media (max-width: 1024px){
+      .wrap{grid-template-columns: 1fr}
+    }
 
-<style>
-  :root{--b:#0f172a;--m:#64748b;--bd:#e5e7eb;--bg:#f8fafc;--a:#0ea5e9;--ok:#059669;--err:#b91c1c}
-  *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,Segoe UI,Arial,sans-serif;color:var(--b);background:var(--bg)}
-  .app{display:grid;grid-template-columns:360px 1fr;min-height:100vh}
-  .left{background:#fff;border-right:1px solid var(--bd);padding:12px;overflow:auto}
-  .right{overflow:auto}
-  h1{margin:.2rem 0 .6rem;font-size:18px}
-  h2{margin:.2rem 0 .6rem}
-  h3{margin:.6rem 0 .3rem}
-  .muted{color:var(--m)}
-  label{display:block;font-size:12px;margin:.5rem 0 .2rem}
-  input,select,button,textarea{width:100%;font:12px inherit;padding:.45rem .55rem;border:1px solid var(--bd);border-radius:8px;background:#fff}
-  textarea{min-height:90px;resize:vertical}
-  button{cursor:pointer}
-  .primary{background:var(--a);border-color:var(--a);color:#fff}
-  .row{display:flex;gap:.5rem;flex-wrap:wrap}
-  .row>*{flex:1}
-  .card{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:10px;margin:.6rem 0}
-  .pill{display:inline-block;padding:.1rem .5rem;border:1px solid var(--bd);border-radius:999px;font-size:11px}
-  .disabled{opacity:.45;pointer-events:none}
+    .panel{
+      background:var(--panel);
+      border:1px solid var(--b);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    h2{margin:6px 0 12px 0}
+    h3{margin:12px 0 8px 0; font-size:1rem}
 
-  #map{position:relative;width:100%;height:420px;border:1px solid var(--bd);border-radius:10px}
-  #map.crosshair{cursor:crosshair}
-  #mouseTip{position:absolute;background:rgba(255,255,255,.96);border:1px solid var(--bd);padding:2px 6px;font-size:11px;border-radius:4px;display:none;pointer-events:none;z-index:20000}
-  #coordBox{position:absolute;right:8px;top:8px;background:#ffffffd9;border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font-size:12px;z-index:19999;pointer-events:none}
-  ul{margin:.3rem 0 .2rem;padding-left:1.1rem}
-  li{margin:.2rem 0}
-  .kbd{font-family:ui-monospace,monospace;background:#f3f4f6;border:1px solid #e5e7eb;border-bottom-width:2px;padding:.1rem .3rem;border-radius:4px;font-size:11px}
-  table{border-collapse:collapse}
-  th,td{border:1px solid var(--bd);padding:.3rem .4rem;font-size:12px}
-  th{background:#f3f4f6;text-align:left}
-  .hl{outline:3px solid #f59e0b;outline-offset:2px;border-radius:6px}
-</style>
+    #map{
+      height: 56vh;              /* ¡clave para que no “desaparezca”! */
+      min-height: 420px;
+      border-radius:12px;
+      border:1px solid var(--b);
+      background:#fafafa;
+    }
+
+    .row{display:flex; gap:8px; align-items:center}
+    .col{display:flex; flex-direction:column; gap:8px}
+    input, textarea, select, button{
+      font:inherit;
+    }
+    input[type="text"], textarea, select{
+      width:100%;
+      border:1px solid var(--b);
+      border-radius:8px;
+      padding:10px 12px;
+      background:#fff;
+    }
+    textarea{height:120px; resize:vertical}
+    .btn{
+      padding:10px 12px;
+      border:1px solid var(--b);
+      border-radius:8px;
+      background:#fff;
+      cursor:pointer;
+    }
+    .btn.primary{background:var(--brand); color:#fff; border-color:transparent}
+    .btn.warn{background:#fff7ed; border-color:#fed7aa}
+    .btn.ok{background:#ecfdf5; border-color:#a7f3d0}
+    .btn:disabled{opacity:.55; cursor:not-allowed}
+
+    .list{
+      border:1px solid var(--b);
+      border-radius:8px;
+      padding:8px;
+      max-height:160px;
+      overflow:auto;
+      background:#fff
+    }
+    .item{
+      padding:6px 8px;
+      border-radius:6px;
+      cursor:pointer;
+    }
+    .item:hover{background:#f3f4f6}
+    .item.active{background:#e8efff}
+
+    .coordsCtl{
+      background: #0f172a;
+      color:#e2e8f0;
+      padding:6px 10px;
+      border-radius:8px;
+      font-size:.9rem;
+      border:1px solid rgba(255,255,255,.1);
+      box-shadow: 0 4px 10px rgba(0,0,0,.15);
+      user-select:none;
+    }
+
+    .help{
+      font-size:.9rem; color:var(--muted)
+    }
+    .divider{height:1px;background:var(--b); margin:8px 0}
+  </style>
 </head>
 <body>
-<div class="app">
-  <aside class="left">
-    <h1>Administración</h1>
-    <div class="card">
-      <label>Email de login</label>
-      <div class="row">
-        <input id="loginEmail" placeholder="tu@correo.com">
-        <button id="btnLogin" class="primary" style="flex:0 0 120px">Ingresar</button>
-      </div>
-      <div class="muted" style="margin-top:.35rem">Nivel actual: <b id="nivelLbl">Invitado</b></div>
-    </div>
+  <div class="wrap">
+    <!-- Lado izquierdo: Administración + Geocercas -->
+    <div class="panel">
+      <h2>Administración</h2>
+      <div class="help">Dueño: <strong>fenice.ecuador@gmail.com</strong></div>
 
-    <div id="ownerPanel" class="card" style="display:none">
-      <div class="row" style="align-items:center">
-        <h3 style="margin:0">Dueño</h3><span class="pill">fenice.ecuador@gmail.com</span>
-      </div>
-      <label>Nuevo administrador</label>
-      <div class="row">
-        <input id="newAdminEmail" placeholder="nuevo@dominio.com">
-        <button id="btnCrearAdmin" class="primary" style="flex:0 0 130px">Crear Admin</button>
-      </div>
-      <div id="inviteBox" class="muted" style="margin-top:.35rem;display:none"></div>
-      <h3>Administradores activos</h3>
-      <ul id="adminsList" class="muted"></ul>
-    </div>
-
-    <div id="multiuser" class="card">
-      <h3>Usuarios</h3>
-      <div class="row">
-        <select id="userSel"></select>
-        <button id="btnCambiarUsuario" style="flex:0 0 120px">Cambiar</button>
-      </div>
-      <div class="row">
-        <input id="newUserName" placeholder="Nuevo usuario">
-        <button id="btnCrearUsuario" class="primary" style="flex:0 0 120px">Crear</button>
-      </div>
-      <div class="muted">Usuario activo: <b id="userLbl">Ninguno</b></div>
-    </div>
-
-    <div id="geoCard" class="card">
       <h3>Geocercas</h3>
       <div class="row">
-        <button id="btnFenceNew" class="primary">Nueva (clic en mapa)</button>
-        <button id="btnFenceFinish" disabled>Finalizar</button>
-        <button id="btnFenceCancel" disabled>Cancelar</button>
+        <button id="btnNew" class="btn">Nueva (clic en mapa)</button>
+        <button id="btnFinish" class="btn ok" disabled>Finalizar</button>
+        <button id="btnCancel" class="btn" disabled>Cancelar</button>
       </div>
 
-      <details style="margin-top:.5rem">
-        <summary class="kbd">Crear desde coordenadas (lat,lng)</summary>
-        <label>Coordenadas por línea (<span class="muted">-1.2345,-77.9876</span>)</label>
-        <textarea id="txtCoords" placeholder="-1.23,-77.98
--1.24,-77.97
--1.25,-77.99"></textarea>
-        <div class="row">
-          <input id="nameCoords" placeholder="Nombre de geocerca (opcional)">
-          <button id="btnFromCoords" class="primary" style="flex:0 0 180px">Crear por coordenadas</button>
+      <details style="margin-top:8px;">
+        <summary class="help">Crear desde coordenadas (lat,lng)</summary>
+        <div class="col" style="margin-top:8px;">
+          <textarea id="taCoords" placeholder="-1.7370, -77.9185&#10;-1.7315, -77.9104&#10;-1.7315, -77.9077"></textarea>
+          <div class="row">
+            <input id="inName" type="text" placeholder="Nombre de geocerca" />
+            <button id="btnCreateFromCoords" class="btn">Crear por coordenadas</button>
+          </div>
+          <div class="help">Una coordenada por línea. Formato: <code>lat,lng</code></div>
         </div>
       </details>
 
-      <div class="row" style="margin-top:.4rem">
-        <button id="btnFenceEdit">Editar vértices</button>
-        <button id="btnFenceSave" class="primary" disabled>Guardar</button>
-        <button id="btnFenceAbort" disabled>Cancelar edición</button>
+      <div class="divider"></div>
+
+      <div class="row">
+        <button id="btnEdit" class="btn">Editar vértices</button>
+        <button id="btnEditCancel" class="btn" disabled>Cancelar edición</button>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="btnSave" class="btn primary" disabled>Guardar</button>
+        <button id="btnRename" class="btn" disabled>Renombrar</button>
+        <button id="btnDelete" class="btn warn" disabled>Eliminar</button>
       </div>
 
-      <div class="row" style="margin-top:.4rem">
-        <button id="btnFenceRename">Renombrar</button>
-        <button id="btnFenceDelete">Eliminar</button>
-      </div>
+      <div class="divider"></div>
 
-      <div class="row" style="margin-top:.4rem">
-        <button id="btnFenceExport">Exportar JSON</button>
-        <label class="kbd">Importar
-          <input type="file" id="fileImport" accept=".json" style="display:none">
+      <div class="row">
+        <button id="btnExport" class="btn">Exportar JSON</button>
+        <label class="btn" style="cursor:pointer;">
+          Importar
+          <input id="fileImport" type="file" accept="application/json" hidden />
         </label>
       </div>
 
-      <label style="margin-top:.6rem">Lista (clic para seleccionar)</label>
-      <ul id="fenceList"></ul>
-      <div class="muted">Seleccionada: <b id="fenceSelLbl">Ninguna</b></div>
+      <h3 style="margin-top:16px;">Lista</h3>
+      <div id="list" class="list" aria-live="polite"></div>
+      <div class="help" style="margin-top:6px">Seleccionada: <strong id="selName">Ninguna</strong></div>
     </div>
 
-    <div id="peopleCard" class="card">
-      <h3>Personal</h3>
-      <div class="muted">Geocerca actual: <b id="personalFenceLbl">Ninguna</b></div>
-      <form onsubmit="return false" class="row" style="margin-top:.4rem">
-        <input id="pNombre" placeholder="Nombre" required>
-        <input id="pRol" placeholder="Rol" required>
-        <input id="pTel" placeholder="+593..." pattern="^\\+?[0-9]{7,15}$" required>
-        <input id="pTarifa" type="number" step="0.01" min="0" placeholder="Tarifa/hora" required>
-        <select id="pEstado"><option>Activo</option><option>Inactivo</option></select>
-        <button id="btnAddP" class="primary" style="flex:0 0 120px">Agregar</button>
-      </form>
-      <ul id="peopleList"></ul>
-    </div>
-
-    <div id="actCard" class="card">
-      <h3>Actividades</h3>
-      <label>Geocerca</label>
-      <select id="actFenceSel"></select>
-      <div class="row" style="margin-top:.4rem">
-        <input id="actNombre" placeholder="Nombre de actividad">
-      </div>
-      <div class="row">
-        <select id="actRespSel"></select>
-        <input id="actPres" type="number" step="0.01" min="0" placeholder="Presupuesto (opcional)">
-      </div>
-      <div class="row">
-        <select id="actEstado">
-          <option value="pendiente">Pendiente</option>
-          <option value="progreso">En progreso</option>
-          <option value="cerrada">Cerrada</option>
-        </select>
-        <button id="btnAddAct" class="primary" style="flex:0 0 150px">Crear</button>
-      </div>
-      <ul id="actList"></ul>
-    </div>
-
-    <div id="workerCard" class="card">
-      <h3>Modo Trabajador</h3>
-      <label>Trabajador</label><input id="wNombre" placeholder="Juan P.">
-      <label>Geocerca</label><select id="wFence"></select>
-      <label>Actividad (opcional)</label><select id="wAct"></select>
-      <label>Intervalo (minutos)</label><input id="wMin" type="number" value="5" min="1">
-      <div class="row" style="margin-top:.4rem">
-        <button id="btnStart" class="primary">Iniciar</button>
-        <button id="btnStop">Detener</button>
-      </div>
-      <div id="trackInfo" class="muted" style="margin-top:.3rem"></div>
-    </div>
-
-    <div id="repCard" class="card">
-      <h3>Reportes y Costos</h3>
-      <label>Geocerca</label><select id="repFenceSel"></select>
-      <div class="row">
-        <input id="repDesde" type="date"><input id="repHasta" type="date">
-      </div>
-      <div class="row" style="margin-top:.4rem">
-        <button id="btnCalc" class="primary">Calcular</button>
-        <button id="btnCsvPers">CSV personas</button>
-        <button id="btnCsvAct">CSV actividades</button>
-      </div>
-      <div id="repInfo" class="muted" style="margin-top:.3rem"></div>
-    </div>
-  </aside>
-
-  <main class="right">
-    <div style="padding:12px;border-bottom:1px solid var(--bd);background:#fff">
+    <!-- Lado derecho: Mapa + Historial (placeholder) -->
+    <div class="panel">
       <h2>Mapa de Geocercas</h2>
-      <div id="map">
-        <div id="mouseTip"></div>
-        <div id="coordBox">Lat: –, Lng: –</div>
-      </div>
-    </div>
+      <div id="map" role="region" aria-label="Mapa de geocercas"></div>
 
-    <div style="padding:12px;border-bottom:1px solid var(--bd);background:#fff">
-      <h2 style="margin:.2rem 0 .4rem">Histórico de ubicaciones</h2>
-      <table id="tblUbic" style="width:100%">
-        <thead><tr><th>Fecha</th><th>Trabajador</th><th>Geocerca</th><th>Actividad</th><th>Lat</th><th>Lng</th><th>mins</th></tr></thead>
-        <tbody></tbody>
+      <h3 style="margin-top:14px;">Histórico de ubicaciones</h3>
+      <div class="help">Por ahora es un placeholder; se llenará cuando conectemos tracking.</div>
+      <table style="width:100%; border-collapse:collapse; margin-top:6px; font-size:.95rem;">
+        <thead>
+          <tr style="background:#f3f4f6">
+            <th style="text-align:left; padding:8px; border:1px solid var(--b);">Fecha</th>
+            <th style="text-align:left; padding:8px; border:1px solid var(--b);">Trabajador</th>
+            <th style="text-align:left; padding:8px; border:1px solid var(--b);">Geocerca</th>
+            <th style="text-align:left; padding:8px; border:1px solid var(--b);">Actividad</th>
+            <th style="text-align:left; padding:8px; border:1px solid var(--b);">Lat</th>
+            <th style="text-align:left; padding:8px; border:1px solid var(--b);">Lng</th>
+            <th style="text-align:left; padding:8px; border:1px solid var(--b);">mins</th>
+          </tr>
+        </thead>
+        <tbody id="histBody">
+          <!-- vacío -->
+        </tbody>
       </table>
     </div>
-
-    <div id="repTables" style="padding:12px;display:none;background:#fff">
-      <h2>Resultados</h2>
-      <h3>Costos por persona</h3>
-      <table id="tblPers" style="width:100%">
-        <thead><tr><th>Persona</th><th>Horas</th><th>Tarifa</th><th>Costo</th></tr></thead>
-        <tbody></tbody>
-        <tfoot><tr><th colspan="3" style="text-align:right">Total</th><th id="totPers">$0.00</th></tr></tfoot>
-      </table>
-
-      <h3 style="margin-top:1rem">Costos por actividad</h3>
-      <table id="tblAct" style="width:100%">
-        <thead><tr><th>Actividad</th><th>Horas</th><th>Costo</th></tr></thead>
-        <tbody></tbody>
-        <tfoot><tr><th colspan="2" style="text-align:right">Total</th><th id="totAct">$0.00</th></tr></tfoot>
-      </table>
-    </div>
-  </main>
-</div>
+  </div>
 
 <script>
-/* ===== Config básica ===== */
-const OWNER_EMAIL = "fenice.ecuador@gmail.com";
+/* =========================
+   Estado y utilidades
+========================= */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => document.querySelectorAll(sel);
 
-/* ===== Estado global ===== */
-let nivel=0, loginEmail="", currentUser=null;
-let db = { geocercas:[], personal:[], actividades:[], ubicaciones:[] };
+const storeKey = 'nobis_geofences_v2';
 
-function admins(){ return JSON.parse(localStorage.getItem("admins")||"[]"); }
-function setAdmins(a){ localStorage.setItem("admins", JSON.stringify(a)); }
-function pend(){ return JSON.parse(localStorage.getItem("pendingInvites")||"{}"); }
-function setPend(o){ localStorage.setItem("pendingInvites", JSON.stringify(o)); }
+let geofences = [];        // {id, name, latlngs: [{lat,lng},...]}
+let layers = new Map();    // id -> L.Polygon
+let activeId = null;
 
-function saveDB(){ if(!currentUser) return; localStorage.setItem("db_"+currentUser, JSON.stringify(db)); }
-function loadDB(){
-  if(!currentUser) return;
-  const raw=localStorage.getItem("db_"+currentUser);
-  db = raw ? JSON.parse(raw) : { geocercas:[], personal:[], actividades:[], ubicaciones:[] };
-  ["geocercas","personal","actividades","ubicaciones"].forEach(k=>{ if(!Array.isArray(db[k])) db[k]=[]; });
-}
+let drawing = false;
+let tempPoints = [];
+let tempLine = null;
+let tempPoly = null;
 
-/* ===== Roles/Login ===== */
-function computeLevel(){ nivel = (loginEmail===OWNER_EMAIL)?1:(admins().includes(loginEmail)?2:0); }
-function renderLevel(){
-  document.getElementById("nivelLbl").textContent = nivel===1?"Dueño":(nivel===2?"Administrador":"Invitado");
-  document.getElementById("ownerPanel").style.display = (nivel===1)?"":"none";
-  const can=(nivel>=2);
-  ["multiuser","geoCard","peopleCard","actCard","workerCard","repCard"].forEach(id=>{
-    document.getElementById(id).classList.toggle("disabled", !can);
-  });
-}
-function doLogin(){
-  const v=document.getElementById("loginEmail").value.trim().toLowerCase();
-  if(!v) return alert("Ingresa tu email.");
-  loginEmail=v; localStorage.setItem("last_login_email", v);
-  computeLevel(); renderLevel();
-  if(nivel===0) alert("Acceso denegado. El email no es administrador.");
+let editMarkers = [];      // circleMarkers para edición
+
+function uid(){ return 'g'+Math.random().toString(36).slice(2,8) }
+function persist(){ localStorage.setItem(storeKey, JSON.stringify(geofences)) }
+function load(){
+  try{
+    geofences = JSON.parse(localStorage.getItem(storeKey) || '[]');
+    if(!Array.isArray(geofences)) geofences = [];
+  }catch(e){ geofences = [] }
 }
 
-/* ===== Dueño: admin invites (sin EmailJS) ===== */
-function createAdmin(){
-  if(nivel!==1) return alert("Solo el dueño.");
-  const email=document.getElementById("newAdminEmail").value.trim().toLowerCase();
-  if(!/^[^@]+@[^@]+\.[^@]+$/.test(email)) return alert("Email inválido");
-  const P=pend(); const tok=Math.random().toString(36).slice(2,10); P[email]=tok; setPend(P);
-  const link=`${location.origin}${location.pathname}?activate=${encodeURIComponent(email)}&token=${tok}`;
-  const box=document.getElementById("inviteBox");
-  box.style.display="";
-  box.innerHTML=`<div><b>Enlace de activación:</b></div>
-  <div style="word-break:break-all">${link}</div>
-  <div class="row" style="margin-top:.3rem">
-    <button class="primary" onclick="navigator.clipboard.writeText('${link}');alert('Copiado');" style="flex:0 0 130px">Copiar</button>
-    <a class="kbd" href="mailto:${email}?subject=Invitaci%C3%B3n%20Administrador&body=${encodeURIComponent(link)}">Enviar por correo</a>
-  </div>`;
-  renderAdmins()
-}
-function renderAdmins(){
-  const ul=document.getElementById("adminsList"); ul.innerHTML="";
-  const a=admins(); if(!a.length){ ul.innerHTML="<li>(sin administradores)</li>"; return; }
-  a.forEach(e=>{
-    const li=document.createElement("li");
-    li.innerHTML=`${e} <button class="kbd" onclick="revokeAdmin('${e}')">Revocar</button>`;
-    ul.appendChild(li);
-  });
-}
-function revokeAdmin(email){ if(nivel!==1) return; setAdmins(admins().filter(x=>x!==email)); renderAdmins(); }
-function tryActivate(){
-  const p=new URLSearchParams(location.search); const e=(p.get("activate")||"").toLowerCase(); const t=p.get("token");
-  if(!e||!t) return; const P=pend();
-  if(P[e]===t){ const A=admins(); if(!A.includes(e)) A.push(e); setAdmins(A); delete P[e]; setPend(P); alert("✅ Ya eres administrador."); history.replaceState({}, "", location.pathname); }
-  else alert("Enlace inválido.");
-  renderAdmins();
-}
+/* =========================
+   Mapa Leaflet
+========================= */
+const map = L.map('map', {zoomControl:true}).setView([-1.731, -77.91], 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap'
+}).addTo(map);
 
-/* ===== Usuarios multi ===== */
-function users(){ return JSON.parse(localStorage.getItem("usuarios")||"[]"); }
-function setUsers(U){ localStorage.setItem("usuarios", JSON.stringify(U)); }
-function initUsersUI(){
-  const sel=document.getElementById("userSel"); const U=users(); sel.innerHTML=U.map(u=>`<option>${u}</option>`).join("");
-  if(!currentUser && U[0]) currentUser=U[0]; if(currentUser) sel.value=currentUser;
-  document.getElementById("userLbl").textContent=currentUser||"Ninguno";
-}
-function createUser(){
-  const n=document.getElementById("newUserName").value.trim(); if(!n) return alert("Nombre de usuario");
-  const U=users(); if(U.includes(n)) return alert("Ya existe."); U.push(n); setUsers(U);
-  localStorage.setItem("db_"+n, JSON.stringify({geocercas:[],personal:[],actividades:[],ubicaciones:[]}));
-  document.getElementById("newUserName").value=""; initUsersUI();
-}
-function changeUser(){ currentUser=document.getElementById("userSel").value; document.getElementById("userLbl").textContent=currentUser||"Ninguno"; loadDB(); redrawAll(); }
+/* Control de coordenadas en la esquina superior-derecha */
+const coordsCtl = L.control({position:'topright'});
+coordsCtl.onAdd = function(){
+  const d = L.DomUtil.create('div','coordsCtl');
+  d.id = 'coordsCtl';
+  d.textContent = 'Lat: –, Lng: –';
+  return d;
+};
+coordsCtl.addTo(map);
 
-/* ===== Mapa & Geocercas ===== */
-let map, layerGroup, tempLayer;
-let isDrawing=false, tempCoords=[];
-let fenceLayers=new Map(); let selectedFenceId=null;
-
-function initMap(){
-  map=L.map('map').setView([-1.718,-77.96],14);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);
-  layerGroup=L.layerGroup().addTo(map);
-  tempLayer=L.layerGroup().addTo(map);
-
-  map.pm.addControls({position:'topleft',drawMarker:false,drawCircle:false,drawPolyline:false,drawRectangle:false,drawCircleMarker:false,drawText:false,drawPolygon:false,dragMode:false,cutPolygon:false,rotateMode:false,removalMode:false});
-
-  // Coordenadas en tiempo real (mapa + polígonos)
-  const tip=document.getElementById("mouseTip");
-  const box=document.getElementById("coordBox");
-  const updateMouse=(e)=>{
-    const {lat,lng}=e.latlng;
-    const pt = map.latLngToContainerPoint(e.latlng);
-    tip.style.display="block";
-    tip.style.left = (pt.x + 12) + "px";
-    tip.style.top  = (pt.y - 18) + "px";
-    const sLat=lat.toFixed(6), sLng=lng.toFixed(6);
-    tip.textContent = `${sLat}, ${sLng}`;
-    box.textContent = `Lat: ${sLat}, Lng: ${sLng}`;
-  };
-  map.on("mousemove", updateMouse);
-  layerGroup.on("mousemove", updateMouse);
-  map.on("mouseout", ()=> tip.style.display="none");
-
-  // Clics de dibujo (mapa + polígonos)
-  const handleClick=(e)=>{
-    if(!isDrawing || nivel<2) return;
-    tempCoords.push([e.latlng.lat, e.latlng.lng]);
-    drawTemp();
-    document.getElementById("btnFenceFinish").disabled = tempCoords.length<3;
-    document.getElementById("btnFenceCancel").disabled = tempCoords.length<1;
-  };
-  map.on("click", handleClick);
-  layerGroup.on("click", handleClick);
-
-  redrawAll();
-}
-
-function redrawAll(){
-  layerGroup.clearLayers(); fenceLayers.clear();
-  (db.geocercas||[]).forEach(f=>{
-    const poly=L.polygon(f.coords,{color:"#f59e0b",weight:3,fillOpacity:.25,fillColor:"#10b981"}).addTo(layerGroup);
-    poly.bindTooltip(f.nombre||("Geocerca "+f.id));
-    poly.on("click",()=>{ if(isDrawing) return; selectFence(f.id,true); });
-    fenceLayers.set(f.id, poly);
-  });
-  renderFenceList();
-  updatePersonalFenceLabel();
-  refillSelects();
-  renderPeople(); renderActs(); renderUbic();
-}
-
-function setDrawingUI(on){
-  isDrawing=on;
-  document.getElementById("map").classList.toggle("crosshair", on);
-  document.getElementById("btnFenceFinish").disabled = on ? (tempCoords.length<3) : true;
-  document.getElementById("btnFenceCancel").disabled = on ? (tempCoords.length<1) : true;
-}
-function drawTemp(){
-  tempLayer.clearLayers();
-  if(tempCoords.length>=2){ L.polyline(tempCoords,{color:"#0ea5e9",dashArray:"3,4"}).addTo(tempLayer); }
-  if(tempCoords.length>=1){ tempCoords.forEach(c=>L.circleMarker(c,{radius:3,color:"#0ea5e9"}).addTo(tempLayer)); }
-}
-
-function newFence(){
-  if(nivel<2) return alert("Requiere rol Administrador.");
-  abortEdit(); // por si hay edición previa
-  tempCoords=[]; setDrawingUI(true); drawTemp();
-}
-function finishFence(){
-  if(tempCoords.length<3) return;
-  const id=Date.now().toString(36);
-  const nombre=prompt("Nombre de geocerca","Geocerca "+(db.geocercas.length+1))||"Geocerca";
-  db.geocercas.push({id,nombre,coords:[...tempCoords]});
-  saveDB();
-  tempCoords=[]; tempLayer.clearLayers(); setDrawingUI(false);
-  redrawAll(); selectFence(id,true);
-}
-function cancelFence(){ tempCoords=[]; tempLayer.clearLayers(); setDrawingUI(false); }
-
-function createFromCoords(){
-  if(nivel<2) return alert("Requiere rol Administrador.");
-  const txt=document.getElementById("txtCoords").value.trim(); if(!txt) return alert("Pega coordenadas (lat,lng)");
-  const lines=txt.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-  const coords=[];
-  for(const ln of lines){
-    const m=ln.split(/[\s,;]+/); if(m.length<2) return alert("Formato inválido: "+ln);
-    const lat=parseFloat(m[0]), lng=parseFloat(m[1]); if(isNaN(lat)||isNaN(lng)) return alert("Número inválido: "+ln);
-    coords.push([lat,lng]);
-  }
-  if(coords.length<3) return alert("Se requieren al menos 3 puntos.");
-  const id=Date.now().toString(36);
-  const nombre=document.getElementById("nameCoords").value.trim() || "Geocerca "+(db.geocercas.length+1);
-  db.geocercas.push({id,nombre,coords}); saveDB(); document.getElementById("nameCoords").value="";
-  redrawAll(); selectFence(id,true); startEdit(); // listo para mover vértices y GUARDAR
-}
-
-let editActive=false;
-function selectFence(id,fromMap=false){
-  selectedFenceId=id;
-  document.getElementById("fenceSelLbl").textContent = (db.geocercas.find(f=>f.id===id)||{}).nombre || "Ninguna";
-  document.querySelectorAll("#fenceList li").forEach(li=>li.classList.remove("hl"));
-  const li=document.querySelector(`#fenceList li[data-id="${id}"]`); if(li) li.classList.add("hl");
-  fenceLayers.forEach((lay,fid)=>lay.setStyle({weight: fid===id?4:3, color: "#f59e0b"}));
-  if(fromMap){ map.flyToBounds(fenceLayers.get(id).getBounds(),{maxZoom:17}); }
-  updatePersonalFenceLabel(); refillActFence(); renderActs();
-}
-function startEdit(){
-  if(!selectedFenceId) return alert("Selecciona una geocerca.");
-  const lay=fenceLayers.get(selectedFenceId); if(!lay) return;
-  lay.pm.enable({allowSelfIntersection:false,snappable:true});
-  editActive=true;
-  document.getElementById("btnFenceSave").disabled=false;
-  document.getElementById("btnFenceAbort").disabled=false;
-}
-function saveEdit(){
-  if(!selectedFenceId) return;
-  const lay=fenceLayers.get(selectedFenceId); if(!lay) return;
-  if(!editActive){ alert("Pulsa 'Editar vértices' antes de guardar."); return; }
-  const latlngs=lay.getLatLngs()[0].map(ll=>[ll.lat,ll.lng]); if(latlngs.length<3) return alert("El polígono debe tener ≥3 puntos.");
-  const f=db.geocercas.find(x=>x.id===selectedFenceId); if(!f) return;
-  f.coords=latlngs; saveDB(); lay.pm.disable(); editActive=false;
-  document.getElementById("btnFenceSave").disabled=true; document.getElementById("btnFenceAbort").disabled=true;
-  redrawAll(); selectFence(f.id);
-}
-function abortEdit(){
-  if(selectedFenceId){ const lay=fenceLayers.get(selectedFenceId); if(lay) lay.pm.disable(); }
-  editActive=false; document.getElementById("btnFenceSave").disabled=true; document.getElementById("btnFenceAbort").disabled=true;
-}
-
-function renameFence(){
-  if(!selectedFenceId) return alert("Selecciona una geocerca.");
-  const f=db.geocercas.find(x=>x.id===selectedFenceId); if(!f) return;
-  const n=prompt("Nuevo nombre",f.nombre); if(!n) return; f.nombre=n; saveDB(); redrawAll(); selectFence(f.id);
-}
-function deleteFence(){
-  if(!selectedFenceId) return alert("Selecciona una geocerca.");
-  if(!confirm("¿Eliminar geocerca seleccionada?")) return;
-  const id=selectedFenceId;
-  db.geocercas=db.geocercas.filter(f=>f.id!==id);
-  db.personal=db.personal.filter(p=>p.fenceId!==id);
-  db.actividades=db.actividades.filter(a=>a.fenceId!==id);
-  db.ubicaciones=db.ubicaciones.filter(u=>u.fenceId!==id);
-  selectedFenceId=null; saveDB(); redrawAll();
-}
-
-function exportFences(){
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(db.geocercas,null,2)],{type:"application/json"}));
-  a.download="geocercas.json"; a.click(); URL.revokeObjectURL(a.href);
-}
-document.getElementById("fileImport").addEventListener("change", e=>{
-  const f=e.target.files[0]; if(!f) return; const fr=new FileReader();
-  fr.onload=()=>{ try{ const arr=JSON.parse(fr.result); if(!Array.isArray(arr)) throw 0; db.geocercas=arr; saveDB(); redrawAll(); }catch{ alert("Archivo inválido"); } };
-  fr.readAsText(f);
+map.on('mousemove', (e)=>{
+  const el = $('#coordsCtl');
+  if(el) el.textContent = `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
 });
-function renderFenceList(){
-  const ul=document.getElementById("fenceList"); ul.innerHTML="";
-  db.geocercas.forEach(f=>{
-    const li=document.createElement("li"); li.dataset.id=f.id; li.textContent=`${f.nombre} (${f.coords.length} pts)`;
-    li.onclick=()=>selectFence(f.id); ul.appendChild(li);
+
+/* Asegurar tamaño correcto si se carga oculto en algún momento */
+setTimeout(()=> map.invalidateSize(), 200);
+
+/* =========================
+   Renderizado de geocercas
+========================= */
+function renderAll(){
+  // limpiar capas
+  layers.forEach(poly => map.removeLayer(poly));
+  layers.clear();
+
+  // dibujar desde datos
+  geofences.forEach(g=>{
+    const poly = L.polygon(g.latlngs, {
+      color: '#ff9800',
+      weight: 4,
+      fillColor: '#a7f3d0',
+      fillOpacity: 0.35
+    }).addTo(map);
+
+    poly.on('click', () => selectGeofence(g.id));
+    layers.set(g.id, poly);
   });
-  document.getElementById("fenceSelLbl").textContent = selectedFenceId ? (db.geocercas.find(x=>x.id===selectedFenceId)||{}).nombre : "Ninguna";
+
+  renderList();
+  setSelectedLabel();
 }
 
-/* ===== Personal ===== */
-function updatePersonalFenceLabel(){
-  const first = db.geocercas[0]?.nombre || "Ninguna";
-  const name = selectedFenceId ? (db.geocercas.find(x=>x.id===selectedFenceId)?.nombre || first) : first;
-  document.getElementById("personalFenceLbl").textContent=name;
-}
-function addPerson(){
-  if(nivel<2) return alert("Requiere rol Administrador.");
-  const fenceId = selectedFenceId || db.geocercas[0]?.id; if(!fenceId) return alert("Crea una geocerca primero.");
-  const nombre=document.getElementById("pNombre").value.trim();
-  const rol=document.getElementById("pRol").value.trim();
-  const tel=document.getElementById("pTel").value.trim();
-  const tarifa=parseFloat(document.getElementById("pTarifa").value)||0;
-  const estado=document.getElementById("pEstado").value;
-  if(!nombre||!rol||!tel) return;
-  db.personal.push({nombre,rol,tel,tarifa,estado,fenceId}); saveDB(); renderPeople(); document.querySelector("#peopleCard form").reset();
-}
-function renderPeople(){
-  const ul=document.getElementById("peopleList"); ul.innerHTML="";
-  db.personal.forEach(p=>{
-    const f=db.geocercas.find(x=>x.id===p.fenceId);
-    const li=document.createElement("li");
-    li.innerHTML=`<b>${p.nombre}</b> — ${p.rol} — ${p.estado} — ${f?f.nombre:"(sin geocerca)"} — Tarifa $${(p.tarifa||0).toFixed(2)}
-    <button class="kbd" onclick="editTarifa('${p.nombre}')">Tarifa</button>`;
-    ul.appendChild(li);
-  });
-  refillActResp();
-}
-function editTarifa(nombre){
-  const p=db.personal.find(x=>x.nombre===nombre); if(!p) return;
-  const t=prompt("Nueva tarifa/hora",p.tarifa||0); if(t===null) return;
-  const v=parseFloat(t); if(isNaN(v)||v<0) return alert("Valor inválido");
-  p.tarifa=v; saveDB(); renderPeople();
-}
-
-/* ===== Actividades ===== */
-function refillActFence(){
-  const sel=document.getElementById("actFenceSel");
-  sel.innerHTML=(db.geocercas||[]).map(f=>`<option value="${f.id}">${f.nombre}</option>`).join("");
-  if(selectedFenceId) sel.value=selectedFenceId;
-}
-function refillActResp(){
-  const sel=document.getElementById("actRespSel");
-  const fid=document.getElementById("actFenceSel").value || db.geocercas[0]?.id || "";
-  const arr=db.personal.filter(p=>p.fenceId===fid);
-  sel.innerHTML=`<option value="">(sin responsable)</option>` + arr.map(p=>`<option>${p.nombre}</option>`).join("");
-}
-function addActivity(){
-  if(nivel<2) return alert("Requiere rol Administrador.");
-  const fid=document.getElementById("actFenceSel").value || db.geocercas[0]?.id || "";
-  if(!fid) return alert("Crea una geocerca primero.");
-  const nombre=document.getElementById("actNombre").value.trim(); if(!nombre) return alert("Nombre requerido");
-  const responsable=document.getElementById("actRespSel").value||"";
-  const presupuesto=parseFloat(document.getElementById("actPres").value)||0;
-  const estado=document.getElementById("actEstado").value;
-  db.actividades.push({id:Date.now().toString(36), fenceId:fid, nombre, estado, presupuesto, responsable});
-  saveDB(); renderActs(); refillWorkerActs(); document.getElementById("actNombre").value=""; document.getElementById("actPres").value="";
-}
-function renderActs(){
-  const ul=document.getElementById("actList"); ul.innerHTML="";
-  const fid=document.getElementById("actFenceSel").value || db.geocercas[0]?.id || "";
-  db.actividades.filter(a=>a.fenceId===fid).forEach(a=>{
-    const li=document.createElement("li");
-    li.innerHTML=`<b>${a.nombre}</b> — ${a.estado} — Resp: ${a.responsable||"-"} — Presup $${(a.presupuesto||0).toFixed(2)}
-    <button class="kbd" onclick="toggleAct('${a.id}')">Estado</button>
-    <button class="kbd" onclick="delAct('${a.id}')">Eliminar</button>`;
-    ul.appendChild(li);
+function renderList(){
+  const box = $('#list');
+  box.innerHTML = '';
+  geofences.forEach(g=>{
+    const div = document.createElement('div');
+    div.className = 'item' + (g.id===activeId?' active':'');
+    div.textContent = `${g.name} (${g.latlngs.length} pts)`;
+    div.onclick = ()=> selectGeofence(g.id);
+    box.appendChild(div);
   });
 }
-function toggleAct(id){
-  const a=db.actividades.find(x=>x.id===id); if(!a) return;
-  a.estado=a.estado==="pendiente"?"progreso":(a.estado==="progreso"?"cerrada":"pendiente");
-  saveDB(); renderActs(); refillWorkerActs();
-}
-function delAct(id){
-  if(!confirm("¿Eliminar actividad?")) return;
-  db.actividades=db.actividades.filter(a=>a.id!==id);
-  db.ubicaciones.forEach(u=>{ if(u.actId===id) u.actId=null; });
-  saveDB(); renderActs(); refillWorkerActs(); renderUbic();
+
+function setSelectedLabel(){
+  const g = geofences.find(x=>x.id===activeId);
+  $('#selName').textContent = g ? g.name : 'Ninguna';
+  // habilitar/deshabilitar botones
+  const has = !!g;
+  $('#btnEdit').disabled = !has;
+  $('#btnRename').disabled = !has;
+  $('#btnDelete').disabled = !has;
+  $('#btnSave').disabled = !has;
 }
 
-/* ===== Tracking ===== */
-let timer=null;
-function refillWorkerFences(){
-  const sel=document.getElementById("wFence"); sel.innerHTML="";
-  db.geocercas.forEach(f=>{ const o=document.createElement("option"); o.value=f.id;o.textContent=f.nombre; sel.appendChild(o); });
-  refillWorkerActs();
+/* Seleccionar geocerca por id */
+function selectGeofence(id, fit=true){
+  activeId = id;
+  renderList();
+  setSelectedLabel();
+  // llevar vista al polígono
+  const poly = layers.get(id);
+  if(poly && fit){
+    map.fitBounds(poly.getBounds(), {padding:[20,20]});
+  }
+  stopEditing(); // si estaba en edición, la cerramos
 }
-function refillWorkerActs(){
-  const sel=document.getElementById("wAct"); sel.innerHTML="";
-  const fid=document.getElementById("wFence").value || db.geocercas[0]?.id || "";
-  const acts=db.actividades.filter(a=>a.fenceId===fid && a.estado!=="cerrada");
-  sel.innerHTML=`<option value="">(sin actividad)</option>` + acts.map(a=>`<option value="${a.id}">${a.nombre}</option>`).join("");
+
+/* =========================
+   Dibujo manual por clics
+========================= */
+function startDrawing(){
+  if(drawing) return;
+  drawing = true;
+  tempPoints = [];
+  if(tempLine){ map.removeLayer(tempLine); tempLine=null }
+  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null }
+
+  $('#btnNew').disabled = true;
+  $('#btnFinish').disabled = false;
+  $('#btnCancel').disabled = false;
+
+  map.getContainer().style.cursor = 'crosshair';
+  map.on('click', addTempPoint);
 }
-document.getElementById("wFence").addEventListener("change", refillWorkerActs);
 
-function startTrack(){
-  if(nivel<2) return alert("Requiere rol Administrador.");
-  const trabajador=document.getElementById("wNombre").value.trim(); if(!trabajador) return alert("Nombre trabajador");
-  const fenceId=document.getElementById("wFence").value; const f=db.geocercas.find(x=>x.id===fenceId); if(!f) return;
-  const actId=document.getElementById("wAct").value||null; const mins=parseInt(document.getElementById("wMin").value,10)||5;
+function addTempPoint(e){
+  tempPoints.push(e.latlng);
 
-  if(timer) clearInterval(timer);
-  const info=document.getElementById("trackInfo");
-  const tick=()=>{
-    navigator.geolocation.getCurrentPosition(pos=>{
-      const lat=pos.coords.latitude,lng=pos.coords.longitude;
-      const inside=inFence([lat,lng],f.coords);
-      if(inside){
-        db.ubicaciones.push({ts:Date.now(),trabajador,fenceId,actId,lat,lng,mins});
-        saveDB(); renderUbic();
-        info.innerHTML=`<span style="color:var(--ok)">Dentro</span> de ${f.nombre} — ${lat.toFixed(6)}, ${lng.toFixed(6)} — ${mins}m`;
-      }else info.innerHTML=`<span style="color:var(--err)">Fuera</span> de ${f.nombre} — ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-    }, err=>{ info.textContent="Geo error: "+err.message; }, {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  if(tempLine) map.removeLayer(tempLine);
+  tempLine = L.polyline(tempPoints, {color:'#ff9800', weight:2, dashArray:'6,6'}).addTo(map);
+
+  if(tempPoly) map.removeLayer(tempPoly);
+  if(tempPoints.length>=3){
+    tempPoly = L.polygon(tempPoints, {
+      color:'#ff9800', weight:4,
+      fillColor:'#a7f3d0', fillOpacity:.35
+    }).addTo(map);
+  }
+}
+
+function finishDrawing(){
+  if(!drawing) return;
+  if(tempPoints.length<3){
+    alert('Necesitas al menos 3 puntos.');
+    return;
+  }
+  const id = uid();
+  const name = 'Geocerca ' + (geofences.length+1);
+  geofences.push({id, name, latlngs: tempPoints.map(p=>({lat:p.lat, lng:p.lng}))});
+  persist();
+
+  // limpiar temporales
+  map.off('click', addTempPoint);
+  if(tempLine){ map.removeLayer(tempLine); tempLine=null }
+  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null }
+  drawing=false;
+  map.getContainer().style.cursor = '';
+
+  // UI
+  $('#btnNew').disabled = false;
+  $('#btnFinish').disabled = true;
+  $('#btnCancel').disabled = true;
+
+  renderAll();
+  selectGeofence(id);
+}
+
+function cancelDrawing(){
+  if(!drawing) return;
+  drawing=false;
+  map.off('click', addTempPoint);
+  if(tempLine){ map.removeLayer(tempLine); tempLine=null }
+  if(tempPoly){ map.removeLayer(tempPoly); tempPoly=null }
+  map.getContainer().style.cursor = '';
+  $('#btnNew').disabled = false;
+  $('#btnFinish').disabled = true;
+  $('#btnCancel').disabled = true;
+}
+
+/* =========================
+   Crear desde textarea
+========================= */
+function createFromTextarea(){
+  const raw = $('#taCoords').value.trim();
+  if(!raw){
+    alert('Pega coordenadas (lat,lng), una por línea.');
+    return;
+  }
+  const lines = raw.split(/\r?\n/);
+  const pts = [];
+  for(const ln of lines){
+    const m = ln.split(',').map(x=>x.trim());
+    if(m.length<2) continue;
+    const lat = parseFloat(m[0]);
+    const lng = parseFloat(m[1]);
+    if(Number.isFinite(lat) && Number.isFinite(lng)){
+      pts.push({lat, lng});
+    }
+  }
+  if(pts.length<3){
+    alert('Se requieren al menos 3 pares lat,lng.');
+    return;
+  }
+  const id = uid();
+  const nm = ($('#inName').value.trim() || ('Geocerca '+(geofences.length+1)));
+  geofences.push({id, name:nm, latlngs: pts});
+  persist();
+  renderAll();
+  selectGeofence(id);
+  $('#inName').value='';
+}
+
+/* =========================
+   Edición de vértices
+========================= */
+function startEditing(){
+  const g = geofences.find(x=>x.id===activeId);
+  if(!g) return;
+  stopEditing(); // limpiar si ya había
+
+  // crear marcadores en cada vértice
+  const poly = layers.get(g.id);
+  if(!poly) return;
+
+  editMarkers = g.latlngs.map((p, idx)=>{
+    const mk = L.circleMarker(p, {
+      radius:6, weight:2, color:'#0ea5e9', fillColor:'#38bdf8', fillOpacity:.9
+    }).addTo(map);
+    mk.options._idx = idx;
+    mk.dragging = new L.Handler.MarkerDrag(mk); // activar drag handler
+    mk.dragging.enable();
+    mk.on('drag', ev=>{
+      const i = ev.target.options._idx;
+      const ll = ev.target.getLatLng();
+      // actualizar punto en data y polígono
+      g.latlngs[i] = {lat: ll.lat, lng: ll.lng};
+      poly.setLatLngs(g.latlngs);
+    });
+    return mk;
+  });
+
+  $('#btnEdit').disabled = true;
+  $('#btnEditCancel').disabled = false;
+}
+
+function stopEditing(){
+  editMarkers.forEach(m=>{
+    if(m.dragging) m.dragging.disable();
+    map.removeLayer(m);
+  });
+  editMarkers = [];
+  $('#btnEdit').disabled = !activeId;
+  $('#btnEditCancel').disabled = true;
+}
+
+/* =========================
+   Guardar / Renombrar / Eliminar
+========================= */
+function saveActive(){
+  const g = geofences.find(x=>x.id===activeId);
+  if(!g) return;
+  persist();
+  alert('Geocerca guardada.');
+}
+
+function renameActive(){
+  const g = geofences.find(x=>x.id===activeId);
+  if(!g) return;
+  const nv = prompt('Nuevo nombre:', g.name);
+  if(nv && nv.trim()){
+    g.name = nv.trim();
+    persist();
+    renderAll();
+    selectGeofence(g.id, false);
+  }
+}
+
+function deleteActive(){
+  const g = geofences.find(x=>x.id===activeId);
+  if(!g) return;
+  if(!confirm(`¿Eliminar "${g.name}"?`)) return;
+  geofences = geofences.filter(x=>x.id!==g.id);
+  persist();
+  activeId = null;
+  renderAll();
+}
+
+/* =========================
+   Exportar / Importar
+========================= */
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(geofences, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'geocercas.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+$('#fileImport').addEventListener('change', (ev)=>{
+  const f = ev.target.files?.[0];
+  if(!f) return;
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    try{
+      const arr = JSON.parse(rd.result);
+      if(Array.isArray(arr)){
+        geofences = arr.filter(x=>x && x.id && x.latlngs);
+        persist();
+        renderAll();
+        activeId = null;
+        setSelectedLabel();
+        alert('Importado correctamente.');
+      }else{
+        alert('Archivo inválido.');
+      }
+    }catch(e){
+      alert('No se pudo leer el JSON.');
+    }
   };
-  tick(); timer=setInterval(tick, mins*60*1000);
-}
-function stopTrack(){ if(timer) clearInterval(timer); timer=null; document.getElementById("trackInfo").textContent="Detenido."; }
-function inFence(pt,poly){ const p=turf.point([pt[1],pt[0]]); const g=turf.polygon([poly.map(c=>[c[1],c[0]])]); return turf.booleanPointInPolygon(p,g); }
-function renderUbic(){
-  const tb=document.querySelector("#tblUbic tbody"); tb.innerHTML="";
-  db.ubicaciones.slice().reverse().slice(0,300).forEach(r=>{
-    const f=db.geocercas.find(x=>x.id===r.fenceId); const a=r.actId?db.actividades.find(x=>x.id===r.actId):null;
-    const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${new Date(r.ts).toLocaleString()}</td><td>${r.trabajador}</td><td>${f?f.nombre:"(id:"+r.fenceId+")"}</td>
-    <td>${a?a.nombre:"-"}</td><td>${r.lat.toFixed(6)}</td><td>${r.lng.toFixed(6)}</td><td>${r.mins||0}</td>`;
-    tb.appendChild(tr);
-  });
-}
+  rd.readAsText(f);
+  ev.target.value = '';
+});
 
-/* ===== Reportes ===== */
-function refillReportFences(){
-  const sel=document.getElementById("repFenceSel");
-  sel.innerHTML=(db.geocercas||[]).map(f=>`<option value="${f.id}">${f.nombre}</option>`).join("");
-  if(selectedFenceId) sel.value=selectedFenceId;
-}
-function calcReport(){
-  const fid=document.getElementById("repFenceSel").value || db.geocercas[0]?.id || "";
-  if(!fid) return alert("Crea una geocerca.");
-  const d=document.getElementById("repDesde").value, h=document.getElementById("repHasta").value;
-  if(!d||!h) return alert("Indica fechas.");
-  const from=new Date(d+" 00:00:00").getTime(), to=new Date(h+" 23:59:59").getTime();
-  const reg=db.ubicaciones.filter(u=>u.fenceId===fid && u.ts>=from && u.ts<=to);
+/* =========================
+   Eventos UI
+========================= */
+$('#btnNew').onclick = startDrawing;
+$('#btnFinish').onclick = finishDrawing;
+$('#btnCancel').onclick = cancelDrawing;
 
-  const minsPers=new Map(), tarifa=new Map(); db.personal.filter(p=>p.fenceId===fid).forEach(p=>tarifa.set(p.nombre,parseFloat(p.tarifa||0)));
-  const minsAct=new Map(), actName=new Map(); db.actividades.filter(a=>a.fenceId===fid).forEach(a=>actName.set(a.id,a.nombre));
-  reg.forEach(r=>{ const m=parseInt(r.mins||0,10); minsPers.set(r.trabajador,(minsPers.get(r.trabajador)||0)+m); if(r.actId) minsAct.set(r.actId,(minsAct.get(r.actId)||0)+m); });
+$('#btnCreateFromCoords').onclick = createFromTextarea;
 
-  const tbP=document.querySelector("#tblPers tbody"); tbP.innerHTML=""; let totP=0;
-  for(const [nom,mins] of minsPers.entries()){
-    const hrs=mins/60, t=tarifa.get(nom)||0, c=hrs*t; totP+=c;
-    const tr=document.createElement("tr"); tr.innerHTML=`<td>${nom}</td><td>${hrs.toFixed(2)}</td><td>$${t.toFixed(2)}</td><td>$${c.toFixed(2)}</td>`; tbP.appendChild(tr);
-  }
-  document.getElementById("totPers").textContent="$"+totP.toFixed(2);
+$('#btnEdit').onclick = startEditing;
+$('#btnEditCancel').onclick = stopEditing;
 
-  const costAct=new Map(); reg.forEach(r=>{ if(!r.actId) return; const t=tarifa.get(r.trabajador)||0; costAct.set(r.actId,(costAct.get(r.actId)||0)+(r.mins||0)/60*t); });
-  const tbA=document.querySelector("#tblAct tbody"); tbA.innerHTML=""; let totA=0;
-  for(const [aid, mins] of minsAct.entries()){
-    const hrs=mins/60, c=(costAct.get(aid)||0); totA+=c;
-    const tr=document.createElement("tr"); tr.innerHTML=`<td>${actName.get(aid)||"(borrada)"}</td><td>${hrs.toFixed(2)}</td><td>$${c.toFixed(2)}</td>`; tbA.appendChild(tr);
-  }
-  document.getElementById("totAct").textContent="$"+totA.toFixed(2);
-  document.getElementById("repInfo").textContent=`Registros: ${reg.length} · Rango: ${d} a
+$('#btnSave').onclick = saveActive;
+$('#btnRename').onclick = renameActive;
+$('#btnDelete').onclick = deleteActive;
+
+$('#btnExport').onclick = exportJSON;
+
+/* =========================
+   Carga inicial
+========================= */
+load();
+renderAll();
+setSelectedLabel();
+</script>
+</body>
+</html>
