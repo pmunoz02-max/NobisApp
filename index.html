@@ -5,23 +5,12 @@
   <title>Nobis App Multiusuario</title>
   <script src="https://cdn.jsdelivr.net/npm/emailjs-com@2.6.4/dist/email.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-    }
-    h2 {
-      margin-top: 30px;
-    }
-    input {
-      margin: 5px 0;
-      padding: 6px;
-      width: 250px;
-    }
-    button {
-      margin: 5px 0;
-      padding: 6px 12px;
-      cursor: pointer;
-    }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { margin-bottom: 20px; }
+    h2 { margin-top: 30px; }
+    input { margin: 5px 0; padding: 6px; width: 260px; }
+    button { margin: 5px 0; padding: 6px 12px; cursor: pointer; }
+    ul { margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -48,12 +37,19 @@
   <p>[Aquí va el mapa con geocercas y módulos de tu app]</p>
 
   <script>
-    // ✅ Inicializar EmailJS correctamente
+    // 🚀 Configuración centralizada
+    const PUBLIC_KEY = "qSmyIiQYgJVnpll9S";
+    const SERVICE_ID = "service_fuhd91q";
+    const TEMPLATE_ID = "template_k4gnktv";
+    const SUPER_ADMIN = "fenice.ecuador@gmail.com"; // Dueño fijo
+
+    // Inicializar EmailJS
     (function() {
-      emailjs.init("qSmyIiQYgJVnpll9S"); // tu Public Key
-      console.log("DEBUG → EmailJS inicializado");
+      emailjs.init(PUBLIC_KEY);
+      console.log("DEBUG → EmailJS inicializado con clave pública");
     })();
 
+    // Obtener lista de admins actuales
     function getAdmins() {
       const admins = [];
       document.querySelectorAll("#adminList li").forEach(li => {
@@ -62,29 +58,32 @@
       return admins;
     }
 
+    // Login de usuario
     function login() {
       const email = document.getElementById("loginEmail").value.trim();
       const admins = getAdmins();
-      const superAdmin = "fenice.ecuador@gmail.com";
 
       if (!email) {
         alert("Ingrese su email");
         return;
       }
 
-      if (email === superAdmin || admins.includes(email)) {
+      if (email === SUPER_ADMIN) {
+        document.getElementById("nivel").textContent = "Dueño";
+        alert("✅ Bienvenido dueño: " + email);
+        return;
+      }
+
+      if (admins.includes(email)) {
         document.getElementById("nivel").textContent = "Administrador";
         alert("✅ Bienvenido administrador: " + email);
-
-        if (email === superAdmin && !admins.includes(superAdmin)) {
-          document.getElementById("adminList").innerHTML += `<li>${superAdmin}</li>`;
-        }
       } else {
         document.getElementById("nivel").textContent = "Invitado";
         alert("❌ Acceso denegado. El email no es administrador.");
       }
     }
 
+    // Crear nuevo administrador
     function crearAdmin() {
       const nuevoAdminEmail = document.getElementById("nuevoAdmin").value.trim();
       if (!nuevoAdminEmail) {
@@ -97,9 +96,8 @@
 
       console.log("DEBUG → Creando admin:", nuevoAdminEmail);
       console.log("DEBUG → Token generado:", token);
-      console.log("DEBUG → Activation link:", activationLink);
 
-      emailjs.send("service_fuhd91q", "template_k4gnktv", {
+      emailjs.send(SERVICE_ID, TEMPLATE_ID, {
         to_email: nuevoAdminEmail,
         from_name: "Nobis App",
         message: `Has sido invitado como administrador. Activa tu cuenta aquí: ${activationLink}`
@@ -114,8 +112,9 @@
       });
     }
 
+    // Enviar correo de prueba
     function enviarCorreoPrueba() {
-      emailjs.send("service_fuhd91q", "template_k4gnktv", {
+      emailjs.send(SERVICE_ID, TEMPLATE_ID, {
         to_email: "pmunoz02@gmail.com",
         from_name: "Nobis App",
         message: "Este es un correo de prueba desde la App Nobis."
@@ -131,3 +130,4 @@
   </script>
 </body>
 </html>
+
