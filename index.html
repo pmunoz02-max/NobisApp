@@ -37,12 +37,14 @@
   .card{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:10px;margin:.6rem 0}
   .pill{display:inline-block;padding:.1rem .5rem;border:1px solid var(--bd);border-radius:999px;font-size:11px}
   .disabled{opacity:.45;pointer-events:none}
+
   /* Mapa y overlays */
   #map{position:relative;width:100%;height:420px;border:1px solid var(--bd);border-radius:10px}
-  #mouse{position:absolute;background:rgba(255,255,255,.95);border:1px solid var(--bd);padding:2px 6px;
-    font-size:11px;border-radius:4px;display:none;pointer-events:none;z-index:999}
+  #map.crosshair{cursor:crosshair}
+  #mouse{position:absolute;background:rgba(255,255,255,.96);border:1px solid var(--bd);padding:2px 6px;
+    font-size:11px;border-radius:4px;display:none;pointer-events:none;z-index:20000}
   #coordBox{position:absolute;right:8px;top:8px;background:#ffffffd9;border:1px solid var(--bd);
-    border-radius:6px;padding:4px 8px;font-size:12px;z-index:998;pointer-events:none}
+    border-radius:6px;padding:4px 8px;font-size:12px;z-index:19999;pointer-events:none}
   ul{margin:.3rem 0 .2rem;padding-left:1.1rem}
   li{margin:.2rem 0}
   .kbd{font-family:ui-monospace,monospace;background:#f3f4f6;border:1px solid #e5e7eb;border-bottom-width:2px;padding:.1rem .3rem;border-radius:4px;font-size:11px}
@@ -206,7 +208,6 @@
     <div style="padding:12px;border-bottom:1px solid var(--bd);background:#fff">
       <h2 style="margin:.2rem 0 .6rem">Mapa de Geocercas</h2>
       <div id="map">
-        <!-- overlays dentro del contenedor del mapa -->
         <div id="mouse"></div>
         <div id="coordBox">Lat: –, Lng: –</div>
       </div>
@@ -341,7 +342,7 @@ function initMap(){
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);
   layerGroup=L.layerGroup().addTo(map);
 
-  // Geoman (edición manual, no usamos sus herramientas de dibujo)
+  // Geoman (solo edición)
   map.pm.addControls({position:'topleft',drawMarker:false,drawCircle:false,drawPolyline:false,drawRectangle:false,drawCircleMarker:false,drawText:false,drawPolygon:false,dragMode:false,cutPolygon:false,rotateMode:false,removalMode:false});
 
   // Coordenadas en tiempo real
@@ -349,16 +350,16 @@ function initMap(){
   const box = document.getElementById("coordBox");
   map.on("mousemove", (e)=>{
     const lat=e.latlng.lat.toFixed(6), lng=e.latlng.lng.toFixed(6);
-    const p = map.latLngToContainerPoint(e.latlng); // relativo al #map
+    const p = map.latLngToContainerPoint(e.latlng);
     mouse.style.display="block";
     mouse.style.left = (p.x + 12) + "px";
-    mouse.style.top  = (p.y - 16) + "px";
+    mouse.style.top  = (p.y - 18) + "px";
     mouse.textContent = `${lat}, ${lng}`;
     box.textContent = `Lat: ${lat}, Lng: ${lng}`;
   });
   map.getContainer().addEventListener("mouseleave", ()=>{ mouse.style.display="none"; });
 
-  // Click para dibujar (si está activo)
+  // Clics para dibujo
   map.on("click", (e)=>{
     if(!isDrawing || nivel<2) return;
     tempCoords.push([e.latlng.lat,e.latlng.lng]);
@@ -376,8 +377,8 @@ function redrawAll(){
     const poly=L.polygon(f.coords,{color:"#10b981",weight:2,fillOpacity:.12}).addTo(layerGroup);
     poly.bindTooltip(f.nombre||("Geocerca "+f.id));
     poly.on("click",(ev)=>{
-      if(isDrawing){ // si estoy dibujando, no seleccionar; uso el clic como punto y detengo propagación
-        L.DomEvent.stop(ev);
+      if(isDrawing){
+        L.DomEvent.stop(ev); // no cortar el trazado
         tempCoords.push([ev.latlng.lat,ev.latlng.lng]);
         drawTemp();
         document.getElementById("btnFenceFinish").disabled = tempCoords.length<3;
@@ -394,7 +395,15 @@ function redrawAll(){
   renderPeople(); renderActs(); renderUbic();
 }
 
+function setDrawingUI(on){
+  isDrawing=on;
+  document.getElementById("map").classList.toggle("crosshair", on);
+  document.getElementById("btnFenceFinish").disabled = on ? (tempCoords.length<3) : true;
+  document.getElementById("btnFenceCancel").disabled = on ? (tempCoords.length<1) : true;
+}
+
 function drawTemp(){
+  // re-pintar todo + polilínea temporal
   layerGroup.clearLayers();
   (db.geocercas||[]).forEach(f=>{ L.polygon(f.coords,{color:"#10b981",weight:2,fillOpacity:.12}).addTo(layerGroup); });
   if(tempCoords.length>=2){ L.polyline(tempCoords,{color:"#0ea5e9",dashArray:"3,4"}).addTo(layerGroup); }
@@ -402,18 +411,18 @@ function drawTemp(){
 
 function newFence(){
   if(nivel<2) return alert("Requiere rol Administrador.");
-  isDrawing=true; tempCoords=[];
-  document.getElementById("btnFenceCancel").disabled=false;
-  document.getElementById("btnFenceFinish").disabled=true;
+  tempCoords=[]; setDrawingUI(true);
 }
 function finishFence(){
   if(tempCoords.length<3) return;
   const id=Date.now().toString(36);
   const nombre=prompt("Nombre de geocerca","Geocerca "+(db.geocercas.length+1))||"Geocerca";
   db.geocercas.push({id,nombre,coords:tempCoords});
-  saveDB(); isDrawing=false; tempCoords=[]; redrawAll(); selectFence(id);
+  saveDB();
+  tempCoords=[]; setDrawingUI(false);
+  redrawAll(); selectFence(id,true);
 }
-function cancelFence(){ isDrawing=false; tempCoords=[]; redrawAll(); }
+function cancelFence(){ tempCoords=[]; setDrawingUI(false); redrawAll(); }
 
 function createFromCoords(){
   if(nivel<2) return alert("Requiere rol Administrador.");
@@ -429,7 +438,9 @@ function createFromCoords(){
   const id=Date.now().toString(36);
   const nombre=document.getElementById("nameCoords").value.trim() || "Geocerca "+(db.geocercas.length+1);
   db.geocercas.push({id,nombre,coords}); saveDB(); document.getElementById("nameCoords").value="";
-  redrawAll(); selectFence(id);
+  redrawAll(); selectFence(id,true);
+  // entrar en edición automáticamente para permitir "Guardar"
+  startEdit();
 }
 
 let editActive=false;
@@ -446,10 +457,14 @@ function startEdit(){
   if(!selectedFenceId) return alert("Selecciona una geocerca.");
   const lay=fenceLayers.get(selectedFenceId); if(!lay) return;
   lay.pm.enable({allowSelfIntersection:false,snappable:true});
-  editActive=true; document.getElementById("btnFenceSave").disabled=false; document.getElementById("btnFenceAbort").disabled=false;
+  editActive=true;
+  document.getElementById("btnFenceSave").disabled=false;
+  document.getElementById("btnFenceAbort").disabled=false;
 }
 function saveEdit(){
-  if(!selectedFenceId) return; const lay=fenceLayers.get(selectedFenceId); if(!lay) return;
+  if(!selectedFenceId) return;
+  const lay=fenceLayers.get(selectedFenceId); if(!lay) return;
+  if(!editActive){ alert("Pulsa 'Editar vértices' antes de guardar."); return; }
   const latlngs=lay.getLatLngs()[0].map(ll=>[ll.lat,ll.lng]); if(latlngs.length<3) return alert("El polígono debe tener ≥3 puntos.");
   const f=db.geocercas.find(x=>x.id===selectedFenceId); if(!f) return;
   f.coords=latlngs; saveDB(); lay.pm.disable(); editActive=false;
