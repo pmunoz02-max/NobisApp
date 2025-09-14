@@ -189,6 +189,11 @@ function initUsuarios(){
     opt.value=u; opt.textContent=u;
     select.appendChild(opt);
   });
+  // Seleccionar automáticamente el primero si hay usuarios
+  if(users.length>0){
+    select.value=users[0];
+    cambiarUsuario(); // activa al primer usuario
+  }
 }
 
 function crearUsuario(){
@@ -251,3 +256,4 @@ initMap();
 </script>
 </body>
 </html>
+
