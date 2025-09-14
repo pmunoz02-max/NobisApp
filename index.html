@@ -5,12 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Nobis App • Administración</title>
 
+<!-- Leaflet + Geoman -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <link rel="stylesheet" href="https://unpkg.com/leaflet-geoman-free@2.14.0/dist/leaflet-geoman.css">
 <script src="https://unpkg.com/leaflet-geoman-free@2.14.0/dist/leaflet-geoman.min.js"></script>
 
+<!-- Turf -->
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
 <style>
@@ -21,8 +22,8 @@
   .left{background:#fff;border-right:1px solid var(--bd);padding:12px;overflow:auto}
   .right{overflow:auto}
   h1{margin:.2rem 0 .6rem;font-size:18px}
-  h2{margin:.6rem 0 .4rem}
-  h3{margin:.6rem 0 .2rem}
+  h2{margin:.2rem 0 .6rem}
+  h3{margin:.6rem 0 .3rem}
   .muted{color:var(--m)}
   label{display:block;font-size:12px;margin:.5rem 0 .2rem}
   input,select,button,textarea{width:100%;font:12px inherit;padding:.45rem .55rem;border:1px solid var(--bd);border-radius:8px;background:#fff}
@@ -37,10 +38,8 @@
 
   #map{position:relative;width:100%;height:420px;border:1px solid var(--bd);border-radius:10px}
   #map.crosshair{cursor:crosshair}
-  #mouse{position:absolute;background:rgba(255,255,255,.96);border:1px solid var(--bd);padding:2px 6px;
-    font-size:11px;border-radius:4px;display:none;pointer-events:none;z-index:20000}
-  #coordBox{position:absolute;right:8px;top:8px;background:#ffffffd9;border:1px solid var(--bd);
-    border-radius:6px;padding:4px 8px;font-size:12px;z-index:19999;pointer-events:none}
+  #mouseTip{position:absolute;background:rgba(255,255,255,.96);border:1px solid var(--bd);padding:2px 6px;font-size:11px;border-radius:4px;display:none;pointer-events:none;z-index:20000}
+  #coordBox{position:absolute;right:8px;top:8px;background:#ffffffd9;border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font-size:12px;z-index:19999;pointer-events:none}
   ul{margin:.3rem 0 .2rem;padding-left:1.1rem}
   li{margin:.2rem 0}
   .kbd{font-family:ui-monospace,monospace;background:#f3f4f6;border:1px solid #e5e7eb;border-bottom-width:2px;padding:.1rem .3rem;border-radius:4px;font-size:11px}
@@ -199,9 +198,9 @@
 
   <main class="right">
     <div style="padding:12px;border-bottom:1px solid var(--bd);background:#fff">
-      <h2 style="margin:.2rem 0 .6rem">Mapa de Geocercas</h2>
+      <h2>Mapa de Geocercas</h2>
       <div id="map">
-        <div id="mouse"></div>
+        <div id="mouseTip"></div>
         <div id="coordBox">Lat: –, Lng: –</div>
       </div>
     </div>
@@ -234,8 +233,10 @@
 </div>
 
 <script>
+/* ===== Config básica ===== */
 const OWNER_EMAIL = "fenice.ecuador@gmail.com";
 
+/* ===== Estado global ===== */
 let nivel=0, loginEmail="", currentUser=null;
 let db = { geocercas:[], personal:[], actividades:[], ubicaciones:[] };
 
@@ -252,7 +253,7 @@ function loadDB(){
   ["geocercas","personal","actividades","ubicaciones"].forEach(k=>{ if(!Array.isArray(db[k])) db[k]=[]; });
 }
 
-/* Roles */
+/* ===== Roles/Login ===== */
 function computeLevel(){ nivel = (loginEmail===OWNER_EMAIL)?1:(admins().includes(loginEmail)?2:0); }
 function renderLevel(){
   document.getElementById("nivelLbl").textContent = nivel===1?"Dueño":(nivel===2?"Administrador":"Invitado");
@@ -270,7 +271,7 @@ function doLogin(){
   if(nivel===0) alert("Acceso denegado. El email no es administrador.");
 }
 
-/* Dueño */
+/* ===== Dueño: admin invites (sin EmailJS) ===== */
 function createAdmin(){
   if(nivel!==1) return alert("Solo el dueño.");
   const email=document.getElementById("newAdminEmail").value.trim().toLowerCase();
@@ -305,7 +306,7 @@ function tryActivate(){
   renderAdmins();
 }
 
-/* Usuarios */
+/* ===== Usuarios multi ===== */
 function users(){ return JSON.parse(localStorage.getItem("usuarios")||"[]"); }
 function setUsers(U){ localStorage.setItem("usuarios", JSON.stringify(U)); }
 function initUsersUI(){
@@ -321,40 +322,38 @@ function createUser(){
 }
 function changeUser(){ currentUser=document.getElementById("userSel").value; document.getElementById("userLbl").textContent=currentUser||"Ninguno"; loadDB(); redrawAll(); }
 
-/* Mapa/Geocercas */
-let map, layerGroup, tempLayer, isDrawing=false, tempCoords=[];
+/* ===== Mapa & Geocercas ===== */
+let map, layerGroup, tempLayer;
+let isDrawing=false, tempCoords=[];
 let fenceLayers=new Map(); let selectedFenceId=null;
 
 function initMap(){
   map=L.map('map').setView([-1.718,-77.96],14);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);
   layerGroup=L.layerGroup().addTo(map);
-  tempLayer=L.layerGroup().addTo(map); // capa temporal para el trazado
+  tempLayer=L.layerGroup().addTo(map);
 
   map.pm.addControls({position:'topleft',drawMarker:false,drawCircle:false,drawPolyline:false,drawRectangle:false,drawCircleMarker:false,drawText:false,drawPolygon:false,dragMode:false,cutPolygon:false,rotateMode:false,removalMode:false});
 
-  // Coordenadas en tiempo real robustas (DOM sobre el contenedor)
-  const mouse = document.getElementById("mouse");
-  const box = document.getElementById("coordBox");
-  const cont = map.getContainer();
-  cont.addEventListener("mousemove", (ev)=>{
-    const latlng = map.mouseEventToLatLng(ev);
-    if(!latlng) return;
-    const lat=latlng.lat.toFixed(6), lng=latlng.lng.toFixed(6);
-    const rect=cont.getBoundingClientRect();
-    mouse.style.display="block";
-    mouse.style.left = (ev.clientX - rect.left + 12) + "px";
-    mouse.style.top  = (ev.clientY - rect.top  - 18) + "px";
-    mouse.textContent = `${lat}, ${lng}`;
-    box.textContent = `Lat: ${lat}, Lng: ${lng}`;
+  // Coordenadas en tiempo real (seguras)
+  const tip=document.getElementById("mouseTip");
+  const box=document.getElementById("coordBox");
+  map.on("mousemove", (e)=>{
+    const {lat,lng}=e.latlng;
+    const pt = map.latLngToContainerPoint(e.latlng);
+    tip.style.display="block";
+    tip.style.left = (pt.x + 12) + "px";
+    tip.style.top  = (pt.y - 18) + "px";
+    const sLat=lat.toFixed(6), sLng=lng.toFixed(6);
+    tip.textContent = `${sLat}, ${sLng}`;
+    box.textContent = `Lat: ${sLat}, Lng: ${sLng}`;
   });
-  cont.addEventListener("mouseleave", ()=>{ mouse.style.display="none"; });
+  map.on("mouseout", ()=> tip.style.display="none");
 
-  // Clics para dibujo (capturados del contenedor)
-  cont.addEventListener("click",(ev)=>{
+  // Clics de dibujo (sólo activos cuando isDrawing=true)
+  map.on("click", (e)=>{
     if(!isDrawing || nivel<2) return;
-    const latlng = map.mouseEventToLatLng(ev); if(!latlng) return;
-    tempCoords.push([latlng.lat, latlng.lng]);
+    tempCoords.push([e.latlng.lat, e.latlng.lng]);
     drawTemp();
     document.getElementById("btnFenceFinish").disabled = tempCoords.length<3;
     document.getElementById("btnFenceCancel").disabled = tempCoords.length<1;
@@ -368,7 +367,7 @@ function redrawAll(){
   (db.geocercas||[]).forEach(f=>{
     const poly=L.polygon(f.coords,{color:"#10b981",weight:2,fillOpacity:.12}).addTo(layerGroup);
     poly.bindTooltip(f.nombre||("Geocerca "+f.id));
-    poly.on("click",(ev)=>{ if(isDrawing) return; selectFence(f.id,true); });
+    poly.on("click",()=>{ if(isDrawing) return; selectFence(f.id,true); });
     fenceLayers.set(f.id, poly);
   });
   renderFenceList();
@@ -383,7 +382,6 @@ function setDrawingUI(on){
   document.getElementById("btnFenceFinish").disabled = on ? (tempCoords.length<3) : true;
   document.getElementById("btnFenceCancel").disabled = on ? (tempCoords.length<1) : true;
 }
-
 function drawTemp(){
   tempLayer.clearLayers();
   if(tempCoords.length>=2){ L.polyline(tempCoords,{color:"#0ea5e9",dashArray:"3,4"}).addTo(tempLayer); }
@@ -392,13 +390,14 @@ function drawTemp(){
 
 function newFence(){
   if(nivel<2) return alert("Requiere rol Administrador.");
+  abortEdit(); // por si hay edición previa
   tempCoords=[]; setDrawingUI(true); drawTemp();
 }
 function finishFence(){
   if(tempCoords.length<3) return;
   const id=Date.now().toString(36);
   const nombre=prompt("Nombre de geocerca","Geocerca "+(db.geocercas.length+1))||"Geocerca";
-  db.geocercas.push({id,nombre,coords:tempCoords});
+  db.geocercas.push({id,nombre,coords:[...tempCoords]});
   saveDB();
   tempCoords=[]; tempLayer.clearLayers(); setDrawingUI(false);
   redrawAll(); selectFence(id,true);
@@ -419,7 +418,7 @@ function createFromCoords(){
   const id=Date.now().toString(36);
   const nombre=document.getElementById("nameCoords").value.trim() || "Geocerca "+(db.geocercas.length+1);
   db.geocercas.push({id,nombre,coords}); saveDB(); document.getElementById("nameCoords").value="";
-  redrawAll(); selectFence(id,true); startEdit(); // entra en edición para poder Guardar
+  redrawAll(); selectFence(id,true); startEdit(); // listo para mover vértices y GUARDAR
 }
 
 let editActive=false;
@@ -451,9 +450,8 @@ function saveEdit(){
   redrawAll(); selectFence(f.id);
 }
 function abortEdit(){
-  if(!selectedFenceId) return; const lay=fenceLayers.get(selectedFenceId); if(lay) lay.pm.disable();
+  if(selectedFenceId){ const lay=fenceLayers.get(selectedFenceId); if(lay) lay.pm.disable(); }
   editActive=false; document.getElementById("btnFenceSave").disabled=true; document.getElementById("btnFenceAbort").disabled=true;
-  redrawAll(); if(selectedFenceId) selectFence(selectedFenceId);
 }
 
 function renameFence(){
@@ -491,7 +489,7 @@ function renderFenceList(){
   document.getElementById("fenceSelLbl").textContent = selectedFenceId ? (db.geocercas.find(x=>x.id===selectedFenceId)||{}).nombre : "Ninguna";
 }
 
-/* Personal */
+/* ===== Personal ===== */
 function updatePersonalFenceLabel(){
   const first = db.geocercas[0]?.nombre || "Ninguna";
   const name = selectedFenceId ? (db.geocercas.find(x=>x.id===selectedFenceId)?.nombre || first) : first;
@@ -526,7 +524,7 @@ function editTarifa(nombre){
   p.tarifa=v; saveDB(); renderPeople();
 }
 
-/* Actividades */
+/* ===== Actividades ===== */
 function refillActFence(){
   const sel=document.getElementById("actFenceSel");
   sel.innerHTML=(db.geocercas||[]).map(f=>`<option value="${f.id}">${f.nombre}</option>`).join("");
@@ -572,7 +570,7 @@ function delAct(id){
   saveDB(); renderActs(); refillWorkerActs(); renderUbic();
 }
 
-/* Tracking */
+/* ===== Tracking ===== */
 let timer=null;
 function refillWorkerFences(){
   const sel=document.getElementById("wFence"); sel.innerHTML="";
@@ -621,7 +619,7 @@ function renderUbic(){
   });
 }
 
-/* Reportes */
+/* ===== Reportes ===== */
 function refillReportFences(){
   const sel=document.getElementById("repFenceSel");
   sel.innerHTML=(db.geocercas||[]).map(f=>`<option value="${f.id}">${f.nombre}</option>`).join("");
@@ -661,7 +659,7 @@ function dl(name,txt){ const a=document.createElement("a"); a.href=URL.createObj
 function csvPers(){ const rows=[["Persona","Horas","Tarifa","Costo"]]; document.querySelectorAll("#tblPers tbody tr").forEach(tr=>rows.push([...tr.children].map(td=>td.textContent.replace(/^\$/,"")))); dl("costos_personas.csv", csv(rows)); }
 function csvAct(){ const rows=[["Actividad","Horas","Costo"]]; document.querySelectorAll("#tblAct tbody tr").forEach(tr=>rows.push([...tr.children].map(td=>td.textContent.replace(/^\$/,"")))); dl("costos_actividades.csv", csv(rows)); }
 
-/* Selects y Boot */
+/* ===== Selects/Boot ===== */
 function refillSelects(){ refillWorkerFences(); refillActFence(); refillActResp(); refillReportFences(); }
 
 function wire(){
