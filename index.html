@@ -196,7 +196,11 @@
   function saveDB(db){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
   let DB = loadDB();
 
-  // ===== Modo =====
+  \/\/ ===== Geometría y capas (declaradas ANTES de iniciar) =====
+  let map; const drawn = new L.FeatureGroup();
+  const manual = {active:false, latlngs:[], temp:null};
+
+  \/\/ ===== Modo =====
   const params=getParams();
   const isSenderMode=(params.mode||'').toLowerCase()==='sender' && !!params.phone;
   const modeTag=qs('#modeTag');
@@ -215,9 +219,7 @@
     return inside;
   }
 
-  // ===== App (admin/operador) =====
-  let map; const drawn = new L.FeatureGroup();
-  const manual = {active:false, latlngs:[], temp:null};
+  \/\/ ===== App (admin/operador) =====
 
   function initMap(containerId){
     const m=L.map(containerId||'map').setView([-1.0639,-77.8125],16);
