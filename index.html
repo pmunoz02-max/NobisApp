@@ -10,12 +10,10 @@
   <!-- Leaflet Draw -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-  <!-- Turf.js para point-in-polygon -->
+  <!-- Turf.js -->
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
   <style>
-    :root{
-      --bg:#0c0d10;--panel:#141721;--muted:#778;--text:#eaeef7;--acc:#41d39e;--warn:#ffc13b;--danger:#ff6363;
-    }
+    :root{ --bg:#0c0d10;--panel:#141721;--muted:#778;--text:#eaeef7;--acc:#41d39e;--warn:#ffc13b;--danger:#ff6363; }
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
     header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(180deg,#161a25,#12151f);border-bottom:1px solid #222}
     header h1{font-size:16px;margin:0;font-weight:600}
@@ -30,11 +28,7 @@
     input,select,button,textarea{background:#0f131c;border:1px solid #2a3245;color:var(--text);border-radius:10px;padding:8px;font-size:14px}
     button.primary{background:linear-gradient(180deg,#1c2b3b,#142031);border-color:#22324b}
     button.ghost{background:transparent}
-    button.danger{background:#2a1217;border-color:#5b1d26;color:#ffb2b2}
     button.warn{background:#2a2412;border-color:#5b4f1d;color:#ffe1a4}
-    .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 8px;background:#101621;border:1px solid #22314a;font-size:12px;color:#a7b2c4}
-    .ok{color:#aaffd6}
-    .bad{color:#ffacac}
     #map{height:55vh;border-top:1px solid #222;border-bottom:1px solid #222}
     #coords{padding:6px 10px;font-size:12px;color:#9fb3c8}
     nav.tabs{display:flex;gap:6px;padding:8px;border-bottom:1px solid #222;background:#0f131b}
@@ -43,12 +37,13 @@
     table{width:100%;border-collapse:collapse}
     th,td{border-bottom:1px solid #232734;padding:6px;text-align:left;font-size:13px}
     .hide{display:none !important}
-    .copy{cursor:pointer}
     .sender-wrap{max-width:720px;margin:18px auto;padding:0 12px}
     .status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;background:#555}
     .status-dot.on{background:#41d39e}
     .status-dot.off{background:#ff6363}
     .tiny{font-size:12px;color:#8aa}
+    /* Cursor cuando está el modo de dibujo manual activo */
+    .drawing-cursor .leaflet-container {cursor: crosshair !important;}
   </style>
 </head>
 <body>
@@ -57,7 +52,6 @@
     <span id="modeTag" class="tag">Cargando…</span>
   </header>
 
-  <!-- Contenedor Admin / Operador -->
   <div id="app" class="hide">
     <aside id="sidebar">
       <div class="section">
@@ -65,12 +59,11 @@
         <div class="card">
           <div class="row">
             <select id="roleSelect">
-              <option value="admin">Administrador</option>
+              <option value="admin" selected>Administrador</option>
               <option value="operador">Operador</option>
             </select>
-            <button id="logoutBtn" class="ghost">Salir</button>
+            <button type="button" id="logoutBtn" class="ghost">Salir</button>
           </div>
-          <div class="tiny" id="activeUserInfo"></div>
         </div>
       </div>
 
@@ -78,11 +71,11 @@
         <h2>Módulos</h2>
         <div class="card">
           <div class="row" style="flex-wrap:wrap;gap:8px">
-            <button class="tablink" data-tab="geocercas">Geocercas</button>
-            <button class="tablink" data-tab="personal">Personal</button>
-            <button class="tablink" data-tab="actividades">Actividades</button>
-            <button class="tablink" data-tab="costos">Costos</button>
-            <button class="tablink" data-tab="reportes">Reportes</button>
+            <button type="button" class="tablink" data-tab="geocercas">Geocercas</button>
+            <button type="button" class="tablink" data-tab="personal">Personal</button>
+            <button type="button" class="tablink" data-tab="actividades">Actividades</button>
+            <button type="button" class="tablink" data-tab="costos">Costos</button>
+            <button type="button" class="tablink" data-tab="reportes">Reportes</button>
           </div>
         </div>
       </div>
@@ -90,45 +83,37 @@
       <div class="section">
         <h2>Acceso rápido</h2>
         <div class="card">
-          <button id="centerToGF" class="primary">Centrar a geocercas</button>
+          <button type="button" id="centerToGF" class="primary">Centrar a geocercas</button>
           <div style="height:6px"></div>
-          <button id="exportCSV" class="warn">Exportar envíos (CSV)</button>
-        </div>
-      </div>
-
-      <div class="section">
-        <h2>Ayuda</h2>
-        <div class="card tiny">
-          • Para generar un enlace de activación al teléfono de un usuario (modo Emisor), vaya a <b>Personal</b> → seleccione el usuario → <b>Generar enlace</b>.
-          <br/>• El emisor solo puede enviar datos desde dentro de sus geocercas asignadas.
+          <button type="button" id="exportCSV" class="warn">Exportar envíos (CSV)</button>
         </div>
       </div>
     </aside>
 
     <main id="content">
       <nav class="tabs">
-        <button class="active" data-tabbtn="geocercas">Geocercas</button>
-        <button data-tabbtn="personal">Personal</button>
-        <button data-tabbtn="actividades">Actividades</button>
-        <button data-tabbtn="costos">Costos</button>
-        <button data-tabbtn="reportes">Reportes</button>
+        <button type="button" class="active" data-tabbtn="geocercas">Geocercas</button>
+        <button type="button" data-tabbtn="personal">Personal</button>
+        <button type="button" data-tabbtn="actividades">Actividades</button>
+        <button type="button" data-tabbtn="costos">Costos</button>
+        <button type="button" data-tabbtn="reportes">Reportes</button>
       </nav>
 
-      <!-- MAPA COMPARTIDO -->
       <div id="map"></div>
       <div id="coords">Lat: –, Lng: –</div>
 
-      <!-- PANELES -->
       <section id="panel-geocercas" class="panel">
         <div class="section">
           <h2>Gestión de Geocercas</h2>
           <div class="card">
             <div class="row">
-              <input id="gfName" placeholder="Nombre de geocerca" />
-              <button id="btnAddPoly" class="primary">Nueva Geocerca (dibujo)</button>
-              <button id="btnSavePolys" class="primary">Guardar Cambios</button>
+              <input id="gfName" placeholder="Nombre de geocerca (opcional al guardar)" />
+              <button type="button" id="btnAddPoly" class="primary">Nueva Geocerca (dibujo)</button>
+              <button type="button" id="btnSavePolys" class="primary">Guardar Cambios</button>
             </div>
-            <div class="tiny">Tip: use las herramientas de dibujo (polígono) arriba a la izquierda del mapa. Para editar, seleccione el modo edición (icono de lápiz). Las coordenadas aparecen al mover el mouse sobre el mapa.</div>
+            <div class="tiny">
+              Si no aparece la barra de herramientas de Leaflet.draw, este botón activa un <b>modo de dibujo manual</b>: clic para vértices y <b>doble clic</b> para cerrar.
+            </div>
           </div>
 
           <div class="card">
@@ -146,9 +131,9 @@
           <div class="card">
             <div class="row">
               <input id="pName" placeholder="Nombre" />
-              <input id="pPhone" placeholder="Teléfono (incluya país, ej. 5939xxxx)" />
+              <input id="pPhone" placeholder="Teléfono (5939...)" />
               <select id="pRole">
-                <option value="sender">Emisor (solo envía)</option>
+                <option value="sender" selected>Emisor (solo envía)</option>
                 <option value="operador">Operador</option>
                 <option value="admin">Administrador</option>
               </select>
@@ -164,20 +149,8 @@
         </div>
       </section>
 
-      <section id="panel-actividades" class="panel hide">
-        <div class="section">
-          <h2>Actividades</h2>
-          <div class="card tiny">(Placeholder) Vincule actividades a personal y geocercas. Esta versión mantiene compatibilidad y almacenamiento básico.</div>
-        </div>
-      </section>
-
-      <section id="panel-costos" class="panel hide">
-        <div class="section">
-          <h2>Costos</h2>
-          <div class="card tiny">(Placeholder) Estructura para costos diarios ligados a geocerca, actividad y persona activa.</div>
-        </div>
-      </section>
-
+      <section id="panel-actividades" class="panel hide"><div class="section"><h2>Actividades</h2><div class="card tiny">Placeholder</div></div></section>
+      <section id="panel-costos" class="panel hide"><div class="section"><h2>Costos</h2><div class="card tiny">Placeholder</div></div></section>
       <section id="panel-reportes" class="panel hide">
         <div class="section">
           <h2>Reportes</h2>
@@ -187,7 +160,7 @@
               <select id="rGeofence"></select>
               <input id="rFrom" type="datetime-local" />
               <input id="rTo" type="datetime-local" />
-              <button id="btnRunReport" class="primary">Generar</button>
+              <button type="button" id="btnRunReport" class="primary">Generar</button>
             </div>
           </div>
           <div class="card">
@@ -201,7 +174,7 @@
     </main>
   </div>
 
-  <!-- Contenedor MODO EMISOR (solo envío) -->
+  <!-- MODO EMISOR -->
   <div id="sender" class="hide">
     <div class="sender-wrap">
       <div class="card" style="display:flex;gap:10px;align-items:center;justify-content:space-between">
@@ -211,76 +184,68 @@
           <div class="tiny" id="senderGeofences">Geocercas asignadas: –</div>
         </div>
         <div class="row">
-          <button id="btnSenderStart" class="primary">Iniciar envío</button>
-          <button id="btnSenderStop" class="ghost">Detener</button>
+          <button type="button" id="btnSenderStart" class="primary">Iniciar envío</button>
+          <button type="button" id="btnSenderStop" class="ghost">Detener</button>
         </div>
       </div>
-
       <div id="senderMap" style="height:48vh;border:1px solid #222;border-radius:14px"></div>
       <div class="tiny" id="senderInfo">Estado: esperando…</div>
-
-      <div class="card tiny">
-        • Este modo se activa desde un enlace personalizado con su número de teléfono. 
-        • Solo se registran puntos cuando usted está <b>dentro</b> de las geocercas asignadas.
-      </div>
     </div>
   </div>
 
   <script>
-    /*************************
-     * Utilidades generales  *
-     *************************/
     const qs = (s, r=document)=>r.querySelector(s);
     const qsa = (s, r=document)=>Array.from(r.querySelectorAll(s));
-    const toast = (msg)=>{console.log(msg)};
     const getParams = ()=>Object.fromEntries(new URLSearchParams(location.search).entries());
-
-    // Storage por proyecto
     const LS_KEY = 'appnobis.v2';
+
     function loadDB(){
       const raw = localStorage.getItem(LS_KEY);
-      if(raw){ try { return JSON.parse(raw);} catch(e){ console.warn('DB corrupta, reseteando'); } }
-      const seed = {
-        geofences: [
-          {id:'gf1', name:'Parcela Norte', coords:[[-77.8122,-1.0635],[-77.8111,-1.0634],[-77.8112,-1.0625],[-77.8123,-1.0626]]},
-          {id:'gf2', name:'Parcela Sur', coords:[[-77.8132,-1.0645],[-77.8122,-1.0643],[-77.8123,-1.0634],[-77.8133,-1.0636]]}
-        ],
-        people: [
-          {id:'u1', name:'Operario A', phone:'593900000001', role:'sender', geofences:['gf1']},
-          {id:'u2', name:'Operario B', phone:'593900000002', role:'sender', geofences:['gf2']},
-          {id:'adm', name:'Admin', phone:'593900000000', role:'admin', geofences:['gf1','gf2']}
-        ],
-        submissions: [] // {ts, phone, userId, lat, lng, acc, geofenceId}
+      if(raw){ try { return JSON.parse(raw);} catch(e){} }
+      const seed={
+        geofences:[{id:'gf1',name:'Parcela Norte',coords:[[-77.8122,-1.0635],[-77.8111,-1.0634],[-77.8112,-1.0625],[-77.8123,-1.0626]]}],
+        people:[{id:'adm',name:'Admin',phone:'593900000000',role:'admin',geofences:['gf1']}],
+        submissions:[]
       };
       localStorage.setItem(LS_KEY, JSON.stringify(seed));
       return seed;
     }
     function saveDB(db){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
-
     let DB = loadDB();
 
-    /*************************
-     * Detección de MODE     *
-     *************************/
     const params = getParams();
     const isSenderMode = (params.mode||'').toLowerCase()==='sender' && !!params.phone;
-    const modeTag = qs('#modeTag');
+    const modeTag=qs('#modeTag');
+    if(isSenderMode){ modeTag.textContent='Modo Emisor'; qs('#sender').classList.remove('hide'); initSender(params.phone); }
+    else { modeTag.textContent='Modo Administrador/Operador'; qs('#app').classList.remove('hide'); initApp(); }
 
-    if(isSenderMode){ modeTag.textContent = 'Modo Emisor'; qs('#sender').classList.remove('hide'); initSender(params.phone); }
-    else { modeTag.textContent = 'Modo Administrador/Operador'; qs('#app').classList.remove('hide'); initApp(); }
-
-    /*************************
-     * MODO ADMIN/OPERADOR   *
-     *************************/
-    let map, drawControl, drawnLayer;
-    const drawn = new L.FeatureGroup();
-
+    let map, drawControl; const drawn = new L.FeatureGroup();
     function initMap(containerId){
-      const m = L.map(containerId||'map').setView([-1.0639,-77.8125], 17);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 20}).addTo(m);
+      const m=L.map(containerId||'map').setView([-1.0639,-77.8125],16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20}).addTo(m);
       m.addLayer(drawn);
-      m.on('mousemove', (e)=>{qs('#coords').textContent = `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`});
+      m.on('mousemove', (e)=>{qs('#coords').textContent=`Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`});
       return m;
+    }
+
+    // ===== DIBUJO MANUAL (fallback) =====
+    const manual = {active:false, latlngs:[], temp:null, dbl:false};
+    function startManualDraw(){
+      manual.active=true; manual.latlngs=[]; if(manual.temp){ map.removeLayer(manual.temp); manual.temp=null; }
+      document.body.classList.add('drawing-cursor');
+      map.doubleClickZoom.disable();
+      qs('#coords').textContent='Modo dibujo manual: clic para vértices, doble clic para cerrar.';
+    }
+    function stopManualDraw(commit){
+      document.body.classList.remove('drawing-cursor');
+      map.doubleClickZoom.enable();
+      if(manual.temp){ map.removeLayer(manual.temp); manual.temp=null; }
+      if(commit && manual.latlngs.length>=3){
+        const poly=L.polygon(manual.latlngs,{color:'#41d39e'}); drawn.addLayer(poly);
+        alert('Geocerca dibujada. Pulse "Guardar Cambios".');
+      }
+      manual.active=false; manual.latlngs=[];
+      qs('#coords').textContent='Lat: –, Lng: –';
     }
 
     function initApp(){
@@ -288,293 +253,84 @@
       qsa('.tablink').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
       qsa('nav.tabs button').forEach(b=>b.addEventListener('click',()=>switchTab(b.getAttribute('data-tabbtn'))));
 
-      // Mapa principal
-      map = initMap('map');
-
-      // Cargar geocercas existentes
+      // Mapa
+      map=initMap('map');
       renderGeofencesOnMap();
 
-      // Leaflet Draw (dibujo/edición de polígonos)
-      drawControl = new L.Control.Draw({
-        draw: {polyline:false, rectangle:false, circle:false, marker:false, circlemarker:false, polygon:{allowIntersection:false,showArea:true}},
-        edit: {featureGroup: drawn, edit:true, remove:true}
-      });
-      map.addControl(drawControl);
+      // Leaflet.draw si está disponible
+      if(L && L.Control && L.Control.Draw){
+        drawControl=new L.Control.Draw({
+          draw:{polyline:false,rectangle:false,circle:false,marker:false,circlemarker:false,polygon:{allowIntersection:false,showArea:true}},
+          edit:{featureGroup:drawn,edit:true,remove:true}
+        });
+        map.addControl(drawControl);
+        map.on(L.Draw.Event.CREATED, (e)=>{ drawn.addLayer(e.layer); alert('Geocerca dibujada. Pulse "Guardar Cambios".'); });
+      }
 
-      // Ayudas visuales durante el dibujo
-      map.on(L.Draw.Event.DRAWSTART, function(){
-        qs('#coords').textContent = 'Modo dibujo activo: clic para vértices, doble clic para cerrar.';
+      // Eventos para dibujo manual
+      map.on('click', (e)=>{
+        if(!manual.active) return;
+        manual.latlngs.push([e.latlng.lat, e.latlng.lng]);
+        if(manual.temp){ map.removeLayer(manual.temp); }
+        if(manual.latlngs.length>=3){ manual.temp=L.polygon(manual.latlngs,{dashArray:'4'}).addTo(map); }
+        else { manual.temp=L.polyline(manual.latlngs,{dashArray:'4'}).addTo(map); }
       });
-      map.on(L.Draw.Event.DRAWSTOP, function(){
-        qs('#coords').textContent = 'Lat: –, Lng: –';
-      });
-      map.on(L.Draw.Event.CREATED, function (e) {
-        const layer = e.layer; drawn.addLayer(layer);
-        alert('Geocerca dibujada. Ahora pulse "Guardar Cambios" para persistirla.');
-      });
+      map.on('dblclick', ()=>{ if(manual.active){ stopManualDraw(true); }});
 
-      // Botones de geocercas
+      // Botones
       qs('#btnAddPoly').addEventListener('click', ()=>{
         try{
-          if(!L || !L.Draw || !L.Draw.Polygon){ alert('Leaflet.draw no cargó correctamente.'); return; }
-          if(window.__currentDraw){ window.__currentDraw.disable?.(); }
-          const polyOpts = (drawControl && drawControl.options && drawControl.options.draw && drawControl.options.draw.polygon) || {allowIntersection:false,showArea:true};
-          window.__currentDraw = new L.Draw.Polygon(map, polyOpts);
-          window.__currentDraw.enable();
-          qs('#coords').textContent = 'Modo dibujo activo: clic para vértices, doble clic para cerrar.';
-        }catch(err){ console.error(err); alert('No se pudo iniciar el modo dibujo.'); }
+          if(L && L.Draw && L.Draw.Polygon){
+            // Inicia dibujo de Leaflet.draw
+            new L.Draw.Polygon(map, drawControl?.options?.draw?.polygon || {allowIntersection:false,showArea:true}).enable();
+            qs('#coords').textContent='Modo dibujo activo: clic para vértices, doble clic para cerrar.';
+          } else {
+            // Fallback manual
+            startManualDraw();
+          }
+        }catch(err){ console.error(err); startManualDraw(); }
       });
       qs('#btnSavePolys').addEventListener('click', saveGeofencesFromMap);
-
-      // Accesos rápidos
       qs('#centerToGF').addEventListener('click',()=>{ if(drawn.getLayers().length) map.fitBounds(drawn.getBounds()); });
       qs('#exportCSV').addEventListener('click', exportCSV);
 
-      // Tablas/Combos
       renderGFTable();
       renderPeopleTable();
-
-      // Añadir personal
-      const addBtn = qs('#btnAddPerson');
-      if(addBtn){
-        addBtn.addEventListener('click', ()=>{
-          const name = qs('#pName').value.trim();
-          const phone = qs('#pPhone').value.trim();
-          const role = qs('#pRole').value;
-          if(!name || !phone){ alert('Nombre y teléfono son obligatorios'); return; }
-          const id = 'u'+Math.random().toString(36).slice(2,7);
-          DB.people.push({id,name,phone,role,geofences:[]});
-          saveDB(DB);
-          qs('#pName').value=''; qs('#pPhone').value='';
-          renderPeopleTable(); fillReportSelectors();
-          alert('Usuario añadido');
-        });
-      }
-
-      // Reportes
       fillReportSelectors();
       qs('#btnRunReport').addEventListener('click', runReport);
     }
 
-    function switchTab(name){
-      qsa('.panel').forEach(p=>p.classList.add('hide'));
-      qs('#panel-'+name).classList.remove('hide');
-      qsa('nav.tabs button').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tabbtn')===name));
-    }
-
-    function renderGeofencesOnMap(){
-      drawn.clearLayers();
-      DB.geofences.forEach(gf=>{
-        const latlngs = gf.coords.map(([lng,lat])=>[lat,lng]);
-        const poly = L.polygon(latlngs, {color:'#41d39e'});
-        poly.bindTooltip(gf.name);
-        drawn.addLayer(poly);
-      });
-      if(drawn.getLayers().length) map.fitBounds(drawn.getBounds());
-    }
+    function switchTab(name){ qsa('.panel').forEach(p=>p.classList.add('hide')); qs('#panel-'+name).classList.remove('hide'); qsa('nav.tabs button').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tabbtn')===name)); }
+    function renderGeofencesOnMap(){ drawn.clearLayers(); DB.geofences.forEach(gf=>{ const ll=gf.coords.map(([lng,lat])=>[lat,lng]); drawn.addLayer(L.polygon(ll,{color:'#41d39e'}).bindTooltip(gf.name)); }); if(drawn.getLayers().length) map.fitBounds(drawn.getBounds()); }
 
     function saveGeofencesFromMap(){
-      const nameInput = qs('#gfName');
-      const layers = drawn.getLayers();
-      if(!layers.length){ alert('No hay geocercas dibujadas.'); return; }
-      // Si se ingresó un nombre nuevo, añadimos como nueva geocerca la última capa dibujada
+      const nameInput=qs('#gfName'); const layers=drawn.getLayers(); if(!layers.length){ alert('No hay geocercas dibujadas.'); return; }
       if(nameInput.value.trim()){
-        const layer = layers[layers.length-1];
-        const latlngs = layer.getLatLngs()[0].map(p=>[p.lng, p.lat]);
-        const id = 'gf'+Math.random().toString(36).slice(2,7);
-        DB.geofences.push({id, name:nameInput.value.trim(), coords:latlngs});
-        nameInput.value='';
+        const layer=layers[layers.length-1]; const latlngs=(layer.getLatLngs()[0]||layer.getLatLngs()).map(p=>[p.lng,p.lat]);
+        const id='gf'+Math.random().toString(36).slice(2,7); DB.geofences.push({id,name:nameInput.value.trim(),coords:latlngs}); nameInput.value='';
       } else {
-        // Actualizamos todas según el orden
-        const newGFs = layers.map((layer,i)=>{
-          const coords = layer.getLatLngs()[0].map(p=>[p.lng,p.lat]);
-          return DB.geofences[i] ? {...DB.geofences[i], coords} : null;
-        }).filter(Boolean);
-        // Si la cantidad cambió, intentamos conservar nombres, sino dejamos según orden
-        if(newGFs.length){ DB.geofences = DB.geofences.map((gf,i)=> newGFs[i] || gf); }
+        const newGFs=layers.map((layer,i)=>{ const ll=(layer.getLatLngs()[0]||layer.getLatLngs()).map(p=>[p.lng,p.lat]); return DB.geofences[i]?{...DB.geofences[i],coords:ll}:null; }).filter(Boolean);
+        if(newGFs.length){ DB.geofences=DB.geofences.map((gf,i)=> newGFs[i] || gf); }
       }
-      saveDB(DB);
-      renderGFTable();
-      alert('Geocercas guardadas.');
+      saveDB(DB); renderGFTable(); alert('Geocercas guardadas.');
     }
 
-    function renderGFTable(){
-      const tb = qs('#gfTable tbody');
-      tb.innerHTML='';
-      DB.geofences.forEach(gf=>{
-        const tr = document.createElement('tr');
-        const verts = gf.coords.length;
-        tr.innerHTML = `<td>${gf.name}</td><td>${verts}</td><td><button data-id="${gf.id}" class="ghost btnZoom">Zoom</button></td>`;
-        tb.appendChild(tr);
-      });
-      qsa('.btnZoom', tb).forEach(b=>b.addEventListener('click', ()=>{
-        const gf = DB.geofences.find(x=>x.id===b.dataset.id);
-        if(!gf) return; const ll = gf.coords.map(([lng,lat])=>[lat,lng]);
-        map.fitBounds(L.polygon(ll).getBounds());
-      }));
-    }
+    function renderGFTable(){ const tb=qs('#gfTable tbody'); tb.innerHTML=''; DB.geofences.forEach(gf=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${gf.name}</td><td>${gf.coords.length}</td><td><button type="button" class="ghost btnZoom" data-id="${gf.id}">Zoom</button></td>`; tb.appendChild(tr); }); qsa('.btnZoom',tb).forEach(b=>b.addEventListener('click',()=>{ const gf=DB.geofences.find(x=>x.id===b.dataset.id); if(!gf) return; map.fitBounds(L.polygon(gf.coords.map(([lng,lat])=>[lat,lng])).getBounds()); })); }
 
-    
-    function renderPeopleTable(){
-      const tb = qs('#personTable tbody'); tb.innerHTML='';
-      DB.people.forEach(u=>{
-        const gfBadges = u.geofences.map(id=> DB.geofences.find(g=>g.id===id)?.name||id).join(', ')||'—';
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${u.name}</td>
-          <td>${u.phone}</td>
-          <td>${u.role}</td>
-          <td>
-            <select data-id="${u.id}" class="selGF" multiple size="3" style="min-width:180px">
-              ${DB.geofences.map(g=>`<option value="${g.id}" ${u.geofences.includes(g.id)?'selected':''}>${g.name}</option>`).join('')}
-            </select>
-          </td>
-          <td>
-            <button class="ghost btnSaveGF" data-id="${u.id}">Guardar asignación</button>
-            <button class="primary copy btnLink" data-id="${u.id}">Generar enlace</button>
-          </td>`;
-        tb.appendChild(tr);
-      });
-      // Guardar asignaciones
-      qsa('.btnSaveGF', tb).forEach(b=>b.addEventListener('click',()=>{
-        const id=b.dataset.id; const sel = qs(`select.selGF[data-id="${id}"]`);
-        const vals = Array.from(sel.selectedOptions).map(o=>o.value);
-        const i = DB.people.findIndex(x=>x.id===id); if(i>=0){ DB.people[i].geofences = vals; saveDB(DB); alert('Asignación guardada'); }
-      }));
-      // Generar enlaces
-      qsa('.btnLink', tb).forEach(b=>b.addEventListener('click',()=>{
-        const user = DB.people.find(x=>x.id===b.dataset.id); if(!user) return;
-        const url = `${location.origin}${location.pathname}?mode=sender&phone=${encodeURIComponent(user.phone)}`;
-        navigator.clipboard?.writeText(url);
-        alert('Enlace copiado al portapapeles:\n'+url+"\nComparta este vínculo al teléfono del usuario.");
-      }));
-    }
+    function renderPeopleTable(){ const tb=qs('#personTable tbody'); if(!tb) return; tb.innerHTML=''; DB.people.forEach(u=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${u.name}</td><td>${u.phone}</td><td>${u.role}</td><td><select data-id="${u.id}" class="selGF" multiple size="3" style="min-width:180px">${DB.geofences.map(g=>`<option value="${g.id}" ${u.geofences?.includes(g.id)?'selected':''}>${g.name}</option>`).join('')}</select></td><td><button type="button" class="ghost btnSaveGF" data-id="${u.id}">Guardar asignación</button><button type="button" class="primary btnLink" data-id="${u.id}">Generar enlace</button></td>`; tb.appendChild(tr); }); qsa('.btnSaveGF',tb).forEach(b=>b.addEventListener('click',()=>{ const id=b.dataset.id; const sel=qs(`select.selGF[data-id="${id}"]`); const vals=Array.from(sel.selectedOptions).map(o=>o.value); const i=DB.people.findIndex(x=>x.id===id); if(i>=0){ DB.people[i].geofences=vals; saveDB(DB); alert('Asignación guardada'); } })); qsa('.btnLink',tb).forEach(b=>b.addEventListener('click',()=>{ const user=DB.people.find(x=>x.id===b.dataset.id); if(!user) return; const url=`${location.origin}${location.pathname}?mode=sender&phone=${encodeURIComponent(user.phone)}`; navigator.clipboard?.writeText(url); alert('Enlace copiado:\n'+url); })); }
 
-    // REPORTES
-    function fillReportSelectors(){
-      const uSel = qs('#rUser'); const gSel = qs('#rGeofence');
-      uSel.innerHTML = '<option value="">Todos los usuarios</option>' + DB.people.map(u=>`<option value="${u.id}">${u.name} (${u.phone})</option>`).join('');
-      gSel.innerHTML = '<option value="">Todas las geocercas</option>' + DB.geofences.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
-    }
-    function runReport(){
-      const u = qs('#rUser').value; const g = qs('#rGeofence').value;
-      const from = qs('#rFrom').value ? new Date(qs('#rFrom').value).getTime() : 0;
-      const to = qs('#rTo').value ? new Date(qs('#rTo').value).getTime() : Date.now();
-      const rows = DB.submissions.filter(r=> (!u || r.userId===u) && (!g || r.geofenceId===g) && r.ts>=from && r.ts<=to);
-      const tb = qs('#reportTable tbody'); tb.innerHTML='';
-      rows.forEach(r=>{
-        const tr = document.createElement('tr');
-        const user = DB.people.find(x=>x.id===r.userId);
-        const gf = DB.geofences.find(x=>x.id===r.geofenceId);
-        tr.innerHTML = `<td>${new Date(r.ts).toLocaleString()}</td><td>${user?.name||'—'}</td><td>${r.phone}</td><td>${gf?.name||r.geofenceId}</td><td>${r.lat.toFixed(6)}</td><td>${r.lng.toFixed(6)}</td><td>${Math.round(r.acc||0)}</td>`;
-        tb.appendChild(tr);
-      });
-    }
-    function exportCSV(){
-      const head = ['fecha','usuario','telefono','geocerca','lat','lng','precision_m'];
-      const lines = [head.join(',')];
-      DB.submissions.forEach(r=>{
-        const user = DB.people.find(x=>x.id===r.userId);
-        const gf = DB.geofences.find(x=>x.id===r.geofenceId);
-        lines.push([
-          new Date(r.ts).toISOString(), user?.name||'', r.phone, gf?.name||r.geofenceId, r.lat, r.lng, Math.round(r.acc||0)
-        ].join(','));
-      });
-      const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = 'envios_georreferenciados.csv'; a.click();
-    }
+    function fillReportSelectors(){ const uSel=qs('#rUser'); const gSel=qs('#rGeofence'); if(!uSel||!gSel) return; uSel.innerHTML='<option value="">Todos los usuarios</option>'+DB.people.map(u=>`<option value="${u.id}">${u.name} (${u.phone})</option>`).join(''); gSel.innerHTML='<option value="">Todas las geocercas</option>'+DB.geofences.map(g=>`<option value="${g.id}">${g.name}</option>`).join(''); }
+    function runReport(){ const u=qs('#rUser').value; const g=qs('#rGeofence').value; const from=qs('#rFrom').value?new Date(qs('#rFrom').value).getTime():0; const to=qs('#rTo').value?new Date(qs('#rTo').value).getTime():Date.now(); const rows=DB.submissions.filter(r=>(!u||r.userId===u)&&(!g||r.geofenceId===g)&&r.ts>=from&&r.ts<=to); const tb=qs('#reportTable tbody'); tb.innerHTML=''; rows.forEach(r=>{ const user=DB.people.find(x=>x.id===r.userId); const gf=DB.geofences.find(x=>x.id===r.geofenceId); const tr=document.createElement('tr'); tr.innerHTML=`<td>${new Date(r.ts).toLocaleString()}</td><td>${user?.name||'—'}</td><td>${r.phone}</td><td>${gf?.name||r.geofenceId}</td><td>${r.lat.toFixed(6)}</td><td>${r.lng.toFixed(6)}</td><td>${Math.round(r.acc||0)}</td>`; tb.appendChild(tr); }); }
+    function exportCSV(){ const head=['fecha','usuario','telefono','geocerca','lat','lng','precision_m']; const lines=[head.join(',')]; DB.submissions.forEach(r=>{ const user=DB.people.find(x=>x.id===r.userId); const gf=DB.geofences.find(x=>x.id===r.geofenceId); lines.push([ new Date(r.ts).toISOString(), user?.name||'', r.phone, gf?.name||r.geofenceId, r.lat, r.lng, Math.round(r.acc||0) ].join(',')); }); const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='envios_georreferenciados.csv'; a.click(); }
 
-    /*************************
-     * MODO EMISOR (Sender)  *
-     *************************/
+    // ====== MODO EMISOR ======
     let senderMap, senderLayerGroup, senderWatchId=null, senderUser=null;
-
-    function initSender(phone){
-      // Resolver usuario
-      senderUser = DB.people.find(u=>u.phone===phone);
-      if(!senderUser){ alert('No existe un usuario con este teléfono. Pida a su administrador el enlace correcto.'); return; }
-      // Mostrar datos
-      qs('#senderUser').textContent = `Usuario: ${senderUser.name} (${senderUser.phone})`;
-      const gfNames = senderUser.geofences.map(id=> DB.geofences.find(g=>g.id===id)?.name||id);
-      qs('#senderGeofences').textContent = `Geocercas asignadas: ${gfNames.join(', ')||'— (consulte a su administrador)'}`;
-
-      // Map
-      senderMap = L.map('senderMap').setView([-1.0639,-77.8125], 16);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 20}).addTo(senderMap);
-      senderLayerGroup = L.layerGroup().addTo(senderMap);
-      // Pintar geocercas asignadas
-      const bounds = [];
-      senderUser.geofences.forEach(id=>{
-        const gf = DB.geofences.find(g=>g.id===id); if(!gf) return;
-        const ll = gf.coords.map(([lng,lat])=>[lat,lng]);
-        const poly = L.polygon(ll,{color:'#41d39e'}).addTo(senderLayerGroup).bindTooltip(gf.name);
-        bounds.push(...ll);
-      });
-      if(bounds.length){ senderMap.fitBounds(L.polygon(bounds).getBounds()); }
-
-      // Botones
-      qs('#btnSenderStart').addEventListener('click', startSending);
-      qs('#btnSenderStop').addEventListener('click', stopSending);
-    }
-
-    function setSenderStatus(on, msg){
-      qs('#senderStatus').textContent = on?'Enviando':'Detenido';
-      qs('#senderStatusDot').classList.toggle('on', on);
-      qs('#senderStatusDot').classList.toggle('off', !on);
-      qs('#senderInfo').textContent = 'Estado: '+(msg|| (on?'activo':'inactivo'));
-    }
-
-    function startSending(){
-      if(!navigator.geolocation){ alert('Geolocalización no soportada'); return; }
-      if(senderWatchId!=null) return;
-      setSenderStatus(true,'iniciando geolocalización…');
-      // watchPosition para actualizaciones continuas
-      senderWatchId = navigator.geolocation.watchPosition(onPos, onPosError, {
-        enableHighAccuracy:true, maximumAge:5000, timeout:15000
-      });
-    }
-
-    function stopSending(){
-      if(senderWatchId!=null){ navigator.geolocation.clearWatch(senderWatchId); senderWatchId=null; }
-      setSenderStatus(false,'detenido por el usuario');
-    }
-
-    function onPosError(err){ setSenderStatus(false, 'error geolocalización: '+err.message); }
-
-    function onPos(pos){
-      const {latitude:lat, longitude:lng, accuracy} = pos.coords;
-      senderLayerGroup.clearLayers();
-      // Redibujar geocercas del usuario
-      const bounds = [];
-      senderUser.geofences.forEach(id=>{
-        const gf = DB.geofences.find(g=>g.id===id); if(!gf) return;
-        const ll = gf.coords.map(([lng2,lat2])=>[lat2,lng2]);
-        L.polygon(ll,{color:'#41d39e'}).addTo(senderLayerGroup);
-        bounds.push(...ll);
-      });
-      const m = L.marker([lat,lng]).addTo(senderLayerGroup).bindTooltip('Usted');
-      L.circle([lat,lng], {radius: Math.max(15, accuracy||15)}).addTo(senderLayerGroup);
-      if(bounds.length){ senderMap.fitBounds(L.latLngBounds([ [lat,lng], ...bounds ]), {maxZoom:18}); }
-
-      // Validar si está dentro de alguna geocerca asignada
-      const pt = turf.point([lng,lat]);
-      let insideGfId = null;
-      for(const id of senderUser.geofences){
-        const gf = DB.geofences.find(g=>g.id===id); if(!gf) continue;
-        const poly = turf.polygon([[...gf.coords, gf.coords[0]]]);
-        if(turf.booleanPointInPolygon(pt, poly)){ insideGfId = gf.id; break; }
-      }
-
-      if(insideGfId){
-        // Guardar envío local (simulación de POST)
-        DB.submissions.push({ts:Date.now(), phone:senderUser.phone, userId:senderUser.id, lat, lng, acc:accuracy||0, geofenceId:insideGfId});
-        saveDB(DB);
-        setSenderStatus(true, `dentro de geocerca (${insideGfId}). Punto registrado.`);
-      } else {
-        setSenderStatus(true, 'fuera de geocerca: no se registra punto.');
-      }
-    }
+    function initSender(phone){ senderUser=DB.people.find(u=>u.phone===phone); if(!senderUser){ alert('No existe un usuario con este teléfono.'); return; } qs('#senderUser').textContent=`Usuario: ${senderUser.name} (${senderUser.phone})`; const gfNames=senderUser.geofences.map(id=>DB.geofences.find(g=>g.id===id)?.name||id); qs('#senderGeofences').textContent=`Geocercas asignadas: ${gfNames.join(', ')||'—'}`; senderMap=L.map('senderMap').setView([-1.0639,-77.8125],16); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20}).addTo(senderMap); senderLayerGroup=L.layerGroup().addTo(senderMap); const bounds=[]; senderUser.geofences.forEach(id=>{ const gf=DB.geofences.find(g=>g.id===id); if(!gf) return; const ll=gf.coords.map(([lng,lat])=>[lat,lng]); L.polygon(ll,{color:'#41d39e'}).addTo(senderLayerGroup).bindTooltip(gf.name); bounds.push(...ll); }); if(bounds.length){ senderMap.fitBounds(L.polygon(bounds).getBounds()); } qs('#btnSenderStart').addEventListener('click', startSending); qs('#btnSenderStop').addEventListener('click', stopSending); }
+    function setSenderStatus(on,msg){ qs('#senderStatus').textContent=on?'Enviando':'Detenido'; const dot=qs('#senderStatusDot'); dot.classList.toggle('on',on); dot.classList.toggle('off',!on); qs('#senderInfo').textContent='Estado: '+(msg|| (on?'activo':'inactivo')); }
+    function startSending(){ if(!navigator.geolocation){ alert('Geolocalización no soportada'); return; } if(senderWatchId!=null) return; setSenderStatus(true,'iniciando geolocalización…'); senderWatchId=navigator.geolocation.watchPosition(onPos,onPosError,{enableHighAccuracy:true,maximumAge:5000,timeout:15000}); }
+    function stopSending(){ if(senderWatchId!=null){ navigator.geolocation.clearWatch(senderWatchId); senderWatchId=null; } setSenderStatus(false,'detenido por el usuario'); }
+    function onPosError(err){ setSenderStatus(false,'error geolocalización: '+err.message); }
+    function onPos(pos){ const {latitude:lat,longitude:lng,accuracy}=pos.coords; senderLayerGroup.clearLayers(); const bounds=[]; senderUser.geofences.forEach(id=>{ const gf=DB.geofences.find(g=>g.id===id); if(!gf) return; const ll=gf.coords.map(([lng2,lat2])=>[lat2,lng2]); L.polygon(ll,{color:'#41d39e'}).addTo(senderLayerGroup); bounds.push(...ll); }); L.marker([lat,lng]).addTo(senderLayerGroup); L.circle([lat,lng],{radius:Math.max(15,accuracy||15)}).addTo(senderLayerGroup); if(bounds.length){ senderMap.fitBounds(L.latLngBounds([[lat,lng],...bounds]),{maxZoom:18}); } const pt=turf.point([lng,lat]); let insideGfId=null; for(const id of senderUser.geofences){ const gf=DB.geofences.find(g=>g.id===id); if(!gf) continue; const poly=turf.polygon([[...gf.coords,gf.coords[0]]]); if(turf.booleanPointInPolygon(pt,poly)){ insideGfId=gf.id; break; } } if(insideGfId){ DB.submissions.push({ts:Date.now(),phone:senderUser.phone,userId:senderUser.id,lat,lng,acc:accuracy||0,geofenceId:insideGfId}); saveDB(DB); setSenderStatus(true,`dentro de geocerca (${insideGfId}). Punto registrado.`); } else { setSenderStatus(true,'fuera de geocerca: no se registra punto.'); } }
 
   </script>
 </body>
