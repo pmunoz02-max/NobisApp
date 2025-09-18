@@ -238,8 +238,16 @@
     }
     function stopManualDraw(commit){
       document.body.classList.remove('drawing-cursor');
+      qs('#drawHelp').style.display='none';
       map.doubleClickZoom.enable();
       if(manual.temp){ map.removeLayer(manual.temp); manual.temp=null; }
+      if(commit && manual.latlngs.length>=3){
+        const poly=L.polygon(manual.latlngs,{color:'#41d39e'}); drawn.addLayer(poly);
+        alert('Geocerca dibujada. Pulse "Guardar Cambios".');
+      }
+      manual.active=false; manual.latlngs=[];
+      qs('#coords').textContent='Lat: –, Lng: –';
+    }
       if(commit && manual.latlngs.length>=3){
         const poly=L.polygon(manual.latlngs,{color:'#41d39e'}); drawn.addLayer(poly);
         alert('Geocerca dibujada. Pulse "Guardar Cambios".');
@@ -276,6 +284,9 @@
         else { manual.temp=L.polyline(manual.latlngs,{dashArray:'4'}).addTo(map); }
       });
       map.on('dblclick', ()=>{ if(manual.active){ stopManualDraw(true); }});
+      // Botones de ayuda
+      qs('#btnClosePoly').addEventListener('click', ()=>{ if(manual.active) stopManualDraw(true); });
+      qs('#btnCancelPoly').addEventListener('click', ()=>{ if(manual.active) stopManualDraw(false); });
 
       // Botones
       qs('#btnAddPoly').addEventListener('click', ()=>{
