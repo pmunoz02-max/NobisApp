@@ -3,10 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>App Nobis – Geocercas & Envío Georreferenciado (v1.3)</title>
-  <!-- Leaflet (ÚNICA dependencia externa) -->
+  <title>App Nobis – Geocercas & Envío Georreferenciado (SAFE v1.4)</title>
+  <!-- ÚNICA dependencia externa: Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root{ --bg:#0c0d10;--panel:#141721;--muted:#778;--text:#eaeef7;--acc:#41d39e;--warn:#ffc13b;--danger:#ff6363; }
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
@@ -66,8 +65,6 @@
           <div class="row">
             <button type="button" class="tablink" data-tab="geocercas">Geocercas</button>
             <button type="button" class="tablink" data-tab="personal">Personal</button>
-            <button type="button" class="tablink" data-tab="actividades">Actividades</button>
-            <button type="button" class="tablink" data-tab="costos">Costos</button>
             <button type="button" class="tablink" data-tab="reportes">Reportes</button>
           </div>
         </div>
@@ -86,8 +83,6 @@
       <nav class="tabs">
         <button type="button" class="active" data-tabbtn="geocercas">Geocercas</button>
         <button type="button" data-tabbtn="personal">Personal</button>
-        <button type="button" data-tabbtn="actividades">Actividades</button>
-        <button type="button" data-tabbtn="costos">Costos</button>
         <button type="button" data-tabbtn="reportes">Reportes</button>
       </nav>
 
@@ -134,8 +129,6 @@
         </div>
       </section>
 
-      <section id="panel-actividades" class="panel hide"><div class="section"><h2>Actividades</h2><div class="card tiny">Placeholder</div></div></section>
-      <section id="panel-costos" class="panel hide"><div class="section"><h2>Costos</h2><div class="card tiny">Placeholder</div></div></section>
       <section id="panel-reportes" class="panel hide">
         <div class="section">
           <h2>Reportes</h2>
@@ -173,164 +166,191 @@
     </div>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-  // ===== Errores visibles =====
+  // ==== Captura de errores visibles para evitar pantalla negra ====
   window.onerror = function(msg, url, line, col){ alert('[JS] '+msg+' @'+line+':'+col); };
 
-  // ===== Utilidades/Storage =====
-  const qs = (s, r=document)=>r.querySelector(s);
-  const qsa = (s, r=document)=>Array.from(r.querySelectorAll(s));
-  const getParams = ()=>Object.fromEntries(new URLSearchParams(location.search).entries());
-  const LS_KEY='appnobis.v3';
-  function loadDB(){
-    const raw=localStorage.getItem(LS_KEY);
-    if(raw){ try{return JSON.parse(raw);}catch(e){} }
-    const seed={
-      geofences:[{id:'gf1',name:'Parcela Norte',coords:[[-77.8122,-1.0635],[-77.8111,-1.0634],[-77.8112,-1.0625],[-77.8123,-1.0626]]}],
-      people:[{id:'adm',name:'Admin',phone:'593900000000',role:'admin',geofences:['gf1']}],
-      submissions:[]
-    };
-    localStorage.setItem(LS_KEY, JSON.stringify(seed));
-    return seed;
-  }
-  function saveDB(db){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
-  let DB = loadDB();
-
-  \/\/ ===== Geometría y capas (declaradas ANTES de iniciar) =====
-  let map; let drawn = null;
-  const manual = {active:false, latlngs:[], temp:null};
-
-  \/\/ ===== Modo =====
-  const params=getParams();
-  const isSenderMode=(params.mode||'').toLowerCase()==='sender' && !!params.phone;
-  const modeTag=qs('#modeTag');
-  if(isSenderMode){ modeTag.textContent='Modo Emisor'; qs('#sender').classList.remove('hide'); initSender(params.phone); }
-  else { modeTag.textContent='Modo Administrador/Operador'; qs('#app').classList.remove('hide'); initApp(); }
-
-  // ===== Geometría: punto en polígono (lng,lat) =====
-  function pointInPoly(pt, poly){ // pt:[lng,lat], poly:[[lng,lat],...]
-    let x=pt[0], y=pt[1], inside=false;
-    for(let i=0, j=poly.length-1; i<poly.length; j=i++){
-      const xi=poly[i][0], yi=poly[i][1];
-      const xj=poly[j][0], yj=poly[j][1];
-      const intersect=((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12)+xi);
-      if(intersect) inside=!inside;
+  document.addEventListener('DOMContentLoaded', function(){
+    // ==== Utilidades/Storage ====
+    const qs = (s, r=document)=>r.querySelector(s);
+    const qsa = (s, r=document)=>Array.from(r.querySelectorAll(s));
+    const getParams = ()=>Object.fromEntries(new URLSearchParams(location.search).entries());
+    const LS_KEY='appnobis.safe.v1';
+    function loadDB(){
+      const raw=localStorage.getItem(LS_KEY);
+      if(raw){ try{return JSON.parse(raw);}catch(e){} }
+      const seed={
+        geofences:[{id:'gf1',name:'Parcela Norte',coords:[[-77.8122,-1.0635],[-77.8111,-1.0634],[-77.8112,-1.0625],[-77.8123,-1.0626]]}],
+        people:[{id:'adm',name:'Admin',phone:'593900000000',role:'admin',geofences:['gf1']}],
+        submissions:[]
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(seed)); return seed;
     }
-    return inside;
-  }
+    function saveDB(db){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
+    let DB = loadDB();
 
-  \/\/ ===== App (admin/operador) =====
-
-  function initMap(containerId){
-    const m=L.map(containerId||'map').setView([-1.0639,-77.8125],16);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20}).addTo(m);
-    // 'drawn' se agrega luego de crear el map en initApp()
-    m.on('mousemove', (e)=>{qs('#coords').textContent=`Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`});
-    return m;
-  }
-
-  function initApp(){
-    // Tabs
-    qsa('.tablink').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
-    qsa('nav.tabs button').forEach(b=>b.addEventListener('click',()=>switchTab(b.getAttribute('data-tabbtn'))));
-
-    map=initMap('map');
-    // Inicializa la capa 'drawn' DESPUÉS de crear el mapa
-    drawn = L.featureGroup().addTo(map);
-    renderGeofencesOnMap();
-
-    // Dibujo manual puro (sin Leaflet.draw)
-    document.addEventListener('click', (ev)=>{
-      if(ev.target.closest('#btnAddPoly')) startManualDraw();
-      if(ev.target.closest('#btnSavePolys')) saveGeofencesFromMap();
-    });
-
-    map.on('click', (e)=>{
-      if(!manual.active) return;
-      manual.latlngs.push([e.latlng.lat, e.latlng.lng]);
-      if(manual.temp){ map.removeLayer(manual.temp); }
-      if(manual.latlngs.length>=3){ manual.temp=L.polygon(manual.latlngs,{dashArray:'4'}).addTo(map); }
-      else { manual.temp=L.polyline(manual.latlngs,{dashArray:'4'}).addTo(map); }
-    });
-    map.on('dblclick', ()=>{ if(manual.active) stopManualDraw(true); });
-    qs('#btnClosePoly').addEventListener('click', ()=>{ if(manual.active) stopManualDraw(true); });
-    qs('#btnCancelPoly').addEventListener('click', ()=>{ if(manual.active) stopManualDraw(false); });
-
-    // Accesos rápidos
-    qs('#centerToGF').addEventListener('click',()=>{ if(drawn.getLayers().length) map.fitBounds(drawn.getBounds()); });
-    qs('#exportCSV').addEventListener('click', exportCSV);
-
-    // Tablas/Reportes
-    renderGFTable();
-    renderPeopleTable();
-    fillReportSelectors();
-    qs('#btnRunReport').addEventListener('click', runReport);
-    // Añadir personal
-    qs('#btnAddPerson').addEventListener('click', ()=>{
-      const name=qs('#pName').value.trim(); const phone=qs('#pPhone').value.trim(); const role=qs('#pRole').value;
-      if(!name||!phone) return alert('Nombre y teléfono son obligatorios');
-      const id='u'+Math.random().toString(36).slice(2,7);
-      DB.people.push({id,name,phone,role,geofences:[]}); saveDB(DB);
-      qs('#pName').value=''; qs('#pPhone').value='';
-      renderPeopleTable(); fillReportSelectors(); alert('Usuario añadido');
-    });
-  }
-
-  function startManualDraw(){
-    manual.active=true; manual.latlngs=[]; if(manual.temp){ map.removeLayer(manual.temp); manual.temp=null; }
-    document.body.classList.add('drawing-cursor');
-    qs('#drawHelp').style.display='block';
-    map.doubleClickZoom.disable();
-    qs('#coords').textContent='Modo dibujo: clic para vértices, doble clic/cerrar';
-  }
-  function stopManualDraw(commit){
-    document.body.classList.remove('drawing-cursor');
-    qs('#drawHelp').style.display='none';
-    map.doubleClickZoom.enable();
-    if(manual.temp){ map.removeLayer(manual.temp); manual.temp=null; }
-    if(commit && manual.latlngs.length>=3){
-      drawn.addLayer(L.polygon(manual.latlngs,{color:'#41d39e'}));
-      alert('Geocerca dibujada. Pulse "Guardar Cambios".');
+    // ==== Geometría: punto en polígono (lng,lat) ====
+    function pointInPoly(pt, poly){ // pt:[lng,lat], poly:[[lng,lat],...]
+      let x=pt[0], y=pt[1], inside=false;
+      for(let i=0, j=poly.length-1; i<poly.length; j=i++){
+        const xi=poly[i][0], yi=poly[i][1], xj=poly[j][0], yj=poly[j][1];
+        const intersect=((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12)+xi);
+        if(intersect) inside=!inside;
+      }
+      return inside;
     }
-    manual.active=false; manual.latlngs=[];
-    qs('#coords').textContent='Lat: –, Lng: –';
-  }
 
-  function switchTab(name){ qsa('.panel').forEach(p=>p.classList.add('hide')); qs('#panel-'+name).classList.remove('hide'); qsa('nav.tabs button').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tabbtn')===name)); }
-  function renderGeofencesOnMap(){ if(!drawn){ return; } drawn.clearLayers(); DB.geofences.forEach(gf=>{ const ll=gf.coords.map(([lng,lat])=>[lat,lng]); drawn.addLayer(L.polygon(ll,{color:'#41d39e'}).bindTooltip(gf.name)); }); if(drawn.getLayers().length) map.fitBounds(drawn.getBounds()); }
+    // ==== Modo ====
+    const params=getParams();
+    const isSenderMode=(params.mode||'').toLowerCase()==='sender' && !!params.phone;
+    const modeTag=qs('#modeTag');
+    if(isSenderMode){ modeTag.textContent='Modo Emisor'; qs('#sender').classList.remove('hide'); initSender(params.phone); }
+    else { modeTag.textContent='Modo Administrador/Operador'; qs('#app').classList.remove('hide'); initApp(); }
 
-  function saveGeofencesFromMap(){
-    const nameInput=qs('#gfName'); const layers=drawn.getLayers(); if(!layers.length){ alert('No hay geocercas dibujadas.'); return; }
-    if(nameInput.value.trim()){
-      const layer=layers[layers.length-1]; const latlngs=(layer.getLatLngs()[0]||layer.getLatLngs()).map(p=>[p.lng,p.lat]);
-      const id='gf'+Math.random().toString(36).slice(2,7); DB.geofences.push({id,name:nameInput.value.trim(),coords:latlngs}); nameInput.value='';
-    } else {
-      const newGFs=layers.map((layer,i)=>{ const ll=(layer.getLatLngs()[0]||layer.getLatLngs()).map(p=>[p.lng,p.lat]); return DB.geofences[i]?{...DB.geofences[i],coords:ll}:null; }).filter(Boolean);
-      if(newGFs.length){ DB.geofences=DB.geofences.map((gf,i)=> newGFs[i] || gf); }
+    // ==== MAPA y capas ====
+    let map=null;           // mapa admin
+    let drawn=null;         // featureGroup para geocercas (se inicializa después del mapa)
+    const manual={active:false, latlngs:[], temp:null}; // estado dibujo manual
+
+    function initMap(containerId){
+      const m=L.map(containerId).setView([-1.0639,-77.8125],16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20}).addTo(m);
+      m.on('mousemove', (e)=>{qs('#coords').textContent=`Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`});
+      return m;
     }
-    saveDB(DB); renderGFTable(); alert('Geocercas guardadas.');
-  }
 
-  function renderGFTable(){ const tb=qs('#gfTable tbody'); tb.innerHTML=''; DB.geofences.forEach(gf=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${gf.name}</td><td>${gf.coords.length}</td><td><button type="button" class="ghost btnZoom" data-id="${gf.id}">Zoom</button></td>`; tb.appendChild(tr); }); qsa('.btnZoom',tb).forEach(b=>b.addEventListener('click',()=>{ const gf=DB.geofences.find(x=>x.id===b.dataset.id); if(!gf) return; map.fitBounds(L.polygon(gf.coords.map(([lng,lat])=>[lat,lng])).getBounds()); })); }
+    // ===== Admin/Operador =====
+    function initApp(){
+      // Tabs
+      qsa('.tablink').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
+      qsa('nav.tabs button').forEach(b=>b.addEventListener('click',()=>switchTab(b.getAttribute('data-tabbtn'))));
 
-  function renderPeopleTable(){ const tb=qs('#personTable tbody'); tb.innerHTML=''; DB.people.forEach(u=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${u.name}</td><td>${u.phone}</td><td>${u.role}</td><td><select data-id="${u.id}" class="selGF" multiple size="3" style="min-width:180px">${DB.geofences.map(g=>`<option value="${g.id}" ${u.geofences?.includes(g.id)?'selected':''}>${g.name}</option>`).join('')}</select></td><td><button type=button class="ghost btnSaveGF" data-id="${u.id}">Guardar asignación</button> <button type=button class="primary btnLink" data-id="${u.id}">Generar enlace</button></td>`; tb.appendChild(tr); }); qsa('.btnSaveGF',tb).forEach(b=>b.addEventListener('click',()=>{ const id=b.dataset.id; const sel=qs(`select.selGF[data-id="${id}"]`); const vals=Array.from(sel.selectedOptions).map(o=>o.value); const i=DB.people.findIndex(x=>x.id===id); if(i>=0){ DB.people[i].geofences=vals; saveDB(DB); alert('Asignación guardada'); } })); qsa('.btnLink',tb).forEach(b=>b.addEventListener('click',()=>{ const user=DB.people.find(x=>x.id===b.dataset.id); if(!user) return; const url=`${location.origin}${location.pathname}?mode=sender&phone=${encodeURIComponent(user.phone)}`; navigator.clipboard?.writeText(url); alert('Enlace copiado:\n'+url); })); }
+      map = initMap('map');
+      drawn = L.featureGroup().addTo(map);   // AHORA sí existe antes de usarse
+      renderGeofencesOnMap();
 
-  // ===== Reportes =====
-  function fillReportSelectors(){ const uSel=qs('#rUser'); const gSel=qs('#rGeofence'); if(!uSel||!gSel) return; uSel.innerHTML='<option value="">Todos los usuarios</option>'+DB.people.map(u=>`<option value="${u.id}">${u.name} (${u.phone})</option>`).join(''); gSel.innerHTML='<option value="">Todas las geocercas</option>'+DB.geofences.map(g=>`<option value="${g.id}">${g.name}</option>`).join(''); }
-  function runReport(){ const u=qs('#rUser').value; const g=qs('#rGeofence').value; const from=qs('#rFrom').value?new Date(qs('#rFrom').value).getTime():0; const to=qs('#rTo').value?new Date(qs('#rTo').value).getTime():Date.now(); const rows=DB.submissions.filter(r=>(!u||r.userId===u)&&(!g||r.geofenceId===g)&&r.ts>=from&&r.ts<=to); const tb=qs('#reportTable tbody'); tb.innerHTML=''; rows.forEach(r=>{ const user=DB.people.find(x=>x.id===r.userId); const gf=DB.geofences.find(x=>x.id===r.geofenceId); const tr=document.createElement('tr'); tr.innerHTML=`<td>${new Date(r.ts).toLocaleString()}</td><td>${user?.name||'—'}</td><td>${r.phone}</td><td>${gf?.name||r.geofenceId}</td><td>${r.lat.toFixed(6)}</td><td>${r.lng.toFixed(6)}</td><td>${Math.round(r.acc||0)}</td>`; tb.appendChild(tr); }); }
-  function exportCSV(){ const head=['fecha','usuario','telefono','geocerca','lat','lng','precision_m']; const lines=[head.join(',')]; DB.submissions.forEach(r=>{ const user=DB.people.find(x=>x.id===r.userId); const gf=DB.geofences.find(x=>x.id===r.geofenceId); lines.push([ new Date(r.ts).toISOString(), user?.name||'', r.phone, gf?.name||r.geofenceId, r.lat, r.lng, Math.round(r.acc||0) ].join(',')); }); const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='envios_georreferenciados.csv'; a.click(); }
+      // Dibujo manual
+      document.addEventListener('click', (ev)=>{
+        if(ev.target.closest('#btnAddPoly')) startManualDraw();
+        if(ev.target.closest('#btnSavePolys')) saveGeofencesFromMap();
+      });
+      map.on('click', (e)=>{
+        if(!manual.active) return;
+        manual.latlngs.push([e.latlng.lat, e.latlng.lng]);
+        if(manual.temp){ map.removeLayer(manual.temp); }
+        if(manual.latlngs.length>=3){ manual.temp=L.polygon(manual.latlngs,{dashArray:'4'}).addTo(map); }
+        else { manual.temp=L.polyline(manual.latlngs,{dashArray:'4'}).addTo(map); }
+      });
+      map.on('dblclick', ()=>{ if(manual.active) stopManualDraw(true); });
+      qs('#btnClosePoly').addEventListener('click', ()=>{ if(manual.active) stopManualDraw(true); });
+      qs('#btnCancelPoly').addEventListener('click', ()=>{ if(manual.active) stopManualDraw(false); });
 
-  // ===== Emisor =====
-  let senderMap, senderLayerGroup, senderWatchId=null, senderUser=null;
-  function initSender(phone){ senderUser=DB.people.find(u=>u.phone===phone); if(!senderUser){ alert('No existe un usuario con este teléfono.'); return; } qs('#senderUser').textContent=`Usuario: ${senderUser.name} (${senderUser.phone})`; const gfNames=senderUser.geofences.map(id=>DB.geofences.find(g=>g.id===id)?.name||id); qs('#senderGeofences').textContent=`Geocercas asignadas: ${gfNames.join(', ')||'—'}`; senderMap=L.map('senderMap').setView([-1.0639,-77.8125],16); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20}).addTo(senderMap); senderLayerGroup=L.layerGroup().addTo(senderMap); const bounds=[]; senderUser.geofences.forEach(id=>{ const gf=DB.geofences.find(g=>g.id===id); if(!gf) return; const ll=gf.coords.map(([lng,lat])=>[lat,lng]); L.polygon(ll,{color:'#41d39e'}).addTo(senderLayerGroup).bindTooltip(gf.name); bounds.push(...ll); }); if(bounds.length){ senderMap.fitBounds(L.polygon(bounds).getBounds()); } qs('#btnSenderStart').addEventListener('click', startSending); qs('#btnSenderStop').addEventListener('click', stopSending); }
-  function setSenderStatus(on,msg){ qs('#senderStatus').textContent=on?'Enviando':'Detenido'; const dot=qs('#senderStatusDot'); dot.classList.toggle('on',on); dot.classList.toggle('off',!on); qs('#senderInfo').textContent='Estado: '+(msg|| (on?'activo':'inactivo')); }
-  function startSending(){ if(!navigator.geolocation){ alert('Geolocalización no soportada'); return; } if(senderWatchId!=null) return; setSenderStatus(true,'iniciando geolocalización…'); senderWatchId=navigator.geolocation.watchPosition(onPos,onPosError,{enableHighAccuracy:true,maximumAge:5000,timeout:15000}); }
-  function stopSending(){ if(senderWatchId!=null){ navigator.geolocation.clearWatch(senderWatchId); senderWatchId=null; } setSenderStatus(false,'detenido por el usuario'); }
-  function onPosError(err){ setSenderStatus(false,'error geolocalización: '+err.message); }
-  function onPos(pos){ const {latitude:lat,longitude:lng,accuracy}=pos.coords; senderLayerGroup.clearLayers(); const bounds=[]; senderUser.geofences.forEach(id=>{ const gf=DB.geofences.find(g=>g.id===id); if(!gf) return; const ll=gf.coords.map(([lng2,lat2])=>[lat2,lng2]); L.polygon(ll,{color:'#41d39e'}).addTo(senderLayerGroup); bounds.push(...ll); }); L.marker([lat,lng]).addTo(senderLayerGroup); L.circle([lat,lng],{radius:Math.max(15,accuracy||15)}).addTo(senderLayerGroup); if(bounds.length){ senderMap.fitBounds(L.latLngBounds([[lat,lng],...bounds]),{maxZoom:18}); } // Validación
-    let insideId=null; for(const id of senderUser.geofences){ const gf=DB.geofences.find(g=>g.id===id); if(!gf) continue; if(pointInPoly([lng,lat], gf.coords)) { insideId=gf.id; break; } }
-    if(insideId){ DB.submissions.push({ts:Date.now(),phone:senderUser.phone,userId:senderUser.id,lat,lng,acc:accuracy||0,geofenceId:insideId}); saveDB(DB); setSenderStatus(true,`dentro de geocerca (${insideId}). Punto registrado.`); } else { setSenderStatus(true,'fuera de geocerca: no se registra punto.'); }
-  }
+      // Accesos rápidos
+      qs('#centerToGF').addEventListener('click',()=>{ if(drawn.getLayers().length) map.fitBounds(drawn.getBounds()); });
+      qs('#exportCSV').addEventListener('click', exportCSV);
+
+      // Tablas/Reportes
+      renderGFTable();
+      renderPeopleTable();
+      fillReportSelectors();
+      qs('#btnRunReport').addEventListener('click', runReport);
+      qs('#btnAddPerson').addEventListener('click', ()=>{
+        const name=qs('#pName').value.trim(); const phone=qs('#pPhone').value.trim(); const role=qs('#pRole').value;
+        if(!name||!phone) return alert('Nombre y teléfono son obligatorios');
+        const id='u'+Math.random().toString(36).slice(2,7);
+        DB.people.push({id,name,phone,role,geofences:[]}); saveDB(DB);
+        qs('#pName').value=''; qs('#pPhone').value='';
+        renderPeopleTable(); fillReportSelectors(); alert('Usuario añadido');
+      });
+    }
+
+    function startManualDraw(){
+      manual.active=true; manual.latlngs=[]; if(manual.temp){ map.removeLayer(manual.temp); manual.temp=null; }
+      document.body.classList.add('drawing-cursor');
+      qs('#drawHelp').style.display='block';
+      map.doubleClickZoom.disable();
+      qs('#coords').textContent='Modo dibujo: clic para vértices, doble clic/cerrar';
+    }
+    function stopManualDraw(commit){
+      document.body.classList.remove('drawing-cursor');
+      qs('#drawHelp').style.display='none';
+      map.doubleClickZoom.enable();
+      if(manual.temp){ map.removeLayer(manual.temp); manual.temp=null; }
+      if(commit && manual.latlngs.length>=3){
+        drawn.addLayer(L.polygon(manual.latlngs,{color:'#41d39e'}));
+        alert('Geocerca dibujada. Pulse "Guardar Cambios".');
+      }
+      manual.active=false; manual.latlngs=[];
+      qs('#coords').textContent='Lat: –, Lng: –';
+    }
+
+    function switchTab(name){ qsa('.panel').forEach(p=>p.classList.add('hide')); qs('#panel-'+name).classList.remove('hide'); qsa('nav.tabs button').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tabbtn')===name)); }
+    function renderGeofencesOnMap(){ if(!drawn) return; drawn.clearLayers(); DB.geofences.forEach(gf=>{ const ll=gf.coords.map(([lng,lat])=>[lat,lng]); drawn.addLayer(L.polygon(ll,{color:'#41d39e'}).bindTooltip(gf.name)); }); if(drawn.getLayers().length) map.fitBounds(drawn.getBounds()); }
+
+    function saveGeofencesFromMap(){
+      const nameInput=qs('#gfName'); const layers=drawn.getLayers(); if(!layers.length){ alert('No hay geocercas dibujadas.'); return; }
+      if(nameInput.value.trim()){
+        const layer=layers[layers.length-1]; const latlngs=(layer.getLatLngs()[0]||layer.getLatLngs()).map(p=>[p.lng,p.lat]);
+        const id='gf'+Math.random().toString(36).slice(2,7); DB.geofences.push({id,name:nameInput.value.trim(),coords:latlngs}); nameInput.value='';
+      } else {
+        const newGFs=layers.map((layer,i)=>{ const ll=(layer.getLatLngs()[0]||layer.getLatLngs()).map(p=>[p.lng,p.lat]); return DB.geofences[i]?{...DB.geofences[i],coords:ll}:null; }).filter(Boolean);
+        if(newGFs.length){ DB.geofences=DB.geofences.map((gf,i)=> newGFs[i] || gf); }
+      }
+      saveDB(DB); renderGFTable(); alert('Geocercas guardadas.');
+    }
+
+    function renderGFTable(){ const tb=qs('#gfTable tbody'); tb.innerHTML=''; DB.geofences.forEach(gf=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${gf.name}</td><td>${gf.coords.length}</td><td><button type="button" class="ghost btnZoom" data-id="${gf.id}">Zoom</button></td>`; tb.appendChild(tr); }); qsa('.btnZoom',tb).forEach(b=>b.addEventListener('click',()=>{ const gf=DB.geofences.find(x=>x.id===b.dataset.id); if(!gf) return; map.fitBounds(L.polygon(gf.coords.map(([lng,lat])=>[lat,lng])).getBounds()); })); }
+
+    function renderPeopleTable(){ const tb=qs('#personTable tbody'); tb.innerHTML=''; DB.people.forEach(u=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${u.name}</td><td>${u.phone}</td><td>${u.role}</td><td><select data-id="${u.id}" class="selGF" multiple size="3" style="min-width:180px">${DB.geofences.map(g=>`<option value="${g.id}" ${u.geofences?.includes(g.id)?'selected':''}>${g.name}</option>`).join('')}</select></td><td><button type="button" class="ghost btnSaveGF" data-id="${u.id}">Guardar asignación</button> <button type="button" class="primary btnLink" data-id="${u.id}">Generar enlace</button></td>`; tb.appendChild(tr); }); qsa('.btnSaveGF',tb).forEach(b=>b.addEventListener('click',()=>{ const id=b.dataset.id; const sel=qs(`select.selGF[data-id="${id}"]`); const vals=Array.from(sel.selectedOptions).map(o=>o.value); const i=DB.people.findIndex(x=>x.id===id); if(i>=0){ DB.people[i].geofences=vals; saveDB(DB); alert('Asignación guardada'); } })); qsa('.btnLink',tb).forEach(b=>b.addEventListener('click',()=>{ const user=DB.people.find(x=>x.id===b.dataset.id); if(!user) return; const url=`${location.origin}${location.pathname}?mode=sender&phone=${encodeURIComponent(user.phone)}`; navigator.clipboard?.writeText(url); alert('Enlace copiado:\n'+url); })); }
+
+    // ===== Reportes =====
+    function fillReportSelectors(){ const uSel=qs('#rUser'); const gSel=qs('#rGeofence'); if(!uSel||!gSel) return; uSel.innerHTML='<option value="">Todos los usuarios</option>'+DB.people.map(u=>`<option value="${u.id}">${u.name} (${u.phone})</option>`).join(''); gSel.innerHTML='<option value="">Todas las geocercas</option>'+DB.geofences.map(g=>`<option value="${g.id}">${g.name}</option>`).join(''); }
+    function runReport(){ const u=qs('#rUser').value; const g=qs('#rGeofence').value; const from=qs('#rFrom').value?new Date(qs('#rFrom').value).getTime():0; const to=qs('#rTo').value?new Date(qs('#rTo').value).getTime():Date.now(); const rows=DB.submissions.filter(r=>(!u||r.userId===u)&&(!g||r.geofenceId===g)&&r.ts>=from&&r.ts<=to); const tb=qs('#reportTable tbody'); tb.innerHTML=''; rows.forEach(r=>{ const user=DB.people.find(x=>x.id===r.userId); const gf=DB.geofences.find(x=>x.id===r.geofenceId); const tr=document.createElement('tr'); tr.innerHTML=`<td>${new Date(r.ts).toLocaleString()}</td><td>${user?.name||'—'}</td><td>${r.phone}</td><td>${gf?.name||r.geofenceId}</td><td>${r.lat.toFixed(6)}</td><td>${r.lng.toFixed(6)}</td><td>${Math.round(r.acc||0)}</td>`; tb.appendChild(tr); }); }
+    function exportCSV(){ const head=['fecha','usuario','telefono','geocerca','lat','lng','precision_m']; const lines=[head.join(',')]; DB.submissions.forEach(r=>{ const user=DB.people.find(x=>x.id===r.userId); const gf=DB.geofences.find(x=>x.id===r.geofenceId); lines.push([ new Date(r.ts).toISOString(), user?.name||'', r.phone, gf?.name||r.geofenceId, r.lat, r.lng, Math.round(r.acc||0) ].join(',')); }); const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='envios_georreferenciados.csv'; a.click(); }
+
+    // ===== Emisor =====
+    let senderMap, senderLayerGroup, senderWatchId=null, senderUser=null;
+    function initSender(phone){
+      senderUser=DB.people.find(u=>u.phone===phone);
+      if(!senderUser){ alert('No existe un usuario con este teléfono.'); return; }
+      qs('#senderUser').textContent=`Usuario: ${senderUser.name} (${senderUser.phone})`;
+      const gfNames=senderUser.geofences.map(id=>DB.geofences.find(g=>g.id===id)?.name||id);
+      qs('#senderGeofences').textContent=`Geocercas asignadas: ${gfNames.join(', ')||'—'}`;
+      senderMap=L.map('senderMap').setView([-1.0639,-77.8125],16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20}).addTo(senderMap);
+      senderLayerGroup=L.layerGroup().addTo(senderMap);
+      const bounds=[];
+      senderUser.geofences.forEach(id=>{
+        const gf=DB.geofences.find(g=>g.id===id); if(!gf) return;
+        const ll=gf.coords.map(([lng,lat])=>[lat,lng]);
+        L.polygon(ll,{color:'#41d39e'}).addTo(senderLayerGroup).bindTooltip(gf.name);
+        bounds.push(...ll);
+      });
+      if(bounds.length){ senderMap.fitBounds(L.polygon(bounds).getBounds()); }
+      qs('#btnSenderStart').addEventListener('click', startSending);
+      qs('#btnSenderStop').addEventListener('click', stopSending);
+    }
+    function setSenderStatus(on,msg){ qs('#senderStatus').textContent=on?'Enviando':'Detenido'; const dot=qs('#senderStatusDot'); dot.classList.toggle('on',on); dot.classList.toggle('off',!on); qs('#senderInfo').textContent='Estado: '+(msg|| (on?'activo':'inactivo')); }
+    function startSending(){ if(!navigator.geolocation){ alert('Geolocalización no soportada'); return; } if(senderWatchId!=null) return; setSenderStatus(true,'iniciando geolocalización…'); senderWatchId=navigator.geolocation.watchPosition(onPos,onPosError,{enableHighAccuracy:true,maximumAge:5000,timeout:15000}); }
+    function stopSending(){ if(senderWatchId!=null){ navigator.geolocation.clearWatch(senderWatchId); senderWatchId=null; } setSenderStatus(false,'detenido por el usuario'); }
+    function onPosError(err){ setSenderStatus(false,'error geolocalización: '+err.message); }
+    function onPos(pos){
+      const {latitude:lat,longitude:lng,accuracy}=pos.coords;
+      senderLayerGroup.clearLayers();
+      const bounds=[];
+      senderUser.geofences.forEach(id=>{
+        const gf=DB.geofences.find(g=>g.id===id); if(!gf) return;
+        const ll=gf.coords.map(([lng2,lat2])=>[lat2,lng2]);
+        L.polygon(ll,{color:'#41d39e'}).addTo(senderLayerGroup); bounds.push(...ll);
+      });
+      L.marker([lat,lng]).addTo(senderLayerGroup);
+      L.circle([lat,lng],{radius:Math.max(15,accuracy||15)}).addTo(senderLayerGroup);
+      if(bounds.length){ senderMap.fitBounds(L.latLngBounds([[lat,lng],...bounds]),{maxZoom:18}); }
+      let insideId=null; for(const id of senderUser.geofences){ const gf=DB.geofences.find(g=>g.id===id); if(!gf) continue; if(pointInPoly([lng,lat], gf.coords)) { insideId=gf.id; break; } }
+      if(insideId){ DB.submissions.push({ts:Date.now(),phone:senderUser.phone,userId:senderUser.id,lat,lng,acc:accuracy||0,geofenceId:insideId}); saveDB(DB); setSenderStatus(true,`dentro de geocerca (${insideId}). Punto registrado.`); } else { setSenderStatus(true,'fuera de geocerca: no se registra punto.'); }
+    }
+  });
   </script>
 </body>
 </html>
