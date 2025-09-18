@@ -197,7 +197,7 @@
   let DB = loadDB();
 
   \/\/ ===== Geometría y capas (declaradas ANTES de iniciar) =====
-  let map; const drawn = new L.FeatureGroup();
+  let map; let drawn = null;
   const manual = {active:false, latlngs:[], temp:null};
 
   \/\/ ===== Modo =====
@@ -224,7 +224,7 @@
   function initMap(containerId){
     const m=L.map(containerId||'map').setView([-1.0639,-77.8125],16);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20}).addTo(m);
-    m.addLayer(drawn);
+    // 'drawn' se agrega luego de crear el map en initApp()
     m.on('mousemove', (e)=>{qs('#coords').textContent=`Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`});
     return m;
   }
@@ -235,6 +235,8 @@
     qsa('nav.tabs button').forEach(b=>b.addEventListener('click',()=>switchTab(b.getAttribute('data-tabbtn'))));
 
     map=initMap('map');
+    // Inicializa la capa 'drawn' DESPUÉS de crear el mapa
+    drawn = L.featureGroup().addTo(map);
     renderGeofencesOnMap();
 
     // Dibujo manual puro (sin Leaflet.draw)
@@ -295,7 +297,7 @@
   }
 
   function switchTab(name){ qsa('.panel').forEach(p=>p.classList.add('hide')); qs('#panel-'+name).classList.remove('hide'); qsa('nav.tabs button').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tabbtn')===name)); }
-  function renderGeofencesOnMap(){ drawn.clearLayers(); DB.geofences.forEach(gf=>{ const ll=gf.coords.map(([lng,lat])=>[lat,lng]); drawn.addLayer(L.polygon(ll,{color:'#41d39e'}).bindTooltip(gf.name)); }); if(drawn.getLayers().length) map.fitBounds(drawn.getBounds()); }
+  function renderGeofencesOnMap(){ if(!drawn){ return; } drawn.clearLayers(); DB.geofences.forEach(gf=>{ const ll=gf.coords.map(([lng,lat])=>[lat,lng]); drawn.addLayer(L.polygon(ll,{color:'#41d39e'}).bindTooltip(gf.name)); }); if(drawn.getLayers().length) map.fitBounds(drawn.getBounds()); }
 
   function saveGeofencesFromMap(){
     const nameInput=qs('#gfName'); const layers=drawn.getLayers(); if(!layers.length){ alert('No hay geocercas dibujadas.'); return; }
