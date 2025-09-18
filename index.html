@@ -405,6 +405,23 @@
       }
     }
   }
+  
+  // Asegura que los selectores/tablas se sincronicen cuando cambia el storage
+  function refreshBindings(){
+    try {
+      renderConfig();
+      refreshFenceSelects();
+      refreshActivePersonalSelects();
+      renderFencesTable?.();
+      renderPersonalTable?.();
+      renderActividadesTable?.();
+      renderCostosTable?.();
+      renderLogs?.();
+    } catch(e){ console.warn('refreshBindings:', e); }
+  } catch(e){ console.warn('JSON inválido en',k); }
+      }
+    }
+  }
   function ensureFarmList(){
     const key = `${LS_PREFIX}_farms`;
     let arr = JSON.parse(localStorage.getItem(key) || '[]');
