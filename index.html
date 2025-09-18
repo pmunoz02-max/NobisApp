@@ -108,7 +108,7 @@
           <div class="card">
             <div class="row">
               <input id="gfName" placeholder="Nombre de geocerca (opcional al guardar)" />
-              <button type="button" id="btnAddPoly" class="primary">Nueva Geocerca (dibujo)</button>
+              <button type="button" id="btnAddPoly" class="primary" style="position:relative; z-index:10">Nueva Geocerca (dibujo)</button>
               <button type="button" id="btnSavePolys" class="primary">Guardar Cambios</button>
             </div>
             <div class="tiny">
@@ -194,6 +194,16 @@
   </div>
 
   <script>
+    // ===== Diagnóstico: captura errores JS para que no pasen silenciosos =====
+    window.__errlog = [];
+    window.onerror = function(msg, url, line, col, err){
+      const text = '[JS ERROR] '+msg+' @'+line+':'+col;
+      window.__errlog.push(text);
+      console.error(text, err);
+      try{ alert('Error interno de script:
+'+text+'
+Revisa la consola (F12)'); }catch(_){ }
+    };
     const qs = (s, r=document)=>r.querySelector(s);
     const qsa = (s, r=document)=>Array.from(r.querySelectorAll(s));
     const getParams = ()=>Object.fromEntries(new URLSearchParams(location.search).entries());
@@ -288,19 +298,23 @@
       qs('#btnClosePoly').addEventListener('click', ()=>{ if(manual.active) stopManualDraw(true); });
       qs('#btnCancelPoly').addEventListener('click', ()=>{ if(manual.active) stopManualDraw(false); });
 
-      // Botones
-      qs('#btnAddPoly').addEventListener('click', ()=>{
+      // Botones (delegación para evitar fallos por timing)
+      document.addEventListener('click', (ev)=>{
+        const t = ev.target.closest('#btnAddPoly');
+        if(!t) return;
         try{
+          __drawStarted = false;
           if(L && L.Draw && L.Draw.Polygon){
-            // Inicia dibujo de Leaflet.draw
             new L.Draw.Polygon(map, drawControl?.options?.draw?.polygon || {allowIntersection:false,showArea:true}).enable();
-            qs('#coords').textContent='Modo dibujo activo: clic para vértices, doble clic para cerrar.';
+            setTimeout(()=>{ if(!__drawStarted && !manual.active){ startManualDraw(); } }, 600);
           } else {
-            // Fallback manual
             startManualDraw();
           }
         }catch(err){ console.error(err); startManualDraw(); }
       });
+      // Guardar cambios
+      document.addEventListener('click', (ev)=>{ if(ev.target.closest('#btnSavePolys')) saveGeofencesFromMap(); });
+
       qs('#btnSavePolys').addEventListener('click', saveGeofencesFromMap);
       qs('#centerToGF').addEventListener('click',()=>{ if(drawn.getLayers().length) map.fitBounds(drawn.getBounds()); });
       qs('#exportCSV').addEventListener('click', exportCSV);
