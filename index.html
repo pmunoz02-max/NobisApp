@@ -66,6 +66,15 @@
     .success{color:#0b5}
     .error{color:#d33}
   </style>
+  
+  <!-- Fallback CSS esencial para Leaflet (por si el CDN de estilos no carga) -->
+  <style id="leaflet-fallback">
+    .leaflet-container{position:relative;overflow:hidden;outline:0}
+    .leaflet-pane,.leaflet-map-pane,.leaflet-tile-pane,.leaflet-overlay-pane,
+    .leaflet-shadow-pane,.leaflet-marker-pane,.leaflet-tooltip-pane,.leaflet-popup-pane{position:absolute;left:0;top:0}
+    .leaflet-tile{position:absolute;width:256px;height:256px;}
+    .leaflet-zoom-animated{transform-origin:0 0}
+  </style>
 </head>
 <body>
   <header>
@@ -515,8 +524,19 @@
     let base = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contrib.'});
     base.on('tileerror', ()=>{
       try{ map.removeLayer(base); }catch(_){ }
+      // 1er fallback
       base = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contrib.'});
+      base.on('tileerror', ()=>{
+        try{ map.removeLayer(base); }catch(_){ }
+        // 2do fallback (HOT)
+        base = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contrib.'});
+        base.addTo(map);
+        setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){ } }, 200);
+      });
       base.addTo(map);
+      setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){ } }, 200);
+    });
+    base.addTo(map);
     });
     base.addTo(map);
 
