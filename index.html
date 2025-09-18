@@ -1,324 +1,921 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>MVP Geocercas & Envío — Simple</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<style>
-  body{margin:0;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;background:#0c0d10;color:#eaeef7}
-  header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#12151f;border-bottom:1px solid #222}
-  .tag{font-size:12px;background:#1b2130;color:#cfe3ff;border:1px solid #263149;border-radius:999px;padding:4px 8px}
-  #wrap{display:grid;grid-template-columns:320px 1fr;height:calc(100vh - 52px)}
-  #left{border-right:1px solid #222;padding:10px;overflow:auto}
-  #map{height:100%}
-  .card{background:#10131c;border:1px solid #222;border-radius:12px;padding:10px;margin-bottom:10px}
-  .row{display:flex;gap:8px;flex-wrap:wrap}
-  input,select,button{background:#0f131c;border:1px solid #2a3245;color:#eaeef7;border-radius:10px;padding:8px}
-  button.primary{background:#1b2a3b}
-  .tiny{font-size:12px;color:#9fb3c8}
-  .hide{display:none!important}
-  .crosshair .leaflet-container{cursor:crosshair!important}
-  table{width:100%;border-collapse:collapse}
-  th,td{border-bottom:1px solid #232734;padding:6px;text-align:left;font-size:13px}
-  #senderMap{height:48vh;border:1px solid #222;border-radius:12px}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>App Fincas · Geocercas + Trackers</title>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet Draw -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <!-- Chart.js for reportes -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root{
+      --c1:#0b5; --c2:#095; --c3:#eee; --c4:#222; --danger:#d33; --warn:#e9b300;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#fafafa;color:#222}
+    header{
+      position:sticky;top:0;z-index:999;display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;background:#fff;border-bottom:1px solid #ddd}
+    header h1{font-size:1rem;margin:0 0 0 .25rem;font-weight:700}
+    .flex{display:flex}.col{flex-direction:column}.row{flex-direction:row}
+    .grow{flex:1}
+    .btn{appearance:none;border:1px solid #ccc;background:#fff;padding:.5rem .75rem;border-radius:.5rem;cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    .btn.primary{background:var(--c1);border-color:var(--c2);color:white;font-weight:600}
+    .btn.danger{background:var(--danger);color:#fff;border-color:#b12}
+    .btn.warn{background:var(--warn);color:#000;border-color:#c99}
+    .tag{display:inline-block;padding:.15rem .5rem;border-radius:999px;font-size:.8rem;border:1px solid #ddd;background:#f5f5f5}
+    .badge{display:inline-block;width:.75rem;height:.75rem;border-radius:50%}
+    .ok{background:#2ecc71}.no{background:#e74c3c}.idle{background:#bdc3c7}
+    .wrap{max-width:1200px;margin:0 auto;padding:1rem}
+    nav.tabs{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
+    nav.tabs button{border:1px solid #ddd;background:#fff;padding:.5rem .75rem;border-radius:.5rem;cursor:pointer}
+    nav.tabs button.active{background:#222;color:#fff;border-color:#222}
+    section.panel{display:none;background:#fff;border:1px solid #e5e5e5;border-radius:.75rem;margin-top:1rem;padding:1rem}
+    section.panel.show{display:block}
+    .grid{display:grid;gap:1rem}
+    .grid-2{grid-template-columns:1fr 1fr}
+    .grid-3{grid-template-columns:repeat(3,1fr)}
+    .card{background:#fff;border:1px solid #e6e6e6;border-radius:.75rem;padding:1rem}
+    label{font-size:.9rem;color:#444}
+    input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radius:.5rem}
+    textarea{min-height:90px}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid #eee;padding:.5rem;text-align:left;font-size:.92rem}
+    .muted{color:#666}
+    .small{font-size:.86rem}
+    .map{height:520px;border-radius:.75rem;border:1px solid #e5e5e5}
+    .mini-map{height:360px;border-radius:.75rem;border:1px solid #e5e5e5}
+    .row-actions{display:flex;gap:.25rem}
+    .sticky-ctrls{position:sticky;top:.5rem;z-index:5}
+    .coords{position:absolute;right:.75rem;bottom:.75rem;background:rgba(255,255,255,.92);border:1px solid #ddd;border-radius:.5rem;padding:.25rem .5rem;font-size:.85rem}
+    .legend{display:flex;gap:.5rem;align-items:center}
+    .pill{padding:.15rem .5rem;border:1px solid #ddd;border-radius:999px}
+    .hr{height:1px;background:#eee;margin:.5rem 0}
+    .help{font-size:.82rem;color:#555}
+    .hidden{display:none}
+    .mt{margin-top:.75rem}
+    .mb{margin-bottom:.75rem}
+    .mr{margin-right:.5rem}
+    .center{text-align:center}
+    .success{color:#0b5}
+    .error{color:#d33}
+  </style>
 </head>
 <body>
-<header>
-  <div><b>MVP Geocercas & Envío</b></div>
-  <div id="modeTag" class="tag">Cargando…</div>
-</header>
+  <header>
+    <div class="badge ok" title="App OK"></div>
+    <h1>App Fincas · Geocercas + Trackers</h1>
+    <div class="grow"></div>
 
-<!-- ADMIN -->
-<div id="wrap" class="hide">
-  <aside id="left">
-    <div class="card">
-      <div class="row">
-        <button id="btnDraw" class="primary">Dibujar geocerca</button>
-        <button id="btnClose" class="">Cerrar polígono</button>
-        <button id="btnCancel" class="">Cancelar</button>
+    <!-- Selector de Finca / Contexto -->
+    <label for="farmSelect" class="muted small mr">Finca:</label>
+    <select id="farmSelect" class="mr"></select>
+    <button class="btn" id="btnNuevaFinca" title="Crear/Seleccionar finca">Crear</button>
+    <button class="btn danger" id="btnEliminarFinca" title="Eliminar finca actual">Eliminar Finca</button>
+  </header>
+
+  <!-- Contenedor de modo TRACKER (interfaz mínima) -->
+  <div id="trackerShell" class="wrap hidden">
+    <div class="grid grid-2">
+      <div class="card">
+        <h2 style="margin:0 0 .5rem">Modo de Usuario · Envío Georeferenciado</h2>
+        <div id="trackerUserInfo" class="small muted">Cargando usuario…</div>
+        <div class="hr"></div>
+        <div class="legend">
+          <div>Estado:</div>
+          <span id="trackerStateDot" class="badge idle"></span>
+          <span id="trackerStateText" class="tag">Inactivo</span>
+        </div>
+        <div class="mt">
+          <label class="small">Asignado a geocerca</label>
+          <div id="trackerFenceName" class="tag">(sin asignar)</div>
+        </div>
+        <div class="mt">
+          <label>Activar envío de datos</label>
+          <div>
+            <input type="checkbox" id="toggleSend" /> <span class="small muted">(solo se envía si estás DENTRO de tu geocerca)</span>
+          </div>
+        </div>
+        <div class="mt small help">
+          • Este enlace está asociado a tu número. Mantén la ventana abierta para enviar periódicamente tu ubicación.<br>
+          • Frecuencia: cada <span id="freqSec">15</span> s (configurable por Admin).
+        </div>
+        <div class="mt small">
+          <div><b>Último evento:</b> <span id="lastEvent">—</span></div>
+          <div><b>Último envío:</b> <span id="lastSend">—</span></div>
+        </div>
       </div>
-      <div class="row" style="margin-top:6px">
-        <input id="gfName" placeholder="Nombre de geocerca"/>
-        <button id="btnSave" class="primary">Guardar</button>
+      <div class="card">
+        <div id="miniMap" class="mini-map"></div>
+        <div class="coords" id="miniCoords">—</div>
       </div>
-      <div class="tiny" id="hint">Estado: listo.</div>
-    </div>
-
-    <div class="card">
-      <b>Geocercas</b>
-      <table><thead><tr><th>Nombre</th><th>Vértices</th></tr></thead>
-        <tbody id="gfTable"></tbody>
-      </table>
-    </div>
-
-    <div class="card">
-      <b>Personal</b>
-      <div class="row" style="margin-top:6px">
-        <input id="pName" placeholder="Nombre"/>
-        <input id="pPhone" placeholder="Teléfono (5939...)"/>
-        <button id="btnAddPerson" class="primary">Añadir</button>
-      </div>
-      <table style="margin-top:8px"><thead><tr><th>Usuario</th><th>Teléfono</th><th>Geocercas</th><th>Link</th></tr></thead>
-        <tbody id="peopleTable"></tbody>
-      </table>
-    </div>
-
-    <div class="card">
-      <b>Exportar</b><br/>
-      <button id="btnExport" class="primary" style="margin-top:6px">Exportar envíos (CSV)</button>
-    </div>
-  </aside>
-
-  <main>
-    <div id="map"></div>
-  </main>
-</div>
-
-<!-- SENDER -->
-<div id="sender" class="hide" style="padding:12px;max-width:900px;margin:0 auto">
-  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
-    <div>
-      <div id="senderUser" class="tiny">Usuario: —</div>
-      <div id="senderGfs" class="tiny">Geocercas: —</div>
-      <div id="senderInfo" class="tiny">Estado: detenido</div>
-    </div>
-    <div class="row">
-      <button id="start" class="primary">Iniciar envío</button>
-      <button id="stop">Detener</button>
     </div>
   </div>
-  <div id="senderMap"></div>
-</div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Contenedor de modo ADMIN (app completa) -->
+  <div id="adminShell" class="wrap hidden">
+    <nav class="tabs" id="tabs">
+      <button data-tab="geocercas" class="active">Geocercas</button>
+      <button data-tab="personal">Personal</button>
+      <button data-tab="actividades">Actividades</button>
+      <button data-tab="costos">Costos</button>
+      <button data-tab="reportes">Reportes</button>
+      <button data-tab="config">Config</button>
+    </nav>
+
+    <!-- Panel Geocercas -->
+    <section class="panel show" id="tab-geocercas">
+      <div class="grid grid-2">
+        <div>
+          <div class="sticky-ctrls">
+            <div class="card">
+              <div class="grid grid-3">
+                <button class="btn" id="btnNuevaGeocerca">Nueva Geocerca</button>
+                <button class="btn warn" id="btnEditarGeocerca">Editar Geocercas</button>
+                <button class="btn primary" id="btnGuardarGeocercas">Guardar Cambios</button>
+              </div>
+              <div class="mt">
+                <label>Crear geocerca desde lista Lat,Lng (una por línea)</label>
+                <textarea id="coordsInput" placeholder="-0.12345,-78.56789\n-0.12300,-78.56850\n..."></textarea>
+                <div class="row" style="gap:.5rem;margin-top:.5rem">
+                  <input id="newFenceName" placeholder="Nombre geocerca (ej. Lote A)" />
+                  <button class="btn" id="btnCrearDesdeLista">Crear desde Lat/Lng</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="position:relative;margin-top:1rem">
+            <div id="map" class="map"></div>
+            <div class="coords" id="mapCoords">Lat: — Lng: —</div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <h3 style="margin-top:0">Listado de Geocercas</h3>
+            <table id="fencesTable">
+              <thead><tr><th>Nombre</th><th>Vértices</th><th>Asignados</th><th>Acciones</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <div class="help mt">• Recuerda <b>Guardar Cambios</b> luego de editar el polígono.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Personal -->
+    <section class="panel" id="tab-personal">
+      <div class="grid grid-2">
+        <div class="card">
+          <h3 style="margin-top:0">Nuevo Personal</h3>
+          <div class="grid grid-2">
+            <div>
+              <label>Nombre</label>
+              <input id="pNombre" placeholder="Nombre y Apellido" />
+            </div>
+            <div>
+              <label>Teléfono (E.164)</label>
+              <input id="pTelefono" placeholder="+5939XXXXXXX" />
+            </div>
+            <div>
+              <label>Rol</label>
+              <select id="pRol">
+                <option value="TRACKER">TRACKER</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+            </div>
+            <div>
+              <label>Activo</label>
+              <select id="pActivo">
+                <option value="true">Sí</option>
+                <option value="false">No</option>
+              </select>
+            </div>
+            <div>
+              <label>Geocerca asignada</label>
+              <select id="pGeocerca"></select>
+            </div>
+            <div class="row" style="align-items:flex-end;gap:.5rem">
+              <button class="btn primary" id="btnAddPersonal">Añadir</button>
+              <span class="small muted">El enlace de acceso se genera automáticamente.</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Personal</h3>
+          <table id="personalTable">
+            <thead><tr><th>Nombre</th><th>Teléfono</th><th>Rol</th><th>Activo</th><th>Geocerca</th><th>Enlace</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Actividades -->
+    <section class="panel" id="tab-actividades">
+      <div class="grid grid-2">
+        <div class="card">
+          <h3 style="margin-top:0">Nueva Actividad</h3>
+          <div class="grid grid-2">
+            <div>
+              <label>Fecha</label>
+              <input type="date" id="aFecha" />
+            </div>
+            <div>
+              <label>Geocerca</label>
+              <select id="aGeocerca"></select>
+            </div>
+            <div>
+              <label>Actividad</label>
+              <input list="actividadList" id="aActividad" placeholder="Ej. Deshierba" />
+              <datalist id="actividadList">
+                <option>Siembra</option>
+                <option>Riego</option>
+                <option>Cosecha</option>
+                <option>Deshierba</option>
+                <option>Poda</option>
+              </datalist>
+            </div>
+            <div>
+              <label>Personal (activo)</label>
+              <select id="aPersonal"></select>
+            </div>
+            <div>
+              <label>Notas</label>
+              <input id="aNotas" placeholder="Opcional" />
+            </div>
+            <div class="row" style="align-items:flex-end;gap:.5rem">
+              <button class="btn primary" id="btnAddActividad">Añadir</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Actividades</h3>
+          <table id="actividadesTable">
+            <thead><tr><th>Fecha</th><th>Geocerca</th><th>Actividad</th><th>Personal</th><th>Notas</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Costos -->
+    <section class="panel" id="tab-costos">
+      <div class="grid grid-2">
+        <div class="card">
+          <h3 style="margin-top:0">Nuevo Costo ($/día)</h3>
+          <div class="grid grid-2">
+            <div>
+              <label>Fecha</label>
+              <input type="date" id="cFecha" />
+            </div>
+            <div>
+              <label>Geocerca</label>
+              <select id="cGeocerca"></select>
+            </div>
+            <div>
+              <label>Actividad</label>
+              <input list="actividadList" id="cActividad" placeholder="Ej. Raleo" />
+            </div>
+            <div>
+              <label>Personal (activo)</label>
+              <select id="cPersonal"></select>
+            </div>
+            <div>
+              <label>Costo $/día</label>
+              <input id="cCosto" type="number" step="0.01" placeholder="Ej. 25" />
+            </div>
+            <div class="row" style="align-items:flex-end;gap:.5rem">
+              <button class="btn primary" id="btnAddCosto">Añadir</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Costos</h3>
+          <table id="costosTable">
+            <thead><tr><th>Fecha</th><th>Geocerca</th><th>Actividad</th><th>Personal</th><th>$ / día</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Reportes -->
+    <section class="panel" id="tab-reportes">
+      <div class="grid grid-2">
+        <div class="card">
+          <h3 style="margin-top:0">Tabla de posiciones enviadas</h3>
+          <div class="help mb">Registros capturados por usuarios TRACKER dentro de su geocerca.</div>
+          <div class="row" style="gap:.5rem;flex-wrap:wrap">
+            <button class="btn" id="btnExportCSV">Exportar CSV</button>
+            <button class="btn" id="btnBorrarLogs">Borrar registros</button>
+          </div>
+          <div class="mt" style="max-height:360px;overflow:auto">
+            <table id="logsTable">
+              <thead><tr><th>Fecha/Hora</th><th>Teléfono</th><th>Geocerca</th><th>Lat</th><th>Lng</th><th>Accuracy</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Gráfico: posiciones por día</h3>
+          <canvas id="chartPos"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Config -->
+    <section class="panel" id="tab-config">
+      <div class="grid grid-2">
+        <div class="card">
+          <h3 style="margin-top:0">Parámetros</h3>
+          <div class="grid grid-2">
+            <div>
+              <label>Webhook (opcional) para POST JSON</label>
+              <input id="cfgWebhook" placeholder="https://mi-servidor/endpoint" />
+              <div class="help">Si se define, cada posición enviada usará <code>navigator.sendBeacon</code> o <code>fetch</code> para POST.</div>
+            </div>
+            <div>
+              <label>Frecuencia (segundos)</label>
+              <input id="cfgFreq" type="number" min="5" step="1" value="15" />
+            </div>
+          </div>
+          <div class="mt">
+            <button class="btn primary" id="btnGuardarCfg">Guardar Config</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Enlaces de acceso rápido</h3>
+          <div class="help">Selecciona una persona (TRACKER) para copiar su enlace de acceso directo (por teléfono).</div>
+          <div class="row" style="gap:.5rem;align-items:flex-end">
+            <select id="quickUser"></select>
+            <button class="btn" id="btnCopiarEnlace">Copiar enlace</button>
+            <span id="copiedMsg" class="small muted"></span>
+          </div>
+          <div class="mt small help">Formato de enlace:<br>
+            <code>…/index.html?mode=tracker&phone=+593XXXXXXXXX&farm=ID_Finca</code>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
 <script>
-// ====== util ======
-const qs=(s,r=document)=>r.querySelector(s);
-const qsa=(s,r=document)=>Array.from(r.querySelectorAll(s));
-const params=Object.fromEntries(new URLSearchParams(location.search).entries());
-const LS='mvp.app.v1';
-function loadDB(){
-  const raw=localStorage.getItem(LS);
-  if(raw){ try{return JSON.parse(raw);}catch{} }
-  const seed={geofences:[],people:[],submissions:[]};
-  localStorage.setItem(LS, JSON.stringify(seed)); return seed;
-}
-function saveDB(){ localStorage.setItem(LS, JSON.stringify(DB)); }
-let DB=loadDB();
+(function(){
+  // ===== Utilidades básicas =====
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const fmt = n => (typeof n==='number')? (Math.round(n*1e6)/1e6) : n;
+  const nowISO = () => new Date().toISOString();
 
-// punto en polígono (lng,lat)
-function pointInPoly([x,y], poly){
-  let inside=false;
-  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
-    const [xi,yi]=poly[i], [xj,yj]=poly[j];
-    const intersect=((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi+1e-12)+xi);
-    if(intersect) inside=!inside;
-  }
-  return inside;
-}
-
-// ====== modo ======
-const isSender=(params.mode||'').toLowerCase()==='sender' && !!params.phone;
-qs('#modeTag').textContent=isSender?'Modo Emisor':'Modo Admin';
-qs(isSender?'#sender':'#wrap').classList.remove('hide');
-
-// ====== ADMIN ======
-let map=null, drawn=null, manual={active:false, latlngs:[], temp:null};
-
-function initAdmin(){
-  map=L.map('map').setView([ -1.0639, -77.8125 ], 16);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20}).addTo(map);
-  drawn=L.featureGroup().addTo(map);
-
-  // render existentes
-  renderGeofences();
-
-  // dibujo manual
-  qs('#btnDraw').onclick=()=>{
-    manual.active=true; manual.latlngs=[];
-    qs('#hint').textContent='Dibujo: clic para vértices, doble clic para cerrar.';
-    document.body.classList.add('crosshair');
-    map.doubleClickZoom.disable();
-  };
-  qs('#btnClose').onclick=()=>{ if(manual.active) closeManual(true); };
-  qs('#btnCancel').onclick=()=>{ if(manual.active) closeManual(false); };
-
-  map.on('click', (e)=>{
-    if(!manual.active) return;
-    manual.latlngs.push([e.latlng.lat, e.latlng.lng]);
-    if(manual.temp) map.removeLayer(manual.temp);
-    if(manual.latlngs.length>=3) manual.temp=L.polygon(manual.latlngs,{dashArray:'4'}).addTo(map);
-    else manual.temp=L.polyline(manual.latlngs,{dashArray:'4'}).addTo(map);
-  });
-  map.on('dblclick', ()=>{ if(manual.active) closeManual(true); });
-
-  function closeManual(commit){
-    document.body.classList.remove('crosshair');
-    map.doubleClickZoom.enable();
-    if(manual.temp) { map.removeLayer(manual.temp); manual.temp=null; }
-    if(commit && manual.latlngs.length>=3){
-      drawn.addLayer(L.polygon(manual.latlngs,{color:'#41d39e'}));
-      qs('#hint').textContent='Polígono listo. Pon un nombre y pulsa Guardar.';
-    }else{
-      qs('#hint').textContent='Cancelado.';
+  // ===== Contexto multi-finca =====
+  const LS_PREFIX = 'app_geo_v2';
+  const ctx = {
+    farmId: null,
+    data: {
+      fences: [], // {id,name,coords:[[lat,lng],...], color}
+      personal: [], // {id,nombre,telefono,rol,activo,geocercaId}
+      actividades: [], // {id,fecha,geocercaId,actividad,personalId,notas}
+      costos: [], // {id,fecha,geocercaId,actividad,personalId,costo}
+      logs: [], // {ts,telefono,geocercaId,lat,lng,acc}
+      config: { webhook: '', freqSec: 15 }
     }
-    manual.active=false; manual.latlngs=[];
+  };
+
+  function storageKey(section){
+    if(!ctx.farmId) return `${LS_PREFIX}_temp_${section}`;
+    return `${LS_PREFIX}_${ctx.farmId}_${section}`;
+  }
+  function saveAll(){
+    for(const k of Object.keys(ctx.data)){
+      localStorage.setItem(storageKey(k), JSON.stringify(ctx.data[k]));
+    }
+    refreshBindings();
+  }
+  function loadAll(){
+    for(const k of Object.keys(ctx.data)){
+      const raw = localStorage.getItem(storageKey(k));
+      if(raw){
+        try{ ctx.data[k] = JSON.parse(raw); } catch(e){ console.warn('JSON inválido en',k); }
+      }
+    }
+  }
+  function ensureFarmList(){
+    const key = `${LS_PREFIX}_farms`;
+    let arr = JSON.parse(localStorage.getItem(key) || '[]');
+    return {
+      get: ()=>arr,
+      set: (a)=>{ arr=a; localStorage.setItem(key, JSON.stringify(arr)); }
+    }
   }
 
-  qs('#btnSave').onclick=()=>{
-    const layers=drawn.getLayers();
-    if(!layers.length) return alert('No hay polígonos que guardar.');
-    const name=qs('#gfName').value.trim() || ('Geocerca '+(DB.geofences.length+1));
-    const layer=layers[layers.length-1];
-    const latlngs=(layer.getLatLngs()[0]||layer.getLatLngs()).map(p=>[p.lng,p.lat]); // (lng,lat)
-    DB.geofences.push({id:'gf'+Math.random().toString(36).slice(2,8), name, coords:latlngs});
-    saveDB(); qs('#gfName').value=''; renderGeofences(); alert('Geocerca guardada.');
-  };
+  // ===== Inicializar selector de fincas =====
+  const farmSelect = $('#farmSelect');
+  const farmsState = ensureFarmList();
+  function renderFarms(){
+    const farms = farmsState.get();
+    farmSelect.innerHTML = farms.map(f=>`<option value="${f.id}">${f.nombre}</option>`).join('');
+    if(!ctx.farmId && farms[0]) ctx.farmId = farms[0].id;
+    if(ctx.farmId) farmSelect.value = ctx.farmId;
+  }
+  function chooseFarm(id){
+    ctx.farmId = id;
+    loadAll();
+    refreshBindings();
+    mapRenderFences();
+    renderAllTables();
+    updateTrackerFreqBadge();
+  }
 
-  // personas
-  qs('#btnAddPerson').onclick=()=>{
-    const name=qs('#pName').value.trim(), phone=qs('#pPhone').value.trim();
-    if(!name||!phone) return alert('Nombre y teléfono obligatorios');
-    DB.people.push({id:'u'+Math.random().toString(36).slice(2,8), name, phone, geofences:[]});
-    saveDB(); qs('#pName').value=''; qs('#pPhone').value=''; renderPeople(); alert('Usuario añadido');
-  };
-
-  qs('#btnExport').onclick=exportCSV;
-
-  renderPeople();
-}
-
-function renderGeofences(){
-  drawn.clearLayers();
-  DB.geofences.forEach(g=>{
-    const ll=g.coords.map(([lng,lat])=>[lat,lng]);
-    drawn.addLayer(L.polygon(ll,{color:'#41d39e'}).bindTooltip(g.name));
+  $('#btnNuevaFinca').addEventListener('click', ()=>{
+    const nombre = prompt('Nombre de la finca:');
+    if(!nombre) return;
+    const id = `f${Date.now()}`;
+    const farms = farmsState.get();
+    farms.push({id, nombre});
+    farmsState.set(farms);
+    renderFarms();
+    chooseFarm(id);
   });
-  if(drawn.getLayers().length) map.fitBounds(drawn.getBounds());
-
-  const tb=qs('#gfTable'); tb.innerHTML='';
-  DB.geofences.forEach(g=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${g.name}</td><td>${g.coords.length}</td>`;
-    tb.appendChild(tr);
+  $('#btnEliminarFinca').addEventListener('click', ()=>{
+    if(!ctx.farmId) return alert('No hay finca activa');
+    if(!confirm('¿Eliminar la finca actual y TODOS sus datos?')) return;
+    // Borrar secciones
+    for(const k of Object.keys(ctx.data)){
+      localStorage.removeItem(storageKey(k));
+    }
+    // Borrar de la lista
+    const farms = farmsState.get().filter(f=>f.id!==ctx.farmId);
+    farmsState.set(farms);
+    ctx.farmId = farms[0]?.id || null;
+    renderFarms();
+    if(ctx.farmId) chooseFarm(ctx.farmId); else location.reload();
   });
-}
+  farmSelect.addEventListener('change', ()=> chooseFarm(farmSelect.value));
 
-function renderPeople(){
-  const tb=qs('#peopleTable'); tb.innerHTML='';
-  DB.people.forEach(u=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`
-      <td>${u.name}</td>
-      <td>${u.phone}</td>
-      <td>
-        <select multiple size="3" data-id="${u.id}">
-          ${DB.geofences.map(g=>`<option value="${g.id}" ${u.geofences?.includes(g.id)?'selected':''}>${g.name}</option>`).join('')}
-        </select>
-      </td>
-      <td><button data-link="${u.id}">Generar</button></td>`;
-    tb.appendChild(tr);
+  // ===== Navegación de pestañas (Admin) =====
+  $('#tabs').addEventListener('click', (e)=>{
+    if(e.target.tagName!=='BUTTON') return;
+    const tab = e.target.dataset.tab;
+    $$('#tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+    $$('section.panel').forEach(p=>p.classList.remove('show'));
+    $(`#tab-${tab}`).classList.add('show');
+    if(tab==='reportes') drawChart();
   });
 
-  // guardar asignación cuando cambia
-  qsa('#peopleTable select').forEach(sel=>{
-    sel.onchange=()=>{
-      const id=sel.getAttribute('data-id');
-      const vals=Array.from(sel.selectedOptions).map(o=>o.value);
-      const i=DB.people.findIndex(p=>p.id===id); if(i>=0){ DB.people[i].geofences=vals; saveDB(); }
+  // ====== Leaflet (mapa ADMIN) ======
+  let map, drawControl, drawnItems, editOn=false;
+  function initMap(){
+    map = L.map('map');
+    // Intento ubicar en Ecuador si no hay fences
+    const defaultCenter = [-1.8312, -78.1834];
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      maxZoom:19, attribution:'&copy; OpenStreetMap contrib.'
+    }).addTo(map);
+    drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    drawControl = new L.Control.Draw({
+      draw: {
+        polyline:false, rectangle:false, circle:false, circlemarker:false, marker:false,
+        polygon: { allowIntersection:false, showArea:true }
+      },
+      edit: { featureGroup: drawnItems }
+    });
+    map.addControl(drawControl);
+
+    map.on(L.Draw.Event.CREATED, function (e) {
+      const layer = e.layer; drawnItems.addLayer(layer); updateFencesFromLayers();
+    });
+    map.on(L.Draw.Event.EDITED, function () { updateFencesFromLayers(); });
+
+    // Coordenadas en vivo
+    map.on('mousemove', (ev)=>{ $('#mapCoords').textContent = `Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`; });
+
+    // Ajuste inicial
+    map.setView(defaultCenter, 6);
+  }
+
+  function layerToCoords(layer){
+    const latlngs = layer.getLatLngs(); // puede ser multi
+    const first = Array.isArray(latlngs[0])? latlngs[0]: latlngs;
+    return first.map(ll=>[ll.lat, ll.lng]);
+  }
+  function coordsToLayer(coords){
+    return L.polygon(coords, {color:'#0b5', weight:2, fillOpacity:0.1});
+  }
+
+  function updateFencesFromLayers(){
+    // Vuelco todo lo dibujado a ctx.data.fences (mantengo nombres si existen por proximidad)
+    const newF = [];
+    drawnItems.eachLayer((layer)=>{
+      const coords = layerToCoords(layer);
+      // Intentar emparejar por bbox con alguna existente para conservar nombre
+      let name = 'Geocerca ' + (ctx.data.fences.length + newF.length + 1);
+      let id = 'g' + Date.now() + Math.random().toString(36).slice(2,6);
+      // Aproximar matching: busca una existente con centro similar
+      const c = centroid(coords);
+      const match = ctx.data.fences.find(f=>{
+        const cc = centroid(f.coords);
+        const d = Math.hypot(c[0]-cc[0], c[1]-cc[1]);
+        return d<0.0008; // ~80m aprox
+      });
+      if(match){ name = match.name; id = match.id; }
+      newF.push({id, name, coords, color:'#0b5'});
+    });
+    ctx.data.fences = newF;
+    saveAll();
+    renderFencesTable();
+    refreshFenceSelects();
+  }
+
+  function mapRenderFences(){
+    if(!map) return;
+    drawnItems.clearLayers();
+    if(ctx.data.fences.length===0){ map.setView([-1.8312,-78.1834], 6); return; }
+    const layers = ctx.data.fences.map(f=> coordsToLayer(f.coords).bindTooltip(f.name));
+    layers.forEach(l=> drawnItems.addLayer(l));
+    const group = L.featureGroup(layers);
+    try{ map.fitBounds(group.getBounds().pad(0.2)); }catch(e){ /* ignore */ }
+    renderFencesTable();
+    refreshFenceSelects();
+  }
+
+  function renderFencesTable(){
+    const tb = $('#fencesTable tbody');
+    tb.innerHTML = '';
+    const assignedCounts = Object.fromEntries(ctx.data.fences.map(f=>[f.id,0]));
+    ctx.data.personal.forEach(p=>{ if(p.geocercaId) assignedCounts[p.geocercaId] = (assignedCounts[p.geocercaId]||0)+1; });
+    for(const f of ctx.data.fences){
+      const tr = document.createElement('tr');
+      const verts = f.coords.length;
+      tr.innerHTML = `<td contenteditable onblur="window._renameFence('${f.id}', this.textContent)">${escapeHtml(f.name)}</td>
+        <td>${verts}</td>
+        <td>${assignedCounts[f.id]||0}</td>
+        <td class="row-actions">
+          <button class="btn" onclick="window._zoomFence('${f.id}')">Zoom</button>
+          <button class="btn danger" onclick="window._deleteFence('${f.id}')">Borrar</button>
+        </td>`;
+      tb.appendChild(tr);
+    }
+  }
+  window._zoomFence = (id)=>{
+    const f = ctx.data.fences.find(x=>x.id===id); if(!f) return;
+    const l = coordsToLayer(f.coords); const b = l.getBounds(); map.fitBounds(b.pad(0.2));
+  }
+  window._deleteFence = (id)=>{
+    if(!confirm('¿Eliminar esta geocerca?')) return;
+    ctx.data.fences = ctx.data.fences.filter(f=>f.id!==id);
+    saveAll(); mapRenderFences();
+  }
+  window._renameFence = (id, name)=>{
+    const f = ctx.data.fences.find(x=>x.id===id); if(!f) return; f.name = name.trim()||f.name; saveAll(); renderFencesTable(); refreshFenceSelects();
+  }
+
+  // Botones geocercas
+  $('#btnNuevaGeocerca').addEventListener('click', ()=>{
+    new L.Draw.Polygon(map, drawControl.options.draw.polygon).enable();
+  });
+  let editing = false;
+  $('#btnEditarGeocerca').addEventListener('click', ()=>{
+    editing = !editing;
+    if(editing){ new L.EditToolbar.Edit(map, { featureGroup: drawnItems }).enable(); }
+    else { new L.EditToolbar.Edit(map, { featureGroup: drawnItems }).disable(); }
+    $('#btnEditarGeocerca').textContent = editing? 'Salir de Edición' : 'Editar Geocercas';
+  });
+  $('#btnGuardarGeocercas').addEventListener('click', ()=>{
+    updateFencesFromLayers(); alert('Cambios de geocercas guardados.');
+  });
+  $('#btnCrearDesdeLista').addEventListener('click', ()=>{
+    const name = ($('#newFenceName').value || '').trim();
+    const txt = $('#coordsInput').value.trim();
+    if(!txt) return alert('Pega coordenadas primero');
+    const coords = txt.split(/\n+/).map(l=>{
+      const [a,b] = l.split(',').map(s=>parseFloat(s.trim()));
+      if(Number.isFinite(a)&&Number.isFinite(b)) return [a,b];
+    }).filter(Boolean);
+    if(coords.length<3) return alert('Se requieren ≥ 3 puntos');
+    const layer = coordsToLayer(coords).bindTooltip(name||('Geocerca '+(ctx.data.fences.length+1)));
+    drawnItems.addLayer(layer);
+    updateFencesFromLayers();
+    $('#coordsInput').value=''; $('#newFenceName').value='';
+  });
+
+  // ===== Personal =====
+  function refreshFenceSelects(){
+    const opts = ['<option value="">(sin asignar)</option>'].concat(ctx.data.fences.map(f=>`<option value="${f.id}">${escapeHtml(f.name)}</option>`));
+    $('#pGeocerca').innerHTML = opts.join('');
+    $('#aGeocerca').innerHTML = ['<option value="">(todas)</option>'].concat(ctx.data.fences.map(f=>`<option value="${f.id}">${escapeHtml(f.name)}</option>`)).join('');
+    $('#cGeocerca').innerHTML = ['<option value="">(todas)</option>'].concat(ctx.data.fences.map(f=>`<option value="${f.id}">${escapeHtml(f.name)}</option>`)).join('');
+  }
+
+  function refreshActivePersonalSelects(){
+    const active = ctx.data.personal.filter(p=>p.activo);
+    const opts = ['<option value="">(ninguno)</option>'].concat(active.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre)}</option>`));
+    $('#aPersonal').innerHTML = opts.join('');
+    $('#cPersonal').innerHTML = opts.join('');
+    // Quick link picker
+    const trackers = ctx.data.personal.filter(p=>p.rol==='TRACKER');
+    $('#quickUser').innerHTML = trackers.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre)} (${escapeHtml(p.telefono)})</option>`).join('');
+  }
+
+  $('#btnAddPersonal').addEventListener('click', ()=>{
+    const nombre = $('#pNombre').value.trim();
+    const telefono = $('#pTelefono').value.trim();
+    const rol = $('#pRol').value;
+    const activo = $('#pActivo').value==='true';
+    const geocercaId = $('#pGeocerca').value || '';
+    if(!nombre || !telefono) return alert('Completa nombre y teléfono');
+    const id = 'p'+Date.now();
+    ctx.data.personal.push({id,nombre,telefono,rol,activo,geocercaId});
+    saveAll();
+    $('#pNombre').value=''; $('#pTelefono').value=''; $('#pRol').value='TRACKER'; $('#pActivo').value='true'; $('#pGeocerca').value='';
+    renderPersonalTable(); refreshActivePersonalSelects();
+  });
+
+  function trackerLinkFor(p){
+    const u = new URL(location.href);
+    u.search = '';
+    u.hash = '';
+    u.searchParams.set('mode','tracker');
+    u.searchParams.set('phone', p.telefono);
+    if(ctx.farmId) u.searchParams.set('farm', ctx.farmId);
+    return u.toString();
+  }
+
+  function renderPersonalTable(){
+    const tb = $('#personalTable tbody'); tb.innerHTML='';
+    for(const p of ctx.data.personal){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td contenteditable onblur="window._pf('${p.id}','nombre',this.textContent)">${escapeHtml(p.nombre)}</td>
+        <td contenteditable onblur="window._pf('${p.id}','telefono',this.textContent)">${escapeHtml(p.telefono)}</td>
+        <td>
+          <select onchange="window._pf('${p.id}','rol',this.value)">
+            <option ${p.rol==='TRACKER'?'selected':''}>TRACKER</option>
+            <option ${p.rol==='ADMIN'?'selected':''}>ADMIN</option>
+          </select>
+        </td>
+        <td>
+          <select onchange="window._pf('${p.id}','activo',this.value)">
+            <option value="true" ${p.activo?'selected':''}>Sí</option>
+            <option value="false" ${!p.activo?'selected':''}>No</option>
+          </select>
+        </td>
+        <td>
+          <select onchange="window._pf('${p.id}','geocercaId',this.value)">
+            <option value="">(sin)</option>
+            ${ctx.data.fences.map(f=>`<option value="${f.id}" ${p.geocercaId===f.id?'selected':''}>${escapeHtml(f.name)}</option>`).join('')}
+          </select>
+        </td>
+        <td><input readonly value="${trackerLinkFor(p)}" style="width:260px"/></td>
+        <td class="row-actions">
+          <button class="btn" onclick="window._open('${trackerLinkFor(p)}')">Abrir</button>
+          <button class="btn danger" onclick="window._delP('${p.id}')">Borrar</button>
+        </td>`;
+      tb.appendChild(tr);
+    }
+  }
+  window._open = (url)=> window.open(url,'_blank');
+  window._delP = (id)=>{ if(!confirm('¿Eliminar persona?'))return; ctx.data.personal=ctx.data.personal.filter(x=>x.id!==id); saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); }
+  window._pf = (id,field,value)=>{
+    const p = ctx.data.personal.find(x=>x.id===id); if(!p) return;
+    if(field==='activo') value = (value==='true');
+    p[field] = value; saveAll(); renderPersonalTable(); refreshActivePersonalSelects();
+  }
+
+  // Quick copy link
+  $('#btnCopiarEnlace').addEventListener('click', async ()=>{
+    const id = $('#quickUser').value; const p = ctx.data.personal.find(x=>x.id===id); if(!p) return;
+    const link = trackerLinkFor(p);
+    try{ await navigator.clipboard.writeText(link); $('#copiedMsg').textContent='¡Copiado!'; setTimeout(()=>$('#copiedMsg').textContent='',1500);}catch(e){ alert(link); }
+  });
+
+  // ===== Actividades =====
+  $('#btnAddActividad').addEventListener('click', ()=>{
+    const fecha = $('#aFecha').value; const geocercaId=$('#aGeocerca').value; const actividad=$('#aActividad').value.trim(); const personalId=$('#aPersonal').value; const notas=$('#aNotas').value.trim();
+    if(!fecha||!actividad) return alert('Completa fecha y actividad');
+    ctx.data.actividades.push({id:'a'+Date.now(),fecha,geocercaId,actividad,personalId,notas});
+    saveAll(); renderActividadesTable(); $('#aNotas').value='';
+  });
+  function renderActividadesTable(){
+    const tb = $('#actividadesTable tbody'); tb.innerHTML='';
+    for(const a of ctx.data.actividades){
+      const f = ctx.data.fences.find(x=>x.id===a.geocercaId)?.name||'';
+      const p = ctx.data.personal.find(x=>x.id===a.personalId)?.nombre||'';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(a.fecha)}</td><td>${escapeHtml(f)}</td><td>${escapeHtml(a.actividad)}</td><td>${escapeHtml(p)}</td><td>${escapeHtml(a.notas||'')}</td><td><button class="btn danger" onclick="window._delA('${a.id}')">Borrar</button></td>`;
+      tb.appendChild(tr);
+    }
+  }
+  window._delA = (id)=>{ if(!confirm('¿Eliminar actividad?')) return; ctx.data.actividades = ctx.data.actividades.filter(x=>x.id!==id); saveAll(); renderActividadesTable(); }
+
+  // ===== Costos =====
+  $('#btnAddCosto').addEventListener('click', ()=>{
+    const fecha=$('#cFecha').value; const geocercaId=$('#cGeocerca').value; const actividad=$('#cActividad').value.trim(); const personalId=$('#cPersonal').value; const costo=parseFloat($('#cCosto').value);
+    if(!fecha || !Number.isFinite(costo)) return alert('Completa fecha y costo');
+    ctx.data.costos.push({id:'c'+Date.now(),fecha,geocercaId,actividad,personalId,costo});
+    saveAll(); renderCostosTable(); $('#cCosto').value='';
+  });
+  function renderCostosTable(){
+    const tb = $('#costosTable tbody'); tb.innerHTML='';
+    for(const c of ctx.data.costos){
+      const f = ctx.data.fences.find(x=>x.id===c.geocercaId)?.name||'';
+      const p = ctx.data.personal.find(x=>x.id===c.personalId)?.nombre||'';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(c.fecha)}</td><td>${escapeHtml(f)}</td><td>${escapeHtml(c.actividad||'')}</td><td>${escapeHtml(p)}</td><td>$ ${Number(c.costo).toFixed(2)}</td><td><button class="btn danger" onclick="window._delC('${c.id}')">Borrar</button></td>`;
+      tb.appendChild(tr);
+    }
+  }
+  window._delC = (id)=>{ if(!confirm('¿Eliminar costo?')) return; ctx.data.costos = ctx.data.costos.filter(x=>x.id!==id); saveAll(); renderCostosTable(); }
+
+  // ===== Reportes (logs de posiciones) =====
+  function renderLogs(){
+    const tb = $('#logsTable tbody'); tb.innerHTML='';
+    for(const Lg of ctx.data.logs.slice().reverse()){
+      const f = ctx.data.fences.find(x=>x.id===Lg.geocercaId)?.name||Lg.geocercaId||'';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(Lg.ts)}</td><td>${escapeHtml(Lg.telefono)}</td><td>${escapeHtml(f)}</td><td>${fmt(Lg.lat)}</td><td>${fmt(Lg.lng)}</td><td>${Lg.acc??''}</td>`;
+      tb.appendChild(tr);
+    }
+  }
+
+  $('#btnExportCSV').addEventListener('click', ()=>{
+    const rows = [['ts','telefono','geocerca','lat','lng','accuracy']]
+      .concat(ctx.data.logs.map(l=>[l.ts,l.telefono,l.geocercaId,l.lat,l.lng,l.acc]));
+    const csv = rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'\"')}"`).join(',')).join('\n');
+    const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`logs_${ctx.farmId||'finca'}.csv`; a.click();
+  });
+  $('#btnBorrarLogs').addEventListener('click', ()=>{
+    if(!confirm('¿Borrar TODOS los registros de posiciones?')) return;
+    ctx.data.logs = []; saveAll(); renderLogs(); drawChart();
+  });
+
+  let chart;
+  function drawChart(){
+    const data = {};
+    for(const l of ctx.data.logs){ const d = l.ts.slice(0,10); data[d]=(data[d]||0)+1; }
+    const labels = Object.keys(data).sort();
+    const values = labels.map(k=>data[k]);
+    const ctxc = document.getElementById('chartPos');
+    if(chart) chart.destroy();
+    chart = new Chart(ctxc, { type:'bar', data:{ labels, datasets:[{ label:'Posiciones/día', data:values }] }, options:{ responsive:true, scales:{ y:{ beginAtZero:true } } } });
+  }
+
+  // ===== Config =====
+  function renderConfig(){
+    $('#cfgWebhook').value = ctx.data.config.webhook||'';
+    $('#cfgFreq').value = ctx.data.config.freqSec||15;
+  }
+  $('#btnGuardarCfg').addEventListener('click', ()=>{
+    ctx.data.config.webhook = $('#cfgWebhook').value.trim();
+    const f = parseInt($('#cfgFreq').value,10); ctx.data.config.freqSec = Number.isFinite(f)&&f>0 ? f : 15;
+    saveAll(); updateTrackerFreqBadge(); alert('Configuración guardada.');
+  });
+  function updateTrackerFreqBadge(){ $('#freqSec').textContent = ctx.data.config.freqSec; }
+
+  // ===== Modo TRACKER =====
+  let miniMap, miniFenceLayer, watchId=null, sendTimer=null, trackerUser=null, trackerFence=null;
+
+  function initTracker(){
+    const phone = param('phone');
+    const farm = param('farm');
+    if(farm){ ctx.farmId = farm; renderFarms(); chooseFarm(farm); }
+
+    trackerUser = ctx.data.personal.find(p=> p.telefono===phone ) || null;
+    const isValid = !!(trackerUser && trackerUser.activo);
+    $('#trackerUserInfo').textContent = isValid ? `${trackerUser.nombre} · ${trackerUser.telefono}` : `Teléfono ${phone||'(no provisto)'} · Usuario no encontrado o inactivo`;
+
+    trackerFence = ctx.data.fences.find(f=> f.id === trackerUser?.geocercaId );
+    $('#trackerFenceName').textContent = trackerFence? trackerFence.name : '(sin asignar)';
+
+    // Mapa mini
+    miniMap = L.map('miniMap');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(miniMap);
+    if(trackerFence){ miniFenceLayer = coordsToLayer(trackerFence.coords).addTo(miniMap); miniMap.fitBounds(miniFenceLayer.getBounds().pad(0.3)); }
+    else { miniMap.setView([-1.8312,-78.1834],6); }
+
+    miniMap.on('mousemove', (ev)=>{ $('#miniCoords').textContent = `Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`; });
+
+    $('#toggleSend').addEventListener('change', (e)=> toggleSending(e.target.checked));
+  }
+
+  function toggleSending(on){
+    setState(on? 'ok':'idle', on? 'Envío activo':'Inactivo');
+    if(on){
+      if(!('geolocation' in navigator)) { alert('Geolocalización no disponible'); $('#toggleSend').checked=false; setState('no','Error'); return; }
+      if(!trackerFence){ alert('No tienes geocerca asignada. Contacta al administrador.'); $('#toggleSend').checked=false; setState('idle','Sin geocerca'); return; }
+      // Iniciar watch + timer de envíos
+      if(watchId===null){ watchId = navigator.geolocation.watchPosition(onPos, onGeoErr, { enableHighAccuracy:true, maximumAge:10000, timeout:20000 }); }
+      const freq = ctx.data.config.freqSec || 15;
+      if(sendTimer!==null) clearInterval(sendTimer);
+      sendTimer = setInterval(()=>{ trySend(); }, freq*1000);
+      trySend();
+    } else {
+      if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
+      if(sendTimer!==null){ clearInterval(sendTimer); sendTimer=null; }
+    }
+  }
+
+  let lastPos=null; let lastInside=false; let lastSentTs=null;
+  function onPos(pos){
+    const {latitude, longitude, accuracy} = pos.coords;
+    lastPos = {lat:latitude, lng:longitude, acc:accuracy, ts: nowISO() };
+    $('#miniCoords').textContent = `Lat: ${fmt(latitude)} Lng: ${fmt(longitude)} (±${Math.round(accuracy)}m)`;
+    // Actualizar punto en mapa
+    if(window._myMarker) window._myMarker.setLatLng([latitude, longitude]);
+    else window._myMarker = L.marker([latitude, longitude]).addTo(miniMap);
+    if(trackerFence && miniFenceLayer){ const b = miniFenceLayer.getBounds(); if(!b.contains([latitude,longitude])) miniMap.fitBounds(b.pad(0.3)); }
+    lastInside = trackerFence? pointInPolygon([latitude, longitude], trackerFence.coords) : false;
+    setState(lastInside? 'ok':'no', lastInside? 'Dentro de geocerca':'Fuera de geocerca');
+    $('#lastEvent').textContent = `${lastPos.ts} · ${lastInside? 'Dentro':'Fuera'} (${Math.round(accuracy)}m)`;
+  }
+  function onGeoErr(err){ console.warn(err); $('#lastEvent').textContent = `Error GPS: ${err.message}`; setState('no','GPS error'); }
+
+  function trySend(){
+    if(!$('#toggleSend').checked) return;
+    if(!lastPos) return;
+    if(!lastInside) return; // solo si está dentro
+    const payload = {
+      ts: lastPos.ts,
+      telefono: trackerUser?.telefono || param('phone') || 'desconocido',
+      geocercaId: trackerUser?.geocercaId || (trackerFence?.id||''),
+      lat: lastPos.lat, lng: lastPos.lng, acc: lastPos.acc,
+      farmId: ctx.farmId
     };
-  });
-  // generar enlace
-  qsa('#peopleTable button[data-link]').forEach(btn=>{
-    btn.onclick=()=>{
-      const id=btn.getAttribute('data-link');
-      const u=DB.people.find(p=>p.id===id); if(!u) return;
-      const url=`${location.origin}${location.pathname}?mode=sender&phone=${encodeURIComponent(u.phone)}`;
-      navigator.clipboard?.writeText(url);
-      alert('Enlace copiado:\n'+url);
-    };
-  });
-}
+    // Guardar local
+    ctx.data.logs.push(payload); saveAll(); renderLogs(); drawChart();
 
-function exportCSV(){
-  const head=['fecha','usuario','telefono','geocerca','lat','lng','precision_m'];
-  const rows=[head.join(',')];
-  DB.submissions.forEach(r=>{
-    const u=DB.people.find(x=>x.id===r.userId);
-    const g=DB.geofences.find(x=>x.id===r.geofenceId);
-    rows.push([new Date(r.ts).toISOString(), u?.name||'', r.phone, g?.name||r.geofenceId, r.lat, r.lng, Math.round(r.acc||0)].join(','));
-  });
-  const blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='envios.csv'; a.click();
-}
-
-// ====== SENDER ======
-let sMap=null, sLayer=null, watchId=null, sUser=null;
-function initSender(){
-  sUser=DB.people.find(u=>u.phone===params.phone);
-  if(!sUser){ alert('Teléfono no registrado.'); return;}
-  qs('#senderUser').textContent=`Usuario: ${sUser.name} (${sUser.phone})`;
-  const gnames=sUser.geofences.map(id=>DB.geofences.find(g=>g.id===id)?.name||id).join(', ');
-  qs('#senderGfs').textContent='Geocercas: '+(gnames||'—');
-
-  sMap=L.map('senderMap').setView([-1.0639,-77.8125],16);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20}).addTo(sMap);
-  sLayer=L.layerGroup().addTo(sMap);
-
-  // pintar geocercas del usuario
-  const bounds=[];
-  sUser.geofences.forEach(id=>{
-    const gf=DB.geofences.find(g=>g.id===id); if(!gf) return;
-    const ll=gf.coords.map(([lng,lat])=>[lat,lng]);
-    L.polygon(ll,{color:'#41d39e'}).addTo(sLayer);
-    bounds.push(...ll);
-  });
-  if(bounds.length) sMap.fitBounds(L.polygon(bounds).getBounds());
-
-  qs('#start').onclick=()=>{
-    if(!navigator.geolocation) return alert('Sin geolocalización');
-    if(watchId!=null) return;
-    qs('#senderInfo').textContent='Estado: iniciando…';
-    watchId=navigator.geolocation.watchPosition(onPos, e=>qs('#senderInfo').textContent='Error: '+e.message, {enableHighAccuracy:true,maximumAge:5000,timeout:15000});
-  };
-  qs('#stop').onclick=()=>{
-    if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
-    qs('#senderInfo').textContent='Estado: detenido';
-  };
-}
-
-function onPos(pos){
-  const {latitude:lat, longitude:lng, accuracy}=pos.coords;
-  sLayer.clearLayers();
-  // redibujar geocercas
-  sUser.geofences.forEach(id=>{
-    const gf=DB.geofences.find(g=>g.id===id); if(!gf) return;
-    const ll=gf.coords.map(([lng2,lat2])=>[lat2,lng2]);
-    L.polygon(ll,{color:'#41d39e'}).addTo(sLayer);
-  });
-  L.marker([lat,lng]).addTo(sLayer);
-  L.circle([lat,lng],{radius:Math.max(15,accuracy||15)}).addTo(sLayer);
-  sMap.setView([lat,lng], sMap.getZoom());
-
-  // validación
-  let inside=null;
-  for(const id of sUser.geofences){
-    const gf=DB.geofences.find(g=>g.id===id); if(!gf) continue;
-    if(pointInPoly([lng,lat], gf.coords)){ inside=id; break; }
+    // Enviar remoto, si hay webhook
+    const url = ctx.data.config.webhook?.trim();
+    if(url){
+      const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+      const ok = (navigator.sendBeacon && navigator.sendBeacon(url, blob));
+      if(!ok){
+        fetch(url,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+          .catch(e=>console.warn('POST webhook falló', e));
+      }
+    }
+    lastSentTs = nowISO(); $('#lastSend').textContent = `${lastSentTs}`;
   }
-  if(inside){
-    DB.submissions.push({ts:Date.now(), phone:sUser.phone, userId:sUser.id, lat, lng, acc:accuracy||0, geofenceId:inside});
-    saveDB();
-    qs('#senderInfo').textContent='Dentro de geocerca: punto registrado.';
-  }else{
-    qs('#senderInfo').textContent='Fuera de geocerca: no se registra.';
-  }
-}
 
-// ====== iniciar ======
-if(isSender) initSender(); else initAdmin();
+  function setState(kind,text){
+    const dot = $('#trackerStateDot'); const tx = $('#trackerStateText');
+    dot.classList.remove('ok','no','idle'); dot.classList.add(kind);
+    tx.textContent = text;
+  }
+
+  // ===== Helpers =====
+  function escapeHtml(s){ return String(s||'').replace(/[&<>\"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+  function param(k){ return new URL(location.href).searchParams.get(k); }
+  function centroid(coords){ let x=0,y=0; for(const c of coords){ x+=c[0]; y+=c[1]; } return [x/coords.length, y/coords.length]; }
+  function pointInPolygon(point, vs){
+    // Ray casting — point=[lat,lng], vs=[[lat,lng],...]
+    const x = point[1], y = point[0];
+    let inside = false;
+    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+      const xi = vs[i][1], yi = vs[i][0];
+      const xj = vs[j][1], yj = vs[j][0];
+      const intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / ((yj - yi)||1e-12) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function renderAllTables(){ renderFencesTable(); renderPersonalTable(); refreshActivePersonalSelects(); renderActividadesTable(); renderCostosTable(); renderLogs(); drawChart(); renderConfig(); }
+
+  // ===== Arranque =====
+  function start(){
+    // Determinar modo
+    const mode = (param('mode')||'').toLowerCase();
+    renderFarms();
+    if(!ctx.farmId){ // crear una finca por defecto
+      const id = 'f'+Date.now(); const farms = farmsState.get(); farms.push({id, nombre:'Mi Finca'}); farmsState.set(farms); ctx.farmId = id; renderFarms();
+    }
+    chooseFarm(ctx.farmId);
+
+    if(mode==='tracker' || param('phone')){
+      // MODO TRACKER
+      $('#adminShell').classList.add('hidden');
+      $('#trackerShell').classList.remove('hidden');
+      initTracker();
+    } else {
+      // MODO ADMIN
+      $('#trackerShell').classList.add('hidden');
+      $('#adminShell').classList.remove('hidden');
+      initMap();
+      mapRenderFences();
+    }
+  }
+
+  start();
+})();
 </script>
 </body>
 </html>
