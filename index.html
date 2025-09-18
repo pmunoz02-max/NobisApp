@@ -160,7 +160,9 @@
             </div>
           </div>
           <div style="position:relative;margin-top:1rem">
-            <div id="map" class="map" style="background:#f3f6f9"></div>
+            <div id="map" class="map" style="background:#f3f6f9; position:relative">
+  <div id="mapDebug" style="position:absolute;left:8px;bottom:8px;background:rgba(255,255,255,.9);border:1px solid #ddd;border-radius:6px;padding:4px 6px;font-size:12px;display:none"></div>
+</div>
             <div class="coords" id="mapCoords">Lat: — Lng: —</div>
           </div>
         </div>
@@ -504,8 +506,68 @@
   // ====== Leaflet (mapa ADMIN) ======
   let map, drawControl, drawnItems, editOn=false;
   function initMap(){
+    const dbg = (m)=>{ const el = document.getElementById('mapDebug'); if(!el) return; el.style.display='block'; el.textContent = (el.textContent? el.textContent+' | ':'') + m; };
     // 1) Comprobaciones de entorno
     if(typeof L === 'undefined'){ console.error('Leaflet no cargó'); showFatal(new Error('No se pudo cargar Leaflet desde CDN')); return; }
+
+    const cont = document.getElementById('map');
+    if(!cont){ console.error('#map no existe aún'); return; }
+
+    // Si ya existe, solo revalida tamaño
+    if(map){ setTimeout(()=>{ try{ map.invalidateSize(true); dbg('invalidate-size'); }catch(_){} }, 120); return; }
+
+    // 2) Asegurar tamaño visible del contenedor
+    if(cont.clientHeight < 100){ cont.style.height = '520px'; dbg('height-boost'); }
+
+    // 3) Crear mapa
+    map = L.map('map'); dbg('map-created');
+    const defaultCenter = [-1.8312, -78.1834];
+
+    function addTiles(url){
+      const tl = L.tileLayer(url, {maxZoom:19, attribution:'&copy; OpenStreetMap/Esri'});
+      tl.on('tileerror', ()=>{ dbg('tileerror'); });
+      tl.on('load', ()=>{ dbg('tiles-ok'); setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){} }, 150); });
+      tl.addTo(map); return tl;
+    }
+
+    // Fallback chain de tiles
+    let base = addTiles('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    base.on('tileerror', ()=>{
+      try{ map.removeLayer(base); }catch(_){ }
+      dbg('fallback-osm-root');
+      base = addTiles('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+      base.on('tileerror', ()=>{
+        try{ map.removeLayer(base); }catch(_){ }
+        dbg('fallback-osm-hot');
+        base = addTiles('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png');
+        base.on('tileerror', ()=>{
+          try{ map.removeLayer(base); }catch(_){ }
+          dbg('fallback-esri');
+          base = addTiles('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}');
+        });
+      });
+    });
+
+    drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    drawControl = new L.Control.Draw({
+      draw: { polyline:false, rectangle:false, circle:false, circlemarker:false, marker:false,
+        polygon: { allowIntersection:false, showArea:true } },
+      edit: { featureGroup: drawnItems }
+    });
+    map.addControl(drawControl);
+
+    map.on(L.Draw.Event.CREATED, function (e) { const layer = e.layer; drawnItems.addLayer(layer); updateFencesFromLayers(); });
+    map.on(L.Draw.Event.EDITED, function () { updateFencesFromLayers(); });
+    map.on('mousemove', (ev)=>{ const el=$('#mapCoords'); if(el) el.textContent = `Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`; });
+
+    map.setView(defaultCenter, 6);
+
+    // Invalida tamaño tras un pequeño delay (render en grid/tab)
+    setTimeout(()=>{ try{ map.invalidateSize(true); dbg('invalidate-delay'); }catch(_){} }, 250);
+    window.addEventListener('resize', ()=>{ try{ map.invalidateSize(true); dbg('invalidate-resize'); }catch(_){} });
+  }
 
     const cont = document.getElementById('map');
     if(!cont){ console.error('#map no existe aún'); return; }
