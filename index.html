@@ -1,603 +1,562 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Nobis App • Administración</title>
-
-<!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-
-<style>
-:root{
-  --bg:#f7f7f9; --panel:#fff; --b:#e6e6ee;
-  --brand:#2563eb; --accent:#ff9800; --muted:#6b7280;
-}
-*{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:#111}
-.wrap{max-width:1320px;margin:0 auto;padding:16px;display:grid;grid-template-columns:340px 1fr;gap:16px}
-@media (max-width:1100px){.wrap{grid-template-columns:1fr}}
-.panel{background:var(--panel);border:1px solid var(--b);border-radius:12px;padding:14px}
-h2{margin:6px 0 12px} h3{margin:12px 0 8px;font-size:1rem}
-#map{height:54vh;min-height:420px;border-radius:12px;border:1px solid var(--b);background:#fafafa}
-.section{margin-top:14px;padding-top:8px;border-top:1px dashed var(--b)}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.col{display:flex;flex-direction:column;gap:8px}
-input,textarea,select,button{font:inherit}
-input[type="text"], input[type="number"], textarea, select{width:100%;border:1px solid var(--b);border-radius:8px;padding:9px 10px;background:#fff}
-textarea{height:106px;resize:vertical}
-.btn{padding:9px 12px;border:1px solid var(--b);border-radius:8px;background:#fff;cursor:pointer}
-.btn.primary{background:#2563eb;color:#fff;border-color:transparent}
-.btn.ok{background:#ecfdf5;border-color:#a7f3d0}
-.btn.warn{background:#fff7ed;border-color:#fed7aa}
-.btn:disabled{opacity:.55;cursor:not-allowed}
-.list{border:1px solid var(--b);border-radius:8px;padding:8px;max-height:150px;overflow:auto;background:#fff}
-.item{padding:6px 8px;border-radius:6px;cursor:pointer}
-.item:hover{background:#f3f4f6}
-.item.active{background:#e8efff}
-.help{font-size:.9rem;color:var(--muted)}
-.coordsCtl{background:#0f172a;color:#e2e8f0;padding:6px 10px;border-radius:8px;font-size:.9rem;border:1px solid rgba(255,255,255,.1);box-shadow:0 4px 10px rgba(0,0,0,.15);user-select:none}
-.vertex-dot{width:12px;height:12px;background:#38bdf8;border:2px solid #0ea5e9;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
-.table{width:100%;border-collapse:collapse}
-.table th,.table td{border:1px solid var(--b);padding:8px;text-align:left}
-.table thead{background:#f3f4f6}
-.badge{padding:3px 8px;border-radius:999px;background:#eef2ff;border:1px solid #c7d2fe;font-size:.85rem}
-.divider{height:1px;background:var(--b);margin:10px 0}
-.nowrap{white-space:nowrap}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>App Nobis – Geocercas & Envíos Georreferenciados</title>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet Draw -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <!-- Turf.js para point-in-polygon -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+  <style>
+    :root{
+      --bg:#0c0d10;--panel:#141721;--muted:#778;--text:#eaeef7;--acc:#41d39e;--warn:#ffc13b;--danger:#ff6363;
+    }
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
+    header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(180deg,#161a25,#12151f);border-bottom:1px solid #222}
+    header h1{font-size:16px;margin:0;font-weight:600}
+    header .tag{font-size:12px;color:#9fb3c8;background:#1b2130;border:1px solid #263149;border-radius:999px;padding:4px 8px}
+    #app{display:grid;grid-template-columns:320px 1fr;height:calc(100% - 52px)}
+    #sidebar{background:var(--panel);border-right:1px solid #222;overflow:auto}
+    #content{display:flex;flex-direction:column}
+    .section{padding:12px 12px 0}
+    .section h2{font-size:14px;margin:8px 0 10px;color:#cfe3ff}
+    .card{background:#10131c;border:1px solid #222;border-radius:14px;padding:10px;margin-bottom:10px}
+    .row{display:flex;gap:8px}
+    input,select,button,textarea{background:#0f131c;border:1px solid #2a3245;color:var(--text);border-radius:10px;padding:8px;font-size:14px}
+    button.primary{background:linear-gradient(180deg,#1c2b3b,#142031);border-color:#22324b}
+    button.ghost{background:transparent}
+    button.danger{background:#2a1217;border-color:#5b1d26;color:#ffb2b2}
+    button.warn{background:#2a2412;border-color:#5b4f1d;color:#ffe1a4}
+    .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 8px;background:#101621;border:1px solid #22314a;font-size:12px;color:#a7b2c4}
+    .ok{color:#aaffd6}
+    .bad{color:#ffacac}
+    #map{height:55vh;border-top:1px solid #222;border-bottom:1px solid #222}
+    #coords{padding:6px 10px;font-size:12px;color:#9fb3c8}
+    nav.tabs{display:flex;gap:6px;padding:8px;border-bottom:1px solid #222;background:#0f131b}
+    nav.tabs button{padding:8px 10px;border-radius:10px;border:1px solid #22314a;background:#0e131d}
+    nav.tabs button.active{background:#172135}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid #232734;padding:6px;text-align:left;font-size:13px}
+    .hide{display:none !important}
+    .copy{cursor:pointer}
+    .sender-wrap{max-width:720px;margin:18px auto;padding:0 12px}
+    .status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;background:#555}
+    .status-dot.on{background:#41d39e}
+    .status-dot.off{background:#ff6363}
+    .tiny{font-size:12px;color:#8aa}
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <!-- LADO IZQUIERDO -->
-  <div class="panel">
-    <h2>Administración</h2>
-    <div class="help">Dueño: <strong>fenice.ecuador@gmail.com</strong></div>
+  <header>
+    <h1>App Nobis · Geocercas, Personal y Envío Georreferenciado</h1>
+    <span id="modeTag" class="tag">Cargando…</span>
+  </header>
 
-    <!-- GEOCERCAS -->
-    <div class="section">
-      <h3>Geocercas</h3>
-      <div class="row">
-        <button id="btnNew" class="btn">Nueva (clic en mapa)</button>
-        <button id="btnFinish" class="btn ok" disabled>Finalizar</button>
-        <button id="btnCancel" class="btn" disabled>Cancelar</button>
-      </div>
-
-      <div class="col" style="margin-top:8px;">
-        <div class="help" style="margin-bottom:4px;">Crear desde coordenadas (<code>lat,lng</code>) una por línea:</div>
-        <textarea id="taCoords" placeholder="-1.7370, -77.9185&#10;-1.7315, -77.9104&#10;-1.7315, -77.9077"></textarea>
-        <div class="row">
-          <input id="inName" type="text" placeholder="Nombre de geocerca"/>
-          <button id="btnCreateFromCoords" class="btn">Crear por coordenadas</button>
+  <!-- Contenedor Admin / Operador -->
+  <div id="app" class="hide">
+    <aside id="sidebar">
+      <div class="section">
+        <h2>Sesión</h2>
+        <div class="card">
+          <div class="row">
+            <select id="roleSelect">
+              <option value="admin">Administrador</option>
+              <option value="operador">Operador</option>
+            </select>
+            <button id="logoutBtn" class="ghost">Salir</button>
+          </div>
+          <div class="tiny" id="activeUserInfo"></div>
         </div>
       </div>
 
-      <div class="row" style="margin-top:8px;">
-        <button id="btnEdit" class="btn" disabled>Editar vértices</button>
-        <button id="btnEditCancel" class="btn" disabled>Cancelar edición</button>
-      </div>
-      <div class="row" style="margin-top:8px;">
-        <button id="btnSave" class="btn primary" disabled>Guardar</button>
-        <button id="btnRename" class="btn" disabled>Renombrar</button>
-        <button id="btnDelete" class="btn warn" disabled>Eliminar</button>
-      </div>
-
-      <div class="row" style="margin-top:8px;">
-        <button id="btnExport" class="btn">Exportar JSON</button>
-        <label class="btn" style="cursor:pointer;">Importar
-          <input id="fileImport" type="file" accept="application/json" hidden/>
-        </label>
+      <div class="section">
+        <h2>Módulos</h2>
+        <div class="card">
+          <div class="row" style="flex-wrap:wrap;gap:8px">
+            <button class="tablink" data-tab="geocercas">Geocercas</button>
+            <button class="tablink" data-tab="personal">Personal</button>
+            <button class="tablink" data-tab="actividades">Actividades</button>
+            <button class="tablink" data-tab="costos">Costos</button>
+            <button class="tablink" data-tab="reportes">Reportes</button>
+          </div>
+        </div>
       </div>
 
-      <h4 style="margin:12px 0 6px">Lista</h4>
-      <div id="listGeos" class="list"></div>
-      <div class="help">Seleccionada: <strong id="selGeoName">Ninguna</strong></div>
-    </div>
+      <div class="section">
+        <h2>Acceso rápido</h2>
+        <div class="card">
+          <button id="centerToGF" class="primary">Centrar a geocercas</button>
+          <div style="height:6px"></div>
+          <button id="exportCSV" class="warn">Exportar envíos (CSV)</button>
+        </div>
+      </div>
 
-    <!-- PERSONAL -->
-    <div class="section">
-      <h3>Personal</h3>
-      <div class="row">
-        <input id="personName" type="text" placeholder="Nombre"/>
-        <input id="personRate" type="number" step="0.01" min="0" placeholder="Tarifa/h"/>
-        <button id="btnAddPerson" class="btn">Crear</button>
+      <div class="section">
+        <h2>Ayuda</h2>
+        <div class="card tiny">
+          • Para generar un enlace de activación al teléfono de un usuario (modo Emisor), vaya a <b>Personal</b> → seleccione el usuario → <b>Generar enlace</b>.
+          <br/>• El emisor solo puede enviar datos desde dentro de sus geocercas asignadas.
+        </div>
       </div>
-      <div id="listPeople" class="list" style="margin-top:8px;"></div>
-      <div class="row" style="margin-top:6px;">
-        <button id="btnRenamePerson" class="btn" disabled>Renombrar</button>
-        <button id="btnDeletePerson" class="btn warn" disabled>Eliminar</button>
-      </div>
-      <div class="help">Persona activa: <strong id="activePersonLbl">Ninguna</strong></div>
-    </div>
+    </aside>
 
-    <!-- ACTIVIDADES -->
-    <div class="section">
-      <h3>Actividades</h3>
-      <div class="row">
-        <input id="actName" type="text" placeholder="Actividad"/>
-        <input id="actRate" type="number" step="0.01" min="0" placeholder="Tarifa/h"/>
-        <button id="btnAddAct" class="btn">Crear</button>
-      </div>
-      <div id="listActs" class="list" style="margin-top:8px;"></div>
-      <div class="row" style="margin-top:6px;">
-        <button id="btnRenameAct" class="btn" disabled>Renombrar</button>
-        <button id="btnDeleteAct" class="btn warn" disabled>Eliminar</button>
-      </div>
-    </div>
+    <main id="content">
+      <nav class="tabs">
+        <button class="active" data-tabbtn="geocercas">Geocercas</button>
+        <button data-tabbtn="personal">Personal</button>
+        <button data-tabbtn="actividades">Actividades</button>
+        <button data-tabbtn="costos">Costos</button>
+        <button data-tabbtn="reportes">Reportes</button>
+      </nav>
 
-    <!-- REPORTES -->
-    <div class="section">
-      <h3>Reportes</h3>
-      <div class="col">
-        <div class="row">
-          <label class="help">Desde</label>
-          <input id="fFrom" type="date" class="nowrap"/>
-          <label class="help">Hasta</label>
-          <input id="fTo" type="date" class="nowrap"/>
+      <!-- MAPA COMPARTIDO -->
+      <div id="map"></div>
+      <div id="coords">Lat: –, Lng: –</div>
+
+      <!-- PANELES -->
+      <section id="panel-geocercas" class="panel">
+        <div class="section">
+          <h2>Gestión de Geocercas</h2>
+          <div class="card">
+            <div class="row">
+              <input id="gfName" placeholder="Nombre de geocerca" />
+              <button id="btnAddPoly" class="primary">Nueva Geocerca (dibujo)</button>
+              <button id="btnSavePolys" class="primary">Guardar Cambios</button>
+            </div>
+            <div class="tiny">Tip: use las herramientas de dibujo (polígono) arriba a la izquierda del mapa. Para editar, seleccione el modo edición (icono de lápiz). Las coordenadas aparecen al mover el mouse sobre el mapa.</div>
+          </div>
+
+          <div class="card">
+            <table id="gfTable">
+              <thead><tr><th>Nombre</th><th>Vértices</th><th>Acciones</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-personal" class="panel hide">
+        <div class="section">
+          <h2>Personal</h2>
+          <div class="card">
+            <div class="row">
+              <input id="pName" placeholder="Nombre" />
+              <input id="pPhone" placeholder="Teléfono (incluya país, ej. 5939xxxx)" />
+              <select id="pRole">
+                <option value="sender">Emisor (solo envía)</option>
+                <option value="operador">Operador</option>
+                <option value="admin">Administrador</option>
+              </select>
+              <button id="btnAddPerson" class="primary">Añadir</button>
+            </div>
+          </div>
+          <div class="card">
+            <table id="personTable">
+              <thead><tr><th>Nombre</th><th>Teléfono</th><th>Rol</th><th>Geocercas</th><th>Acciones</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-actividades" class="panel hide">
+        <div class="section">
+          <h2>Actividades</h2>
+          <div class="card tiny">(Placeholder) Vincule actividades a personal y geocercas. Esta versión mantiene compatibilidad y almacenamiento básico.</div>
+        </div>
+      </section>
+
+      <section id="panel-costos" class="panel hide">
+        <div class="section">
+          <h2>Costos</h2>
+          <div class="card tiny">(Placeholder) Estructura para costos diarios ligados a geocerca, actividad y persona activa.</div>
+        </div>
+      </section>
+
+      <section id="panel-reportes" class="panel hide">
+        <div class="section">
+          <h2>Reportes</h2>
+          <div class="card">
+            <div class="row" style="flex-wrap:wrap">
+              <select id="rUser"></select>
+              <select id="rGeofence"></select>
+              <input id="rFrom" type="datetime-local" />
+              <input id="rTo" type="datetime-local" />
+              <button id="btnRunReport" class="primary">Generar</button>
+            </div>
+          </div>
+          <div class="card">
+            <table id="reportTable">
+              <thead><tr><th>Fecha</th><th>Usuario</th><th>Teléfono</th><th>Geocerca</th><th>Lat</th><th>Lng</th><th>Precisión(m)</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Contenedor MODO EMISOR (solo envío) -->
+  <div id="sender" class="hide">
+    <div class="sender-wrap">
+      <div class="card" style="display:flex;gap:10px;align-items:center;justify-content:space-between">
+        <div>
+          <div class="pill"><span id="senderStatusDot" class="status-dot off"></span><b id="senderStatus">Detenido</b></div>
+          <div class="tiny" id="senderUser">Usuario: –</div>
+          <div class="tiny" id="senderGeofences">Geocercas asignadas: –</div>
         </div>
         <div class="row">
-          <select id="fPerson"></select>
-          <select id="fGeo"></select>
-          <select id="fAct"></select>
+          <button id="btnSenderStart" class="primary">Iniciar envío</button>
+          <button id="btnSenderStop" class="ghost">Detener</button>
         </div>
-        <div class="row">
-          <button id="btnRunReport" class="btn primary">Generar</button>
-          <button id="btnCSV" class="btn">Exportar CSV</button>
-          <button id="btnJSON" class="btn">Exportar JSON</button>
-        </div>
+      </div>
+
+      <div id="senderMap" style="height:48vh;border:1px solid #222;border-radius:14px"></div>
+      <div class="tiny" id="senderInfo">Estado: esperando…</div>
+
+      <div class="card tiny">
+        • Este modo se activa desde un enlace personalizado con su número de teléfono. 
+        • Solo se registran puntos cuando usted está <b>dentro</b> de las geocercas asignadas.
       </div>
     </div>
   </div>
 
-  <!-- LADO DERECHO -->
-  <div class="panel">
-    <h2>Mapa de Geocercas</h2>
-    <div id="map"></div>
+  <script>
+    /*************************
+     * Utilidades generales  *
+     *************************/
+    const qs = (s, r=document)=>r.querySelector(s);
+    const qsa = (s, r=document)=>Array.from(r.querySelectorAll(s));
+    const toast = (msg)=>{console.log(msg)};
+    const getParams = ()=>Object.fromEntries(new URLSearchParams(location.search).entries());
 
-    <!-- Registro -->
-    <div class="section">
-      <h3>Registro / Costos</h3>
-      <div class="row">
-        <select id="selPerson"></select>
-        <select id="selGeo"></select>
-        <select id="selAct"></select>
-      </div>
-      <div class="row">
-        <button id="btnStart" class="btn ok">Iniciar</button>
-        <button id="btnStop" class="btn warn">Finalizar</button>
-        <span id="runningBadge" class="badge" style="display:none">En curso…</span>
-      </div>
-      <div class="help">Costo = (min/60) × (Tarifa Persona + Tarifa Actividad). Se guarda al finalizar.</div>
-    </div>
-
-    <!-- Historial -->
-    <div class="section">
-      <h3>Bitácora</h3>
-      <table class="table" id="tblLog">
-        <thead>
-          <tr>
-            <th>Fecha inicio</th><th>Persona</th><th>Geocerca</th><th>Actividad</th>
-            <th>min</th><th>Tarifa P</th><th>Tarifa A</th><th>Costo</th>
-          </tr>
-        </thead>
-        <tbody id="logBody"></tbody>
-        <tfoot>
-          <tr>
-            <th colspan="4" style="text-align:right">Totales:</th>
-            <th id="totMin">0</th><th></th><th></th><th id="totCost">$0.00</th>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  </div>
-</div>
-
-<script>
-/* === Helpers === */
-const $ = s=>document.querySelector(s);
-const fmt = n=>'$'+(n||0).toFixed(2);
-const uid = ()=>'id'+Math.random().toString(36).slice(2,10);
-const todayStr = ()=> new Date().toISOString().slice(0,10);
-
-/* === Storage keys === */
-const K_GEOS='nobis_geofences_v2';
-const K_PPL='nobis_people_v1';
-const K_ACT='nobis_acts_v1';
-const K_LOG='nobis_logs_v1';
-const K_RUN='nobis_running_v1';
-
-/* === Estado === */
-let geos=[], people=[], acts=[], logs=[];
-let layers=new Map(), activeGeoId=null, editMarkers=[];
-let drawing=false, tmpPts=[], tmpLine=null, tmpPoly=null;
-let running=null; // {personId, geoId, actId, startISO}
-
-function saveAll(){
-  localStorage.setItem(K_GEOS,JSON.stringify(geos));
-  localStorage.setItem(K_PPL,JSON.stringify(people));
-  localStorage.setItem(K_ACT,JSON.stringify(acts));
-  localStorage.setItem(K_LOG,JSON.stringify(logs));
-  localStorage.setItem(K_RUN, JSON.stringify(running||null));
-}
-function loadAll(){
-  geos=JSON.parse(localStorage.getItem(K_GEOS)||'[]'); if(!Array.isArray(geos)) geos=[];
-  people=JSON.parse(localStorage.getItem(K_PPL)||'[]'); if(!Array.isArray(people)) people=[];
-  acts=JSON.parse(localStorage.getItem(K_ACT)||'[]'); if(!Array.isArray(acts)) acts=[];
-  logs=JSON.parse(localStorage.getItem(K_LOG)||'[]'); if(!Array.isArray(logs)) logs=[];
-  running=JSON.parse(localStorage.getItem(K_RUN)||'null');
-}
-
-/* === Mapa === */
-const map=L.map('map',{zoomControl:true}).setView([-1.731,-77.91],14);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
-
-/* Coordenadas en vivo */
-const coordsCtl=L.control({position:'topright'});
-coordsCtl.onAdd=()=>{const d=L.DomUtil.create('div','coordsCtl');d.id='coordsCtl';d.textContent='Lat: –, Lng: –';return d;};
-coordsCtl.addTo(map);
-map.on('mousemove',e=>{$('#coordsCtl').textContent=`Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`});
-setTimeout(()=>map.invalidateSize(),200);
-
-/* === Render geos === */
-function renderGeos(){
-  layers.forEach(p=>map.removeLayer(p)); layers.clear();
-  geos.forEach(g=>{
-    const poly=L.polygon(g.latlngs,{color:'#ff9800',weight:4,fillColor:'#a7f3d0',fillOpacity:.35,bubblingMouseEvents:false}).addTo(map);
-    if(poly.dragging && typeof poly.dragging.disable==='function'){ poly.dragging.disable(); }
-    poly.on('click',()=>selectGeo(g.id));
-    layers.set(g.id,poly);
-  });
-  const ul=$('#listGeos'); ul.innerHTML='';
-  geos.forEach(g=>{
-    const d=document.createElement('div');
-    d.className='item'+(g.id===activeGeoId?' active':''); d.textContent=`${g.name} (${g.latlngs.length} pts)`;
-    d.onclick=()=>selectGeo(g.id);
-    ul.appendChild(d);
-  });
-  $('#selGeoName').textContent= geos.find(x=>x.id===activeGeoId)?.name || 'Ninguna';
-  // combos dependientes
-  syncCombos();
-}
-function selectGeo(id, fit=true){
-  activeGeoId=id; renderGeos();
-  const poly=layers.get(id); if(poly&&fit) map.fitBounds(poly.getBounds(),{padding:[20,20]});
-  stopEditing();
-  setGeoButtons();
-}
-function setGeoButtons(){
-  const has=!!activeGeoId;
-  $('#btnEdit').disabled=!has; $('#btnEditCancel').disabled=true;
-  $('#btnSave').disabled=!has; $('#btnRename').disabled=!has; $('#btnDelete').disabled=!has;
-}
-
-/* === Dibujo por clic === */
-function startDrawing(){
-  if(drawing) return; drawing=true; tmpPts=[];
-  if(tmpLine){map.removeLayer(tmpLine); tmpLine=null}
-  if(tmpPoly){map.removeLayer(tmpPoly); tmpPoly=null}
-  $('#btnNew').disabled=true; $('#btnFinish').disabled=false; $('#btnCancel').disabled=false;
-  map.getContainer().style.cursor='crosshair';
-  map.on('click', addTempPoint);
-}
-function addTempPoint(e){
-  tmpPts.push(e.latlng);
-  if(tmpLine) map.removeLayer(tmpLine);
-  tmpLine=L.polyline(tmpPts,{color:'#ff9800',weight:2,dashArray:'6,6'}).addTo(map);
-  if(tmpPoly) map.removeLayer(tmpPoly);
-  if(tmpPts.length>=3) tmpPoly=L.polygon(tmpPts,{color:'#ff9800',weight:4,fillColor:'#a7f3d0',fillOpacity:.35}).addTo(map);
-}
-function finishDrawing(){
-  if(!drawing) return;
-  if(tmpPts.length<3){alert('Necesitas al menos 3 puntos.');return;}
-  const id=uid(); const name='Geocerca '+(geos.length+1);
-  geos.push({id,name,latlngs:tmpPts.map(p=>({lat:p.lat,lng:p.lng}))});
-  saveAll(); map.off('click',addTempPoint);
-  if(tmpLine){map.removeLayer(tmpLine)} if(tmpPoly){map.removeLayer(tmpPoly)}
-  tmpLine=tmpPoly=null; drawing=false; map.getContainer().style.cursor='';
-  $('#btnNew').disabled=false; $('#btnFinish').disabled=true; $('#btnCancel').disabled=true;
-  renderGeos(); selectGeo(id);
-}
-function cancelDrawing(){
-  if(!drawing) return; drawing=false; map.off('click',addTempPoint);
-  if(tmpLine){map.removeLayer(tmpLine)} if(tmpPoly){map.removeLayer(tmpPoly)}
-  tmpLine=tmpPoly=null; map.getContainer().style.cursor='';
-  $('#btnNew').disabled=false; $('#btnFinish').disabled=true; $('#btnCancel').disabled=true;
-}
-function createFromCoords(){
-  const raw=$('#taCoords').value.trim();
-  if(!raw){alert('Pega coordenadas (lat,lng), una por línea.');return;}
-  const pts=[];
-  raw.split(/\r?\n/).forEach(ln=>{
-    const m=ln.split(',').map(x=>x.trim()); if(m.length>=2){
-      const lat=parseFloat(m[0]), lng=parseFloat(m[1]);
-      if(Number.isFinite(lat)&&Number.isFinite(lng)) pts.push({lat,lng});
+    // Storage por proyecto
+    const LS_KEY = 'appnobis.v2';
+    function loadDB(){
+      const raw = localStorage.getItem(LS_KEY);
+      if(raw){ try { return JSON.parse(raw);} catch(e){ console.warn('DB corrupta, reseteando'); } }
+      const seed = {
+        geofences: [
+          {id:'gf1', name:'Parcela Norte', coords:[[-77.8122,-1.0635],[-77.8111,-1.0634],[-77.8112,-1.0625],[-77.8123,-1.0626]]},
+          {id:'gf2', name:'Parcela Sur', coords:[[-77.8132,-1.0645],[-77.8122,-1.0643],[-77.8123,-1.0634],[-77.8133,-1.0636]]}
+        ],
+        people: [
+          {id:'u1', name:'Operario A', phone:'593900000001', role:'sender', geofences:['gf1']},
+          {id:'u2', name:'Operario B', phone:'593900000002', role:'sender', geofences:['gf2']},
+          {id:'adm', name:'Admin', phone:'593900000000', role:'admin', geofences:['gf1','gf2']}
+        ],
+        submissions: [] // {ts, phone, userId, lat, lng, acc, geofenceId}
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(seed));
+      return seed;
     }
-  });
-  if(pts.length<3){alert('Se requieren al menos 3 pares lat,lng.');return;}
-  const id=uid(); const nm=($('#inName').value.trim()||('Geocerca '+(geos.length+1)));
-  geos.push({id,name:nm,latlngs:pts}); saveAll(); renderGeos(); selectGeo(id);
-  $('#inName').value='';
-}
+    function saveDB(db){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
 
-/* === Edición de vértices (solo vértice) === */
-const vertexIcon=L.divIcon({className:'vertex-dot',iconSize:[12,12],iconAnchor:[6,6]});
-function startEditing(){
-  if(!activeGeoId) return;
-  stopEditing();
-  const g=geos.find(x=>x.id===activeGeoId); const poly=layers.get(activeGeoId); if(!g||!poly) return;
-  if(poly.dragging && typeof poly.dragging.disable==='function'){ poly.dragging.disable(); }
-  const el=poly.getElement && poly.getElement(); if(el){ poly._prevPointerEvents=el.style.pointerEvents; el.style.pointerEvents='none'; }
-  // crear marcadores
-  g.latlngs.forEach((p,idx)=>{
-    const mk=L.marker([p.lat,p.lng],{draggable:true,icon:vertexIcon,autoPan:true,autoPanPadding:[60,60],autoPanSpeed:10}).addTo(map);
-    mk.on('dragstart',()=>{map.dragging.disable(); map.doubleClickZoom.disable();});
-    mk.on('drag',ev=>{
-      const ll=ev.target.getLatLng(); g.latlngs[idx]={lat:ll.lat,lng:ll.lng}; poly.setLatLngs(g.latlngs);
+    let DB = loadDB();
+
+    /*************************
+     * Detección de MODE     *
+     *************************/
+    const params = getParams();
+    const isSenderMode = (params.mode||'').toLowerCase()==='sender' && !!params.phone;
+    const modeTag = qs('#modeTag');
+
+    if(isSenderMode){ modeTag.textContent = 'Modo Emisor'; qs('#sender').classList.remove('hide'); initSender(params.phone); }
+    else { modeTag.textContent = 'Modo Administrador/Operador'; qs('#app').classList.remove('hide'); initApp(); }
+
+    /*************************
+     * MODO ADMIN/OPERADOR   *
+     *************************/
+    let map, drawControl, drawnLayer;
+    const drawn = new L.FeatureGroup();
+
+    function initMap(containerId){
+      const m = L.map(containerId||'map').setView([-1.0639,-77.8125], 17);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 20}).addTo(m);
+      m.addLayer(drawn);
+      m.on('mousemove', (e)=>{qs('#coords').textContent = `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`});
+      return m;
+    }
+
+    function initApp(){
+      // Tabs
+      qsa('.tablink').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
+      qsa('nav.tabs button').forEach(b=>b.addEventListener('click',()=>switchTab(b.getAttribute('data-tabbtn'))));
+
+      // Map principal
+      map = initMap('map');
+
+      // Cargar geocercas a capa
+      renderGeofencesOnMap();
+
+      // Leaflet Draw
+      drawControl = new L.Control.Draw({
+        draw: {polyline:false, rectangle:false, circle:false, marker:false, circlemarker:false, polygon:{allowIntersection:false,showArea:true}},
+        edit: {featureGroup: drawn, edit:true, remove:true}
+      });
+      map.addControl(drawControl);
+
+      map.on(L.Draw.Event.CREATED, function (e) {
+        const layer = e.layer; drawn.addLayer(layer);
+      });
+
+      // Guardar cambios
+      qs('#btnSavePolys').addEventListener('click', saveGeofencesFromMap);
+      qs('#btnAddPoly').addEventListener('click', ()=>{
+        new L.Draw.Polygon(map, drawControl.options.draw.polygon).enable();
+      });
+
+      // UI basica
+      qs('#centerToGF').addEventListener('click',()=>{
+        if(drawn.getLayers().length) map.fitBounds(drawn.getBounds());
+      });
+      qs('#exportCSV').addEventListener('click', exportCSV);
+
+      // Geocercas tabla y personal
+      renderGFTable();
+      renderPeopleTable();
+
+      // Reportes selects
+      fillReportSelectors();
+      qs('#btnRunReport').addEventListener('click', runReport);
+    }
+
+    function switchTab(name){
+      qsa('.panel').forEach(p=>p.classList.add('hide'));
+      qs('#panel-'+name).classList.remove('hide');
+      qsa('nav.tabs button').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tabbtn')===name));
+    }
+
+    function renderGeofencesOnMap(){
+      drawn.clearLayers();
+      DB.geofences.forEach(gf=>{
+        const latlngs = gf.coords.map(([lng,lat])=>[lat,lng]);
+        const poly = L.polygon(latlngs, {color:'#41d39e'});
+        poly.bindTooltip(gf.name);
+        drawn.addLayer(poly);
+      });
+      if(drawn.getLayers().length) map.fitBounds(drawn.getBounds());
+    }
+
+    function saveGeofencesFromMap(){
+      const nameInput = qs('#gfName');
+      const layers = drawn.getLayers();
+      if(!layers.length){ alert('No hay geocercas dibujadas.'); return; }
+      // Si se ingresó un nombre nuevo, añadimos como nueva geocerca la última capa dibujada
+      if(nameInput.value.trim()){
+        const layer = layers[layers.length-1];
+        const latlngs = layer.getLatLngs()[0].map(p=>[p.lng, p.lat]);
+        const id = 'gf'+Math.random().toString(36).slice(2,7);
+        DB.geofences.push({id, name:nameInput.value.trim(), coords:latlngs});
+        nameInput.value='';
+      } else {
+        // Actualizamos todas según el orden
+        const newGFs = layers.map((layer,i)=>{
+          const coords = layer.getLatLngs()[0].map(p=>[p.lng,p.lat]);
+          return DB.geofences[i] ? {...DB.geofences[i], coords} : null;
+        }).filter(Boolean);
+        // Si la cantidad cambió, intentamos conservar nombres, sino dejamos según orden
+        if(newGFs.length){ DB.geofences = DB.geofences.map((gf,i)=> newGFs[i] || gf); }
+      }
+      saveDB(DB);
+      renderGFTable();
+      alert('Geocercas guardadas.');
+    }
+
+    function renderGFTable(){
+      const tb = qs('#gfTable tbody');
+      tb.innerHTML='';
+      DB.geofences.forEach(gf=>{
+        const tr = document.createElement('tr');
+        const verts = gf.coords.length;
+        tr.innerHTML = `<td>${gf.name}</td><td>${verts}</td><td><button data-id="${gf.id}" class="ghost btnZoom">Zoom</button></td>`;
+        tb.appendChild(tr);
+      });
+      qsa('.btnZoom', tb).forEach(b=>b.addEventListener('click', ()=>{
+        const gf = DB.geofences.find(x=>x.id===b.dataset.id);
+        if(!gf) return; const ll = gf.coords.map(([lng,lat])=>[lat,lng]);
+        map.fitBounds(L.polygon(ll).getBounds());
+      }));
+    }
+
+    // PERSONAL
+    qs('#btnAddPerson')?.addEventListener('click', ()=>{
+      const name = qs('#pName').value.trim();
+      const phone = qs('#pPhone').value.trim();
+      const role = qs('#pRole').value;
+      if(!name || !phone) return alert('Nombre y teléfono son obligatorios');
+      const id = 'u'+Math.random().toString(36).slice(2,7);
+      DB.people.push({id,name,phone,role,geofences:[]});
+      saveDB(DB); qs('#pName').value=''; qs('#pPhone').value='';
+      renderPeopleTable(); fillReportSelectors();
     });
-    mk.on('dragend',()=>{map.dragging.enable(); map.doubleClickZoom.enable(); saveAll();});
-    ['mousedown','touchstart','pointerdown'].forEach(n=>mk.on(n,e=>e.originalEvent?.stopPropagation()));
-    editMarkers.push(mk);
-  });
-  $('#btnEdit').disabled=true; $('#btnEditCancel').disabled=false;
-}
-function stopEditing(){
-  editMarkers.forEach(m=>map.removeLayer(m)); editMarkers=[];
-  if(activeGeoId){
-    const poly=layers.get(activeGeoId);
-    if(poly && poly.getElement){
-      const el=poly.getElement(); if(el){ el.style.pointerEvents=(poly._prevPointerEvents??'auto'); delete poly._prevPointerEvents; }
+
+    function renderPeopleTable(){
+      const tb = qs('#personTable tbody'); tb.innerHTML='';
+      DB.people.forEach(u=>{
+        const gfBadges = u.geofences.map(id=> DB.geofences.find(g=>g.id===id)?.name||id).join(', ')||'—';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${u.name}</td>
+          <td>${u.phone}</td>
+          <td>${u.role}</td>
+          <td>
+            <select data-id="${u.id}" class="selGF" multiple size="3" style="min-width:180px">
+              ${DB.geofences.map(g=>`<option value="${g.id}" ${u.geofences.includes(g.id)?'selected':''}>${g.name}</option>`).join('')}
+            </select>
+          </td>
+          <td>
+            <button class="ghost btnSaveGF" data-id="${u.id}">Guardar asignación</button>
+            <button class="primary copy btnLink" data-id="${u.id}">Generar enlace</button>
+          </td>`;
+        tb.appendChild(tr);
+      });
+      // Guardar asignaciones
+      qsa('.btnSaveGF', tb).forEach(b=>b.addEventListener('click',()=>{
+        const id=b.dataset.id; const sel = qs(`select.selGF[data-id="${id}"]`);
+        const vals = Array.from(sel.selectedOptions).map(o=>o.value);
+        const i = DB.people.findIndex(x=>x.id===id); if(i>=0){ DB.people[i].geofences = vals; saveDB(DB); alert('Asignación guardada'); }
+      }));
+      // Generar enlaces
+      qsa('.btnLink', tb).forEach(b=>b.addEventListener('click',()=>{
+        const user = DB.people.find(x=>x.id===b.dataset.id); if(!user) return;
+        const url = `${location.origin}${location.pathname}?mode=sender&phone=${encodeURIComponent(user.phone)}`;
+        navigator.clipboard?.writeText(url);
+        alert('Enlace copiado al portapapeles:\n'+url+"\nComparta este vínculo al teléfono del usuario.");
+      }));
     }
-  }
-  setGeoButtons();
-}
 
-/* === Renombrar / Guardar / Eliminar Geo === */
-function saveGeo(){ if(!activeGeoId) return; saveAll(); alert('Geocerca guardada.'); }
-function renameGeo(){
-  if(!activeGeoId) return;
-  const g=geos.find(x=>x.id===activeGeoId); const nv=prompt('Nuevo nombre:',g.name);
-  if(nv&&nv.trim()){ g.name=nv.trim(); saveAll(); renderGeos(); selectGeo(g.id,false); }
-}
-function deleteGeo(){
-  if(!activeGeoId) return;
-  const g=geos.find(x=>x.id===activeGeoId);
-  if(!confirm(`¿Eliminar "${g.name}"?`)) return;
-  geos=geos.filter(x=>x.id!==activeGeoId); activeGeoId=null; saveAll(); renderGeos(); setGeoButtons(); syncCombos();
-}
+    // REPORTES
+    function fillReportSelectors(){
+      const uSel = qs('#rUser'); const gSel = qs('#rGeofence');
+      uSel.innerHTML = '<option value="">Todos los usuarios</option>' + DB.people.map(u=>`<option value="${u.id}">${u.name} (${u.phone})</option>`).join('');
+      gSel.innerHTML = '<option value="">Todas las geocercas</option>' + DB.geofences.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+    }
+    function runReport(){
+      const u = qs('#rUser').value; const g = qs('#rGeofence').value;
+      const from = qs('#rFrom').value ? new Date(qs('#rFrom').value).getTime() : 0;
+      const to = qs('#rTo').value ? new Date(qs('#rTo').value).getTime() : Date.now();
+      const rows = DB.submissions.filter(r=> (!u || r.userId===u) && (!g || r.geofenceId===g) && r.ts>=from && r.ts<=to);
+      const tb = qs('#reportTable tbody'); tb.innerHTML='';
+      rows.forEach(r=>{
+        const tr = document.createElement('tr');
+        const user = DB.people.find(x=>x.id===r.userId);
+        const gf = DB.geofences.find(x=>x.id===r.geofenceId);
+        tr.innerHTML = `<td>${new Date(r.ts).toLocaleString()}</td><td>${user?.name||'—'}</td><td>${r.phone}</td><td>${gf?.name||r.geofenceId}</td><td>${r.lat.toFixed(6)}</td><td>${r.lng.toFixed(6)}</td><td>${Math.round(r.acc||0)}</td>`;
+        tb.appendChild(tr);
+      });
+    }
+    function exportCSV(){
+      const head = ['fecha','usuario','telefono','geocerca','lat','lng','precision_m'];
+      const lines = [head.join(',')];
+      DB.submissions.forEach(r=>{
+        const user = DB.people.find(x=>x.id===r.userId);
+        const gf = DB.geofences.find(x=>x.id===r.geofenceId);
+        lines.push([
+          new Date(r.ts).toISOString(), user?.name||'', r.phone, gf?.name||r.geofenceId, r.lat, r.lng, Math.round(r.acc||0)
+        ].join(','));
+      });
+      const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'envios_georreferenciados.csv'; a.click();
+    }
 
-/* === Personal === */
-let activePersonId=null, activeActId=null;
-function renderPeople(){
-  const box=$('#listPeople'); box.innerHTML='';
-  people.forEach(p=>{
-    const d=document.createElement('div');
-    d.className='item'+(p.id===activePersonId?' active':'');
-    d.innerHTML=`${p.name} <span class="badge" style="margin-left:6px">${fmt(p.rate||0)}/h</span>`;
-    d.onclick=()=>{activePersonId=p.id; renderPeople(); syncCombos(); setPersonButtons();};
-    box.appendChild(d);
-  });
-  $('#activePersonLbl').textContent = people.find(p=>p.id===activePersonId)?.name || 'Ninguna';
-}
-function setPersonButtons(){
-  const has=!!activePersonId;
-  $('#btnRenamePerson').disabled=!has; $('#btnDeletePerson').disabled=!has;
-}
-function addPerson(){
-  const name=$('#personName').value.trim(); const rate=parseFloat($('#personRate').value||'0')||0;
-  if(!name){alert('Nombre requerido');return;}
-  const p={id:uid(),name,rate}; people.push(p); $('#personName').value=''; $('#personRate').value='';
-  activePersonId=p.id; saveAll(); renderPeople(); syncCombos(); setPersonButtons();
-}
-function renamePerson(){
-  const p=people.find(x=>x.id===activePersonId); if(!p) return;
-  const nv=prompt('Nuevo nombre:',p.name); if(nv&&nv.trim()){ p.name=nv.trim(); saveAll(); renderPeople(); syncCombos(); }
-}
-function deletePerson(){
-  const p=people.find(x=>x.id===activePersonId); if(!p) return;
-  if(!confirm(`¿Eliminar "${p.name}"?`)) return;
-  people=people.filter(x=>x.id!==p.id);
-  // eliminar sesiones en curso y referencias no es necesario para logs cerrados, pero dejamos en pie.
-  if(running?.personId===p.id) running=null;
-  activePersonId=null; saveAll(); renderPeople(); syncCombos(); setPersonButtons();
-}
+    /*************************
+     * MODO EMISOR (Sender)  *
+     *************************/
+    let senderMap, senderLayerGroup, senderWatchId=null, senderUser=null;
 
-/* === Actividades === */
-function renderActs(){
-  const box=$('#listActs'); box.innerHTML='';
-  acts.forEach(a=>{
-    const d=document.createElement('div');
-    d.className='item'+(a.id===activeActId?' active':'');
-    d.innerHTML=`${a.name} <span class="badge" style="margin-left:6px">${fmt(a.rate||0)}/h</span>`;
-    d.onclick=()=>{activeActId=a.id; renderActs(); syncCombos(); setActButtons();};
-    box.appendChild(d);
-  });
-}
-function setActButtons(){
-  const has=!!activeActId;
-  $('#btnRenameAct').disabled=!has; $('#btnDeleteAct').disabled=!has;
-}
-function addAct(){
-  const name=$('#actName').value.trim(); const rate=parseFloat($('#actRate').value||'0')||0;
-  if(!name){alert('Nombre requerido');return;}
-  const a={id:uid(),name,rate}; acts.push(a); $('#actName').value=''; $('#actRate').value='';
-  activeActId=a.id; saveAll(); renderActs(); syncCombos(); setActButtons();
-}
-function renameAct(){
-  const a=acts.find(x=>x.id===activeActId); if(!a) return;
-  const nv=prompt('Nuevo nombre:',a.name); if(nv&&nv.trim()){ a.name=nv.trim(); saveAll(); renderActs(); syncCombos(); }
-}
-function deleteAct(){
-  const a=acts.find(x=>x.id===activeActId); if(!a) return;
-  if(!confirm(`¿Eliminar "${a.name}"?`)) return;
-  acts=acts.filter(x=>x.id!==a.id);
-  if(running?.actId===a.id) running=null;
-  activeActId=null; saveAll(); renderActs(); syncCombos(); setActButtons();
-}
+    function initSender(phone){
+      // Resolver usuario
+      senderUser = DB.people.find(u=>u.phone===phone);
+      if(!senderUser){ alert('No existe un usuario con este teléfono. Pida a su administrador el enlace correcto.'); return; }
+      // Mostrar datos
+      qs('#senderUser').textContent = `Usuario: ${senderUser.name} (${senderUser.phone})`;
+      const gfNames = senderUser.geofences.map(id=> DB.geofences.find(g=>g.id===id)?.name||id);
+      qs('#senderGeofences').textContent = `Geocercas asignadas: ${gfNames.join(', ')||'— (consulte a su administrador)'}`;
 
-/* === Combos compartidos === */
-function fillSel(sel, items, getId='id', getText='name', withAll=false, allText='(Todos)'){
-  sel.innerHTML=''; if(withAll){ const o=document.createElement('option'); o.value=''; o.textContent=allText; sel.appendChild(o); }
-  items.forEach(x=>{const o=document.createElement('option'); o.value=x[getId]; o.textContent=x[getText]; sel.appendChild(o);});
-}
-function syncCombos(){
-  // registro
-  fillSel($('#selPerson'), people);
-  fillSel($('#selGeo'), geos);
-  fillSel($('#selAct'), acts);
-  $('#selPerson').value=activePersonId||'';
-  $('#selGeo').value=activeGeoId||'';
-  $('#selAct').value=activeActId||'';
-  // reportes
-  fillSel($('#fPerson'), people, 'id', 'name', true);
-  fillSel($('#fGeo'), geos, 'id', 'name', true);
-  fillSel($('#fAct'), acts, 'id', 'name', true);
-}
+      // Map
+      senderMap = L.map('senderMap').setView([-1.0639,-77.8125], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 20}).addTo(senderMap);
+      senderLayerGroup = L.layerGroup().addTo(senderMap);
+      // Pintar geocercas asignadas
+      const bounds = [];
+      senderUser.geofences.forEach(id=>{
+        const gf = DB.geofences.find(g=>g.id===id); if(!gf) return;
+        const ll = gf.coords.map(([lng,lat])=>[lat,lng]);
+        const poly = L.polygon(ll,{color:'#41d39e'}).addTo(senderLayerGroup).bindTooltip(gf.name);
+        bounds.push(...ll);
+      });
+      if(bounds.length){ senderMap.fitBounds(L.polygon(bounds).getBounds()); }
 
-/* === Registro de sesiones === */
-function startSession(){
-  const personId=$('#selPerson').value, geoId=$('#selGeo').value, actId=$('#selAct').value;
-  if(!personId||!geoId||!actId){alert('Selecciona Persona, Geocerca y Actividad');return;}
-  if(running){alert('Ya hay una sesión en curso. Finalízala antes de iniciar otra.');return;}
-  running={personId,geoId,actId,startISO:new Date().toISOString()};
-  saveAll(); updateRunningUI();
-}
-function stopSession(){
-  if(!running){alert('No hay sesión en curso.');return;}
-  const endISO=new Date().toISOString();
-  // calcular costo
-  const p=people.find(x=>x.id===running.personId), a=acts.find(x=>x.id===running.actId);
-  const start=new Date(running.startISO), end=new Date(endISO);
-  const min=Math.max(1, Math.round((end-start)/60000)); // al menos 1 minuto
-  const rateP=p?.rate||0, rateA=a?.rate||0;
-  const cost = (min/60)*(rateP+rateA);
-  logs.push({id:uid(), personId:running.personId, geoId:running.geoId, actId:running.actId, startISO:running.startISO, endISO, min, rateP, rateA, cost});
-  running=null; saveAll(); updateRunningUI(); renderLog();
-}
-function updateRunningUI(){
-  const b=$('#runningBadge');
-  if(running){ b.style.display='inline-block'; b.textContent='En curso… ('+ (people.find(x=>x.id===running.personId)?.name||'') +')'; }
-  else b.style.display='none';
-}
+      // Botones
+      qs('#btnSenderStart').addEventListener('click', startSending);
+      qs('#btnSenderStop').addEventListener('click', stopSending);
+    }
 
-/* === Log / Reporte rápido (panel derecho) === */
-function renderLog(){
-  const tbody=$('#logBody'); tbody.innerHTML='';
-  let totMin=0, totCost=0;
-  logs.slice().reverse().forEach(r=>{
-    const tr=document.createElement('tr');
-    const person=people.find(x=>x.id===r.personId)?.name||'—';
-    const geo=geos.find(x=>x.id===r.geoId)?.name||'—';
-    const act=acts.find(x=>x.id===r.actId)?.name||'—';
-    tr.innerHTML=`<td>${new Date(r.startISO).toLocaleString()}</td>
-      <td>${person}</td><td>${geo}</td><td>${act}</td>
-      <td>${r.min}</td><td>${fmt(r.rateP)}</td><td>${fmt(r.rateA)}</td><td>${fmt(r.cost)}</td>`;
-    tbody.appendChild(tr);
-    totMin+=r.min; totCost+=r.cost;
-  });
-  $('#totMin').textContent=totMin;
-  $('#totCost').textContent=fmt(totCost);
-}
+    function setSenderStatus(on, msg){
+      qs('#senderStatus').textContent = on?'Enviando':'Detenido';
+      qs('#senderStatusDot').classList.toggle('on', on);
+      qs('#senderStatusDot').classList.toggle('off', !on);
+      qs('#senderInfo').textContent = 'Estado: '+(msg|| (on?'activo':'inactivo'));
+    }
 
-/* === Reportes === */
-function runReport(){
-  const d1=$('#fFrom').value? new Date($('#fFrom').value+'T00:00:00'): null;
-  const d2=$('#fTo').value? new Date($('#fTo').value+'T23:59:59'): null;
-  const pid=$('#fPerson').value||null, gid=$('#fGeo').value||null, aid=$('#fAct').value||null;
+    function startSending(){
+      if(!navigator.geolocation){ alert('Geolocalización no soportada'); return; }
+      if(senderWatchId!=null) return;
+      setSenderStatus(true,'iniciando geolocalización…');
+      // watchPosition para actualizaciones continuas
+      senderWatchId = navigator.geolocation.watchPosition(onPos, onPosError, {
+        enableHighAccuracy:true, maximumAge:5000, timeout:15000
+      });
+    }
 
-  const rows = logs.filter(r=>{
-    const t=new Date(r.startISO);
-    if(d1 && t<d1) return false; if(d2 && t>d2) return false;
-    if(pid && r.personId!==pid) return false;
-    if(gid && r.geoId!==gid) return false;
-    if(aid && r.actId!==aid) return false;
-    return true;
-  });
+    function stopSending(){
+      if(senderWatchId!=null){ navigator.geolocation.clearWatch(senderWatchId); senderWatchId=null; }
+      setSenderStatus(false,'detenido por el usuario');
+    }
 
-  // pintar en la tabla principal para que veas el filtro aplicado
-  const tbody=$('#logBody'); tbody.innerHTML='';
-  let totMin=0, totCost=0;
-  rows.slice().reverse().forEach(r=>{
-    const tr=document.createElement('tr');
-    const person=people.find(x=>x.id===r.personId)?.name||'—';
-    const geo=geos.find(x=>x.id===r.geoId)?.name||'—';
-    const act=acts.find(x=>x.id===r.actId)?.name||'—';
-    tr.innerHTML=`<td>${new Date(r.startISO).toLocaleString()}</td>
-      <td>${person}</td><td>${geo}</td><td>${act}</td>
-      <td>${r.min}</td><td>${fmt(r.rateP)}</td><td>${fmt(r.rateA)}</td><td>${fmt(r.cost)}</td>`;
-    tbody.appendChild(tr);
-    totMin+=r.min; totCost+=r.cost;
-  });
-  $('#totMin').textContent=totMin; $('#totCost').textContent=fmt(totCost);
+    function onPosError(err){ setSenderStatus(false, 'error geolocalización: '+err.message); }
 
-  // guarda último resultado para exportar
-  lastReportRows = rows;
-}
-let lastReportRows=[];
+    function onPos(pos){
+      const {latitude:lat, longitude:lng, accuracy} = pos.coords;
+      senderLayerGroup.clearLayers();
+      // Redibujar geocercas del usuario
+      const bounds = [];
+      senderUser.geofences.forEach(id=>{
+        const gf = DB.geofences.find(g=>g.id===id); if(!gf) return;
+        const ll = gf.coords.map(([lng2,lat2])=>[lat2,lng2]);
+        L.polygon(ll,{color:'#41d39e'}).addTo(senderLayerGroup);
+        bounds.push(...ll);
+      });
+      const m = L.marker([lat,lng]).addTo(senderLayerGroup).bindTooltip('Usted');
+      L.circle([lat,lng], {radius: Math.max(15, accuracy||15)}).addTo(senderLayerGroup);
+      if(bounds.length){ senderMap.fitBounds(L.latLngBounds([ [lat,lng], ...bounds ]), {maxZoom:18}); }
 
-function toCSV(rows){
-  const header=['startISO','endISO','persona','geocerca','actividad','min','rateP','rateA','cost'];
-  const lines=[header.join(',')];
-  rows.forEach(r=>{
-    const persona=people.find(x=>x.id===r.personId)?.name||'';
-    const geocerca=geos.find(x=>x.id===r.geoId)?.name||'';
-    const actividad=acts.find(x=>x.id===r.actId)?.name||'';
-    lines.push([r.startISO,r.endISO,persona,geocerca,actividad,r.min,r.rateP,r.rateA,r.cost].join(','));
-  });
-  return lines.join('\n');
-}
-function download(name, text, mime='text/plain'){
-  const blob=new Blob([text],{type:mime}); const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url);
-}
+      // Validar si está dentro de alguna geocerca asignada
+      const pt = turf.point([lng,lat]);
+      let insideGfId = null;
+      for(const id of senderUser.geofences){
+        const gf = DB.geofences.find(g=>g.id===id); if(!gf) continue;
+        const poly = turf.polygon([[...gf.coords, gf.coords[0]]]);
+        if(turf.booleanPointInPolygon(pt, poly)){ insideGfId = gf.id; break; }
+      }
 
-/* === Eventos UI === */
-// geocercas
-$('#btnNew').onclick=startDrawing;
-$('#btnFinish').onclick=finishDrawing;
-$('#btnCancel').onclick=cancelDrawing;
-$('#btnCreateFromCoords').onclick=createFromCoords;
-$('#btnEdit').onclick=startEditing;
-$('#btnEditCancel').onclick=stopEditing;
-$('#btnSave').onclick=saveGeo;
-$('#btnRename').onclick=renameGeo;
-$('#btnDelete').onclick=deleteGeo;
-$('#btnExport').onclick=()=>download('geocercas.json', JSON.stringify(geos,null,2), 'application/json');
-$('#fileImport').addEventListener('change',ev=>{
-  const f=ev.target.files?.[0]; if(!f) return;
-  const rd=new FileReader();
-  rd.onload=()=>{ try{ const arr=JSON.parse(rd.result); if(Array.isArray(arr)){ geos=arr; activeGeoId=null; saveAll(); renderGeos(); syncCombos(); alert('Importado.'); } else alert('JSON inválido.'); }catch{ alert('No se pudo leer el JSON.'); } };
-  rd.readAsText(f); ev.target.value='';
-});
+      if(insideGfId){
+        // Guardar envío local (simulación de POST)
+        DB.submissions.push({ts:Date.now(), phone:senderUser.phone, userId:senderUser.id, lat, lng, acc:accuracy||0, geofenceId:insideGfId});
+        saveDB(DB);
+        setSenderStatus(true, `dentro de geocerca (${insideGfId}). Punto registrado.`);
+      } else {
+        setSenderStatus(true, 'fuera de geocerca: no se registra punto.');
+      }
+    }
 
-// personal
-$('#btnAddPerson').onclick=addPerson;
-$('#btnRenamePerson').onclick=renamePerson;
-$('#btnDeletePerson').onclick=deletePerson;
-
-// actividades
-$('#btnAddAct').onclick=addAct;
-$('#btnRenameAct').onclick=renameAct;
-$('#btnDeleteAct').onclick=deleteAct;
-
-// registro
-$('#btnStart').onclick=startSession;
-$('#btnStop').onclick=stopSession;
-
-// reportes
-$('#btnRunReport').onclick=runReport;
-$('#btnCSV').onclick=()=>download('reporte.csv', toCSV(lastReportRows.length? lastReportRows : logs), 'text/csv');
-$('#btnJSON').onclick=()=>download('reporte.json', JSON.stringify(lastReportRows.length? lastReportRows : logs, null, 2), 'application/json');
-
-/* === Init === */
-loadAll();
-if(!$('#fFrom').value) $('#fFrom').value = todayStr();
-if(!$('#fTo').value)   $('#fTo').value   = todayStr();
-renderGeos(); setGeoButtons();
-renderPeople(); setPersonButtons();
-renderActs(); setActButtons();
-syncCombos(); updateRunningUI(); renderLog();
-</script>
+  </script>
 </body>
 </html>
