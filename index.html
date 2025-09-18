@@ -395,6 +395,8 @@
     for(const k of Object.keys(ctx.data)){
       localStorage.setItem(storageKey(k), JSON.stringify(ctx.data[k]));
     }
+    try{ if(typeof refreshBindings==='function') refreshBindings(); }catch(e){ console.warn('refreshBindings no disponible aún'); }
+  }
     refreshBindings();
   }
   function loadAll(){
