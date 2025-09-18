@@ -152,7 +152,7 @@
                 <option value="operador">Operador</option>
                 <option value="admin">Administrador</option>
               </select>
-              <button id="btnAddPerson" class="primary">Añadir</button>
+              <button type="button" id="btnAddPerson" class="primary">Añadir</button>
             </div>
           </div>
           <div class="card">
@@ -283,43 +283,23 @@
       return m;
     }
 
-    function initApp(){
-      // Tabs
-      qsa('.tablink').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
-      qsa('nav.tabs button').forEach(b=>b.addEventListener('click',()=>switchTab(b.getAttribute('data-tabbtn'))));
-
-      // Map principal
-      map = initMap('map');
-
-      // Cargar geocercas a capa
-      renderGeofencesOnMap();
-
-      // Leaflet Draw
-      drawControl = new L.Control.Draw({
-        draw: {polyline:false, rectangle:false, circle:false, marker:false, circlemarker:false, polygon:{allowIntersection:false,showArea:true}},
-        edit: {featureGroup: drawn, edit:true, remove:true}
-      });
-      map.addControl(drawControl);
-
-      map.on(L.Draw.Event.CREATED, function (e) {
-        const layer = e.layer; drawn.addLayer(layer);
-      });
-
-      // Guardar cambios
-      qs('#btnSavePolys').addEventListener('click', saveGeofencesFromMap);
-      qs('#btnAddPoly').addEventListener('click', ()=>{
-        new L.Draw.Polygon(map, drawControl.options.draw.polygon).enable();
-      });
-
-      // UI basica
-      qs('#centerToGF').addEventListener('click',()=>{
-        if(drawn.getLayers().length) map.fitBounds(drawn.getBounds());
-      });
-      qs('#exportCSV').addEventListener('click', exportCSV);
-
-      // Geocercas tabla y personal
-      renderGFTable();
-      renderPeopleTable();
+    function initApp(){$1
+      // Listener botón Añadir personal
+      const addBtn = qs('#btnAddPerson');
+      if(addBtn){
+        addBtn.addEventListener('click', ()=>{
+          const name = qs('#pName').value.trim();
+          const phone = qs('#pPhone').value.trim();
+          const role = qs('#pRole').value;
+          if(!name || !phone){ alert('Nombre y teléfono son obligatorios'); return; }
+          const id = 'u'+Math.random().toString(36).slice(2,7);
+          DB.people.push({id,name,phone,role,geofences:[]});
+          saveDB(DB);
+          qs('#pName').value=''; qs('#pPhone').value='';
+          renderPeopleTable(); fillReportSelectors();
+          alert('Usuario añadido');
+        });
+      }
 
       // Reportes selects
       fillReportSelectors();
@@ -384,14 +364,8 @@
       }));
     }
 
-    // PERSONAL
-    qs('#btnAddPerson')?.addEventListener('click', ()=>{
-      const name = qs('#pName').value.trim();
-      const phone = qs('#pPhone').value.trim();
-      const role = qs('#pRole').value;
-      if(!name || !phone) return alert('Nombre y teléfono son obligatorios');
-      const id = 'u'+Math.random().toString(36).slice(2,7);
-      DB.people.push({id,name,phone,role,geofences:[]});
+    // PERSONAL (se configura dentro de initApp)
+
       saveDB(DB); qs('#pName').value=''; qs('#pPhone').value='';
       renderPeopleTable(); fillReportSelectors();
     });
