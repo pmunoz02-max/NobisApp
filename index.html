@@ -13,7 +13,9 @@
   <!-- Turf.js para point-in-polygon -->
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
   <style>
-    :root{ --bg:#0c0d10;--panel:#141721;--muted:#778;--text:#eaeef7;--acc:#41d39e;--warn:#ffc13b;--danger:#ff6363; }
+    :root{
+      --bg:#0c0d10;--panel:#141721;--muted:#778;--text:#eaeef7;--acc:#41d39e;--warn:#ffc13b;--danger:#ff6363;
+    }
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
     header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(180deg,#161a25,#12151f);border-bottom:1px solid #222}
     header h1{font-size:16px;margin:0;font-weight:600}
@@ -64,9 +66,9 @@
           <div class="row">
             <select id="roleSelect">
               <option value="admin">Administrador</option>
-              <option value="operador" selected>Operador</option>
+              <option value="operador">Operador</option>
             </select>
-            <button type="button" id="logoutBtn" class="ghost">Salir</button>
+            <button id="logoutBtn" class="ghost">Salir</button>
           </div>
           <div class="tiny" id="activeUserInfo"></div>
         </div>
@@ -76,11 +78,11 @@
         <h2>Módulos</h2>
         <div class="card">
           <div class="row" style="flex-wrap:wrap;gap:8px">
-            <button type="button" class="tablink" data-tab="geocercas">Geocercas</button>
-            <button type="button" class="tablink" data-tab="personal">Personal</button>
-            <button type="button" class="tablink" data-tab="actividades">Actividades</button>
-            <button type="button" class="tablink" data-tab="costos">Costos</button>
-            <button type="button" class="tablink" data-tab="reportes">Reportes</button>
+            <button class="tablink" data-tab="geocercas">Geocercas</button>
+            <button class="tablink" data-tab="personal">Personal</button>
+            <button class="tablink" data-tab="actividades">Actividades</button>
+            <button class="tablink" data-tab="costos">Costos</button>
+            <button class="tablink" data-tab="reportes">Reportes</button>
           </div>
         </div>
       </div>
@@ -88,9 +90,9 @@
       <div class="section">
         <h2>Acceso rápido</h2>
         <div class="card">
-          <button type="button" id="centerToGF" class="primary">Centrar a geocercas</button>
+          <button id="centerToGF" class="primary">Centrar a geocercas</button>
           <div style="height:6px"></div>
-          <button type="button" id="exportCSV" class="warn">Exportar envíos (CSV)</button>
+          <button id="exportCSV" class="warn">Exportar envíos (CSV)</button>
         </div>
       </div>
 
@@ -98,18 +100,18 @@
         <h2>Ayuda</h2>
         <div class="card tiny">
           • Para generar un enlace de activación al teléfono de un usuario (modo Emisor), vaya a <b>Personal</b> → seleccione el usuario → <b>Generar enlace</b>.
-          <br/>• El emisor solo puede enviar puntos cuando está <b>dentro</b> de sus geocercas asignadas.
+          <br/>• El emisor solo puede enviar datos desde dentro de sus geocercas asignadas.
         </div>
       </div>
     </aside>
 
     <main id="content">
       <nav class="tabs">
-        <button type="button" class="active" data-tabbtn="geocercas">Geocercas</button>
-        <button type="button" data-tabbtn="personal">Personal</button>
-        <button type="button" data-tabbtn="actividades">Actividades</button>
-        <button type="button" data-tabbtn="costos">Costos</button>
-        <button type="button" data-tabbtn="reportes">Reportes</button>
+        <button class="active" data-tabbtn="geocercas">Geocercas</button>
+        <button data-tabbtn="personal">Personal</button>
+        <button data-tabbtn="actividades">Actividades</button>
+        <button data-tabbtn="costos">Costos</button>
+        <button data-tabbtn="reportes">Reportes</button>
       </nav>
 
       <!-- MAPA COMPARTIDO -->
@@ -123,10 +125,10 @@
           <div class="card">
             <div class="row">
               <input id="gfName" placeholder="Nombre de geocerca" />
-              <button type="button" id="btnAddPoly" class="primary">Nueva Geocerca (dibujo)</button>
-              <button type="button" id="btnSavePolys" class="primary">Guardar Cambios</button>
+              <button id="btnAddPoly" class="primary">Nueva Geocerca (dibujo)</button>
+              <button id="btnSavePolys" class="primary">Guardar Cambios</button>
             </div>
-            <div class="tiny">Tip: tras pulsar <b>Nueva Geocerca</b> el mapa entra en modo dibujo: haga clic para agregar vértices y <b>doble clic</b> para cerrar el polígono. Las coordenadas se muestran al mover el mouse.</div>
+            <div class="tiny">Tip: use las herramientas de dibujo (polígono) arriba a la izquierda del mapa. Para editar, seleccione el modo edición (icono de lápiz). Las coordenadas aparecen al mover el mouse sobre el mapa.</div>
           </div>
 
           <div class="card">
@@ -146,7 +148,7 @@
               <input id="pName" placeholder="Nombre" />
               <input id="pPhone" placeholder="Teléfono (incluya país, ej. 5939xxxx)" />
               <select id="pRole">
-                <option value="sender" selected>Emisor (solo envía)</option>
+                <option value="sender">Emisor (solo envía)</option>
                 <option value="operador">Operador</option>
                 <option value="admin">Administrador</option>
               </select>
@@ -165,14 +167,14 @@
       <section id="panel-actividades" class="panel hide">
         <div class="section">
           <h2>Actividades</h2>
-          <div class="card tiny">(Placeholder) Vincule actividades a personal y geocercas. Almacenamiento local básico.</div>
+          <div class="card tiny">(Placeholder) Vincule actividades a personal y geocercas. Esta versión mantiene compatibilidad y almacenamiento básico.</div>
         </div>
       </section>
 
       <section id="panel-costos" class="panel hide">
         <div class="section">
           <h2>Costos</h2>
-          <div class="card tiny">(Placeholder) Costos diarios ligados a geocerca, actividad y persona activa.</div>
+          <div class="card tiny">(Placeholder) Estructura para costos diarios ligados a geocerca, actividad y persona activa.</div>
         </div>
       </section>
 
@@ -185,7 +187,7 @@
               <select id="rGeofence"></select>
               <input id="rFrom" type="datetime-local" />
               <input id="rTo" type="datetime-local" />
-              <button type="button" id="btnRunReport" class="primary">Generar</button>
+              <button id="btnRunReport" class="primary">Generar</button>
             </div>
           </div>
           <div class="card">
@@ -209,8 +211,8 @@
           <div class="tiny" id="senderGeofences">Geocercas asignadas: –</div>
         </div>
         <div class="row">
-          <button type="button" id="btnSenderStart" class="primary">Iniciar envío</button>
-          <button type="button" id="btnSenderStop" class="ghost">Detener</button>
+          <button id="btnSenderStart" class="primary">Iniciar envío</button>
+          <button id="btnSenderStop" class="ghost">Detener</button>
         </div>
       </div>
 
@@ -230,6 +232,7 @@
      *************************/
     const qs = (s, r=document)=>r.querySelector(s);
     const qsa = (s, r=document)=>Array.from(r.querySelectorAll(s));
+    const toast = (msg)=>{console.log(msg)};
     const getParams = ()=>Object.fromEntries(new URLSearchParams(location.search).entries());
 
     // Storage por proyecto
@@ -285,22 +288,22 @@
       qsa('.tablink').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
       qsa('nav.tabs button').forEach(b=>b.addEventListener('click',()=>switchTab(b.getAttribute('data-tabbtn'))));
 
-      // Map principal
+      // Mapa principal
       map = initMap('map');
 
-      // Cargar geocercas a capa
+      // Cargar geocercas existentes
       renderGeofencesOnMap();
 
-      // Leaflet Draw
+      // Leaflet Draw (dibujo/edición de polígonos)
       drawControl = new L.Control.Draw({
         draw: {polyline:false, rectangle:false, circle:false, marker:false, circlemarker:false, polygon:{allowIntersection:false,showArea:true}},
         edit: {featureGroup: drawn, edit:true, remove:true}
       });
       map.addControl(drawControl);
 
-      // Listeners para guiar y confirmar
+      // Ayudas visuales durante el dibujo
       map.on(L.Draw.Event.DRAWSTART, function(){
-        qs('#coords').textContent = 'Modo dibujo activo: haga clic para añadir vértices, doble clic para cerrar.';
+        qs('#coords').textContent = 'Modo dibujo activo: clic para vértices, doble clic para cerrar.';
       });
       map.on(L.Draw.Event.DRAWSTOP, function(){
         qs('#coords').textContent = 'Lat: –, Lng: –';
@@ -310,32 +313,28 @@
         alert('Geocerca dibujada. Ahora pulse "Guardar Cambios" para persistirla.');
       });
 
-      // Botón: iniciar modo polígono
+      // Botones de geocercas
       qs('#btnAddPoly').addEventListener('click', ()=>{
         try{
-          if(!L || !L.Draw || !L.Draw.Polygon){ alert('Leaflet.draw no cargó correctamente. Verifique su conexión.'); return; }
+          if(!L || !L.Draw || !L.Draw.Polygon){ alert('Leaflet.draw no cargó correctamente.'); return; }
           if(window.__currentDraw){ window.__currentDraw.disable?.(); }
           const polyOpts = (drawControl && drawControl.options && drawControl.options.draw && drawControl.options.draw.polygon) || {allowIntersection:false,showArea:true};
           window.__currentDraw = new L.Draw.Polygon(map, polyOpts);
           window.__currentDraw.enable();
-          qs('#coords').textContent = 'Modo dibujo activo: haga clic para añadir vértices, doble clic para cerrar.';
+          qs('#coords').textContent = 'Modo dibujo activo: clic para vértices, doble clic para cerrar.';
         }catch(err){ console.error(err); alert('No se pudo iniciar el modo dibujo.'); }
       });
-
-      // Guardar cambios
       qs('#btnSavePolys').addEventListener('click', saveGeofencesFromMap);
 
-      // UI basica
-      qs('#centerToGF').addEventListener('click',()=>{
-        if(drawn.getLayers().length) map.fitBounds(drawn.getBounds());
-      });
+      // Accesos rápidos
+      qs('#centerToGF').addEventListener('click',()=>{ if(drawn.getLayers().length) map.fitBounds(drawn.getBounds()); });
       qs('#exportCSV').addEventListener('click', exportCSV);
 
-      // Geocercas tabla y personal
+      // Tablas/Combos
       renderGFTable();
       renderPeopleTable();
 
-      // Listener botón Añadir personal
+      // Añadir personal
       const addBtn = qs('#btnAddPerson');
       if(addBtn){
         addBtn.addEventListener('click', ()=>{
@@ -352,7 +351,7 @@
         });
       }
 
-      // Reportes selects
+      // Reportes
       fillReportSelectors();
       qs('#btnRunReport').addEventListener('click', runReport);
     }
@@ -391,6 +390,7 @@
           const coords = layer.getLatLngs()[0].map(p=>[p.lng,p.lat]);
           return DB.geofences[i] ? {...DB.geofences[i], coords} : null;
         }).filter(Boolean);
+        // Si la cantidad cambió, intentamos conservar nombres, sino dejamos según orden
         if(newGFs.length){ DB.geofences = DB.geofences.map((gf,i)=> newGFs[i] || gf); }
       }
       saveDB(DB);
@@ -404,7 +404,7 @@
       DB.geofences.forEach(gf=>{
         const tr = document.createElement('tr');
         const verts = gf.coords.length;
-        tr.innerHTML = `<td>${gf.name}</td><td>${verts}</td><td><button type="button" data-id="${gf.id}" class="ghost btnZoom">Zoom</button></td>`;
+        tr.innerHTML = `<td>${gf.name}</td><td>${verts}</td><td><button data-id="${gf.id}" class="ghost btnZoom">Zoom</button></td>`;
         tb.appendChild(tr);
       });
       qsa('.btnZoom', tb).forEach(b=>b.addEventListener('click', ()=>{
@@ -414,10 +414,11 @@
       }));
     }
 
-    // PERSONAL: tabla + acciones
+    
     function renderPeopleTable(){
       const tb = qs('#personTable tbody'); tb.innerHTML='';
       DB.people.forEach(u=>{
+        const gfBadges = u.geofences.map(id=> DB.geofences.find(g=>g.id===id)?.name||id).join(', ')||'—';
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${u.name}</td>
@@ -429,8 +430,8 @@
             </select>
           </td>
           <td>
-            <button type="button" class="ghost btnSaveGF" data-id="${u.id}">Guardar asignación</button>
-            <button type="button" class="primary copy btnLink" data-id="${u.id}">Generar enlace</button>
+            <button class="ghost btnSaveGF" data-id="${u.id}">Guardar asignación</button>
+            <button class="primary copy btnLink" data-id="${u.id}">Generar enlace</button>
           </td>`;
         tb.appendChild(tr);
       });
@@ -528,6 +529,7 @@
       if(!navigator.geolocation){ alert('Geolocalización no soportada'); return; }
       if(senderWatchId!=null) return;
       setSenderStatus(true,'iniciando geolocalización…');
+      // watchPosition para actualizaciones continuas
       senderWatchId = navigator.geolocation.watchPosition(onPos, onPosError, {
         enableHighAccuracy:true, maximumAge:5000, timeout:15000
       });
@@ -565,6 +567,7 @@
       }
 
       if(insideGfId){
+        // Guardar envío local (simulación de POST)
         DB.submissions.push({ts:Date.now(), phone:senderUser.phone, userId:senderUser.id, lat, lng, acc:accuracy||0, geofenceId:insideGfId});
         saveDB(DB);
         setSenderStatus(true, `dentro de geocerca (${insideGfId}). Punto registrado.`);
