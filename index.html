@@ -892,29 +892,48 @@
 
   // ===== Arranque =====
   function start(){
-    // Determinar modo
-    const mode = (param('mode')||'').toLowerCase();
-    renderFarms();
-    if(!ctx.farmId){ // crear una finca por defecto
-      const id = 'f'+Date.now(); const farms = farmsState.get(); farms.push({id, nombre:'Mi Finca'}); farmsState.set(farms); ctx.farmId = id; renderFarms();
-    }
-    chooseFarm(ctx.farmId);
+    try{
+      // Determinar modo
+      const mode = (param('mode')||'').toLowerCase();
+      renderFarms();
+      if(!ctx.farmId){ // crear una finca por defecto
+        const id = 'f'+Date.now(); const farms = farmsState.get(); farms.push({id, nombre:'Mi Finca'}); farmsState.set(farms); ctx.farmId = id; renderFarms();
+      }
+      chooseFarm(ctx.farmId);
 
-    if(mode==='tracker' || param('phone')){
-      // MODO TRACKER
-      $('#adminShell').classList.add('hidden');
-      $('#trackerShell').classList.remove('hidden');
-      initTracker();
-    } else {
-      // MODO ADMIN
-      $('#trackerShell').classList.add('hidden');
-      $('#adminShell').classList.remove('hidden');
-      initMap();
-      mapRenderFences();
+      if(mode==='tracker' || param('phone')){
+        // MODO TRACKER
+        const adminShell = $('#adminShell'); const trackerShell = $('#trackerShell');
+        if(adminShell) adminShell.classList.add('hidden');
+        if(trackerShell) trackerShell.classList.remove('hidden');
+        initTracker();
+      } else {
+        // MODO ADMIN
+        const adminShell = $('#adminShell'); const trackerShell = $('#trackerShell');
+        if(trackerShell) trackerShell.classList.add('hidden');
+        if(adminShell) adminShell.classList.remove('hidden');
+        initMap();
+        mapRenderFences();
+      }
+    }catch(err){
+      console.error(err);
+      showFatal(err);
     }
   }
 
-  start();
+  // Esperar DOM listo para evitar condiciones de carrera en algunos hosts
+  if(document.readyState==='complete' || document.readyState==='interactive'){
+    setTimeout(start, 0);
+  } else {
+    window.addEventListener('DOMContentLoaded', start);
+  }
+
+  function showFatal(err){
+    const div = document.createElement('div');
+    div.style.cssText = 'position:fixed;inset:64px 12px 12px 12px;background:#fff;border:1px solid #f0bcbc;border-radius:12px;padding:16px;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,.08)';
+    div.innerHTML = `<b style="color:#b00020">Se produjo un error al cargar la app</b><br><span class="small">`+escapeHtml(String(err && err.message || err))+`</span><div class="mt small">Sugerencias: recarga la página. Si persiste, borra caché del navegador. </div>`;
+    document.body.appendChild(div);
+  }
 })();
 </script>
 </body>
