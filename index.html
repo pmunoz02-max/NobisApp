@@ -524,7 +524,16 @@
     const defaultCenter = [-1.8312, -78.1834];
 
     function addTiles(url){
-      const tl = L.tileLayer(url, {maxZoom:19, attribution:'&copy; OpenStreetMap/Esri'});
+      try{
+        const tl = L.tileLayer(url, {maxZoom:19, attribution:'&copy; OpenStreetMap/Esri'});
+        tl.on('tileerror', ()=>{ dbg('tileerror'); });
+        tl.on('load', ()=>{ dbg('tiles-ok'); setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){} }, 150); });
+        tl.addTo(map); return tl;
+      }catch(err){
+        dbg('tilelayer-failed');
+        return null;
+      }
+    });
       tl.on('tileerror', ()=>{ dbg('tileerror'); });
       tl.on('load', ()=>{ dbg('tiles-ok'); setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){} }, 150); });
       tl.addTo(map); return tl;
@@ -551,15 +560,25 @@
     drawnItems = new L.FeatureGroup();
     map.addLayer(drawnItems);
 
-    drawControl = new L.Control.Draw({
-      draw: { polyline:false, rectangle:false, circle:false, circlemarker:false, marker:false,
-        polygon: { allowIntersection:false, showArea:true } },
-      edit: { featureGroup: drawnItems }
-    });
-    map.addControl(drawControl);
+    let drawOk = !!(L.Control && L.Control.Draw);
+    if(drawOk){
+      drawControl = new L.Control.Draw({
+        draw: { polyline:false, rectangle:false, circle:false, circlemarker:false, marker:false,
+          polygon: { allowIntersection:false, showArea:true } },
+        edit: { featureGroup: drawnItems }
+      });
+      map.addControl(drawControl);
+    } else {
+      console.warn('Leaflet.draw no disponible; modo solo-visual');
+      const warn = document.createElement('div');
+      warn.className='coords'; warn.style.left='0.75rem'; warn.style.right='auto'; warn.textContent='⚠ No se cargó Leaflet.draw (CDN). Puedes ver el mapa pero no dibujar.';
+      const cont = document.getElementById('map'); cont && cont.appendChild(warn);
+    }
 
-    map.on(L.Draw.Event.CREATED, function (e) { const layer = e.layer; drawnItems.addLayer(layer); updateFencesFromLayers(); });
-    map.on(L.Draw.Event.EDITED, function () { updateFencesFromLayers(); });
+    if(L.Draw && L.Draw.Event && drawOk){
+      map.on(L.Draw.Event.CREATED, function (e) { const layer = e.layer; drawnItems.addLayer(layer); updateFencesFromLayers(); });
+      map.on(L.Draw.Event.EDITED, function () { updateFencesFromLayers(); });
+    } });
     map.on('mousemove', (ev)=>{ const el=$('#mapCoords'); if(el) el.textContent = `Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`; });
 
     map.setView(defaultCenter, 6);
@@ -567,6 +586,25 @@
     // Invalida tamaño tras un pequeño delay (render en grid/tab)
     setTimeout(()=>{ try{ map.invalidateSize(true); dbg('invalidate-delay'); }catch(_){} }, 250);
     window.addEventListener('resize', ()=>{ try{ map.invalidateSize(true); dbg('invalidate-resize'); }catch(_){} });
+
+    // Último fallback: capa local en blanco por si todos los tiles externos fallan
+    setTimeout(()=>{
+      const hasTileLayer = Object.values(map._layers).some(l=> l instanceof L.TileLayer);
+      if(!hasTileLayer){
+        dbg('fallback-local-canvas');
+        L.gridLayer({
+          tileSize:256,
+          createTile: function(coords){
+            const tile = document.createElement('canvas'); tile.width=256; tile.height=256;
+            const ctx = tile.getContext('2d');
+            ctx.fillStyle = '#e9eff5'; ctx.fillRect(0,0,256,256);
+            ctx.strokeStyle = '#c8d4e0'; ctx.lineWidth = 1; for(let i=0;i<256;i+=32){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,256); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(256,i); ctx.stroke(); }
+            ctx.fillStyle = '#7a8b9a'; ctx.font = '12px system-ui'; ctx.fillText(`z${map.getZoom()} x${coords.x} y${coords.y}`, 8, 16);
+            return tile;
+          }
+        }).addTo(map);
+      }
+    }, 1200);
   }
 
     const cont = document.getElementById('map');
