@@ -524,20 +524,12 @@
   // ====== Leaflet (mapa ADMIN) ======
   let map, drawControl, drawnItems, editOn=false;
   function initMap(){
+    let tileLoaded=false; // marcar cuando al menos un tile cargó
     const dbg = (m)=>{ const el = document.getElementById('mapDebug'); if(!el) return; el.style.display='block'; el.textContent = (el.textContent? el.textContent+' | ':'') + m; };
-    // 1) Comprobaciones de entorno
     if(typeof L === 'undefined'){ console.error('Leaflet no cargó'); showFatal(new Error('No se pudo cargar Leaflet desde CDN')); return; }
-
-    const cont = document.getElementById('map');
-    if(!cont){ console.error('#map no existe aún'); return; }
-
-    // Si ya existe, solo revalida tamaño
+    const cont = document.getElementById('map'); if(!cont){ console.error('#map no existe aún'); return; }
     if(map){ setTimeout(()=>{ try{ map.invalidateSize(true); dbg('invalidate-size'); }catch(_){} }, 120); return; }
-
-    // 2) Asegurar tamaño visible del contenedor
     if(cont.clientHeight < 100){ cont.style.height = '520px'; dbg('height-boost'); }
-
-    // 3) Crear mapa
     map = L.map('map'); dbg('map-created');
     const defaultCenter = [-1.8312, -78.1834];
 
@@ -545,29 +537,21 @@
       try{
         const tl = L.tileLayer(url, {maxZoom:19, attribution:'&copy; OpenStreetMap/Esri'});
         tl.on('tileerror', ()=>{ dbg('tileerror'); });
-        tl.on('load', ()=>{ dbg('tiles-ok'); setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){} }, 150); });
+        tl.on('load', ()=>{ dbg('tiles-ok'); tileLoaded=true; setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){} }, 150); });
         tl.addTo(map); return tl;
-      }catch(err){
-        dbg('tilelayer-failed');
-        return null;
-      }
-    });
-      tl.on('tileerror', ()=>{ dbg('tileerror'); });
-      tl.on('load', ()=>{ dbg('tiles-ok'); setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){} }, 150); });
-      tl.addTo(map); return tl;
+      }catch(err){ dbg('tilelayer-failed'); return null; }
     }
 
-    // Fallback chain de tiles
     let base = addTiles('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-    base.on('tileerror', ()=>{
+    base && base.on('tileerror', ()=>{
       try{ map.removeLayer(base); }catch(_){ }
       dbg('fallback-osm-root');
       base = addTiles('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
-      base.on('tileerror', ()=>{
+      base && base.on('tileerror', ()=>{
         try{ map.removeLayer(base); }catch(_){ }
         dbg('fallback-osm-hot');
         base = addTiles('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png');
-        base.on('tileerror', ()=>{
+        base && base.on('tileerror', ()=>{
           try{ map.removeLayer(base); }catch(_){ }
           dbg('fallback-esri');
           base = addTiles('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}');
@@ -575,8 +559,24 @@
       });
     });
 
-    drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
+    // Si en 3s no se cargó ningún tile, forzar capa local
+    setTimeout(()=>{
+      if(!tileLoaded){ dbg('force-local-grid');
+        try{ if(base) map.removeLayer(base); }catch(_){ }
+        L.gridLayer({
+          tileSize:256,
+          createTile: function(coords){
+            const t = document.createElement('canvas'); t.width=256; t.height=256;
+            const c = t.getContext('2d'); c.fillStyle='#e9eff5'; c.fillRect(0,0,256,256);
+            c.strokeStyle='#c8d4e0'; for(let i=0;i<256;i+=32){ c.beginPath(); c.moveTo(i,0); c.lineTo(i,256); c.stroke(); c.beginPath(); c.moveTo(0,i); c.lineTo(256,i); c.stroke(); }
+            c.fillStyle='#7a8b9a'; c.font='12px system-ui'; c.fillText(`z${map.getZoom()} x${coords.x} y${coords.y}`, 8, 16);
+            return t;
+          }
+        }).addTo(map);
+      }
+    }, 3000);
+
+    drawnItems = new L.FeatureGroup(); map.addLayer(drawnItems);
 
     let drawOk = !!(L.Control && L.Control.Draw);
     if(drawOk){
@@ -588,16 +588,18 @@
       map.addControl(drawControl);
     } else {
       console.warn('Leaflet.draw no disponible; modo solo-visual');
-      const warn = document.createElement('div');
-      warn.className='coords'; warn.style.left='0.75rem'; warn.style.right='auto'; warn.textContent='⚠ No se cargó Leaflet.draw (CDN). Puedes ver el mapa pero no dibujar.';
-      const cont = document.getElementById('map'); cont && cont.appendChild(warn);
+      const warn = document.createElement('div'); warn.className='coords'; warn.style.left='0.75rem'; warn.style.right='auto'; warn.textContent='⚠ No se cargó Leaflet.draw (CDN). Puedes ver el mapa pero no dibujar.'; cont && cont.appendChild(warn);
     }
 
     if(L.Draw && L.Draw.Event && drawOk){
       map.on(L.Draw.Event.CREATED, function (e) { const layer = e.layer; drawnItems.addLayer(layer); updateFencesFromLayers(); });
       map.on(L.Draw.Event.EDITED, function () { updateFencesFromLayers(); });
-    } });
+    }
+
     map.on('mousemove', (ev)=>{ const el=$('#mapCoords'); if(el) el.textContent = `Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`; });
+
+    // Asegurar control de zoom visible
+    try{ L.control.zoom({position:'topleft'}).addTo(map); }catch(_){ }
 
     map.setView(defaultCenter, 6);
 
