@@ -1,1172 +1,372 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>App Fincas · Geocercas + Trackers</title>
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Leaflet Draw -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
-  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-  <!-- Chart.js for reportes -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>App Fincas · Geocercas + Trackers</title>
 
-  <style>
-    :root{
-      --c1:#0b5; --c2:#095; --c3:#eee; --c4:#222; --danger:#d33; --warn:#e9b300;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#fafafa;color:#222}
-    header{
-      position:sticky;top:0;z-index:999;display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;background:#fff;border-bottom:1px solid #ddd}
-    header h1{font-size:1rem;margin:0 0 0 .25rem;font-weight:700}
-    .flex{display:flex}.col{flex-direction:column}.row{flex-direction:row}
-    .grow{flex:1}
-    .btn{appearance:none;border:1px solid #ccc;background:#fff;padding:.5rem .75rem;border-radius:.5rem;cursor:pointer}
-    .btn:active{transform:translateY(1px)}
-    .btn.primary{background:var(--c1);border-color:var(--c2);color:white;font-weight:600}
-    .btn.danger{background:var(--danger);color:#fff;border-color:#b12}
-    .btn.warn{background:var(--warn);color:#000;border-color:#c99}
-    .tag{display:inline-block;padding:.15rem .5rem;border-radius:999px;font-size:.8rem;border:1px solid #ddd;background:#f5f5f5}
-    .badge{display:inline-block;width:.75rem;height:.75rem;border-radius:50%}
-    .ok{background:#2ecc71}.no{background:#e74c3c}.idle{background:#bdc3c7}
-    .wrap{max-width:1200px;margin:0 auto;padding:1rem}
-    nav.tabs{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
-    nav.tabs button{border:1px solid #ddd;background:#fff;padding:.5rem .75rem;border-radius:.5rem;cursor:pointer}
-    nav.tabs button.active{background:#222;color:#fff;border-color:#222}
-    section.panel{display:none;background:#fff;border:1px solid #e5e5e5;border-radius:.75rem;margin-top:1rem;padding:1rem}
-    section.panel.show{display:block}
-    .grid{display:grid;gap:1rem}
-    .grid-2{grid-template-columns:1fr 1fr}
-    .grid-3{grid-template-columns:repeat(3,1fr)}
-    .card{background:#fff;border:1px solid #e6e6e6;border-radius:.75rem;padding:1rem}
-    label{font-size:.9rem;color:#444}
-    input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radius:.5rem}
-    textarea{min-height:90px}
-    table{width:100%;border-collapse:collapse}
-    th,td{border-bottom:1px solid #eee;padding:.5rem;text-align:left;font-size:.92rem}
-    .muted{color:#666}
-    .small{font-size:.86rem}
-    .map{height:520px;border-radius:.75rem;border:1px solid #e5e5e5}
-    .mini-map{height:360px;border-radius:.75rem;border:1px solid #e5e5e5}
-    .row-actions{display:flex;gap:.25rem}
-    .sticky-ctrls{position:sticky;top:.5rem;z-index:5}
-    .coords{position:absolute;right:.75rem;bottom:.75rem;background:rgba(255,255,255,.92);border:1px solid #ddd;border-radius:.5rem;padding:.25rem .5rem;font-size:.85rem}
-    .legend{display:flex;gap:.5rem;align-items:center}
-    .pill{padding:.15rem .5rem;border:1px solid #ddd;border-radius:999px}
-    .hr{height:1px;background:#eee;margin:.5rem 0}
-    .help{font-size:.82rem;color:#555}
-    .hidden{display:none}
-    .mt{margin-top:.75rem}
-    .mb{margin-bottom:.75rem}
-    .mr{margin-right:.5rem}
-    .center{text-align:center}
-    .success{color:#0b5}
-    .error{color:#d33}
-  </style>
-  
-  <!-- Fallback CSS esencial para Leaflet (por si el CDN de estilos no carga) -->
-  <style id="leaflet-fallback">
-    /* Fallback CSS (compact) para Leaflet 1.9+ por si no carga leaflet.css */
-    .leaflet-container{position:relative;overflow:hidden;outline:0}
-    .leaflet-pane,.leaflet-map-pane,.leaflet-tile-pane,.leaflet-overlay-pane,.leaflet-shadow-pane,.leaflet-marker-pane,.leaflet-tooltip-pane,.leaflet-popup-pane{position:absolute;left:0;top:0}
-    .leaflet-pane{z-index:400}
-    .leaflet-tile-pane{z-index:200}
-    .leaflet-overlay-pane{z-index:400}
-    .leaflet-shadow-pane{z-index:500}
-    .leaflet-marker-pane{z-index:600}
-    .leaflet-tooltip-pane{z-index:650}
-    .leaflet-popup-pane{z-index:700}
-    .leaflet-zoom-animated{transform-origin:0 0}
-    .leaflet-tile{position:absolute;width:256px;height:256px;border:0}
-    .leaflet-container img{max-width:none !important;}
-    .leaflet-control{position:relative;z-index:800}
-    .leaflet-control-container{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none}
-    .leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}
-    .leaflet-top{top:10px}.leaflet-bottom{bottom:10px}
-    .leaflet-left{left:10px}.leaflet-right{right:10px}
-    .leaflet-bar{box-shadow:0 1px 5px rgba(0,0,0,.4);border-radius:4px}
-    .leaflet-bar a{background:#fff;border-bottom:1px solid #ccc;width:28px;height:28px;line-height:28px;text-align:center;display:block;color:#000;text-decoration:none;pointer-events:auto}
-    .leaflet-bar a:last-child{border-bottom:none}
-    .leaflet-bar a:hover{background:#f4f4f4}
-    .leaflet-control-zoom-in,.leaflet-control-zoom-out{font:bold 18px/28px Arial,Helvetica,sans-serif}
-  </style>
+<!-- 1) CSS esencial de Leaflet embebido (por si el CDN de estilos no carga) -->
+<style>
+/* Leaflet core (compact) */
+.leaflet-container{position:relative;overflow:hidden;outline:0}
+.leaflet-pane,.leaflet-map-pane,.leaflet-tile-pane,.leaflet-overlay-pane,.leaflet-shadow-pane,.leaflet-marker-pane,.leaflet-tooltip-pane,.leaflet-popup-pane{position:absolute;left:0;top:0}
+.leaflet-pane{z-index:400}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-shadow-pane{z-index:500}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}
+.leaflet-zoom-animated{transform-origin:0 0}
+.leaflet-container img{max-width:none!important}
+.leaflet-tile{position:absolute;width:256px;height:256px;border:0}
+.leaflet-control{position:relative;z-index:800}
+.leaflet-control-container{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none}
+.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}
+.leaflet-top{top:10px}.leaflet-bottom{bottom:10px}
+.leaflet-left{left:10px}.leaflet-right{right:10px}
+.leaflet-bar{box-shadow:0 1px 5px rgba(0,0,0,.4);border-radius:4px;pointer-events:auto}
+.leaflet-bar a{background:#fff;border-bottom:1px solid #ccc;width:28px;height:28px;line-height:28px;text-align:center;display:block;color:#000;text-decoration:none}
+.leaflet-bar a:last-child{border-bottom:none}
+.leaflet-bar a:hover{background:#f4f4f4}
+.leaflet-control-zoom-in,.leaflet-control-zoom-out{font:bold 18px/28px Arial,Helvetica,sans-serif}
+
+/* App UI */
+:root{--c1:#0b5;--c2:#095;--danger:#d33;--warn:#e9b300}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#fafafa;color:#222}
+header{position:sticky;top:0;z-index:10;display:flex;gap:.5rem;align-items:center;padding:.75rem 1rem;background:#fff;border-bottom:1px solid #ddd}
+header h1{font-size:1rem;margin:0 0 0 .25rem;font-weight:700}
+.wrap{max-width:1200px;margin:0 auto;padding:1rem}
+.btn{border:1px solid #ccc;background:#fff;padding:.5rem .75rem;border-radius:.5rem;cursor:pointer}
+.btn.primary{background:var(--c1);border-color:var(--c2);color:#fff}
+.btn.danger{background:var(--danger);border-color:#b12;color:#fff}
+.btn.warn{background:var(--warn)}
+nav.tabs{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
+nav.tabs button{border:1px solid #ddd;background:#fff;padding:.5rem .75rem;border-radius:.5rem;cursor:pointer}
+nav.tabs button.active{background:#222;color:#fff;border-color:#222}
+section.panel{display:none;background:#fff;border:1px solid #e5e5e5;border-radius:.75rem;margin-top:1rem;padding:1rem}
+section.panel.show{display:block}
+.grid{display:grid;gap:1rem}
+.grid-2{grid-template-columns:1fr 1fr}
+.card{background:#fff;border:1px solid #e6e6e6;border-radius:.75rem;padding:1rem}
+input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radius:.5rem}
+.map{height:520px;border-radius:.75rem;border:1px solid #e5e5e5;background:#f3f6f9;position:relative}
+.coords{position:absolute;right:.75rem;bottom:.75rem;background:rgba(255,255,255,.92);border:1px solid #ddd;border-radius:.5rem;padding:.25rem .5rem;font-size:.85rem}
+.small{font-size:.86rem}.muted{color:#666}.hidden{display:none}
+.badge{width:.75rem;height:.75rem;border-radius:50%;display:inline-block}.ok{background:#2ecc71}
+</style>
+
+<!-- 2) Leaflet + Leaflet.draw desde CDN (JS y CSS). Si el CSS no carga, el fallback arriba ya pinta controles. -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 </head>
+
 <body>
-  <header>
-    <div class="badge ok" title="App OK"></div>
-    <h1>App Fincas · Geocercas + Trackers</h1>
-    <div class="grow"></div>
+<header>
+  <div class="badge ok"></div>
+  <h1>App Fincas · Geocercas + Trackers</h1>
+  <div style="flex:1"></div>
+  <label class="small muted" for="farmSelect" style="margin-right:.5rem">Finca:</label>
+  <select id="farmSelect"></select>
+  <button class="btn" id="btnNuevaFinca">Crear</button>
+  <button class="btn danger" id="btnEliminarFinca">Eliminar Finca</button>
+</header>
 
-    <!-- Selector de Finca / Contexto -->
-    <label for="farmSelect" class="muted small mr">Finca:</label>
-    <select id="farmSelect" class="mr"></select>
-    <button class="btn" id="btnNuevaFinca" title="Crear/Seleccionar finca">Crear</button>
-    <button class="btn danger" id="btnEliminarFinca" title="Eliminar finca actual">Eliminar Finca</button>
-  </header>
-
-  <!-- Contenedor de modo TRACKER (interfaz mínima) -->
-  <div id="trackerShell" class="wrap hidden"><noscript><div class="card" style="margin:1rem 0;border-color:#f0bcbc"><b>Activa JavaScript</b> para usar el modo TRACKER.</div></noscript>
-    <div class="grid grid-2">
-      <div class="card">
-        <h2 style="margin:0 0 .5rem">Modo de Usuario · Envío Georeferenciado</h2>
-        <div id="trackerUserInfo" class="small muted">Cargando usuario…</div>
-        <div class="hr"></div>
-        <div class="legend">
-          <div>Estado:</div>
-          <span id="trackerStateDot" class="badge idle"></span>
-          <span id="trackerStateText" class="tag">Inactivo</span>
-        </div>
-        <div class="mt">
-          <label class="small">Asignado a geocerca</label>
-          <div id="trackerFenceName" class="tag">(sin asignar)</div>
-        </div>
-        <div class="mt">
-          <label>Activar envío de datos</label>
-          <div>
-            <input type="checkbox" id="toggleSend" /> <span class="small muted">(solo se envía si estás DENTRO de tu geocerca)</span>
-          </div>
-        </div>
-        <div class="mt small help">
-          • Este enlace está asociado a tu número. Mantén la ventana abierta para enviar periódicamente tu ubicación.<br>
-          • Frecuencia: cada <span id="freqSec">15</span> s (configurable por Admin).
-        </div>
-        <div class="mt small">
-          <div><b>Último evento:</b> <span id="lastEvent">—</span></div>
-          <div><b>Último envío:</b> <span id="lastSend">—</span></div>
-        </div>
+<!-- TRACKER -->
+<div id="trackerShell" class="wrap hidden">
+  <div class="grid grid-2">
+    <div class="card">
+      <h2 style="margin:0 0 .5rem">Modo TRACKER</h2>
+      <div id="trackerUserInfo" class="small muted">Cargando…</div>
+      <div class="small muted" style="margin-top:.5rem">Frecuencia: <span id="freqSec">15</span> s</div>
+      <div style="margin-top:.5rem">
+        <label><input type="checkbox" id="toggleSend"> Activar envío (solo dentro de la geocerca)</label>
       </div>
-      <div class="card">
-        <div id="miniMap" class="mini-map"></div>
-        <div class="coords" id="miniCoords">—</div>
+      <div class="small" style="margin-top:.5rem">
+        Último evento: <span id="lastEvent">—</span><br>
+        Último envío: <span id="lastSend">—</span>
       </div>
     </div>
+    <div class="card">
+      <div id="miniMap" class="map"></div>
+      <div class="coords" id="miniCoords">—</div>
+    </div>
   </div>
-
-  <!-- Contenedor de modo ADMIN (app completa) -->
-  <div id="adminShell" class="wrap">
-    <nav class="tabs" id="tabs">
-      <button data-tab="geocercas" class="active">Geocercas</button>
-      <button data-tab="personal">Personal</button>
-      <button data-tab="actividades">Actividades</button>
-      <button data-tab="costos">Costos</button>
-      <button data-tab="reportes">Reportes</button>
-      <button data-tab="config">Config</button>
-    </nav>
-
-    <!-- Panel Geocercas -->
-    <section class="panel show" id="tab-geocercas">
-      <div class="grid grid-2">
-        <div>
-          <div class="sticky-ctrls">
-            <div class="card">
-              <div class="grid grid-3">
-                <button class="btn" id="btnNuevaGeocerca">Nueva Geocerca</button>
-                <button class="btn warn" id="btnEditarGeocerca">Editar Geocercas</button>
-                <button class="btn primary" id="btnGuardarGeocercas">Guardar Cambios</button>
-              </div>
-              <div class="mt">
-                <label>Crear geocerca desde lista Lat,Lng (una por línea)</label>
-                <textarea id="coordsInput" placeholder="-0.12345,-78.56789\n-0.12300,-78.56850\n..."></textarea>
-                <div class="row" style="gap:.5rem;margin-top:.5rem">
-                  <input id="newFenceName" placeholder="Nombre geocerca (ej. Lote A)" />
-                  <button class="btn" id="btnCrearDesdeLista">Crear desde Lat/Lng</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div style="position:relative;margin-top:1rem">
-            <div id="map" class="map" style="background:#f3f6f9; position:relative">
-  <div id="mapDebug" style="position:absolute;left:8px;bottom:8px;background:rgba(255,255,255,.9);border:1px solid #ddd;border-radius:6px;padding:4px 6px;font-size:12px;display:none"></div>
 </div>
-            <div class="coords" id="mapCoords">Lat: — Lng: —</div>
+
+<!-- ADMIN -->
+<div id="adminShell" class="wrap">
+  <nav class="tabs" id="tabs">
+    <button data-tab="geocercas" class="active">Geocercas</button>
+    <button data-tab="personal">Personal</button>
+    <button data-tab="actividades">Costos</button>
+    <button data-tab="reportes">Reportes</button>
+    <button data-tab="config">Config</button>
+  </nav>
+
+  <section id="tab-geocercas" class="panel show">
+    <div class="grid grid-2">
+      <div>
+        <div class="card">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <button class="btn" id="btnNuevaGeocerca">Nueva Geocerca</button>
+            <button class="btn warn" id="btnEditarGeocerca">Editar Geocercas</button>
+            <button class="btn primary" id="btnGuardarGeocercas">Guardar Cambios</button>
+          </div>
+          <div style="margin-top:.75rem">
+            <label class="small">Crear desde Lat,Lng (una por línea)</label>
+            <textarea id="coordsInput" placeholder="-0.12345,-78.56789&#10;-0.12300,-78.56850"></textarea>
+            <div style="display:flex;gap:.5rem;margin-top:.5rem">
+              <input id="newFenceName" placeholder="Nombre geocerca (ej. Lote A)"/>
+              <button class="btn" id="btnCrearDesdeLista">Crear desde Lat/Lng</button>
+            </div>
           </div>
         </div>
-        <div>
-          <div class="card">
-            <h3 style="margin-top:0">Listado de Geocercas</h3>
-            <table id="fencesTable">
-              <thead><tr><th>Nombre</th><th>Vértices</th><th>Asignados</th><th>Acciones</th></tr></thead>
-              <tbody></tbody>
-            </table>
-            <div class="help mt">• Recuerda <b>Guardar Cambios</b> luego de editar el polígono.</div>
+        <div style="position:relative;margin-top:1rem">
+          <div id="map" class="map">
+            <div id="mapDebug" style="position:absolute;left:.75rem;bottom:.75rem;background:rgba(255,255,255,.9);border:1px solid #ddd;border-radius:.5rem;padding:.25rem .5rem;font-size:.8rem;display:none"></div>
           </div>
+          <div class="coords" id="mapCoords">Lat: — Lng: —</div>
         </div>
       </div>
-    </section>
-
-    <!-- Panel Personal -->
-    <section class="panel" id="tab-personal">
-      <div class="grid grid-2">
+      <div>
         <div class="card">
-          <h3 style="margin-top:0">Nuevo Personal</h3>
-          <div class="grid grid-2">
-            <div>
-              <label>Nombre</label>
-              <input id="pNombre" placeholder="Nombre y Apellido" />
-            </div>
-            <div>
-              <label>Teléfono (E.164)</label>
-              <input id="pTelefono" placeholder="+5939XXXXXXX" />
-            </div>
-            <div>
-              <label>Rol</label>
-              <select id="pRol">
-                <option value="TRACKER">TRACKER</option>
-                <option value="ADMIN">ADMIN</option>
-              </select>
-            </div>
-            <div>
-              <label>Activo</label>
-              <select id="pActivo">
-                <option value="true">Sí</option>
-                <option value="false">No</option>
-              </select>
-            </div>
-            <div>
-              <label>Geocerca asignada</label>
-              <select id="pGeocerca"></select>
-            </div>
-            <div class="row" style="align-items:flex-end;gap:.5rem">
-              <button class="btn primary" id="btnAddPersonal">Añadir</button>
-              <span class="small muted">El enlace de acceso se genera automáticamente.</span>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <h3 style="margin-top:0">Personal</h3>
-          <table id="personalTable">
-            <thead><tr><th>Nombre</th><th>Teléfono</th><th>Rol</th><th>Activo</th><th>Geocerca</th><th>Enlace</th><th></th></tr></thead>
+          <h3 style="margin:0 0 .5rem">Listado de Geocercas</h3>
+          <table id="fencesTable" style="width:100%;border-collapse:collapse">
+            <thead><tr><th>Nombre</th><th>Vértices</th><th>Asignados</th><th>Acciones</th></tr></thead>
             <tbody></tbody>
           </table>
+          <div class="small muted" style="margin-top:.5rem">• Recuerda <b>Guardar Cambios</b> luego de editar el polígono.</div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Panel Actividades -->
-    <section class="panel" id="tab-actividades">
-      <div class="grid grid-2">
-        <div class="card">
-          <h3 style="margin-top:0">Nueva Actividad</h3>
-          <div class="grid grid-2">
-            <div>
-              <label>Fecha</label>
-              <input type="date" id="aFecha" />
-            </div>
-            <div>
-              <label>Geocerca</label>
-              <select id="aGeocerca"></select>
-            </div>
-            <div>
-              <label>Actividad</label>
-              <input list="actividadList" id="aActividad" placeholder="Ej. Deshierba" />
-              <datalist id="actividadList">
-                <option>Siembra</option>
-                <option>Riego</option>
-                <option>Cosecha</option>
-                <option>Deshierba</option>
-                <option>Poda</option>
-              </datalist>
-            </div>
-            <div>
-              <label>Personal (activo)</label>
-              <select id="aPersonal"></select>
-            </div>
-            <div>
-              <label>Notas</label>
-              <input id="aNotas" placeholder="Opcional" />
-            </div>
-            <div class="row" style="align-items:flex-end;gap:.5rem">
-              <button class="btn primary" id="btnAddActividad">Añadir</button>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <h3 style="margin-top:0">Actividades</h3>
-          <table id="actividadesTable">
-            <thead><tr><th>Fecha</th><th>Geocerca</th><th>Actividad</th><th>Personal</th><th>Notas</th><th></th></tr></thead>
-            <tbody></tbody>
-          </table>
+  <section id="tab-personal" class="panel">
+    <div class="grid grid-2">
+      <div class="card">
+        <h3 style="margin:0 0 .5rem">Nuevo Personal</h3>
+        <div class="grid grid-2">
+          <div><label>Nombre</label><input id="pNombre" placeholder="Nombre y Apellido"></div>
+          <div><label>Teléfono (E.164)</label><input id="pTelefono" placeholder="+5939XXXXXXX"></div>
+          <div><label>Rol</label><select id="pRol"><option>TRACKER</option><option>ADMIN</option></select></div>
+          <div><label>Activo</label><select id="pActivo"><option value="true">Sí</option><option value="false">No</option></select></div>
+          <div><label>Geocerca asignada</label><select id="pGeocerca"></select></div>
+          <div style="display:flex;align-items:flex-end;gap:.5rem"><button class="btn primary" id="btnAddPersonal">Añadir</button><span class="small muted">Se genera enlace de acceso.</span></div>
         </div>
       </div>
-    </section>
-
-    <!-- Panel Costos -->
-    <section class="panel" id="tab-costos">
-      <div class="grid grid-2">
-        <div class="card">
-          <h3 style="margin-top:0">Nuevo Costo ($/día)</h3>
-          <div class="grid grid-2">
-            <div>
-              <label>Fecha</label>
-              <input type="date" id="cFecha" />
-            </div>
-            <div>
-              <label>Geocerca</label>
-              <select id="cGeocerca"></select>
-            </div>
-            <div>
-              <label>Actividad</label>
-              <input list="actividadList" id="cActividad" placeholder="Ej. Raleo" />
-            </div>
-            <div>
-              <label>Personal (activo)</label>
-              <select id="cPersonal"></select>
-            </div>
-            <div>
-              <label>Costo $/día</label>
-              <input id="cCosto" type="number" step="0.01" placeholder="Ej. 25" />
-            </div>
-            <div class="row" style="align-items:flex-end;gap:.5rem">
-              <button class="btn primary" id="btnAddCosto">Añadir</button>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <h3 style="margin-top:0">Costos</h3>
-          <table id="costosTable">
-            <thead><tr><th>Fecha</th><th>Geocerca</th><th>Actividad</th><th>Personal</th><th>$ / día</th><th></th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
+      <div class="card">
+        <h3 style="margin:0 0 .5rem">Personal</h3>
+        <table id="personalTable" style="width:100%;border-collapse:collapse">
+          <thead><tr><th>Nombre</th><th>Teléfono</th><th>Rol</th><th>Activo</th><th>Geocerca</th><th>Enlace</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Panel Reportes -->
-    <section class="panel" id="tab-reportes">
-      <div class="grid grid-2">
-        <div class="card">
-          <h3 style="margin-top:0">Tabla de posiciones enviadas</h3>
-          <div class="help mb">Registros capturados por usuarios TRACKER dentro de su geocerca.</div>
-          <div class="row" style="gap:.5rem;flex-wrap:wrap">
-            <button class="btn" id="btnExportCSV">Exportar CSV</button>
-            <button class="btn" id="btnBorrarLogs">Borrar registros</button>
-          </div>
-          <div class="mt" style="max-height:360px;overflow:auto">
-            <table id="logsTable">
-              <thead><tr><th>Fecha/Hora</th><th>Teléfono</th><th>Geocerca</th><th>Lat</th><th>Lng</th><th>Accuracy</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <h3 style="margin-top:0">Gráfico: posiciones por día</h3>
-          <canvas id="chartPos"></canvas>
-        </div>
+  <section id="tab-reportes" class="panel">
+    <div class="card">
+      <h3 style="margin:0 0 .5rem">Registros de posiciones</h3>
+      <div style="max-height:360px;overflow:auto">
+        <table id="logsTable" style="width:100%;border-collapse:collapse">
+          <thead><tr><th>Fecha/Hora</th><th>Teléfono</th><th>Geocerca</th><th>Lat</th><th>Lng</th><th>Accuracy</th></tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
-    </section>
-
-    <!-- Panel Config -->
-    <section class="panel" id="tab-config">
-      <div class="grid grid-2">
-        <div class="card">
-          <h3 style="margin-top:0">Parámetros</h3>
-          <div class="grid grid-2">
-            <div>
-              <label>Webhook (opcional) para POST JSON</label>
-              <input id="cfgWebhook" placeholder="https://mi-servidor/endpoint" />
-              <div class="help">Si se define, cada posición enviada usará <code>navigator.sendBeacon</code> o <code>fetch</code> para POST.</div>
-            </div>
-            <div>
-              <label>Frecuencia (segundos)</label>
-              <input id="cfgFreq" type="number" min="5" step="1" value="15" />
-            </div>
-          </div>
-          <div class="mt">
-            <button class="btn primary" id="btnGuardarCfg">Guardar Config</button>
-          </div>
-        </div>
-        <div class="card">
-          <h3 style="margin-top:0">Enlaces de acceso rápido</h3>
-          <div class="help">Selecciona una persona (TRACKER) para copiar su enlace de acceso directo (por teléfono).</div>
-          <div class="row" style="gap:.5rem;align-items:flex-end">
-            <select id="quickUser"></select>
-            <button class="btn" id="btnCopiarEnlace">Copiar enlace</button>
-            <span id="copiedMsg" class="small muted"></span>
-          </div>
-          <div class="mt small help">Formato de enlace:<br>
-            <code>…/index.html?mode=tracker&phone=+593XXXXXXXXX&farm=ID_Finca</code>
-          </div>
-        </div>
+      <div style="margin-top:.5rem;display:flex;gap:.5rem">
+        <button class="btn" id="btnExportCSV">Exportar CSV</button>
+        <button class="btn" id="btnBorrarLogs">Borrar registros</button>
       </div>
-    </section>
-  </div>
+    </div>
+  </section>
 
+  <section id="tab-config" class="panel">
+    <div class="grid grid-2">
+      <div class="card">
+        <h3 style="margin:0 0 .5rem">Parámetros</h3>
+        <label>Webhook (POST JSON opcional)</label>
+        <input id="cfgWebhook" placeholder="https://mi-servidor/endpoint">
+        <label style="margin-top:.5rem">Frecuencia (segundos)</label>
+        <input id="cfgFreq" type="number" min="5" value="15">
+        <div style="margin-top:.5rem"><button class="btn primary" id="btnGuardarCfg">Guardar Config</button></div>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 .5rem">Acceso rápido (TRACKER)</h3>
+        <div style="display:flex;gap:.5rem;align-items:flex-end">
+          <select id="quickUser"></select>
+          <button class="btn" id="btnCopiarEnlace">Copiar enlace</button>
+          <span id="copiedMsg" class="small muted"></span>
+        </div>
+        <div class="small muted" style="margin-top:.5rem">Formato: <code>?mode=tracker&phone=+593XXXXXXXXX&farm=ID_Finca</code></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 3) Nuestro script al final del body (ya existe el DOM) -->
 <script>
 (function(){
-  // ===== Utilidades básicas =====
-  const $ = sel => document.querySelector(sel);
-  const $$ = sel => Array.from(document.querySelectorAll(sel));
-  const fmt = n => (typeof n==='number')? (Math.round(n*1e6)/1e6) : n;
+  const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+  const fmt = n => (typeof n==='number')? Math.round(n*1e6)/1e6 : n;
   const nowISO = () => new Date().toISOString();
+  const LS_PREFIX='app_geo_v2';
+  const ctx={ farmId:null, data:{
+    fences:[], personal:[], actividades:[], costos:[],
+    logs:[], config:{ webhook:'', freqSec:15 }
+  }};
 
-  // ===== Contexto multi-finca =====
-  const LS_PREFIX = 'app_geo_v2';
-  const ctx = {
-    farmId: null,
-    data: {
-      fences: [], // {id,name,coords:[[lat,lng],...], color}
-      personal: [], // {id,nombre,telefono,rol,activo,geocercaId}
-      actividades: [], // {id,fecha,geocercaId,actividad,personalId,notas}
-      costos: [], // {id,fecha,geocercaId,actividad,personalId,costo}
-      logs: [], // {ts,telefono,geocercaId,lat,lng,acc}
-      config: { webhook: '', freqSec: 15 }
-    }
-  };
+  function storageKey(section){ return `${LS_PREFIX}_${ctx.farmId||'default'}_${section}`; }
+  function loadAll(){ for(const k of Object.keys(ctx.data)){ try{ const raw=localStorage.getItem(storageKey(k)); if(raw) ctx.data[k]=JSON.parse(raw);}catch(e){} } }
+  function refreshBindings(){ try{ renderConfig(); refreshFenceSelects(); refreshActivePersonalSelects(); renderFencesTable(); renderPersonalTable(); renderLogs(); }catch(e){ console.warn(e); } }
+  function saveAll(){ for(const k of Object.keys(ctx.data)){ localStorage.setItem(storageKey(k), JSON.stringify(ctx.data[k])); } refreshBindings(); }
 
-  function storageKey(section){
-    if(!ctx.farmId) return `${LS_PREFIX}_temp_${section}`;
-    return `${LS_PREFIX}_${ctx.farmId}_${section}`;
-  }
-  function saveAll(){
-    for(const k of Object.keys(ctx.data)){
-      localStorage.setItem(storageKey(k), JSON.stringify(ctx.data[k]));
-    }
-    try{ if(typeof refreshBindings==='function') refreshBindings(); }catch(e){ console.warn('refreshBindings no disponible aún'); }
-  }
-    refreshBindings();
-  }
-  function loadAll(){
-    for(const k of Object.keys(ctx.data)){
-      const raw = localStorage.getItem(storageKey(k));
-      if(raw){
-        try{ ctx.data[k] = JSON.parse(raw); } catch(e){ console.warn('JSON inválido en',k); }
-      }
-    }
-  }
-  
-  // Asegura que los selectores/tablas se sincronicen cuando cambia el storage
-  function refreshBindings(){
-    try {
-      renderConfig();
-      refreshFenceSelects();
-      refreshActivePersonalSelects();
-      renderFencesTable?.();
-      renderPersonalTable?.();
-      renderActividadesTable?.();
-      renderCostosTable?.();
-      renderLogs?.();
-    } catch(e){ console.warn('refreshBindings:', e); }
-  } catch(e){ console.warn('JSON inválido en',k); }
-      }
-    }
-  }
-  function ensureFarmList(){
-    const key = `${LS_PREFIX}_farms`;
-    let arr = JSON.parse(localStorage.getItem(key) || '[]');
-    return {
-      get: ()=>arr,
-      set: (a)=>{ arr=a; localStorage.setItem(key, JSON.stringify(arr)); }
-    }
-  }
+  // Fincas
+  const farmsKey = `${LS_PREFIX}_farms`;
+  function farmsGet(){ return JSON.parse(localStorage.getItem(farmsKey)||'[]'); }
+  function farmsSet(a){ localStorage.setItem(farmsKey, JSON.stringify(a)); }
+  function renderFarms(){ const arr=farmsGet(); if(!ctx.farmId&&arr[0]) ctx.farmId=arr[0].id; $('#farmSelect').innerHTML=arr.map(f=>`<option value="${f.id}">${f.nombre}</option>`).join(''); if(ctx.farmId) $('#farmSelect').value=ctx.farmId; }
+  function chooseFarm(id){ ctx.farmId=id; loadAll(); refreshBindings(); mapRenderFences(); }
 
-  // ===== Inicializar selector de fincas =====
-  const farmSelect = $('#farmSelect');
-  const farmsState = ensureFarmList();
-  function renderFarms(){
-    const farms = farmsState.get();
-    farmSelect.innerHTML = farms.map(f=>`<option value="${f.id}">${f.nombre}</option>`).join('');
-    if(!ctx.farmId && farms[0]) ctx.farmId = farms[0].id;
-    if(ctx.farmId) farmSelect.value = ctx.farmId;
-  }
-  function chooseFarm(id){
-    ctx.farmId = id;
-    loadAll();
-    refreshBindings();
-    mapRenderFences();
-    renderAllTables();
-    updateTrackerFreqBadge();
-  }
+  $('#btnNuevaFinca').onclick=()=>{ const nombre=prompt('Nombre de la finca:'); if(!nombre) return; const id='f'+Date.now(); const arr=farmsGet(); arr.push({id,nombre}); farmsSet(arr); renderFarms(); chooseFarm(id); };
+  $('#btnEliminarFinca').onclick=()=>{ if(!ctx.farmId) return; if(!confirm('¿Eliminar finca y todos sus datos?')) return; Object.keys(ctx.data).forEach(k=>localStorage.removeItem(storageKey(k))); const arr=farmsGet().filter(f=>f.id!==ctx.farmId); farmsSet(arr); ctx.farmId=arr[0]?.id||null; renderFarms(); if(ctx.farmId) chooseFarm(ctx.farmId); else location.reload(); };
+  $('#farmSelect').onchange=()=> chooseFarm($('#farmSelect').value);
 
-  $('#btnNuevaFinca').addEventListener('click', ()=>{
-    const nombre = prompt('Nombre de la finca:');
-    if(!nombre) return;
-    const id = `f${Date.now()}`;
-    const farms = farmsState.get();
-    farms.push({id, nombre});
-    farmsState.set(farms);
-    renderFarms();
-    chooseFarm(id);
-  });
-  $('#btnEliminarFinca').addEventListener('click', ()=>{
-    if(!ctx.farmId) return alert('No hay finca activa');
-    if(!confirm('¿Eliminar la finca actual y TODOS sus datos?')) return;
-    // Borrar secciones
-    for(const k of Object.keys(ctx.data)){
-      localStorage.removeItem(storageKey(k));
-    }
-    // Borrar de la lista
-    const farms = farmsState.get().filter(f=>f.id!==ctx.farmId);
-    farmsState.set(farms);
-    ctx.farmId = farms[0]?.id || null;
-    renderFarms();
-    if(ctx.farmId) chooseFarm(ctx.farmId); else location.reload();
-  });
-  farmSelect.addEventListener('change', ()=> chooseFarm(farmSelect.value));
-
-  // ===== Navegación de pestañas (Admin) =====
-  $('#tabs').addEventListener('click', (e)=>{
+  // Tabs
+  $('#tabs').addEventListener('click',e=>{
     if(e.target.tagName!=='BUTTON') return;
-    const tab = e.target.dataset.tab;
+    const tab=e.target.dataset.tab;
     $$('#tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
     $$('section.panel').forEach(p=>p.classList.remove('show'));
     $(`#tab-${tab}`).classList.add('show');
-    if(tab==='reportes') drawChart();
-    if(tab==='geocercas') { try{ initMap(); map.invalidateSize(true); mapRenderFences(); }catch(_){} }
-  });
-    $$('section.panel').forEach(p=>p.classList.remove('show'));
-    $(`#tab-${tab}`).classList.add('show');
-    if(tab==='reportes') drawChart();
+    if(tab==='geocercas'){ try{ initMap(); map.invalidateSize(true); }catch(e){} }
   });
 
-  // ====== Leaflet (mapa ADMIN) ======
-  let map, drawControl, drawnItems, editOn=false;
+  // MAPA
+  let map, drawnItems, drawControl, editing=false;
+  function dbg(m){ const el=$('#mapDebug'); if(!el) return; el.style.display='block'; el.textContent=(el.textContent?el.textContent+' | ':'')+m; }
   function initMap(){
-    let tileLoaded=false; // marcar cuando al menos un tile cargó
-    const dbg = (m)=>{ const el = document.getElementById('mapDebug'); if(!el) return; el.style.display='block'; el.textContent = (el.textContent? el.textContent+' | ':'') + m; };
-    if(typeof L === 'undefined'){ console.error('Leaflet no cargó'); showFatal(new Error('No se pudo cargar Leaflet desde CDN')); return; }
-    const cont = document.getElementById('map'); if(!cont){ console.error('#map no existe aún'); return; }
-    if(map){ setTimeout(()=>{ try{ map.invalidateSize(true); dbg('invalidate-size'); }catch(_){} }, 120); return; }
-    if(cont.clientHeight < 100){ cont.style.height = '520px'; dbg('height-boost'); }
-    map = L.map('map'); dbg('map-created');
-    const defaultCenter = [-1.8312, -78.1834];
-
-    function addTiles(url){
-      try{
-        const tl = L.tileLayer(url, {maxZoom:19, attribution:'&copy; OpenStreetMap/Esri'});
-        tl.on('tileerror', ()=>{ dbg('tileerror'); });
-        tl.on('load', ()=>{ dbg('tiles-ok'); tileLoaded=true; setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){} }, 150); });
-        tl.addTo(map); return tl;
-      }catch(err){ dbg('tilelayer-failed'); return null; }
-    }
-
-    let base = addTiles('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-    base && base.on('tileerror', ()=>{
-      try{ map.removeLayer(base); }catch(_){ }
-      dbg('fallback-osm-root');
-      base = addTiles('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
-      base && base.on('tileerror', ()=>{
-        try{ map.removeLayer(base); }catch(_){ }
-        dbg('fallback-osm-hot');
-        base = addTiles('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png');
-        base && base.on('tileerror', ()=>{
-          try{ map.removeLayer(base); }catch(_){ }
-          dbg('fallback-esri');
-          base = addTiles('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}');
-        });
-      });
-    });
-
-    // Si en 3s no se cargó ningún tile, forzar capa local
-    setTimeout(()=>{
-      if(!tileLoaded){ dbg('force-local-grid');
-        try{ if(base) map.removeLayer(base); }catch(_){ }
-        L.gridLayer({
-          tileSize:256,
-          createTile: function(coords){
-            const t = document.createElement('canvas'); t.width=256; t.height=256;
-            const c = t.getContext('2d'); c.fillStyle='#e9eff5'; c.fillRect(0,0,256,256);
-            c.strokeStyle='#c8d4e0'; for(let i=0;i<256;i+=32){ c.beginPath(); c.moveTo(i,0); c.lineTo(i,256); c.stroke(); c.beginPath(); c.moveTo(0,i); c.lineTo(256,i); c.stroke(); }
-            c.fillStyle='#7a8b9a'; c.font='12px system-ui'; c.fillText(`z${map.getZoom()} x${coords.x} y${coords.y}`, 8, 16);
-            return t;
-          }
-        }).addTo(map);
+    if(typeof L==='undefined'){ alert('Leaflet no cargó'); return; }
+    const cont = $('#map'); if(!cont) return;
+    if(!map){
+      if(cont.clientHeight<100) cont.style.height='520px';
+      map=L.map('map'); dbg('map-created');
+      // tiles con fallback
+      const addTiles=(url)=>{ const t=L.tileLayer(url,{maxZoom:19,attribution:'&copy; OpenStreetMap'}); t.on('load',()=>dbg('tiles-ok')); t.on('tileerror',()=>dbg('tileerror')); t.addTo(map); return t; };
+      let base = addTiles('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+      base.on('tileerror',()=>{ try{map.removeLayer(base);}catch(_){ } base=addTiles('https://tile.openstreetmap.org/{z}/{x}/{y}.png'); });
+      drawnItems=new L.FeatureGroup(); map.addLayer(drawnItems);
+      // draw seguro
+      if(L.Control && L.Control.Draw){
+        drawControl=new L.Control.Draw({ draw:{ polyline:false,rectangle:false,circle:false,circlemarker:false,marker:false, polygon:{allowIntersection:false,showArea:true}}, edit:{featureGroup:drawnItems} });
+        map.addControl(drawControl);
+        map.on(L.Draw.Event.CREATED, e=>{ drawnItems.addLayer(e.layer); updateFencesFromLayers(); });
+        map.on(L.Draw.Event.EDITED, ()=> updateFencesFromLayers());
+      }else{
+        const w=document.createElement('div'); w.className='coords'; w.style.left='.75rem'; w.style.right='auto'; w.textContent='⚠ No se cargó Leaflet.draw; modo visual.'; cont.appendChild(w);
       }
-    }, 3000);
-
-    drawnItems = new L.FeatureGroup(); map.addLayer(drawnItems);
-
-    let drawOk = !!(L.Control && L.Control.Draw);
-    if(drawOk){
-      drawControl = new L.Control.Draw({
-        draw: { polyline:false, rectangle:false, circle:false, circlemarker:false, marker:false,
-          polygon: { allowIntersection:false, showArea:true } },
-        edit: { featureGroup: drawnItems }
-      });
-      map.addControl(drawControl);
-    } else {
-      console.warn('Leaflet.draw no disponible; modo solo-visual');
-      const warn = document.createElement('div'); warn.className='coords'; warn.style.left='0.75rem'; warn.style.right='auto'; warn.textContent='⚠ No se cargó Leaflet.draw (CDN). Puedes ver el mapa pero no dibujar.'; cont && cont.appendChild(warn);
+      map.on('mousemove',ev=> $('#mapCoords').textContent=`Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`);
+      try{ L.control.zoom({position:'topleft'}).addTo(map); }catch(_){}
+      map.setView([-1.8312,-78.1834],6);
+      setTimeout(()=>{ try{ map.invalidateSize(true);}catch(_){ } },200);
+      window.addEventListener('resize',()=>{ try{ map.invalidateSize(true);}catch(_){ } });
+    }else{
+      setTimeout(()=>{ try{ map.invalidateSize(true);}catch(_){ } },0);
     }
-
-    if(L.Draw && L.Draw.Event && drawOk){
-      map.on(L.Draw.Event.CREATED, function (e) { const layer = e.layer; drawnItems.addLayer(layer); updateFencesFromLayers(); });
-      map.on(L.Draw.Event.EDITED, function () { updateFencesFromLayers(); });
-    }
-
-    map.on('mousemove', (ev)=>{ const el=$('#mapCoords'); if(el) el.textContent = `Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`; });
-
-    // Asegurar control de zoom visible
-    try{ L.control.zoom({position:'topleft'}).addTo(map); }catch(_){ }
-
-    map.setView(defaultCenter, 6);
-
-    // Invalida tamaño tras un pequeño delay (render en grid/tab)
-    setTimeout(()=>{ try{ map.invalidateSize(true); dbg('invalidate-delay'); }catch(_){} }, 250);
-    window.addEventListener('resize', ()=>{ try{ map.invalidateSize(true); dbg('invalidate-resize'); }catch(_){} });
-
-    // Último fallback: capa local en blanco por si todos los tiles externos fallan
-    setTimeout(()=>{
-      const hasTileLayer = Object.values(map._layers).some(l=> l instanceof L.TileLayer);
-      if(!hasTileLayer){
-        dbg('fallback-local-canvas');
-        L.gridLayer({
-          tileSize:256,
-          createTile: function(coords){
-            const tile = document.createElement('canvas'); tile.width=256; tile.height=256;
-            const ctx = tile.getContext('2d');
-            ctx.fillStyle = '#e9eff5'; ctx.fillRect(0,0,256,256);
-            ctx.strokeStyle = '#c8d4e0'; ctx.lineWidth = 1; for(let i=0;i<256;i+=32){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,256); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(256,i); ctx.stroke(); }
-            ctx.fillStyle = '#7a8b9a'; ctx.font = '12px system-ui'; ctx.fillText(`z${map.getZoom()} x${coords.x} y${coords.y}`, 8, 16);
-            return tile;
-          }
-        }).addTo(map);
-      }
-    }, 1200);
   }
-
-    const cont = document.getElementById('map');
-    if(!cont){ console.error('#map no existe aún'); return; }
-
-    // Si ya existe, solo revalida tamaño
-    if(map){ setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){} }, 120); return; }
-
-    // 2) Asegurar tamaño visible del contenedor
-    if(cont.clientHeight < 100){ cont.style.height = '520px'; }
-
-    // 3) Crear mapa
-    map = L.map('map');
-    const defaultCenter = [-1.8312, -78.1834];
-
-    // Fallback de tiles: primero con subdominios, si falla usa host plano
-    let base = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contrib.'});
-    base.on('tileerror', ()=>{
-      try{ map.removeLayer(base); }catch(_){ }
-      // 1er fallback
-      base = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contrib.'});
-      base.on('tileerror', ()=>{
-        try{ map.removeLayer(base); }catch(_){ }
-        // 2do fallback (HOT)
-        base = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contrib.'});
-        base.addTo(map);
-        setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){ } }, 200);
-      });
-      base.addTo(map);
-      setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){ } }, 200);
-    });
-    base.addTo(map);
-    });
-    base.addTo(map);
-
-    drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
-
-    drawControl = new L.Control.Draw({
-      draw: { polyline:false, rectangle:false, circle:false, circlemarker:false, marker:false,
-        polygon: { allowIntersection:false, showArea:true } },
-      edit: { featureGroup: drawnItems }
-    });
-    map.addControl(drawControl);
-
-    map.on(L.Draw.Event.CREATED, function (e) { const layer = e.layer; drawnItems.addLayer(layer); updateFencesFromLayers(); });
-    map.on(L.Draw.Event.EDITED, function () { updateFencesFromLayers(); });
-    map.on('mousemove', (ev)=>{ const el=$('#mapCoords'); if(el) el.textContent = `Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`; });
-
-    map.setView(defaultCenter, 6);
-
-    // Invalida tamaño tras un pequeño delay (render en grid/tab)
-    setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){} }, 250);
-    window.addEventListener('resize', ()=>{ try{ map.invalidateSize(true); }catch(_){} });
-  }
-    map = L.map('map');
-    const defaultCenter = [-1.8312, -78.1834];
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      maxZoom:19, attribution:'&copy; OpenStreetMap contrib.'
-    }).addTo(map);
-    drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
-
-    drawControl = new L.Control.Draw({
-      draw: { polyline:false, rectangle:false, circle:false, circlemarker:false, marker:false,
-        polygon: { allowIntersection:false, showArea:true } },
-      edit: { featureGroup: drawnItems }
-    });
-    map.addControl(drawControl);
-
-    map.on(L.Draw.Event.CREATED, function (e) {
-      const layer = e.layer; drawnItems.addLayer(layer); updateFencesFromLayers();
-    });
-    map.on(L.Draw.Event.EDITED, function () { updateFencesFromLayers(); });
-
-    map.on('mousemove', (ev)=>{ const el=$('#mapCoords'); if(el) el.textContent = `Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`; });
-
-    map.setView(defaultCenter, 6);
-
-    // En algunos layouts la grilla tarda en asignar tamaño; invalida tamaño luego de pintar
-    setTimeout(()=>{ try{ map.invalidateSize(true); }catch(_){} }, 250);
-    window.addEventListener('resize', ()=>{ try{ map.invalidateSize(true); }catch(_){} });
-  }.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      maxZoom:19, attribution:'&copy; OpenStreetMap contrib.'
-    }).addTo(map);
-    drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
-
-    drawControl = new L.Control.Draw({
-      draw: {
-        polyline:false, rectangle:false, circle:false, circlemarker:false, marker:false,
-        polygon: { allowIntersection:false, showArea:true }
-      },
-      edit: { featureGroup: drawnItems }
-    });
-    map.addControl(drawControl);
-
-    map.on(L.Draw.Event.CREATED, function (e) {
-      const layer = e.layer; drawnItems.addLayer(layer); updateFencesFromLayers();
-    });
-    map.on(L.Draw.Event.EDITED, function () { updateFencesFromLayers(); });
-
-    // Coordenadas en vivo
-    map.on('mousemove', (ev)=>{ $('#mapCoords').textContent = `Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`; });
-
-    // Ajuste inicial
-    map.setView(defaultCenter, 6);
-  }
-
-  function layerToCoords(layer){
-    const latlngs = layer.getLatLngs(); // puede ser multi
-    const first = Array.isArray(latlngs[0])? latlngs[0]: latlngs;
-    return first.map(ll=>[ll.lat, ll.lng]);
-  }
-  function coordsToLayer(coords){
-    return L.polygon(coords, {color:'#0b5', weight:2, fillOpacity:0.1});
-  }
-
+  function layerToCoords(layer){ const latlngs=layer.getLatLngs(); const first=Array.isArray(latlngs[0])?latlngs[0]:latlngs; return first.map(ll=>[ll.lat,ll.lng]); }
+  function coordsToLayer(coords){ return L.polygon(coords,{color:'#0b5',weight:2,fillOpacity:.1}); }
+  function centroid(coords){ let x=0,y=0; coords.forEach(c=>{x+=c[0];y+=c[1]}); return [x/coords.length,y/coords.length]; }
   function updateFencesFromLayers(){
-    // Vuelco todo lo dibujado a ctx.data.fences (mantengo nombres si existen por proximidad)
-    const newF = [];
-    drawnItems.eachLayer((layer)=>{
-      const coords = layerToCoords(layer);
-      // Intentar emparejar por bbox con alguna existente para conservar nombre
-      let name = 'Geocerca ' + (ctx.data.fences.length + newF.length + 1);
-      let id = 'g' + Date.now() + Math.random().toString(36).slice(2,6);
-      // Aproximar matching: busca una existente con centro similar
-      const c = centroid(coords);
-      const match = ctx.data.fences.find(f=>{
-        const cc = centroid(f.coords);
-        const d = Math.hypot(c[0]-cc[0], c[1]-cc[1]);
-        return d<0.0008; // ~80m aprox
-      });
-      if(match){ name = match.name; id = match.id; }
-      newF.push({id, name, coords, color:'#0b5'});
+    const out=[]; drawnItems.eachLayer(layer=>{
+      const coords=layerToCoords(layer); let name='Geocerca '+(ctx.data.fences.length+out.length+1); let id='g'+Date.now()+Math.random().toString(36).slice(2,6);
+      const c=centroid(coords); const m=ctx.data.fences.find(f=>{const cc=centroid(f.coords); return Math.hypot(c[0]-cc[0],c[1]-cc[1])<0.0008;}); if(m){name=m.name; id=m.id;}
+      out.push({id,name,coords,color:'#0b5'});
     });
-    ctx.data.fences = newF;
-    saveAll();
-    renderFencesTable();
-    refreshFenceSelects();
+    ctx.data.fences=out; saveAll(); renderFencesTable(); refreshFenceSelects();
   }
-
   function mapRenderFences(){
-    if(!map) return;
+    if(!map) return; if(!drawnItems) return;
     drawnItems.clearLayers();
-    if(ctx.data.fences.length===0){ map.setView([-1.8312,-78.1834], 6); return; }
-    const layers = ctx.data.fences.map(f=> coordsToLayer(f.coords).bindTooltip(f.name));
+    if(ctx.data.fences.length===0){ try{ map.setView([-1.8312,-78.1834],6); }catch(_){ } return; }
+    const layers=ctx.data.fences.map(f=> coordsToLayer(f.coords).bindTooltip(f.name));
     layers.forEach(l=> drawnItems.addLayer(l));
-    const group = L.featureGroup(layers);
-    try{ map.fitBounds(group.getBounds().pad(0.2)); }catch(e){ /* ignore */ }
-    renderFencesTable();
-    refreshFenceSelects();
+    try{ map.fitBounds(L.featureGroup(layers).getBounds().pad(.2)); }catch(_){ }
+    renderFencesTable(); refreshFenceSelects();
   }
 
-  function renderFencesTable(){
-    const tb = $('#fencesTable tbody');
-    tb.innerHTML = '';
-    const assignedCounts = Object.fromEntries(ctx.data.fences.map(f=>[f.id,0]));
-    ctx.data.personal.forEach(p=>{ if(p.geocercaId) assignedCounts[p.geocercaId] = (assignedCounts[p.geocercaId]||0)+1; });
-    for(const f of ctx.data.fences){
-      const tr = document.createElement('tr');
-      const verts = f.coords.length;
-      tr.innerHTML = `<td contenteditable onblur="window._renameFence('${f.id}', this.textContent)">${escapeHtml(f.name)}</td>
-        <td>${verts}</td>
-        <td>${assignedCounts[f.id]||0}</td>
-        <td class="row-actions">
-          <button class="btn" onclick="window._zoomFence('${f.id}')">Zoom</button>
-          <button class="btn danger" onclick="window._deleteFence('${f.id}')">Borrar</button>
-        </td>`;
-      tb.appendChild(tr);
-    }
-  }
-  window._zoomFence = (id)=>{
-    const f = ctx.data.fences.find(x=>x.id===id); if(!f) return;
-    const l = coordsToLayer(f.coords); const b = l.getBounds(); map.fitBounds(b.pad(0.2));
-  }
-  window._deleteFence = (id)=>{
-    if(!confirm('¿Eliminar esta geocerca?')) return;
-    ctx.data.fences = ctx.data.fences.filter(f=>f.id!==id);
-    saveAll(); mapRenderFences();
-  }
-  window._renameFence = (id, name)=>{
-    const f = ctx.data.fences.find(x=>x.id===id); if(!f) return; f.name = name.trim()||f.name; saveAll(); renderFencesTable(); refreshFenceSelects();
-  }
+  // Geocercas UI
+  $('#btnNuevaGeocerca').onclick=()=>{ try{ new L.Draw.Polygon(map).enable(); }catch(e){ alert('Leaflet.draw no disponible'); } };
+  $('#btnEditarGeocerca').onclick=()=>{ editing=!editing; try{ new L.EditToolbar.Edit(map,{featureGroup:drawnItems})[editing?'enable':'disable'](); $('#btnEditarGeocerca').textContent= editing?'Salir de Edición':'Editar Geocercas'; }catch(e){ alert('Leaflet.draw no disponible'); } };
+  $('#btnGuardarGeocercas').onclick=()=>{ updateFencesFromLayers(); alert('Cambios de geocercas guardados.'); };
+  $('#btnCrearDesdeLista').onclick=()=>{ const name=$('#newFenceName').value.trim(); const txt=$('#coordsInput').value.trim(); if(!txt) return alert('Pega coordenadas'); const coords=txt.split(/\n+/).map(l=>{ const [a,b]=l.split(',').map(s=>parseFloat(s.trim())); return (Number.isFinite(a)&&Number.isFinite(b))?[a,b]:null; }).filter(Boolean); if(coords.length<3) return alert('Se requieren ≥3 puntos'); const layer=coordsToLayer(coords).bindTooltip(name||('Geocerca '+(ctx.data.fences.length+1))); drawnItems.addLayer(layer); updateFencesFromLayers(); $('#coordsInput').value=''; $('#newFenceName').value=''; };
 
-  // Botones geocercas
-  $('#btnNuevaGeocerca').addEventListener('click', ()=>{
-    new L.Draw.Polygon(map, drawControl.options.draw.polygon).enable();
-  });
-  let editing = false;
-  $('#btnEditarGeocerca').addEventListener('click', ()=>{
-    editing = !editing;
-    if(editing){ new L.EditToolbar.Edit(map, { featureGroup: drawnItems }).enable(); }
-    else { new L.EditToolbar.Edit(map, { featureGroup: drawnItems }).disable(); }
-    $('#btnEditarGeocerca').textContent = editing? 'Salir de Edición' : 'Editar Geocercas';
-  });
-  $('#btnGuardarGeocercas').addEventListener('click', ()=>{
-    updateFencesFromLayers(); alert('Cambios de geocercas guardados.');
-  });
-  $('#btnCrearDesdeLista').addEventListener('click', ()=>{
-    const name = ($('#newFenceName').value || '').trim();
-    const txt = $('#coordsInput').value.trim();
-    if(!txt) return alert('Pega coordenadas primero');
-    const coords = txt.split(/\n+/).map(l=>{
-      const [a,b] = l.split(',').map(s=>parseFloat(s.trim()));
-      if(Number.isFinite(a)&&Number.isFinite(b)) return [a,b];
-    }).filter(Boolean);
-    if(coords.length<3) return alert('Se requieren ≥ 3 puntos');
-    const layer = coordsToLayer(coords).bindTooltip(name||('Geocerca '+(ctx.data.fences.length+1)));
-    drawnItems.addLayer(layer);
-    updateFencesFromLayers();
-    $('#coordsInput').value=''; $('#newFenceName').value='';
-  });
+  // Personal
+  function refreshFenceSelects(){ const opts=['<option value="">(sin asignar)</option>'].concat(ctx.data.fences.map(f=>`<option value="${f.id}">${f.name}</option>`)); $('#pGeocerca').innerHTML=opts.join(''); }
+  function refreshActivePersonalSelects(){ const trackers=ctx.data.personal.filter(p=>p.rol==='TRACKER'); $('#quickUser').innerHTML=trackers.map(p=>`<option value="${p.id}">${p.nombre} (${p.telefono})</option>`).join(''); }
+  $('#btnAddPersonal').onclick=()=>{ const nombre=$('#pNombre').value.trim(); const telefono=$('#pTelefono').value.trim(); if(!nombre||!telefono) return alert('Completa nombre y teléfono'); const rol=$('#pRol').value; const activo=$('#pActivo').value==='true'; const geocercaId=$('#pGeocerca').value||''; ctx.data.personal.push({id:'p'+Date.now(),nombre,telefono,rol,activo,geocercaId}); saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); $('#pNombre').value=''; $('#pTelefono').value=''; };
+  function trackerLinkFor(p){ const u=new URL(location.href); u.search=''; u.hash=''; u.searchParams.set('mode','tracker'); u.searchParams.set('phone',p.telefono); if(ctx.farmId) u.searchParams.set('farm',ctx.farmId); return u.toString(); }
+  function renderPersonalTable(){ const tb=$('#personalTable tbody'); if(!tb) return; tb.innerHTML=''; for(const p of ctx.data.personal){ const tr=document.createElement('tr'); tr.innerHTML=`<td contenteditable onblur="window._pf('${p.id}','nombre',this.textContent)">${p.nombre}</td><td contenteditable onblur="window._pf('${p.id}','telefono',this.textContent)">${p.telefono}</td><td><select onchange="window._pf('${p.id}','rol',this.value)"><option ${p.rol==='TRACKER'?'selected':''}>TRACKER</option><option ${p.rol==='ADMIN'?'selected':''}>ADMIN</option></select></td><td><select onchange="window._pf('${p.id}','activo',this.value)"><option value="true" ${p.activo?'selected':''}>Sí</option><option value="false" ${!p.activo?'selected':''}>No</option></select></td><td><select onchange="window._pf('${p.id}','geocercaId',this.value)"><option value="">(sin)</option>${ctx.data.fences.map(f=>`<option value="${f.id}" ${p.geocercaId===f.id?'selected':''}>${f.name}</option>`).join('')}</select></td><td><input readonly value="${trackerLinkFor(p)}" style="width:260px"/></td><td><button class="btn" onclick="window.open('${trackerLinkFor(p)}','_blank')">Abrir</button></td>`; tb.appendChild(tr); } }
+  window._pf=(id,field,value)=>{ const p=ctx.data.personal.find(x=>x.id===id); if(!p) return; if(field==='activo') value=(value==='true'); p[field]=value; saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); };
 
-  // ===== Personal =====
-  function refreshFenceSelects(){
-    const opts = ['<option value="">(sin asignar)</option>'].concat(ctx.data.fences.map(f=>`<option value="${f.id}">${escapeHtml(f.name)}</option>`));
-    $('#pGeocerca').innerHTML = opts.join('');
-    $('#aGeocerca').innerHTML = ['<option value="">(todas)</option>'].concat(ctx.data.fences.map(f=>`<option value="${f.id}">${escapeHtml(f.name)}</option>`)).join('');
-    $('#cGeocerca').innerHTML = ['<option value="">(todas)</option>'].concat(ctx.data.fences.map(f=>`<option value="${f.id}">${escapeHtml(f.name)}</option>`)).join('');
-  }
+  // Reportes
+  function renderLogs(){ const tb=$('#logsTable tbody'); if(!tb) return; tb.innerHTML=''; for(const Lg of ctx.data.logs.slice().reverse()){ const f=ctx.data.fences.find(x=>x.id===Lg.geocercaId)?.name||Lg.geocercaId||''; const tr=document.createElement('tr'); tr.innerHTML=`<td>${Lg.ts}</td><td>${Lg.telefono}</td><td>${f}</td><td>${fmt(Lg.lat)}</td><td>${fmt(Lg.lng)}</td><td>${Lg.acc??''}</td>`; tb.appendChild(tr);} }
+  $('#btnExportCSV').onclick=()=>{ const rows=[['ts','telefono','geocerca','lat','lng','accuracy']].concat(ctx.data.logs.map(l=>[l.ts,l.telefono,l.geocercaId,l.lat,l.lng,l.acc])); const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'\\"')}"`).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`logs_${ctx.farmId||'finca'}.csv`; a.click(); };
+  $('#btnBorrarLogs').onclick=()=>{ if(!confirm('¿Borrar todos los registros?')) return; ctx.data.logs=[]; saveAll(); renderLogs(); };
 
-  function refreshActivePersonalSelects(){
-    const active = ctx.data.personal.filter(p=>p.activo);
-    const opts = ['<option value="">(ninguno)</option>'].concat(active.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre)}</option>`));
-    $('#aPersonal').innerHTML = opts.join('');
-    $('#cPersonal').innerHTML = opts.join('');
-    // Quick link picker
-    const trackers = ctx.data.personal.filter(p=>p.rol==='TRACKER');
-    $('#quickUser').innerHTML = trackers.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre)} (${escapeHtml(p.telefono)})</option>`).join('');
-  }
+  // Config
+  function renderConfig(){ $('#cfgWebhook').value=ctx.data.config.webhook||''; $('#cfgFreq').value=ctx.data.config.freqSec||15; $('#freqSec').textContent=ctx.data.config.freqSec||15; }
+  $('#btnGuardarCfg').onclick=()=>{ ctx.data.config.webhook=$('#cfgWebhook').value.trim(); const f=parseInt($('#cfgFreq').value,10); ctx.data.config.freqSec=Number.isFinite(f)&&f>0?f:15; saveAll(); alert('Configuración guardada.'); };
 
-  $('#btnAddPersonal').addEventListener('click', ()=>{
-    const nombre = $('#pNombre').value.trim();
-    const telefono = $('#pTelefono').value.trim();
-    const rol = $('#pRol').value;
-    const activo = $('#pActivo').value==='true';
-    const geocercaId = $('#pGeocerca').value || '';
-    if(!nombre || !telefono) return alert('Completa nombre y teléfono');
-    const id = 'p'+Date.now();
-    ctx.data.personal.push({id,nombre,telefono,rol,activo,geocercaId});
-    saveAll();
-    $('#pNombre').value=''; $('#pTelefono').value=''; $('#pRol').value='TRACKER'; $('#pActivo').value='true'; $('#pGeocerca').value='';
-    renderPersonalTable(); refreshActivePersonalSelects();
-  });
-
-  function trackerLinkFor(p){
-    const u = new URL(location.href);
-    u.search = '';
-    u.hash = '';
-    u.searchParams.set('mode','tracker');
-    u.searchParams.set('phone', p.telefono);
-    if(ctx.farmId) u.searchParams.set('farm', ctx.farmId);
-    return u.toString();
-  }
-
-  function renderPersonalTable(){
-    const tb = $('#personalTable tbody'); tb.innerHTML='';
-    for(const p of ctx.data.personal){
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td contenteditable onblur="window._pf('${p.id}','nombre',this.textContent)">${escapeHtml(p.nombre)}</td>
-        <td contenteditable onblur="window._pf('${p.id}','telefono',this.textContent)">${escapeHtml(p.telefono)}</td>
-        <td>
-          <select onchange="window._pf('${p.id}','rol',this.value)">
-            <option ${p.rol==='TRACKER'?'selected':''}>TRACKER</option>
-            <option ${p.rol==='ADMIN'?'selected':''}>ADMIN</option>
-          </select>
-        </td>
-        <td>
-          <select onchange="window._pf('${p.id}','activo',this.value)">
-            <option value="true" ${p.activo?'selected':''}>Sí</option>
-            <option value="false" ${!p.activo?'selected':''}>No</option>
-          </select>
-        </td>
-        <td>
-          <select onchange="window._pf('${p.id}','geocercaId',this.value)">
-            <option value="">(sin)</option>
-            ${ctx.data.fences.map(f=>`<option value="${f.id}" ${p.geocercaId===f.id?'selected':''}>${escapeHtml(f.name)}</option>`).join('')}
-          </select>
-        </td>
-        <td><input readonly value="${trackerLinkFor(p)}" style="width:260px"/></td>
-        <td class="row-actions">
-          <button class="btn" onclick="window._open('${trackerLinkFor(p)}')">Abrir</button>
-          <button class="btn danger" onclick="window._delP('${p.id}')">Borrar</button>
-        </td>`;
-      tb.appendChild(tr);
-    }
-  }
-  window._open = (url)=> window.open(url,'_blank');
-  window._delP = (id)=>{ if(!confirm('¿Eliminar persona?'))return; ctx.data.personal=ctx.data.personal.filter(x=>x.id!==id); saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); }
-  window._pf = (id,field,value)=>{
-    const p = ctx.data.personal.find(x=>x.id===id); if(!p) return;
-    if(field==='activo') value = (value==='true');
-    p[field] = value; saveAll(); renderPersonalTable(); refreshActivePersonalSelects();
-  }
-
-  // Quick copy link
-  $('#btnCopiarEnlace').addEventListener('click', async ()=>{
-    const id = $('#quickUser').value; const p = ctx.data.personal.find(x=>x.id===id); if(!p) return;
-    const link = trackerLinkFor(p);
-    try{ await navigator.clipboard.writeText(link); $('#copiedMsg').textContent='¡Copiado!'; setTimeout(()=>$('#copiedMsg').textContent='',1500);}catch(e){ alert(link); }
-  });
-
-  // ===== Actividades =====
-  $('#btnAddActividad').addEventListener('click', ()=>{
-    const fecha = $('#aFecha').value; const geocercaId=$('#aGeocerca').value; const actividad=$('#aActividad').value.trim(); const personalId=$('#aPersonal').value; const notas=$('#aNotas').value.trim();
-    if(!fecha||!actividad) return alert('Completa fecha y actividad');
-    ctx.data.actividades.push({id:'a'+Date.now(),fecha,geocercaId,actividad,personalId,notas});
-    saveAll(); renderActividadesTable(); $('#aNotas').value='';
-  });
-  function renderActividadesTable(){
-    const tb = $('#actividadesTable tbody'); tb.innerHTML='';
-    for(const a of ctx.data.actividades){
-      const f = ctx.data.fences.find(x=>x.id===a.geocercaId)?.name||'';
-      const p = ctx.data.personal.find(x=>x.id===a.personalId)?.nombre||'';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escapeHtml(a.fecha)}</td><td>${escapeHtml(f)}</td><td>${escapeHtml(a.actividad)}</td><td>${escapeHtml(p)}</td><td>${escapeHtml(a.notas||'')}</td><td><button class="btn danger" onclick="window._delA('${a.id}')">Borrar</button></td>`;
-      tb.appendChild(tr);
-    }
-  }
-  window._delA = (id)=>{ if(!confirm('¿Eliminar actividad?')) return; ctx.data.actividades = ctx.data.actividades.filter(x=>x.id!==id); saveAll(); renderActividadesTable(); }
-
-  // ===== Costos =====
-  $('#btnAddCosto').addEventListener('click', ()=>{
-    const fecha=$('#cFecha').value; const geocercaId=$('#cGeocerca').value; const actividad=$('#cActividad').value.trim(); const personalId=$('#cPersonal').value; const costo=parseFloat($('#cCosto').value);
-    if(!fecha || !Number.isFinite(costo)) return alert('Completa fecha y costo');
-    ctx.data.costos.push({id:'c'+Date.now(),fecha,geocercaId,actividad,personalId,costo});
-    saveAll(); renderCostosTable(); $('#cCosto').value='';
-  });
-  function renderCostosTable(){
-    const tb = $('#costosTable tbody'); tb.innerHTML='';
-    for(const c of ctx.data.costos){
-      const f = ctx.data.fences.find(x=>x.id===c.geocercaId)?.name||'';
-      const p = ctx.data.personal.find(x=>x.id===c.personalId)?.nombre||'';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escapeHtml(c.fecha)}</td><td>${escapeHtml(f)}</td><td>${escapeHtml(c.actividad||'')}</td><td>${escapeHtml(p)}</td><td>$ ${Number(c.costo).toFixed(2)}</td><td><button class="btn danger" onclick="window._delC('${c.id}')">Borrar</button></td>`;
-      tb.appendChild(tr);
-    }
-  }
-  window._delC = (id)=>{ if(!confirm('¿Eliminar costo?')) return; ctx.data.costos = ctx.data.costos.filter(x=>x.id!==id); saveAll(); renderCostosTable(); }
-
-  // ===== Reportes (logs de posiciones) =====
-  function renderLogs(){
-    const tb = $('#logsTable tbody'); tb.innerHTML='';
-    for(const Lg of ctx.data.logs.slice().reverse()){
-      const f = ctx.data.fences.find(x=>x.id===Lg.geocercaId)?.name||Lg.geocercaId||'';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escapeHtml(Lg.ts)}</td><td>${escapeHtml(Lg.telefono)}</td><td>${escapeHtml(f)}</td><td>${fmt(Lg.lat)}</td><td>${fmt(Lg.lng)}</td><td>${Lg.acc??''}</td>`;
-      tb.appendChild(tr);
-    }
-  }
-
-  $('#btnExportCSV').addEventListener('click', ()=>{
-    const rows = [['ts','telefono','geocerca','lat','lng','accuracy']]
-      .concat(ctx.data.logs.map(l=>[l.ts,l.telefono,l.geocercaId,l.lat,l.lng,l.acc]));
-    const csv = rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'\"')}"`).join(',')).join('\n');
-    const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
-    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`logs_${ctx.farmId||'finca'}.csv`; a.click();
-  });
-  $('#btnBorrarLogs').addEventListener('click', ()=>{
-    if(!confirm('¿Borrar TODOS los registros de posiciones?')) return;
-    ctx.data.logs = []; saveAll(); renderLogs(); drawChart();
-  });
-
-  let chart;
-  function drawChart(){
-    const data = {};
-    for(const l of ctx.data.logs){ const d = l.ts.slice(0,10); data[d]=(data[d]||0)+1; }
-    const labels = Object.keys(data).sort();
-    const values = labels.map(k=>data[k]);
-    const ctxc = document.getElementById('chartPos');
-    if(chart) chart.destroy();
-    chart = new Chart(ctxc, { type:'bar', data:{ labels, datasets:[{ label:'Posiciones/día', data:values }] }, options:{ responsive:true, scales:{ y:{ beginAtZero:true } } } });
-  }
-
-  // ===== Config =====
-  function renderConfig(){
-    $('#cfgWebhook').value = ctx.data.config.webhook||'';
-    $('#cfgFreq').value = ctx.data.config.freqSec||15;
-  }
-  $('#btnGuardarCfg').addEventListener('click', ()=>{
-    ctx.data.config.webhook = $('#cfgWebhook').value.trim();
-    const f = parseInt($('#cfgFreq').value,10); ctx.data.config.freqSec = Number.isFinite(f)&&f>0 ? f : 15;
-    saveAll(); updateTrackerFreqBadge(); alert('Configuración guardada.');
-  });
-  function updateTrackerFreqBadge(){ $('#freqSec').textContent = ctx.data.config.freqSec; }
-
-  // ===== Modo TRACKER =====
-  let miniMap, miniFenceLayer, watchId=null, sendTimer=null, trackerUser=null, trackerFence=null;
-
-  function initTracker(){
-    const phone = param('phone');
-    const farm = param('farm');
-    if(farm){ ctx.farmId = farm; renderFarms(); chooseFarm(farm); }
-
-    trackerUser = ctx.data.personal.find(p=> p.telefono===phone ) || null;
-    const isValid = !!(trackerUser && trackerUser.activo);
-    $('#trackerUserInfo').textContent = isValid ? `${trackerUser.nombre} · ${trackerUser.telefono}` : `Teléfono ${phone||'(no provisto)'} · Usuario no encontrado o inactivo`;
-
-    trackerFence = ctx.data.fences.find(f=> f.id === trackerUser?.geocercaId );
-    $('#trackerFenceName').textContent = trackerFence? trackerFence.name : '(sin asignar)';
-
-    // Mapa mini
-    miniMap = L.map('miniMap');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(miniMap);
-    if(trackerFence){ miniFenceLayer = coordsToLayer(trackerFence.coords).addTo(miniMap); miniMap.fitBounds(miniFenceLayer.getBounds().pad(0.3)); }
-    else { miniMap.setView([-1.8312,-78.1834],6); }
-
-    miniMap.on('mousemove', (ev)=>{ $('#miniCoords').textContent = `Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`; });
-
-    $('#toggleSend').addEventListener('change', (e)=> toggleSending(e.target.checked));
-  }
-
-  function toggleSending(on){
-    setState(on? 'ok':'idle', on? 'Envío activo':'Inactivo');
-    if(on){
-      if(!('geolocation' in navigator)) { alert('Geolocalización no disponible'); $('#toggleSend').checked=false; setState('no','Error'); return; }
-      if(!trackerFence){ alert('No tienes geocerca asignada. Contacta al administrador.'); $('#toggleSend').checked=false; setState('idle','Sin geocerca'); return; }
-      // Iniciar watch + timer de envíos
-      if(watchId===null){ watchId = navigator.geolocation.watchPosition(onPos, onGeoErr, { enableHighAccuracy:true, maximumAge:10000, timeout:20000 }); }
-      const freq = ctx.data.config.freqSec || 15;
-      if(sendTimer!==null) clearInterval(sendTimer);
-      sendTimer = setInterval(()=>{ trySend(); }, freq*1000);
-      trySend();
-    } else {
-      if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
-      if(sendTimer!==null){ clearInterval(sendTimer); sendTimer=null; }
-    }
-  }
-
-  let lastPos=null; let lastInside=false; let lastSentTs=null;
-  function onPos(pos){
-    const {latitude, longitude, accuracy} = pos.coords;
-    lastPos = {lat:latitude, lng:longitude, acc:accuracy, ts: nowISO() };
-    $('#miniCoords').textContent = `Lat: ${fmt(latitude)} Lng: ${fmt(longitude)} (±${Math.round(accuracy)}m)`;
-    // Actualizar punto en mapa
-    if(window._myMarker) window._myMarker.setLatLng([latitude, longitude]);
-    else window._myMarker = L.marker([latitude, longitude]).addTo(miniMap);
-    if(trackerFence && miniFenceLayer){ const b = miniFenceLayer.getBounds(); if(!b.contains([latitude,longitude])) miniMap.fitBounds(b.pad(0.3)); }
-    lastInside = trackerFence? pointInPolygon([latitude, longitude], trackerFence.coords) : false;
-    setState(lastInside? 'ok':'no', lastInside? 'Dentro de geocerca':'Fuera de geocerca');
-    $('#lastEvent').textContent = `${lastPos.ts} · ${lastInside? 'Dentro':'Fuera'} (${Math.round(accuracy)}m)`;
-  }
-  function onGeoErr(err){ console.warn(err); $('#lastEvent').textContent = `Error GPS: ${err.message}`; setState('no','GPS error'); }
-
-  function trySend(){
-    if(!$('#toggleSend').checked) return;
-    if(!lastPos) return;
-    if(!lastInside) return; // solo si está dentro
-    const payload = {
-      ts: lastPos.ts,
-      telefono: trackerUser?.telefono || param('phone') || 'desconocido',
-      geocercaId: trackerUser?.geocercaId || (trackerFence?.id||''),
-      lat: lastPos.lat, lng: lastPos.lng, acc: lastPos.acc,
-      farmId: ctx.farmId
-    };
-    // Guardar local
-    ctx.data.logs.push(payload); saveAll(); renderLogs(); drawChart();
-
-    // Enviar remoto, si hay webhook
-    const url = ctx.data.config.webhook?.trim();
-    if(url){
-      const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
-      const ok = (navigator.sendBeacon && navigator.sendBeacon(url, blob));
-      if(!ok){
-        fetch(url,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
-          .catch(e=>console.warn('POST webhook falló', e));
-      }
-    }
-    lastSentTs = nowISO(); $('#lastSend').textContent = `${lastSentTs}`;
-  }
-
-  function setState(kind,text){
-    const dot = $('#trackerStateDot'); const tx = $('#trackerStateText');
-    dot.classList.remove('ok','no','idle'); dot.classList.add(kind);
-    tx.textContent = text;
-  }
-
-  // ===== Helpers =====
-  function escapeHtml(s){ return String(s||'').replace(/[&<>\"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+  // TRACKER
+  let miniMap, miniFenceLayer, watchId=null, sendTimer=null, trackerUser=null, trackerFence=null, lastPos=null, lastInside=false;
   function param(k){ return new URL(location.href).searchParams.get(k); }
-  function centroid(coords){ let x=0,y=0; for(const c of coords){ x+=c[0]; y+=c[1]; } return [x/coords.length, y/coords.length]; }
-  function pointInPolygon(point, vs){
-    // Ray casting — point=[lat,lng], vs=[[lat,lng],...]
-    const x = point[1], y = point[0];
-    let inside = false;
-    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-      const xi = vs[i][1], yi = vs[i][0];
-      const xj = vs[j][1], yj = vs[j][0];
-      const intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / ((yj - yi)||1e-12) + xi);
-      if (intersect) inside = !inside;
-    }
-    return inside;
+  function pointInPolygon(point, vs){ const x=point[1], y=point[0]; let inside=false; for(let i=0,j=vs.length-1;i<vs.length;j=i++){ const xi=vs[i][1], yi=vs[i][0], xj=vs[j][1], yj=vs[j][0]; const intersect=((yi>y)!=(yj>y))&&(x< (xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi); if(intersect) inside=!inside; } return inside; }
+  function initTracker(){
+    const phone=param('phone'); const farm=param('farm'); if(farm){ ctx.farmId=farm; renderFarms(); chooseFarm(farm); }
+    trackerUser=ctx.data.personal.find(p=>p.telefono===phone)||null;
+    $('#trackerUserInfo').textContent= trackerUser? `${trackerUser.nombre} · ${trackerUser.telefono}` : `Teléfono ${phone||'(no provisto)'} · Usuario no encontrado`;
+    trackerFence=ctx.data.fences.find(f=>f.id===trackerUser?.geocercaId);
+    $('#miniMap') && (miniMap=L.map('miniMap')); if(miniMap){ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(miniMap); if(trackerFence){ miniFenceLayer=coordsToLayer(trackerFence.coords).addTo(miniMap); miniMap.fitBounds(miniFenceLayer.getBounds().pad(.3)); } else { miniMap.setView([-1.8312,-78.1834],6);} miniMap.on('mousemove',ev=> $('#miniCoords').textContent=`Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`); }
+    $('#toggleSend').onchange=(e)=> toggleSending(e.target.checked);
   }
+  function toggleSending(on){
+    if(on){
+      if(!('geolocation' in navigator)){ alert('Geolocalización no disponible'); $('#toggleSend').checked=false; return; }
+      if(!trackerFence){ alert('No tienes geocerca asignada.'); $('#toggleSend').checked=false; return; }
+      if(watchId===null){ watchId=navigator.geolocation.watchPosition(onPos,onGeoErr,{enableHighAccuracy:true,maximumAge:10000,timeout:20000}); }
+      const freq=ctx.data.config.freqSec||15; if(sendTimer) clearInterval(sendTimer); sendTimer=setInterval(trySend,freq*1000); trySend();
+    }else{
+      if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
+      if(sendTimer){ clearInterval(sendTimer); sendTimer=null; }
+    }
+  }
+  function onPos(pos){ const {latitude,longitude,accuracy}=pos.coords; lastPos={lat:latitude,lng:longitude,acc:accuracy,ts:nowISO()}; $('#miniCoords').textContent=`Lat: ${fmt(latitude)} Lng: ${fmt(longitude)} (±${Math.round(accuracy)}m)`; if(window._myM) _myM.setLatLng([latitude,longitude]); else window._myM=L.marker([latitude,longitude]).addTo(miniMap); lastInside= trackerFence? pointInPolygon([latitude,longitude], trackerFence.coords) : false; $('#lastEvent').textContent=`${lastPos.ts} · ${lastInside?'Dentro':'Fuera'} (${Math.round(accuracy)}m)`; }
+  function onGeoErr(err){ $('#lastEvent').textContent=`Error GPS: ${err.message}`; }
+  function trySend(){ if(!$('#toggleSend').checked||!lastPos||!lastInside) return; const payload={ ts:lastPos.ts, telefono:trackerUser?.telefono||param('phone')||'desconocido', geocercaId:trackerUser?.geocercaId||(trackerFence?.id||''), lat:lastPos.lat, lng:lastPos.lng, acc:lastPos.acc, farmId:ctx.farmId }; ctx.data.logs.push(payload); saveAll(); const url=(ctx.data.config.webhook||'').trim(); if(url){ const blob=new Blob([JSON.stringify(payload)],{type:'application/json'}); const ok=(navigator.sendBeacon && navigator.sendBeacon(url,blob)); if(!ok){ fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(()=>{}); } } $('#lastSend').textContent=nowISO(); }
 
-  function renderAllTables(){ renderFencesTable(); renderPersonalTable(); refreshActivePersonalSelects(); renderActividadesTable(); renderCostosTable(); renderLogs(); drawChart(); renderConfig(); }
+  // Render tablas
+  function renderFencesTable(){ const tb=$('#fencesTable tbody'); if(!tb) return; tb.innerHTML=''; const assigned=Object.fromEntries(ctx.data.fences.map(f=>[f.id,0])); ctx.data.personal.forEach(p=>{ if(p.geocercaId) assigned[p.geocercaId]=(assigned[p.geocercaId]||0)+1; }); for(const f of ctx.data.fences){ const tr=document.createElement('tr'); tr.innerHTML=`<td contenteditable onblur="window._renameFence('${f.id}',this.textContent)">${f.name}</td><td>${f.coords.length}</td><td>${assigned[f.id]||0}</td><td><button class="btn" onclick="window._zoomFence('${f.id}')">Zoom</button> <button class="btn danger" onclick="window._deleteFence('${f.id}')">Borrar</button></td>`; tb.appendChild(tr); } }
+  window._zoomFence=(id)=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f||!map) return; try{ map.fitBounds(coordsToLayer(f.coords).getBounds().pad(.2)); }catch(_){ } }
+  window._deleteFence=(id)=>{ if(!confirm('¿Eliminar geocerca?')) return; ctx.data.fences=ctx.data.fences.filter(f=>f.id!==id); saveAll(); mapRenderFences(); }
+  window._renameFence=(id,name)=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f) return; f.name=(name||'').trim()||f.name; saveAll(); renderFencesTable(); refreshFenceSelects(); }
 
-  // ===== Arranque =====
+  // START
   function start(){
-    try{
-      // Determinar modo
-      const mode = (param('mode')||'').toLowerCase();
-      renderFarms();
-      if(!ctx.farmId){ // crear una finca por defecto
-        const id = 'f'+Date.now(); const farms = farmsState.get(); farms.push({id, nombre:'Mi Finca'}); farmsState.set(farms); ctx.farmId = id; renderFarms();
-      }
-      chooseFarm(ctx.farmId);
-
-      if(mode==='tracker' || param('phone')){
-        // MODO TRACKER
-        const adminShell = $('#adminShell'); const trackerShell = $('#trackerShell');
-        if(adminShell) adminShell.classList.add('hidden');
-        if(trackerShell) trackerShell.classList.remove('hidden');
-        initTracker();
-      } else {
-        // MODO ADMIN
-        const adminShell = $('#adminShell'); const trackerShell = $('#trackerShell');
-        if(trackerShell) trackerShell.classList.add('hidden');
-        if(adminShell) adminShell.classList.remove('hidden');
-        initMap();
-        mapRenderFences();
-      }
-    }catch(err){
-      console.error(err);
-      showFatal(err);
+    // Crear finca por defecto
+    renderFarms();
+    if(!ctx.farmId){ const id='f'+Date.now(); const arr=farmsGet(); arr.push({id,nombre:'Mi Finca'}); farmsSet(arr); ctx.farmId=id; renderFarms(); }
+    chooseFarm(ctx.farmId);
+    const mode=(new URL(location.href).searchParams.get('mode')||'').toLowerCase();
+    if(mode==='tracker' || new URL(location.href).searchParams.get('phone')){
+      $('#adminShell').classList.add('hidden');
+      $('#trackerShell').classList.remove('hidden');
+      initTracker();
+    }else{
+      $('#trackerShell').classList.add('hidden');
+      $('#adminShell').classList.remove('hidden');
+      initMap(); mapRenderFences();
     }
   }
-
-  // Esperar DOM listo para evitar condiciones de carrera en algunos hosts
-  if(document.readyState==='complete' || document.readyState==='interactive'){
-    setTimeout(start, 0);
-  } else {
-    window.addEventListener('DOMContentLoaded', start);
-  }
-
-  function showFatal(err){
-    const div = document.createElement('div');
-    div.style.cssText = 'position:fixed;inset:64px 12px 12px 12px;background:#fff;border:1px solid #f0bcbc;border-radius:12px;padding:16px;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,.08)';
-    div.innerHTML = `<b style="color:#b00020">Se produjo un error al cargar la app</b><br><span class="small">`+escapeHtml(String(err && err.message || err))+`</span><div class="mt small">Sugerencias: recarga la página. Si persiste, borra caché del navegador. </div>`;
-    document.body.appendChild(div);
-  }
+  // ya estamos al final del body → el DOM existe
+  start();
 })();
 </script>
 </body>
