@@ -5,13 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>App Fincas · Geocercas + Trackers</title>
 
-<!-- CSS Leaflet/Draw (si falla, hay fallback interno) -->
+<!-- Leaflet/Draw CSS (mejora visual; hay fallback interno si no cargan) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
 
 <style>
 :root{--c1:#0b5;--c2:#095;--danger:#d33}
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#fafafa;color:#222}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#fafafa;color:#222}
 header{position:sticky;top:0;z-index:10;display:flex;gap:.5rem;align-items:center;padding:.75rem 1rem;background:#fff;border-bottom:1px solid #ddd}
 header h1{font-size:1rem;margin:0 0 0 .25rem;font-weight:700}
 .wrap{max-width:1200px;margin:0 auto;padding:1rem}
@@ -31,7 +32,8 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
 .map{height:520px;border-radius:.75rem;border:1px solid #e5e5e5}
 .mini-map{height:360px;border-radius:.75rem;border:1px solid #e5e5e5}
 .coords{position:absolute;right:.75rem;bottom:.75rem;background:rgba(255,255,255,.92);border:1px solid #ddd;border-radius:.5rem;padding:.25rem .5rem;font-size:.85rem}
-/* Fallback esencial si no carga leaflet.css */
+
+/* Fallback esencial si el CSS de Leaflet no carga */
 .leaflet-container{position:relative;overflow:hidden;outline:0}
 .leaflet-pane,.leaflet-map-pane,.leaflet-tile-pane,.leaflet-overlay-pane,.leaflet-shadow-pane,.leaflet-marker-pane,.leaflet-tooltip-pane,.leaflet-popup-pane{position:absolute;left:0;top:0}
 .leaflet-zoom-animated{transform-origin:0 0}
@@ -44,17 +46,21 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
 .leaflet-control-zoom-in,.leaflet-control-zoom-out{font:bold 18px/28px Arial,Helvetica,sans-serif}
 </style>
 
-<!-- Loader multi‑CDN: garantiza Leaflet/Draw y después llama a __leafletReady() -->
+<!-- Loader multi-CDN: asegura Leaflet/Draw y luego llama a __leafletReady() -->
 <script>
 (function(){
-  function loadJS(src,cb){var s=document.createElement('script');s.src=src;s.async=true;s.onload=()=>cb();s.onerror=()=>cb(new Error('x'));document.head.appendChild(s)}
-  function chain(urls,test,done){(function nx(){if(!urls.length)return done(new Error('no cdn'));let u=urls.shift();loadJS(u,e=>{if(e||!test())nx();else done();});})();}
+  function loadJS(src,cb){var s=document.createElement('script');s.src=src;s.async=true;s.onload=()=>cb();s.onerror=()=>cb(new Error('fail '+src));document.head.appendChild(s)}
+  function chain(urls,test,done){(function nx(){if(!urls.length)return done(new Error('CDNs agotados'));let u=urls.shift();loadJS(u,e=>{if(e||!test())nx();else done();});})();}
+
   const LJS=['https://unpkg.com/leaflet@1.9.4/dist/leaflet.js','https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'];
   const DRAW=['https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js','https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js'];
-  if(window.L){window.__leafletReady&&window.__leafletReady();return;}
-  chain(LJS.slice(),()=>!!window.L,()=>chain(DRAW.slice(),()=>!!(L&&L.Control&&L.Control.Draw),()=>window.__leafletReady&&window.__leafletReady()));
+
+  if(window.L){ window.__leafletReady && window.__leafletReady(); return; }
+  chain(LJS.slice(), ()=>!!window.L, ()=> chain(DRAW.slice(), ()=>!!(L&&L.Control&&L.Control.Draw), ()=> window.__leafletReady && window.__leafletReady()));
 })();
 </script>
+
+<!-- Chart.js para un gráfico simple en Reportes -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -68,7 +74,7 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   <button class="btn danger" id="btnEliminarFinca">Eliminar Finca</button>
 </header>
 
-<!-- TRACKER (interfaz mínima) -->
+<!-- TRACKER: interfaz mínima -->
 <div id="trackerShell" class="wrap hidden">
   <div class="grid grid-2">
     <div class="card">
@@ -92,7 +98,7 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   </div>
 </div>
 
-<!-- ADMIN (completo) -->
+<!-- ADMIN -->
 <div id="adminShell" class="wrap">
   <nav class="tabs" id="tabs">
     <button data-tab="geocercas" class="active">Geocercas</button>
@@ -171,7 +177,8 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
             <tbody></tbody>
           </table>
         </div>
-        <div style="margin-top:.5rem;display:flex;gap:.5rem">
+        <div style="margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn" id="btnSyncServer">Sincronizar del servidor</button>
           <button class="btn" id="btnExportCSV">Exportar CSV</button>
           <button class="btn" id="btnBorrarLogs">Borrar registros</button>
         </div>
@@ -187,9 +194,10 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
     <div class="grid grid-2">
       <div class="card">
         <h3 style="margin:0 0 .5rem">Parámetros</h3>
-        <label>Webhook (POST JSON opcional)</label>
-        <input id="cfgWebhook" placeholder="https://mi-servidor/endpoint">
-        <label style="margin-top:.5rem">Frecuencia (segundos)</label>
+        <label>Webhook (POST/GET JSON)</label>
+        <input id="cfgWebhook" placeholder="https://script.google.com/macros/s/XXXXX/exec">
+        <div class="small muted" style="margin:.25rem 0 .5rem">Si lo defines, el tracker enviará al servidor (POST) y desde Reportes puedes sincronizar (GET).</div>
+        <label>Frecuencia (segundos)</label>
         <input id="cfgFreq" type="number" min="5" value="15">
         <div style="margin-top:.5rem"><button class="btn primary" id="btnGuardarCfg">Guardar Config</button></div>
       </div>
@@ -210,21 +218,27 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
 (function(){
   // ===== Helpers
   const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
-  const fmt=n=>(typeof n==='number')?Math.round(n*1e6)/1e6:n; const nowISO=()=>new Date().toISOString();
+  const fmt=n=>(typeof n==='number')?Math.round(n*1e6)/1e6:n;
+  const nowISO=()=>new Date().toISOString();
   const param=k=>new URL(location.href).searchParams.get(k);
-  const escapeHtml=s=>String(s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
-  function encodeStateForShare(obj){const json=JSON.stringify(obj);return btoa(unescape(encodeURIComponent(json)));}
-  function decodeStateFromShare(b64){try{const json=decodeURIComponent(escape(atob(b64)));return JSON.parse(json);}catch(_){return null;}}
+  const escapeHtml=s=>String(s||'').replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
 
-  // ===== Estado
+  // Snapshot (state) en URL para trackers
+  function encodeStateForShare(obj){ const json=JSON.stringify(obj); return btoa(unescape(encodeURIComponent(json))); }
+  function decodeStateFromShare(b64){ try{ const json=decodeURIComponent(escape(atob(b64))); return JSON.parse(json); }catch(_){ return null; } }
+
+  // ===== Estado / almacenamiento
   const LS_PREFIX='app_geo_v2';
   const ctx={ farmId:null, data:{ fences:[], personal:[], logs:[], config:{webhook:'',freqSec:15} } };
+
   function storageKey(section){ return `${LS_PREFIX}_${ctx.farmId||'default'}_${section}`; }
-  function loadAll(){ for(const k of Object.keys(ctx.data)){ try{ const raw=localStorage.getItem(storageKey(k)); if(raw) ctx.data[k]=JSON.parse(raw);}catch(e){} } }
+  function loadAll(){ for(const k of Object.keys(ctx.data)){ try{ const raw=localStorage.getItem(storageKey(k)); if(raw) ctx.data[k]=JSON.parse(raw);}catch(_){ } } }
   function saveAll(){ for(const k of Object.keys(ctx.data)){ localStorage.setItem(storageKey(k), JSON.stringify(ctx.data[k])); } refreshBindings(); }
-  function ensureFarmList(){ const key=`${LS_PREFIX}_farms`; let arr=JSON.parse(localStorage.getItem(key)||'[]'); return {get:()=>arr,set:a=>{arr=a;localStorage.setItem(key,JSON.stringify(a));}}}
+
+  function ensureFarmList(){ const key=`${LS_PREFIX}_farms`; let arr=JSON.parse(localStorage.getItem(key)||'[]'); return {get:()=>arr,set:a=>{arr=a;localStorage.setItem(key,JSON.stringify(a));}} }
   const farmsState=ensureFarmList();
 
+  // ===== Fincas
   function renderFarms(){ const arr=farmsState.get(); if(!ctx.farmId&&arr[0]) ctx.farmId=arr[0].id; $('#farmSelect').innerHTML=arr.map(f=>`<option value="${f.id}">${escapeHtml(f.nombre)}</option>`).join(''); if(ctx.farmId) $('#farmSelect').value=ctx.farmId; }
   function chooseFarm(id){ ctx.farmId=id; loadAll(); refreshBindings(); mapRenderFences(); renderLogs(); drawChart(); }
 
@@ -232,34 +246,41 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   $('#btnEliminarFinca').onclick=()=>{ if(!ctx.farmId) return; if(!confirm('¿Eliminar finca y todos sus datos?')) return; Object.keys(ctx.data).forEach(k=>localStorage.removeItem(storageKey(k))); const arr=farmsState.get().filter(f=>f.id!==ctx.farmId); farmsState.set(arr); ctx.farmId=arr[0]?.id||null; renderFarms(); if(ctx.farmId) chooseFarm(ctx.farmId); else location.reload(); };
   $('#farmSelect').onchange=()=>chooseFarm($('#farmSelect').value);
 
-  // ===== Tabs (solo ADMIN)
+  // ===== Tabs (solo admin)
   $('#tabs').addEventListener('click',e=>{
-    if(e.target.tagName!=='BUTTON') return; const tab=e.target.dataset.tab;
+    if(e.target.tagName!=='BUTTON') return;
+    const tab=e.target.dataset.tab;
     $$('#tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
-    $$('section.panel').forEach(p=>p.classList.remove('show')); $(`#tab-${tab}`).classList.add('show');
+    $$('section.panel').forEach(p=>p.classList.remove('show'));
+    $(`#tab-${tab}`).classList.add('show');
     if(tab==='geocercas'){ try{ initMap(); map.invalidateSize(true); mapRenderFences(); }catch(_){ } }
     if(tab==='reportes'){ drawChart(); }
   });
 
-  // ===== Leaflet (ADMIN)
+  // ===== Leaflet (Admin)
   let map, drawnItems, drawControl;
   function initMap(){
     if(typeof L==='undefined'){ alert('Leaflet no cargó'); return; }
-    const cont=$('#map'); if(!cont) return; if(map){ setTimeout(()=>{ try{map.invalidateSize(true)}catch(_){}} ,100); return; }
+    const cont=$('#map'); if(!cont) return;
+    if(map){ setTimeout(()=>{ try{map.invalidateSize(true)}catch(_){}} ,100); return; }
     if(cont.clientHeight<100) cont.style.height='520px';
+
     map=L.map('map');
-    function addTiles(url){ const t=L.tileLayer(url,{maxZoom:19,attribution:'&copy; OpenStreetMap/Esri'}); t.addTo(map); return t; }
+    function addTiles(url){ const t=L.tileLayer(url,{maxZoom:19,attribution:'&copy; OpenStreetMap/Esri'}); t.on('load',()=>setTimeout(()=>{try{map.invalidateSize(true)}catch(_){}} ,120)); t.addTo(map); return t; }
     let base=addTiles('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
     base.on('tileerror',()=>{ try{map.removeLayer(base)}catch(_){ } base=addTiles('https://tile.openstreetmap.org/{z}/{x}/{y}.png'); base.on('tileerror',()=>{ try{map.removeLayer(base)}catch(_){ } base=addTiles('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'); base.on('tileerror',()=>{ try{map.removeLayer(base)}catch(_){ } addTiles('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}');}); }); });
+
     drawnItems=new L.FeatureGroup(); map.addLayer(drawnItems);
     if(L.Control && L.Control.Draw){
       drawControl=new L.Control.Draw({ draw:{ polyline:false,rectangle:false,circle:false,circlemarker:false,marker:false, polygon:{allowIntersection:false,showArea:true}}, edit:{ featureGroup: drawnItems }});
       map.addControl(drawControl);
       map.on(L.Draw.Event.CREATED, e=>{ drawnItems.addLayer(e.layer); updateFencesFromLayers(); });
       map.on(L.Draw.Event.EDITED, ()=> updateFencesFromLayers());
+    } else {
+      const w=document.createElement('div'); w.className='coords'; w.style.left='.75rem'; w.style.right='auto'; w.textContent='⚠ Leaflet.draw no cargó (CDN).'; cont.appendChild(w);
     }
     map.on('mousemove',ev=> $('#mapCoords').textContent=`Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`);
-    try{ L.control.zoom({position:'topleft'}).addTo(map); }catch(_){ }
+    try{ L.control.zoom({position:'topleft'}).addTo(map); }catch(_){}
     map.setView([-1.8312,-78.1834],6);
     setTimeout(()=>{ try{map.invalidateSize(true)}catch(_){}} ,250);
     window.addEventListener('resize',()=>{ try{map.invalidateSize(true)}catch(_){}} );
@@ -267,36 +288,123 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   function layerToCoords(layer){ const latlngs=layer.getLatLngs(); const first=Array.isArray(latlngs[0])?latlngs[0]:latlngs; return first.map(ll=>[ll.lat,ll.lng]); }
   function coordsToLayer(coords){ return L.polygon(coords,{color:'#0b5',weight:2,fillOpacity:.1}); }
   function centroid(coords){ let x=0,y=0; coords.forEach(c=>{x+=c[0];y+=c[1]}); return [x/coords.length,y/coords.length]; }
-  function updateFencesFromLayers(){ const out=[]; drawnItems.eachLayer(ly=>{ const coords=layerToCoords(ly); let name='Geocerca '+(ctx.data.fences.length+out.length+1); let id='g'+Date.now()+Math.random().toString(36).slice(2,6); const c=centroid(coords); const m=ctx.data.fences.find(f=>{const cc=centroid(f.coords); return Math.hypot(c[0]-cc[0],c[1]-cc[1])<0.0008;}); if(m){name=m.name; id=m.id;} out.push({id,name,coords,color:'#0b5'}); }); ctx.data.fences=out; saveAll(); renderFencesTable(); refreshFenceSelects(); }
-  function mapRenderFences(){ if(!map||!drawnItems) return; drawnItems.clearLayers(); if(ctx.data.fences.length===0){ try{ map.setView([-1.8312,-78.1834],6);}catch(_){ } return; } const layers=ctx.data.fences.map(f=>coordsToLayer(f.coords).bindTooltip(f.name)); layers.forEach(l=>drawnItems.addLayer(l)); try{ map.fitBounds(L.featureGroup(layers).getBounds().pad(.2)); }catch(_){ } }
-  function renderFencesTable(){ const tb=$('#fencesTable tbody'); tb.innerHTML=''; const assigned=Object.fromEntries(ctx.data.fences.map(f=>[f.id,0])); ctx.data.personal.forEach(p=>{ if(p.geocercaId) assigned[p.geocercaId]=(assigned[p.geocercaId]||0)+1; }); for(const f of ctx.data.fences){ const tr=document.createElement('tr'); tr.innerHTML=`<td contenteditable onblur="window._renameFence('${f.id}',this.textContent)">${escapeHtml(f.name)}</td><td>${f.coords.length}</td><td>${assigned[f.id]||0}</td><td><button class="btn" onclick="window._zoomFence('${f.id}')">Zoom</button><button class="btn danger" onclick="window._deleteFence('${f.id}')">Borrar</button></td>`; tb.appendChild(tr);} }
+
+  function updateFencesFromLayers(){
+    const out=[];
+    drawnItems.eachLayer(ly=>{
+      const coords=layerToCoords(ly);
+      let name='Geocerca '+(ctx.data.fences.length+out.length+1);
+      let id='g'+Date.now()+Math.random().toString(36).slice(2,6);
+      const c=centroid(coords);
+      const m=ctx.data.fences.find(f=>{const cc=centroid(f.coords); return Math.hypot(c[0]-cc[0],c[1]-cc[1])<0.0008;});
+      if(m){name=m.name; id=m.id;}
+      out.push({id,name,coords,color:'#0b5'});
+    });
+    ctx.data.fences=out; saveAll(); renderFencesTable(); refreshFenceSelects();
+  }
+  function mapRenderFences(){
+    if(!map||!drawnItems) return;
+    drawnItems.clearLayers();
+    if(ctx.data.fences.length===0){ try{ map.setView([-1.8312,-78.1834],6);}catch(_){ } return; }
+    const layers=ctx.data.fences.map(f=>coordsToLayer(f.coords).bindTooltip(f.name));
+    layers.forEach(l=>drawnItems.addLayer(l));
+    try{ map.fitBounds(L.featureGroup(layers).getBounds().pad(.2)); }catch(_){ }
+  }
+  function renderFencesTable(){
+    const tb=$('#fencesTable tbody'); tb.innerHTML='';
+    const assigned=Object.fromEntries(ctx.data.fences.map(f=>[f.id,0]));
+    ctx.data.personal.forEach(p=>{ if(p.geocercaId) assigned[p.geocercaId]=(assigned[p.geocercaId]||0)+1; });
+    for(const f of ctx.data.fences){
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td contenteditable onblur="window._renameFence('${f.id}',this.textContent)">${escapeHtml(f.name)}</td>
+      <td>${f.coords.length}</td><td>${assigned[f.id]||0}</td>
+      <td><button class="btn" onclick="window._zoomFence('${f.id}')">Zoom</button>
+          <button class="btn danger" onclick="window._deleteFence('${f.id}')">Borrar</button></td>`;
+      tb.appendChild(tr);
+    }
+  }
   window._zoomFence=id=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f||!map) return; try{ map.fitBounds(coordsToLayer(f.coords).getBounds().pad(.2)); }catch(_){ } }
   window._deleteFence=id=>{ if(!confirm('¿Eliminar geocerca?')) return; ctx.data.fences=ctx.data.fences.filter(f=>f.id!==id); saveAll(); mapRenderFences(); renderFencesTable(); }
   window._renameFence=(id,name)=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f) return; f.name=(name||'').trim()||f.name; saveAll(); renderFencesTable(); refreshFenceSelects(); }
   $('#btnNuevaGeocerca').onclick=()=>{ try{ new L.Draw.Polygon(map).enable(); }catch(e){ alert('Leaflet.draw no disponible'); } };
-  let editing=false; $('#btnEditarGeocerca').onclick=()=>{ editing=!editing; try{ new L.EditToolbar.Edit(map,{featureGroup:drawnItems})[editing?'enable':'disable'](); $('#btnEditarGeocerca').textContent= editing?'Salir de Edición':'Editar Geocercas'; }catch(e){ alert('Leaflet.draw no disponible'); } };
+  let editing=false;
+  $('#btnEditarGeocerca').onclick=()=>{ editing=!editing; try{ new L.EditToolbar.Edit(map,{featureGroup:drawnItems})[editing?'enable':'disable'](); $('#btnEditarGeocerca').textContent= editing?'Salir de Edición':'Editar Geocercas'; }catch(e){ alert('Leaflet.draw no disponible'); } };
   $('#btnGuardarGeocercas').onclick=()=>{ updateFencesFromLayers(); alert('Cambios guardados.'); };
   $('#btnCrearDesdeLista').onclick=()=>{ const name=$('#newFenceName').value.trim(); const txt=$('#coordsInput').value.trim(); if(!txt) return alert('Pega coordenadas'); const coords=txt.split(/\n+/).map(l=>{ const [a,b]=l.split(',').map(s=>parseFloat(s.trim())); return (Number.isFinite(a)&&Number.isFinite(b))?[a,b]:null; }).filter(Boolean); if(coords.length<3) return alert('Se requieren ≥3 puntos'); const layer=coordsToLayer(coords).bindTooltip(name||('Geocerca '+(ctx.data.fences.length+1))); drawnItems.addLayer(layer); updateFencesFromLayers(); $('#coordsInput').value=''; $('#newFenceName').value=''; };
 
   // ===== Personal
-  function refreshFenceSelects(){ $('#pGeocerca').innerHTML=['<option value="">(sin asignar)</option>'].concat(ctx.data.fences.map(f=>`<option value="${f.id}">${escapeHtml(f.name)}</option>`)).join(''); }
-  function refreshActivePersonalSelects(){ const trackers=ctx.data.personal.filter(p=>p.rol==='TRACKER'); $('#quickUser').innerHTML=trackers.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre)} (${escapeHtml(p.telefono)})</option>`).join(''); }
+  function refreshFenceSelects(){ $('#pGeocerca').innerHTML=['<option value=\"\">(sin asignar)</option>'].concat(ctx.data.fences.map(f=>`<option value=\"${f.id}\">${escapeHtml(f.name)}</option>`)).join(''); }
+  function refreshActivePersonalSelects(){ const trackers=ctx.data.personal.filter(p=>p.rol==='TRACKER'); $('#quickUser').innerHTML=trackers.map(p=>`<option value=\"${p.id}\">${escapeHtml(p.nombre)} (${escapeHtml(p.telefono)})</option>`).join(''); }
   $('#btnAddPersonal').onclick=()=>{ const nombre=$('#pNombre').value.trim(); const telefono=$('#pTelefono').value.trim(); if(!nombre||!telefono) return alert('Completa nombre y teléfono'); const rol=$('#pRol').value; const activo=$('#pActivo').value==='true'; const geocercaId=$('#pGeocerca').value||''; ctx.data.personal.push({id:'p'+Date.now(),nombre,telefono,rol,activo,geocercaId}); saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); $('#pNombre').value=''; $('#pTelefono').value=''; };
-  function trackerLinkFor(p){ const fence = ctx.data.fences.find(f=>f.id===p.geocercaId) || null; const snapshot={ farmId: ctx.farmId, personal:{ id:p.id,nombre:p.nombre,telefono:p.telefono,activo:p.activo,rol:p.rol,geocercaId:p.geocercaId }, fences: fence? [{id:fence.id,name:fence.name,coords:fence.coords,color:'#0b5'}] : [], config:{freqSec:ctx.data.config.freqSec||15} }; const u=new URL(location.href); u.search=''; u.hash=''; u.searchParams.set('mode','tracker'); u.searchParams.set('phone',p.telefono); if(ctx.farmId) u.searchParams.set('farm',ctx.farmId); u.searchParams.set('state', encodeStateForShare(snapshot)); return u.toString(); }
-  function renderPersonalTable(){ const tb=$('#personalTable tbody'); if(!tb) return; tb.innerHTML=''; for(const p of ctx.data.personal){ const tr=document.createElement('tr'); tr.innerHTML=`<td contenteditable onblur=\"window._pf('${p.id}','nombre',this.textContent)\">${escapeHtml(p.nombre)}</td><td contenteditable onblur=\"window._pf('${p.id}','telefono',this.textContent)\">${escapeHtml(p.telefono)}</td><td><select onchange=\"window._pf('${p.id}','rol',this.value)\"><option ${p.rol==='TRACKER'?'selected':''}>TRACKER</option><option ${p.rol==='ADMIN'?'selected':''}>ADMIN</option></select></td><td><select onchange=\"window._pf('${p.id}','activo',this.value)\"><option value=\"true\" ${p.activo?'selected':''}>Sí</option><option value=\"false\" ${!p.activo?'selected':''}>No</option></select></td><td><select onchange=\"window._pf('${p.id}','geocercaId',this.value)\"><option value=\"\">(sin)</option>${ctx.data.fences.map(f=>`<option value=\"${f.id}\" ${p.geocercaId===f.id?'selected':''}>${escapeHtml(f.name)}</option>`).join('')}</select></td><td><input readonly value=\"${trackerLinkFor(p)}\" style=\"width:260px\"/></td><td><button class=\"btn\" onclick=\"window.open('${trackerLinkFor(p)}','_blank')\">Abrir</button></td>`; tb.appendChild(tr);} }
+  function trackerLinkFor(p){
+    const fence = ctx.data.fences.find(f=>f.id===p.geocercaId)||null;
+    const snapshot = {
+      farmId: ctx.farmId,
+      personal: { id:p.id, nombre:p.nombre, telefono:p.telefono, activo:p.activo, rol:p.rol, geocercaId:p.geocercaId },
+      fences: fence ? [{ id:fence.id, name:fence.name, coords:fence.coords, color:'#0b5' }] : [],
+      config: { freqSec: ctx.data.config.freqSec||15 }
+    };
+    const u=new URL(location.href); u.search=''; u.hash='';
+    u.searchParams.set('mode','tracker'); u.searchParams.set('phone',p.telefono); if(ctx.farmId) u.searchParams.set('farm',ctx.farmId);
+    u.searchParams.set('state', encodeStateForShare(snapshot));
+    return u.toString();
+  }
+  function renderPersonalTable(){
+    const tb=$('#personalTable tbody'); if(!tb) return; tb.innerHTML='';
+    for(const p of ctx.data.personal){
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td contenteditable onblur="window._pf('${p.id}','nombre',this.textContent)">${escapeHtml(p.nombre)}</td>
+      <td contenteditable onblur="window._pf('${p.id}','telefono',this.textContent)">${escapeHtml(p.telefono)}</td>
+      <td><select onchange="window._pf('${p.id}','rol',this.value)"><option ${p.rol==='TRACKER'?'selected':''}>TRACKER</option><option ${p.rol==='ADMIN'?'selected':''}>ADMIN</option></select></td>
+      <td><select onchange="window._pf('${p.id}','activo',this.value)"><option value="true" ${p.activo?'selected':''}>Sí</option><option value="false" ${!p.activo?'selected':''}>No</option></select></td>
+      <td><select onchange="window._pf('${p.id}','geocercaId',this.value)"><option value="">(sin)</option>${ctx.data.fences.map(f=>`<option value="${f.id}" ${p.geocercaId===f.id?'selected':''}>${escapeHtml(f.name)}</option>`).join('')}</select></td>
+      <td><input readonly value="${trackerLinkFor(p)}" style="width:260px"/></td>
+      <td><button class="btn" onclick="window.open('${trackerLinkFor(p)}','_blank')">Abrir</button></td>`;
+      tb.appendChild(tr);
+    }
+  }
   window._pf=(id,field,value)=>{ const p=ctx.data.personal.find(x=>x.id===id); if(!p) return; if(field==='activo') value=(value==='true'); p[field]=value; saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); };
+
+  // Copiar enlace rápido
+  $('#btnCopiarEnlace').onclick=async()=>{ const id=$('#quickUser').value; const p=ctx.data.personal.find(x=>x.id===id); if(!p) return; const link=trackerLinkFor(p); try{ await navigator.clipboard.writeText(link); $('#copiedMsg').textContent='¡Copiado!'; setTimeout(()=>$('#copiedMsg').textContent='',1500);}catch(_){ alert(link); } };
 
   // ===== Reportes
   function renderLogs(){ const tb=$('#logsTable tbody'); if(!tb) return; tb.innerHTML=''; for(const Lg of ctx.data.logs.slice().reverse()){ const f=ctx.data.fences.find(x=>x.id===Lg.geocercaId)?.name||Lg.geocercaId||''; const tr=document.createElement('tr'); tr.innerHTML=`<td>${escapeHtml(Lg.ts)}</td><td>${escapeHtml(Lg.telefono)}</td><td>${escapeHtml(f)}</td><td>${fmt(Lg.lat)}</td><td>${fmt(Lg.lng)}</td><td>${Lg.acc??''}</td>`; tb.appendChild(tr);} }
-  $('#btnExportCSV').onclick=()=>{ const rows=[["ts","telefono","geocerca","lat","lng","accuracy"]].concat(ctx.data.logs.map(l=>[l.ts,l.telefono,l.geocercaId,l.lat,l.lng,l.acc])); const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'\\"')}"`).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`logs_${ctx.farmId||'finca'}.csv`; a.click(); };
-  $('#btnBorrarLogs').onclick=()=>{ if(!confirm('¿Borrar todos los registros?')) return; ctx.data.logs=[]; saveAll(); renderLogs(); };
-  let chart; function drawChart(){ const data={}; for(const l of ctx.data.logs){ const d=l.ts.slice(0,10); data[d]=(data[d]||0)+1; } const labels=Object.keys(data).sort(); const values=labels.map(k=>data[k]); const el=document.getElementById('chartPos'); if(!el) return; if(chart) chart.destroy(); chart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Posiciones/día',data:values}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}}); }
+  $('#btnExportCSV').onclick=()=>{ const rows=[['ts','telefono','geocerca','lat','lng','accuracy']].concat(ctx.data.logs.map(l=>[l.ts,l.telefono,l.geocercaId,l.lat,l.lng,l.acc])); const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'\"')}"`).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`logs_${ctx.farmId||'finca'}.csv`; a.click(); };
+  $('#btnBorrarLogs').onclick=()=>{ if(!confirm('¿Borrar todos los registros?')) return; ctx.data.logs=[]; saveAll(); renderLogs(); drawChart(); };
+
+  // Sincronizar desde servidor (GET)
+  async function syncFromServer(){
+    const urlBase=(ctx.data.config.webhook||'').trim();
+    if(!urlBase){ alert('Configura el Webhook en la pestaña Config.'); return; }
+    const params=new URLSearchParams({ farmId: ctx.farmId });
+    try{
+      const res=await fetch(`${urlBase}?${params.toString()}`,{method:'GET'});
+      const remote=await res.json();
+      if(!Array.isArray(remote)) { alert('Respuesta inválida del servidor'); return; }
+      const seen=new Set(ctx.data.logs.map(l=>`${l.ts}|${l.telefono}|${l.lat}|${l.lng}`));
+      let added=0;
+      for(const r of remote){
+        const key=`${r.ts}|${r.telefono}|${r.lat}|${r.lng}`;
+        if(!seen.has(key)){ ctx.data.logs.push(r); seen.add(key); added++; }
+      }
+      ctx.data.logs.sort((a,b)=> String(a.ts).localeCompare(String(b.ts)));
+      saveAll(); renderLogs(); drawChart();
+      alert(`Sincronización completa. Registros nuevos: ${added}`);
+    }catch(err){
+      console.error(err); alert('Error al sincronizar: '+err);
+    }
+  }
+  $('#btnSyncServer').onclick=syncFromServer;
+
+  let chart;
+  function drawChart(){ const data={}; for(const l of ctx.data.logs){ const d=l.ts.slice(0,10); data[d]=(data[d]||0)+1; } const labels=Object.keys(data).sort(); const values=labels.map(k=>data[k]); const el=document.getElementById('chartPos'); if(!el) return; if(chart) chart.destroy(); chart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Posiciones/día',data:values}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}}); }
 
   // ===== Config
   function renderConfig(){ $('#cfgWebhook').value=ctx.data.config.webhook||''; $('#cfgFreq').value=ctx.data.config.freqSec||15; $('#freqSec').textContent=ctx.data.config.freqSec||15; }
   $('#btnGuardarCfg').onclick=()=>{ ctx.data.config.webhook=$('#cfgWebhook').value.trim(); const f=parseInt($('#cfgFreq').value,10); ctx.data.config.freqSec=Number.isFinite(f)&&f>0?f:15; saveAll(); alert('Configuración guardada.'); };
 
-  // ===== Utilidades multi-finca
+  // ===== Utilidades multi-finca (detección por teléfono)
   function loadSectionForFarm(farmId, section){ try{ return JSON.parse(localStorage.getItem(`${LS_PREFIX}_${farmId}_${section}`)||'[]'); }catch(_){ return []; } }
   function resolveFarmByPhone(phone){ if(!phone) return null; const farms=ensureFarmList().get(); for(const f of farms){ const people=loadSectionForFarm(f.id,'personal'); const hit=people.find(p=>p.telefono===phone && p.activo); if(hit) return f.id; } return null; }
 
@@ -304,49 +412,102 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   let miniMap, miniFenceLayer, watchId=null, sendTimer=null, trackerUser=null, trackerFence=null, lastPos=null, lastInside=false;
   function initTracker(){
     const phone=param('phone'); let farm=param('farm');
-    // Cargar snapshot del enlace si viene
-    const rawState=param('state'); if(rawState){ const snap=decodeStateFromShare(rawState); if(snap&&snap.farmId){ ctx.farmId=snap.farmId; ctx.data.fences=snap.fences||[]; ctx.data.personal=snap.personal?[snap.personal]:[]; ctx.data.config.freqSec=(snap.config&&snap.config.freqSec)||ctx.data.config.freqSec; }}
+
+    // Cargar snapshot si viene en el enlace
+    const rawState=param('state');
+    if(rawState){
+      const snap=decodeStateFromShare(rawState);
+      if(snap && snap.farmId){
+        ctx.farmId=snap.farmId;
+        ctx.data.fences=snap.fences||[];
+        ctx.data.personal=snap.personal?[snap.personal]:[];
+        ctx.data.config.freqSec=(snap.config&&snap.config.freqSec)||ctx.data.config.freqSec;
+      }
+    }
+
+    // Si no vino farm, deducir por teléfono (si existe en este navegador)
     if(!farm){ const guess=resolveFarmByPhone(phone); if(guess) farm=guess; }
     if(farm){ ctx.farmId=farm; renderFarms(); chooseFarm(farm); }
-    trackerUser=ctx.data.personal.find(p=>p.telefono===phone)||null; const ok=!!(trackerUser && trackerUser.activo);
+
+    trackerUser=ctx.data.personal.find(p=>p.telefono===phone)||null;
+    const ok=!!(trackerUser && trackerUser.activo);
     $('#trackerUserInfo').textContent= ok? `${trackerUser.nombre} · ${trackerUser.telefono}` : `Teléfono ${phone||'(no provisto)'} · Usuario no encontrado o inactivo`;
-    trackerFence=ctx.data.fences.find(f=>f.id===trackerUser?.geocercaId); $('#trackerFenceName').textContent = trackerFence? trackerFence.name : '(sin asignar)';
-    // Mini-mapa
+    trackerFence=ctx.data.fences.find(f=>f.id===trackerUser?.geocercaId);
+    $('#trackerFenceName').textContent = trackerFence? trackerFence.name : '(sin asignar)';
+
     miniMap=L.map('miniMap'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(miniMap);
-    if(trackerFence){ miniFenceLayer=coordsToLayer(trackerFence.coords).addTo(miniMap); miniMap.fitBounds(miniFenceLayer.getBounds().pad(.3)); } else { miniMap.setView([-1.8312,-78.1834],6); }
+    if(trackerFence){ miniFenceLayer=coordsToLayer(trackerFence.coords).addTo(miniMap); miniMap.fitBounds(miniFenceLayer.getBounds().pad(.3)); }
+    else { miniMap.setView([-1.8312,-78.1834],6); }
     miniMap.on('mousemove',ev=> $('#miniCoords').textContent=`Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`);
+
     $('#toggleSend').onchange=e=>toggleSending(e.target.checked);
   }
   function pointInPolygon(point, vs){ const x=point[1], y=point[0]; let inside=false; for(let i=0,j=vs.length-1;i<vs.length;j=i++){ const xi=vs[i][1], yi=vs[i][0], xj=vs[j][1], yj=vs[j][0]; const intersect=((yi>y)!=(yj>y))&&(x< (xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi); if(intersect) inside=!inside; } return inside; }
   function setState(kind,text){ const dot=$('#trackerStateDot'); const tx=$('#trackerStateText'); dot.classList.remove('ok','no','idle'); dot.classList.add(kind); tx.textContent=text; }
-  function toggleSending(on){ setState(on?'ok':'idle', on?'Envío activo':'Inactivo'); if(on){ if(!('geolocation' in navigator)){ alert('Geolocalización no disponible'); $('#toggleSend').checked=false; setState('no','Error'); return; } if(!trackerFence){ alert('No tienes geocerca asignada.'); $('#toggleSend').checked=false; setState('idle','Sin geocerca'); return; } if(watchId===null){ watchId=navigator.geolocation.watchPosition(onPos,onGeoErr,{enableHighAccuracy:true,maximumAge:10000,timeout:20000}); } const freq=ctx.data.config.freqSec||15; if(sendTimer) clearInterval(sendTimer); sendTimer=setInterval(trySend,freq*1000); trySend(); }else{ if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null; } if(sendTimer){ clearInterval(sendTimer); sendTimer=null; } } }
-  function onPos(pos){ const {latitude,longitude,accuracy}=pos.coords; lastPos={lat:latitude,lng:longitude,acc:accuracy,ts:nowISO()}; $('#miniCoords').textContent=`Lat: ${fmt(latitude)} Lng: ${fmt(longitude)} (±${Math.round(accuracy)}m)`; if(window._myM) _myM.setLatLng([latitude,longitude]); else window._myM=L.marker([latitude,longitude]).addTo(miniMap); if(trackerFence&&miniFenceLayer){ const b=miniFenceLayer.getBounds(); if(!b.contains([latitude,longitude])) miniMap.fitBounds(b.pad(.3)); } lastInside= trackerFence? pointInPolygon([latitude,longitude], trackerFence.coords) : false; setState(lastInside?'ok':'no', lastInside?'Dentro de geocerca':'Fuera de geocerca'); $('#lastEvent').textContent=`${lastPos.ts} · ${lastInside?'Dentro':'Fuera'} (${Math.round(accuracy)}m)`; }
+  function toggleSending(on){
+    setState(on?'ok':'idle', on?'Envío activo':'Inactivo');
+    if(on){
+      if(!('geolocation' in navigator)){ alert('Geolocalización no disponible'); $('#toggleSend').checked=false; setState('no','Error'); return; }
+      if(!trackerFence){ alert('No tienes geocerca asignada.'); $('#toggleSend').checked=false; setState('idle','Sin geocerca'); return; }
+      if(watchId===null){ watchId=navigator.geolocation.watchPosition(onPos,onGeoErr,{enableHighAccuracy:true,maximumAge:10000,timeout:20000}); }
+      const freq=ctx.data.config.freqSec||15; if(sendTimer) clearInterval(sendTimer); sendTimer=setInterval(trySend,freq*1000); trySend();
+    }else{
+      if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
+      if(sendTimer){ clearInterval(sendTimer); sendTimer=null; }
+    }
+  }
+  function onPos(pos){
+    const {latitude,longitude,accuracy}=pos.coords;
+    lastPos={lat:latitude,lng:longitude,acc:accuracy,ts:nowISO()};
+    $('#miniCoords').textContent=`Lat: ${fmt(latitude)} Lng: ${fmt(longitude)} (±${Math.round(accuracy)}m)`;
+    if(window._myM) _myM.setLatLng([latitude,longitude]); else window._myM=L.marker([latitude,longitude]).addTo(miniMap);
+    if(trackerFence&&miniFenceLayer){ const b=miniFenceLayer.getBounds(); if(!b.contains([latitude,longitude])) miniMap.fitBounds(b.pad(.3)); }
+    lastInside= trackerFence? pointInPolygon([latitude,longitude], trackerFence.coords) : false;
+    setState(lastInside?'ok':'no', lastInside?'Dentro de geocerca':'Fuera de geocerca');
+    $('#lastEvent').textContent=`${lastPos.ts} · ${lastInside?'Dentro':'Fuera'} (${Math.round(accuracy)}m)`;
+  }
   function onGeoErr(err){ $('#lastEvent').textContent=`Error GPS: ${err.message}`; setState('no','GPS error'); }
-  function trySend(){ if(!$('#toggleSend').checked||!lastPos||!lastInside) return; const payload={ ts:lastPos.ts, telefono:trackerUser?.telefono||param('phone')||'desconocido', geocercaId:trackerUser?.geocercaId||(trackerFence?.id||''), lat:lastPos.lat, lng:lastPos.lng, acc:lastPos.acc, farmId:ctx.farmId }; ctx.data.logs.push(payload); saveAll(); renderLogs(); const url=(ctx.data.config.webhook||'').trim(); if(url){ const blob=new Blob([JSON.stringify(payload)],{type:'application/json'}); const ok=(navigator.sendBeacon && navigator.sendBeacon(url,blob)); if(!ok){ fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(()=>{}); } } $('#lastSend').textContent=nowISO(); }
+  function trySend(){
+    if(!$('#toggleSend').checked||!lastPos||!lastInside) return;
+    const payload={ ts:lastPos.ts, telefono:trackerUser?.telefono||param('phone')||'desconocido', geocercaId:trackerUser?.geocercaId||(trackerFence?.id||''), lat:lastPos.lat, lng:lastPos.lng, acc:lastPos.acc, farmId:ctx.farmId };
+    // Guarda local (útil para el gráfico local del tracker también)
+    ctx.data.logs.push(payload); saveAll();
+    // Enviar a servidor si hay Webhook
+    const url=(ctx.data.config.webhook||'').trim();
+    if(url){
+      const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+      const ok=(navigator.sendBeacon && navigator.sendBeacon(url,blob));
+      if(!ok){ fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(()=>{}); }
+    }
+    $('#lastSend').textContent=nowISO();
+  }
 
   // ===== Binding general
   function refreshBindings(){ renderConfig(); refreshFenceSelects(); refreshActivePersonalSelects(); renderFencesTable(); renderPersonalTable(); renderLogs(); }
 
-  // ===== Arranque con control de rol/mode =====
+  // ===== Arranque (modo admin vs tracker)
   function start(){
     const mode=(param('mode')||'').toLowerCase();
-    // Si llega snapshot en la URL y el usuario NO es admin, forzamos tracker
-    const rawState=param('state'); if(rawState && mode!=='admin'){ $('#adminShell').classList.add('hidden'); $('#trackerShell').classList.remove('hidden'); initTracker(); return; }
+    // Si llega snapshot y NO venimos en modo admin, vamos directo a tracker
+    const rawState=param('state');
+    if(rawState && mode!=='admin'){ $('#adminShell').classList.add('hidden'); $('#trackerShell').classList.remove('hidden'); initTracker(); return; }
 
-    renderFarms(); if(!ctx.farmId){ const id='f'+Date.now(); const arr=farmsState.get(); arr.push({id,nombre:'Mi Finca'}); farmsState.set(arr); ctx.farmId=id; renderFarms(); }
+    renderFarms();
+    if(!ctx.farmId){ const id='f'+Date.now(); const arr=farmsState.get(); arr.push({id,nombre:'Mi Finca'}); farmsState.set(arr); ctx.farmId=id; renderFarms(); }
     chooseFarm(ctx.farmId);
 
-    // Gate: si ?mode=tracker o hay ?phone válido y su rol=TRACKER => SOLO tracker
+    // Gate de seguridad: si ?mode=tracker o phone es TRACKER => solo tracker
     const phone=param('phone'); const person=ctx.data.personal.find(p=>p.telefono===phone);
     if(mode==='tracker' || (phone && person && person.rol==='TRACKER')){
       $('#adminShell').classList.add('hidden'); $('#trackerShell').classList.remove('hidden'); initTracker(); return;
     }
 
-    // Caso normal: ADMIN
+    // Admin normal
     $('#trackerShell').classList.add('hidden'); $('#adminShell').classList.remove('hidden'); initMap(); mapRenderFences();
   }
 
   if(typeof window.L==='undefined'){ window.__leafletReady=start; } else { start(); }
+
 })();
 </script>
 </body>
