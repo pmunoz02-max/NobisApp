@@ -29,7 +29,7 @@ section.panel.show{display:block}
 .card{background:#fff;border:1px solid #e6e6e6;border-radius:.75rem;padding:1rem}
 input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radius:.5rem}
 .small{font-size:.86rem}.muted{color:#666}.hidden{display:none}
-.map{height:520px;border-radius:.75rem;border:1px solid #e5e5e5}
+.map{height:520px;border-radius:.75rem;border:1px solid #e5e5e5;background:#f2f2f2}
 .mini-map{height:360px;border-radius:.75rem;border:1px solid #e5e5e5}
 .coords{position:absolute;right:.75rem;bottom:.75rem;background:rgba(255,255,255,.92);border:1px solid #ddd;border-radius:.5rem;padding:.25rem .5rem;font-size:.85rem}
 
@@ -49,17 +49,29 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
 .leaflet-control-zoom-in,.leaflet-control-zoom-out{font:bold 18px/28px Arial,Helvetica,sans-serif}
 </style>
 
-<!-- Loader multi-CDN Leaflet/Draw -->
+<!-- Loader multi-CDN: arranca apenas Leaflet esté listo (Draw opcional) -->
 <script>
 (function(){
-  function loadJS(src,cb){var s=document.createElement('script');s.src=src;s.async=true;s.onload=()=>cb();s.onerror=()=>cb(new Error('x'));document.head.appendChild(s)}
-  function chain(urls,test,done){(function nx(){if(!urls.length)return done(new Error('no cdn'));let u=urls.shift();loadJS(u,e=>{if(e||!test())nx();else done();});})();}
+  function loadJS(src,cb){var s=document.createElement('script');s.src=src;s.async=true;s.onload=()=>cb();s.onerror=()=>cb(new Error('fail '+src));document.head.appendChild(s)}
+  function chain(urls,test,done){(function nx(){if(!urls.length)return done(new Error('CDNs agotados'));let u=urls.shift();loadJS(u,e=>{if(e||!test())nx();else done();});})();}
 
   const LJS=['https://unpkg.com/leaflet@1.9.4/dist/leaflet.js','https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'];
   const DRAW=['https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js','https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js'];
 
-  if(window.L){ window.__leafletReady && window.__leafletReady(); return; }
-  chain(LJS.slice(),()=>!!window.L,()=>chain(DRAW.slice(),()=>!!(L&&L.Control&&L.Control.Draw),()=>window.__leafletReady && window.__leafletReady()));
+  function startNow(){ window.__leafletReady && window.__leafletReady(); }
+
+  if(window.L){ // Leaflet ya está
+    startNow();
+    // cargar Draw en segundo plano (opcional)
+    chain(DRAW.slice(), ()=>!!(L&&L.Control&&L.Control.Draw), ()=>{});
+    return;
+  }
+
+  // 1) Carga Leaflet (obligatorio) -> arranca app
+  chain(LJS.slice(), ()=>!!window.L, ()=>{ startNow();
+    // 2) Carga Draw (opcional, no bloquea)
+    chain(DRAW.slice(), ()=>!!(L&&L.Control&&L.Control.Draw), ()=>{});
+  });
 })();
 </script>
 
@@ -71,7 +83,6 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   <div class="badge ok" title="App OK"></div>
   <h1>App Fincas · Geocercas + Trackers</h1>
   <div style="flex:1"></div>
-
   <!-- Controles solo para ADMIN -->
   <span id="adminHeaderControls" style="display:flex;gap:.5rem;align-items:center">
     <label class="small muted" for="farmSelect" style="margin-right:.25rem">Finca:</label>
@@ -89,9 +100,7 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
       <div id="trackerUserInfo" class="small muted">Cargando…</div>
       <div class="small muted" style="margin-top:.25rem">Frecuencia: <span id="freqSec">15</span> s</div>
       <div class="small" style="margin-top:.5rem">Asignado a geocerca: <span id="trackerFenceName" class="badge" style="background:#eee;width:auto;height:auto;border-radius:999px;padding:.1rem .5rem">—</span></div>
-      <div class="small" style="margin-top:.75rem">
-        <label><input type="checkbox" id="toggleSend"> Activar envío (solo dentro de la geocerca)</label>
-      </div>
+      <div class="small" style="margin-top:.75rem"><label><input type="checkbox" id="toggleSend"> Activar envío (solo dentro de la geocerca)</label></div>
       <div class="small" style="margin-top:.5rem">
         Estado: <span id="trackerStateDot" class="badge idle"></span> <span id="trackerStateText">Inactivo</span><br>
         Último evento: <span id="lastEvent">—</span><br>
@@ -231,8 +240,8 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   const escapeHtml=s=>String(s||'').replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
 
   // Snapshot (state) en URL para trackers
-  function encodeStateForShare(obj){const json=JSON.stringify(obj);return btoa(unescape(encodeURIComponent(json))); }
-  function decodeStateFromShare(b64){ try{const json=decodeURIComponent(escape(atob(b64)));return JSON.parse(json);}catch(_){return null;} }
+  function encodeStateForShare(obj){ const json=JSON.stringify(obj); return btoa(unescape(encodeURIComponent(json))); }
+  function decodeStateFromShare(b64){ try{ const json=decodeURIComponent(escape(atob(b64))); return JSON.parse(json); }catch(_){ return null; } }
 
   // ===== Estado
   const LS_PREFIX='app_geo_v2';
@@ -283,6 +292,8 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
       map.addControl(drawControl);
       map.on(L.Draw.Event.CREATED, e=>{ drawnItems.addLayer(e.layer); updateFencesFromLayers(); });
       map.on(L.Draw.Event.EDITED, ()=> updateFencesFromLayers());
+    } else {
+      const w=document.createElement('div'); w.className='coords'; w.style.left='.75rem'; w.style.right='auto'; w.textContent='ℹ Edición deshabilitada (Leaflet.draw no cargó).'; cont.appendChild(w);
     }
     map.on('mousemove',ev=> $('#mapCoords').textContent=`Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`);
     try{ L.control.zoom({position:'topleft'}).addTo(map); }catch(_){}
@@ -331,9 +342,9 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   window._zoomFence=id=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f||!map) return; try{ map.fitBounds(coordsToLayer(f.coords).getBounds().pad(.2)); }catch(_){ } }
   window._deleteFence=id=>{ if(!confirm('¿Eliminar geocerca?')) return; ctx.data.fences=ctx.data.fences.filter(f=>f.id!==id); saveAll(); mapRenderFences(); renderFencesTable(); }
   window._renameFence=(id,name)=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f) return; f.name=(name||'').trim()||f.name; saveAll(); renderFencesTable(); refreshFenceSelects(); }
-  $('#btnNuevaGeocerca').onclick=()=>{ try{ new L.Draw.Polygon(map).enable(); }catch(e){ alert('Leaflet.draw no disponible'); } };
+  $('#btnNuevaGeocerca').onclick=()=>{ try{ new L.Draw.Polygon(map).enable(); }catch(e){ alert('Edición no disponible (Leaflet.draw)'); } };
   let editing=false;
-  $('#btnEditarGeocerca').onclick=()=>{ editing=!editing; try{ new L.EditToolbar.Edit(map,{featureGroup:drawnItems})[editing?'enable':'disable'](); $('#btnEditarGeocerca').textContent= editing?'Salir de Edición':'Editar Geocercas'; }catch(e){ alert('Leaflet.draw no disponible'); } };
+  $('#btnEditarGeocerca').onclick=()=>{ editing=!editing; try{ new L.EditToolbar.Edit(map,{featureGroup:drawnItems})[editing?'enable':'disable'](); $('#btnEditarGeocerca').textContent= editing?'Salir de Edición':'Editar Geocercas'; }catch(e){ alert('Edición no disponible (Leaflet.draw)'); } };
   $('#btnGuardarGeocercas').onclick=()=>{ updateFencesFromLayers(); alert('Cambios guardados.'); };
   $('#btnCrearDesdeLista').onclick=()=>{ const name=$('#newFenceName').value.trim(); const txt=$('#coordsInput').value.trim(); if(!txt) return alert('Pega coordenadas'); const coords=txt.split(/\n+/).map(l=>{ const [a,b]=l.split(',').map(s=>parseFloat(s.trim())); return (Number.isFinite(a)&&Number.isFinite(b))?[a,b]:null; }).filter(Boolean); if(coords.length<3) return alert('Se requieren ≥3 puntos'); const layer=coordsToLayer(coords).bindTooltip(name||('Geocerca '+(ctx.data.fences.length+1))); drawnItems.addLayer(layer); updateFencesFromLayers(); $('#coordsInput').value=''; $('#newFenceName').value=''; };
 
@@ -408,9 +419,8 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   function initTracker(hasSnapshot){
     const phone=param('phone'); let farm=param('farm');
 
-    // Si llega snapshot, CARGA DIRECTA y NO tocar localStorage de la finca
     if(hasSnapshot){
-      const rawState=param('state'); const snap=decodeStateFromShare(rawState);
+      const snap=decodeStateFromShare(param('state'));
       if(snap && snap.farmId){
         ctx.farmId=snap.farmId;
         ctx.data.fences=snap.fences||[];
@@ -418,7 +428,6 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
         ctx.data.config.freqSec=(snap.config&&snap.config.freqSec)||ctx.data.config.freqSec;
       }
     }else{
-      // Sin snapshot: detectar finca y cargar datos locales
       if(!farm){ const guess=resolveFarmByPhone(phone); if(guess) farm=guess; }
       if(farm){ ctx.farmId=farm; renderFarms(); chooseFarm(farm); }
     }
@@ -483,12 +492,10 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
     const hasSnapshot=!!param('state');
 
     if(mode==='tracker' || hasSnapshot){
-      // Oculta controles admin en el encabezado y toda la interfaz admin
       document.body.classList.add('is-tracker');
       $('#adminShell').classList.add('hidden');
       $('#trackerShell').classList.remove('hidden');
-      // No cargar datos locales si viene snapshot (evita geocercas viejas)
-      initTracker(hasSnapshot);
+      initTracker(hasSnapshot);  // <- no tocamos datos locales si hay snapshot
       return;
     }
 
