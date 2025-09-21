@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>App Fincas · Geocercas + Trackers</title>
 
-<!-- Leaflet/Draw CSS (mejora visual; hay fallback interno si no cargan) -->
+<!-- Leaflet/Draw CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
 
@@ -33,6 +33,9 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
 .mini-map{height:360px;border-radius:.75rem;border:1px solid #e5e5e5}
 .coords{position:absolute;right:.75rem;bottom:.75rem;background:rgba(255,255,255,.92);border:1px solid #ddd;border-radius:.5rem;padding:.25rem .5rem;font-size:.85rem}
 
+/* Ocultar controles de header cuando body tiene clase is-tracker */
+.is-tracker #adminHeaderControls{display:none}
+
 /* Fallback esencial si el CSS de Leaflet no carga */
 .leaflet-container{position:relative;overflow:hidden;outline:0}
 .leaflet-pane,.leaflet-map-pane,.leaflet-tile-pane,.leaflet-overlay-pane,.leaflet-shadow-pane,.leaflet-marker-pane,.leaflet-tooltip-pane,.leaflet-popup-pane{position:absolute;left:0;top:0}
@@ -46,21 +49,21 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
 .leaflet-control-zoom-in,.leaflet-control-zoom-out{font:bold 18px/28px Arial,Helvetica,sans-serif}
 </style>
 
-<!-- Loader multi-CDN: asegura Leaflet/Draw y luego llama a __leafletReady() -->
+<!-- Loader multi-CDN Leaflet/Draw -->
 <script>
 (function(){
-  function loadJS(src,cb){var s=document.createElement('script');s.src=src;s.async=true;s.onload=()=>cb();s.onerror=()=>cb(new Error('fail '+src));document.head.appendChild(s)}
-  function chain(urls,test,done){(function nx(){if(!urls.length)return done(new Error('CDNs agotados'));let u=urls.shift();loadJS(u,e=>{if(e||!test())nx();else done();});})();}
+  function loadJS(src,cb){var s=document.createElement('script');s.src=src;s.async=true;s.onload=()=>cb();s.onerror=()=>cb(new Error('x'));document.head.appendChild(s)}
+  function chain(urls,test,done){(function nx(){if(!urls.length)return done(new Error('no cdn'));let u=urls.shift();loadJS(u,e=>{if(e||!test())nx();else done();});})();}
 
   const LJS=['https://unpkg.com/leaflet@1.9.4/dist/leaflet.js','https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'];
   const DRAW=['https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js','https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js'];
 
   if(window.L){ window.__leafletReady && window.__leafletReady(); return; }
-  chain(LJS.slice(), ()=>!!window.L, ()=> chain(DRAW.slice(), ()=>!!(L&&L.Control&&L.Control.Draw), ()=> window.__leafletReady && window.__leafletReady()));
+  chain(LJS.slice(),()=>!!window.L,()=>chain(DRAW.slice(),()=>!!(L&&L.Control&&L.Control.Draw),()=>window.__leafletReady && window.__leafletReady()));
 })();
 </script>
 
-<!-- Chart.js para un gráfico simple en Reportes -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -68,13 +71,17 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   <div class="badge ok" title="App OK"></div>
   <h1>App Fincas · Geocercas + Trackers</h1>
   <div style="flex:1"></div>
-  <label class="small muted" for="farmSelect" style="margin-right:.5rem">Finca:</label>
-  <select id="farmSelect"></select>
-  <button class="btn" id="btnNuevaFinca">Crear</button>
-  <button class="btn danger" id="btnEliminarFinca">Eliminar Finca</button>
+
+  <!-- Controles solo para ADMIN -->
+  <span id="adminHeaderControls" style="display:flex;gap:.5rem;align-items:center">
+    <label class="small muted" for="farmSelect" style="margin-right:.25rem">Finca:</label>
+    <select id="farmSelect"></select>
+    <button class="btn" id="btnNuevaFinca">Crear</button>
+    <button class="btn danger" id="btnEliminarFinca">Eliminar Finca</button>
+  </span>
 </header>
 
-<!-- TRACKER: interfaz mínima -->
+<!-- TRACKER -->
 <div id="trackerShell" class="wrap hidden">
   <div class="grid grid-2">
     <div class="card">
@@ -224,10 +231,10 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   const escapeHtml=s=>String(s||'').replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
 
   // Snapshot (state) en URL para trackers
-  function encodeStateForShare(obj){ const json=JSON.stringify(obj); return btoa(unescape(encodeURIComponent(json))); }
-  function decodeStateFromShare(b64){ try{ const json=decodeURIComponent(escape(atob(b64))); return JSON.parse(json); }catch(_){ return null; } }
+  function encodeStateForShare(obj){const json=JSON.stringify(obj);return btoa(unescape(encodeURIComponent(json))); }
+  function decodeStateFromShare(b64){ try{const json=decodeURIComponent(escape(atob(b64)));return JSON.parse(json);}catch(_){return null;} }
 
-  // ===== Estado / almacenamiento
+  // ===== Estado
   const LS_PREFIX='app_geo_v2';
   const ctx={ farmId:null, data:{ fences:[], personal:[], logs:[], config:{webhook:'',freqSec:15} } };
 
@@ -246,7 +253,7 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   $('#btnEliminarFinca').onclick=()=>{ if(!ctx.farmId) return; if(!confirm('¿Eliminar finca y todos sus datos?')) return; Object.keys(ctx.data).forEach(k=>localStorage.removeItem(storageKey(k))); const arr=farmsState.get().filter(f=>f.id!==ctx.farmId); farmsState.set(arr); ctx.farmId=arr[0]?.id||null; renderFarms(); if(ctx.farmId) chooseFarm(ctx.farmId); else location.reload(); };
   $('#farmSelect').onchange=()=>chooseFarm($('#farmSelect').value);
 
-  // ===== Tabs (solo admin)
+  // ===== Tabs (admin)
   $('#tabs').addEventListener('click',e=>{
     if(e.target.tagName!=='BUTTON') return;
     const tab=e.target.dataset.tab;
@@ -276,8 +283,6 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
       map.addControl(drawControl);
       map.on(L.Draw.Event.CREATED, e=>{ drawnItems.addLayer(e.layer); updateFencesFromLayers(); });
       map.on(L.Draw.Event.EDITED, ()=> updateFencesFromLayers());
-    } else {
-      const w=document.createElement('div'); w.className='coords'; w.style.left='.75rem'; w.style.right='auto'; w.textContent='⚠ Leaflet.draw no cargó (CDN).'; cont.appendChild(w);
     }
     map.on('mousemove',ev=> $('#mapCoords').textContent=`Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`);
     try{ L.control.zoom({position:'topleft'}).addTo(map); }catch(_){}
@@ -337,13 +342,8 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   function refreshActivePersonalSelects(){ const trackers=ctx.data.personal.filter(p=>p.rol==='TRACKER'); $('#quickUser').innerHTML=trackers.map(p=>`<option value=\"${p.id}\">${escapeHtml(p.nombre)} (${escapeHtml(p.telefono)})</option>`).join(''); }
   $('#btnAddPersonal').onclick=()=>{ const nombre=$('#pNombre').value.trim(); const telefono=$('#pTelefono').value.trim(); if(!nombre||!telefono) return alert('Completa nombre y teléfono'); const rol=$('#pRol').value; const activo=$('#pActivo').value==='true'; const geocercaId=$('#pGeocerca').value||''; ctx.data.personal.push({id:'p'+Date.now(),nombre,telefono,rol,activo,geocercaId}); saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); $('#pNombre').value=''; $('#pTelefono').value=''; };
   function trackerLinkFor(p){
-    const fence = ctx.data.fences.find(f=>f.id===p.geocercaId)||null;
-    const snapshot = {
-      farmId: ctx.farmId,
-      personal: { id:p.id, nombre:p.nombre, telefono:p.telefono, activo:p.activo, rol:p.rol, geocercaId:p.geocercaId },
-      fences: fence ? [{ id:fence.id, name:fence.name, coords:fence.coords, color:'#0b5' }] : [],
-      config: { freqSec: ctx.data.config.freqSec||15 }
-    };
+    const fence=ctx.data.fences.find(f=>f.id===p.geocercaId)||null;
+    const snapshot={ farmId:ctx.farmId, personal:{id:p.id,nombre:p.nombre,telefono:p.telefono,activo:p.activo,rol:p.rol,geocercaId:p.geocercaId}, fences: fence?[{id:fence.id,name:fence.name,coords:fence.coords,color:'#0b5'}]:[], config:{freqSec:ctx.data.config.freqSec||15} };
     const u=new URL(location.href); u.search=''; u.hash='';
     u.searchParams.set('mode','tracker'); u.searchParams.set('phone',p.telefono); if(ctx.farmId) u.searchParams.set('farm',ctx.farmId);
     u.searchParams.set('state', encodeStateForShare(snapshot));
@@ -373,7 +373,6 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   $('#btnExportCSV').onclick=()=>{ const rows=[['ts','telefono','geocerca','lat','lng','accuracy']].concat(ctx.data.logs.map(l=>[l.ts,l.telefono,l.geocercaId,l.lat,l.lng,l.acc])); const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'\"')}"`).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`logs_${ctx.farmId||'finca'}.csv`; a.click(); };
   $('#btnBorrarLogs').onclick=()=>{ if(!confirm('¿Borrar todos los registros?')) return; ctx.data.logs=[]; saveAll(); renderLogs(); drawChart(); };
 
-  // Sincronizar desde servidor (GET)
   async function syncFromServer(){
     const urlBase=(ctx.data.config.webhook||'').trim();
     if(!urlBase){ alert('Configura el Webhook en la pestaña Config.'); return; }
@@ -400,34 +399,29 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   let chart;
   function drawChart(){ const data={}; for(const l of ctx.data.logs){ const d=l.ts.slice(0,10); data[d]=(data[d]||0)+1; } const labels=Object.keys(data).sort(); const values=labels.map(k=>data[k]); const el=document.getElementById('chartPos'); if(!el) return; if(chart) chart.destroy(); chart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Posiciones/día',data:values}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}}); }
 
-  // ===== Config
-  function renderConfig(){ $('#cfgWebhook').value=ctx.data.config.webhook||''; $('#cfgFreq').value=ctx.data.config.freqSec||15; $('#freqSec').textContent=ctx.data.config.freqSec||15; }
-  $('#btnGuardarCfg').onclick=()=>{ ctx.data.config.webhook=$('#cfgWebhook').value.trim(); const f=parseInt($('#cfgFreq').value,10); ctx.data.config.freqSec=Number.isFinite(f)&&f>0?f:15; saveAll(); alert('Configuración guardada.'); };
-
-  // ===== Utilidades multi-finca (detección por teléfono)
+  // ===== Utilidades multi-finca
   function loadSectionForFarm(farmId, section){ try{ return JSON.parse(localStorage.getItem(`${LS_PREFIX}_${farmId}_${section}`)||'[]'); }catch(_){ return []; } }
   function resolveFarmByPhone(phone){ if(!phone) return null; const farms=ensureFarmList().get(); for(const f of farms){ const people=loadSectionForFarm(f.id,'personal'); const hit=people.find(p=>p.telefono===phone && p.activo); if(hit) return f.id; } return null; }
 
   // ===== TRACKER
   let miniMap, miniFenceLayer, watchId=null, sendTimer=null, trackerUser=null, trackerFence=null, lastPos=null, lastInside=false;
-  function initTracker(){
+  function initTracker(hasSnapshot){
     const phone=param('phone'); let farm=param('farm');
 
-    // Cargar snapshot si viene en el enlace
-    const rawState=param('state');
-    if(rawState){
-      const snap=decodeStateFromShare(rawState);
+    // Si llega snapshot, CARGA DIRECTA y NO tocar localStorage de la finca
+    if(hasSnapshot){
+      const rawState=param('state'); const snap=decodeStateFromShare(rawState);
       if(snap && snap.farmId){
         ctx.farmId=snap.farmId;
         ctx.data.fences=snap.fences||[];
         ctx.data.personal=snap.personal?[snap.personal]:[];
         ctx.data.config.freqSec=(snap.config&&snap.config.freqSec)||ctx.data.config.freqSec;
       }
+    }else{
+      // Sin snapshot: detectar finca y cargar datos locales
+      if(!farm){ const guess=resolveFarmByPhone(phone); if(guess) farm=guess; }
+      if(farm){ ctx.farmId=farm; renderFarms(); chooseFarm(farm); }
     }
-
-    // Si no vino farm, deducir por teléfono (si existe en este navegador)
-    if(!farm){ const guess=resolveFarmByPhone(phone); if(guess) farm=guess; }
-    if(farm){ ctx.farmId=farm; renderFarms(); chooseFarm(farm); }
 
     trackerUser=ctx.data.personal.find(p=>p.telefono===phone)||null;
     const ok=!!(trackerUser && trackerUser.activo);
@@ -470,9 +464,7 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   function trySend(){
     if(!$('#toggleSend').checked||!lastPos||!lastInside) return;
     const payload={ ts:lastPos.ts, telefono:trackerUser?.telefono||param('phone')||'desconocido', geocercaId:trackerUser?.geocercaId||(trackerFence?.id||''), lat:lastPos.lat, lng:lastPos.lng, acc:lastPos.acc, farmId:ctx.farmId };
-    // Guarda local (útil para el gráfico local del tracker también)
     ctx.data.logs.push(payload); saveAll();
-    // Enviar a servidor si hay Webhook
     const url=(ctx.data.config.webhook||'').trim();
     if(url){
       const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
@@ -485,29 +477,45 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   // ===== Binding general
   function refreshBindings(){ renderConfig(); refreshFenceSelects(); refreshActivePersonalSelects(); renderFencesTable(); renderPersonalTable(); renderLogs(); }
 
-  // ===== Arranque (modo admin vs tracker)
+  // ===== Inicio
   function start(){
     const mode=(param('mode')||'').toLowerCase();
-    // Si llega snapshot y NO venimos en modo admin, vamos directo a tracker
-    const rawState=param('state');
-    if(rawState && mode!=='admin'){ $('#adminShell').classList.add('hidden'); $('#trackerShell').classList.remove('hidden'); initTracker(); return; }
+    const hasSnapshot=!!param('state');
 
-    renderFarms();
-    if(!ctx.farmId){ const id='f'+Date.now(); const arr=farmsState.get(); arr.push({id,nombre:'Mi Finca'}); farmsState.set(arr); ctx.farmId=id; renderFarms(); }
-    chooseFarm(ctx.farmId);
-
-    // Gate de seguridad: si ?mode=tracker o phone es TRACKER => solo tracker
-    const phone=param('phone'); const person=ctx.data.personal.find(p=>p.telefono===phone);
-    if(mode==='tracker' || (phone && person && person.rol==='TRACKER')){
-      $('#adminShell').classList.add('hidden'); $('#trackerShell').classList.remove('hidden'); initTracker(); return;
+    if(mode==='tracker' || hasSnapshot){
+      // Oculta controles admin en el encabezado y toda la interfaz admin
+      document.body.classList.add('is-tracker');
+      $('#adminShell').classList.add('hidden');
+      $('#trackerShell').classList.remove('hidden');
+      // No cargar datos locales si viene snapshot (evita geocercas viejas)
+      initTracker(hasSnapshot);
+      return;
     }
 
-    // Admin normal
-    $('#trackerShell').classList.add('hidden'); $('#adminShell').classList.remove('hidden'); initMap(); mapRenderFences();
+    // ADMIN
+    document.body.classList.remove('is-tracker');
+    renderFarms();
+    if(!ctx.farmId){
+      const id='f'+Date.now();
+      const arr=farmsState.get(); arr.push({id,nombre:'Mi Finca'}); farmsState.set(arr);
+      ctx.farmId=id; renderFarms();
+    }
+    chooseFarm(ctx.farmId);
+    $('#trackerShell').classList.add('hidden');
+    $('#adminShell').classList.remove('hidden');
+    initMap(); mapRenderFences();
   }
 
-  if(typeof window.L==='undefined'){ window.__leafletReady=start; } else { start(); }
+  // Botones de Reportes y Config
+  $('#btnSyncServer').onclick=syncFromServer;
+  $('#btnGuardarCfg').onclick=()=>{ ctx.data.config.webhook=$('#cfgWebhook').value.trim(); const f=parseInt($('#cfgFreq').value,10); ctx.data.config.freqSec=Number.isFinite(f)&&f>0?f:15; saveAll(); alert('Configuración guardada.'); };
+  function renderConfig(){ $('#cfgWebhook').value=ctx.data.config.webhook||''; $('#cfgFreq').value=ctx.data.config.freqSec||15; $('#freqSec').textContent=ctx.data.config.freqSec||15; }
 
+  // Gráfico
+  let chart;
+  function drawChart(){ const data={}; for(const l of ctx.data.logs){ const d=l.ts.slice(0,10); data[d]=(data[d]||0)+1; } const labels=Object.keys(data).sort(); const values=labels.map(k=>data[k]); const el=document.getElementById('chartPos'); if(!el) return; if(chart) chart.destroy(); chart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Posiciones/día',data:values}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}}); }
+
+  if(typeof window.L==='undefined'){ window.__leafletReady=start; } else { start(); }
 })();
 </script>
 </body>
