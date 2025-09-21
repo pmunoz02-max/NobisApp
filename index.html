@@ -39,7 +39,7 @@ section.panel.show{display:block}
 .vertex{fill:#fff;stroke:#0b5;stroke-width:2}
 .marker{fill:#e74c3c;stroke:#fff;stroke-width:2}
 
-.hint{position:absolute;left:.75rem;bottom:.75rem;background:rgba(255,255,255,.95);border:1px solid #ddd;border-radius:.5rem;padding:.35rem .6rem;font-size:.85rem;z-index:6}
+.toolbox{position:absolute;left:.75rem;bottom:.75rem;display:flex;gap:.5rem;align-items:center;background:rgba(255,255,255,.95);border:1px solid #ddd;border-radius:.5rem;padding:.35rem .6rem;font-size:.85rem;z-index:6}
 </style>
 </head>
 <body>
@@ -106,7 +106,11 @@ section.panel.show{display:block}
         </div>
         <div style="position:relative;margin-top:1rem">
           <div id="map" class="map"></div>
-          <div class="hint hidden" id="drawHint">Dibujando geocerca: click para añadir vértices, <b>doble-click</b> para cerrar · <b>ESC</b> cancela</div>
+          <!-- panel flotante visible SOLO en modo dibujo -->
+          <div class="toolbox hidden" id="drawToolbox">
+            <span id="drawHint">Dibujando: click agrega vértices, <b>doble-click</b> cierra, <b>ESC</b> cancela</span>
+            <button class="btn primary" id="btnFinishDraw">Finalizar dibujo</button>
+          </div>
           <div class="coords" id="mapCoords">Lat: — Lng: —</div>
         </div>
       </div>
@@ -284,7 +288,6 @@ class TinyMap {
     this.render();
   }
   render(){
-    const world = 256*Math.pow(2,this.z);
     const cp = this._project(this.center.lat,this.center.lng,this.z);
     const topLeft = {x: cp.x - this.w/2, y: cp.y - this.h/2};
     const startX = Math.floor(topLeft.x/256), startY = Math.floor(topLeft.y/256);
@@ -437,7 +440,7 @@ let drawing=false, drawPts=[], drawPoly=null, drawDots=[];
 function setDrawing(on){
   drawing=on;
   adminMap.enablePan = !on;
-  $('#drawHint').classList.toggle('hidden', !on);
+  document.getElementById('drawToolbox').classList.toggle('hidden', !on);
   if(!on){
     drawPts=[]; if(drawPoly){ drawPoly.remove(); drawPoly=null; }
     drawDots.forEach(d=>d.remove()); drawDots=[];
@@ -464,7 +467,9 @@ function finishDrawing(){
   saveAll(); renderFencesTable(); refreshFenceSelects(); mapRenderFences();
   setDrawing(false);
 }
-$('#btnDrawFence').onclick=()=>{ if(drawing){ setDrawing(false); } else { setDrawing(true); } };
+document.getElementById('btnDrawFence').onclick=()=>{ setDrawing(!drawing); };
+document.getElementById('btnFinishDraw').onclick=finishDrawing;
+
 document.getElementById('map').addEventListener('click',e=>{
   if(!drawing) return;
   const rect=e.currentTarget.getBoundingClientRect();
@@ -499,7 +504,7 @@ function renderPersonalTable(){
     tr.innerHTML=`<td contenteditable onblur="window._pf('${p.id}','nombre',this.textContent)">${escapeHtml(p.nombre)}</td>
     <td contenteditable onblur="window._pf('${p.id}','telefono',this.textContent)">${escapeHtml(p.telefono)}</td>
     <td><select onchange="window._pf('${p.id}','rol',this.value)"><option ${p.rol==='TRACKER'?'selected':''}>TRACKER</option><option ${p.rol==='ADMIN'?'selected':''}>ADMIN</option></select></td>
-    <td><select onchange="window._pf('${p.id}','activo',this.value)"><option value="true" ${p.activo?'selected':''}>Sí</option><option value="false" ${!p.activo?'selected':''}>No</option></select></td>
+    <td><select onchange="window._pf('${p.id)','activo',this.value)"><option value="true" ${p.activo?'selected':''}>Sí</option><option value="false" ${!p.activo?'selected':''}>No</option></select></td>
     <td><select onchange="window._pf('${p.id}','geocercaId',this.value)"><option value="">(sin)</option>${ctx.data.fences.map(f=>`<option value="${f.id}" ${p.geocercaId===f.id?'selected':''}>${escapeHtml(f.name)}</option>`).join('')}</select></td>
     <td><input readonly value="${trackerLinkFor(p)}" style="width:260px"/></td>
     <td><button class="btn" onclick="window.open('${trackerLinkFor(p)}','_blank')">Abrir</button></td>`;
