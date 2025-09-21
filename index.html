@@ -32,11 +32,9 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
 .map{height:520px;border-radius:.75rem;border:1px solid #e5e5e5;background:#f2f2f2}
 .mini-map{height:360px;border-radius:.75rem;border:1px solid #e5e5e5}
 .coords{position:absolute;right:.75rem;bottom:.75rem;background:rgba(255,255,255,.92);border:1px solid #ddd;border-radius:.5rem;padding:.25rem .5rem;font-size:.85rem}
-
-/* Ocultar controles de header cuando body tiene clase is-tracker */
 .is-tracker #adminHeaderControls{display:none}
 
-/* Fallback esencial si el CSS de Leaflet no carga */
+/* Essentials Leaflet fallback */
 .leaflet-container{position:relative;overflow:hidden;outline:0}
 .leaflet-pane,.leaflet-map-pane,.leaflet-tile-pane,.leaflet-overlay-pane,.leaflet-shadow-pane,.leaflet-marker-pane,.leaflet-tooltip-pane,.leaflet-popup-pane{position:absolute;left:0;top:0}
 .leaflet-zoom-animated{transform-origin:0 0}
@@ -49,27 +47,35 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
 .leaflet-control-zoom-in,.leaflet-control-zoom-out{font:bold 18px/28px Arial,Helvetica,sans-serif}
 </style>
 
-<!-- Loader multi-CDN: arranca apenas Leaflet esté listo (Draw opcional) -->
+<!-- Orquestador seguro: ejecuta callbacks cuando Leaflet está listo (Draw opcional) -->
 <script>
 (function(){
+  // API pública para el resto del archivo
+  window.__leafletCbs = [];
+  window.__whenLeafletReady = function(cb){
+    if (window.L) { try{ cb(); }catch(_){} }
+    else { window.__leafletCbs.push(cb); }
+  };
+  function fireLeafletReady(){
+    var cbs = window.__leafletCbs.splice(0, window.__leafletCbs.length);
+    cbs.forEach(function(f){ try{ f(); }catch(_){ } });
+  }
+
   function loadJS(src,cb){var s=document.createElement('script');s.src=src;s.async=true;s.onload=()=>cb();s.onerror=()=>cb(new Error('fail '+src));document.head.appendChild(s)}
   function chain(urls,test,done){(function nx(){if(!urls.length)return done(new Error('CDNs agotados'));let u=urls.shift();loadJS(u,e=>{if(e||!test())nx();else done();});})();}
 
   const LJS=['https://unpkg.com/leaflet@1.9.4/dist/leaflet.js','https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'];
   const DRAW=['https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js','https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js'];
 
-  function startNow(){ window.__leafletReady && window.__leafletReady(); }
-
-  if(window.L){ // Leaflet ya está
-    startNow();
-    // cargar Draw en segundo plano (opcional)
+  if (window.L){
+    fireLeafletReady();
     chain(DRAW.slice(), ()=>!!(L&&L.Control&&L.Control.Draw), ()=>{});
     return;
   }
 
-  // 1) Carga Leaflet (obligatorio) -> arranca app
-  chain(LJS.slice(), ()=>!!window.L, ()=>{ startNow();
-    // 2) Carga Draw (opcional, no bloquea)
+  // 1) Carga Leaflet (obligatorio) -> dispara callbacks
+  chain(LJS.slice(), ()=>!!window.L, ()=>{ fireLeafletReady();
+    // 2) Carga Draw (opcional, no bloquea la app)
     chain(DRAW.slice(), ()=>!!(L&&L.Control&&L.Control.Draw), ()=>{});
   });
 })();
@@ -83,7 +89,6 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   <div class="badge ok" title="App OK"></div>
   <h1>App Fincas · Geocercas + Trackers</h1>
   <div style="flex:1"></div>
-  <!-- Controles solo para ADMIN -->
   <span id="adminHeaderControls" style="display:flex;gap:.5rem;align-items:center">
     <label class="small muted" for="farmSelect" style="margin-right:.25rem">Finca:</label>
     <select id="farmSelect"></select>
@@ -232,29 +237,22 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
 
 <script>
 (function(){
-  // ===== Helpers
   const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
   const fmt=n=>(typeof n==='number')?Math.round(n*1e6)/1e6:n;
   const nowISO=()=>new Date().toISOString();
   const param=k=>new URL(location.href).searchParams.get(k);
   const escapeHtml=s=>String(s||'').replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
-
-  // Snapshot (state) en URL para trackers
   function encodeStateForShare(obj){ const json=JSON.stringify(obj); return btoa(unescape(encodeURIComponent(json))); }
   function decodeStateFromShare(b64){ try{ const json=decodeURIComponent(escape(atob(b64))); return JSON.parse(json); }catch(_){ return null; } }
 
-  // ===== Estado
   const LS_PREFIX='app_geo_v2';
   const ctx={ farmId:null, data:{ fences:[], personal:[], logs:[], config:{webhook:'',freqSec:15} } };
-
   function storageKey(section){ return `${LS_PREFIX}_${ctx.farmId||'default'}_${section}`; }
   function loadAll(){ for(const k of Object.keys(ctx.data)){ try{ const raw=localStorage.getItem(storageKey(k)); if(raw) ctx.data[k]=JSON.parse(raw);}catch(_){ } } }
   function saveAll(){ for(const k of Object.keys(ctx.data)){ localStorage.setItem(storageKey(k), JSON.stringify(ctx.data[k])); } refreshBindings(); }
-
   function ensureFarmList(){ const key=`${LS_PREFIX}_farms`; let arr=JSON.parse(localStorage.getItem(key)||'[]'); return {get:()=>arr,set:a=>{arr=a;localStorage.setItem(key,JSON.stringify(a));}} }
   const farmsState=ensureFarmList();
 
-  // ===== Fincas
   function renderFarms(){ const arr=farmsState.get(); if(!ctx.farmId&&arr[0]) ctx.farmId=arr[0].id; $('#farmSelect').innerHTML=arr.map(f=>`<option value="${f.id}">${escapeHtml(f.nombre)}</option>`).join(''); if(ctx.farmId) $('#farmSelect').value=ctx.farmId; }
   function chooseFarm(id){ ctx.farmId=id; loadAll(); refreshBindings(); mapRenderFences(); renderLogs(); drawChart(); }
 
@@ -262,7 +260,6 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   $('#btnEliminarFinca').onclick=()=>{ if(!ctx.farmId) return; if(!confirm('¿Eliminar finca y todos sus datos?')) return; Object.keys(ctx.data).forEach(k=>localStorage.removeItem(storageKey(k))); const arr=farmsState.get().filter(f=>f.id!==ctx.farmId); farmsState.set(arr); ctx.farmId=arr[0]?.id||null; renderFarms(); if(ctx.farmId) chooseFarm(ctx.farmId); else location.reload(); };
   $('#farmSelect').onchange=()=>chooseFarm($('#farmSelect').value);
 
-  // ===== Tabs (admin)
   $('#tabs').addEventListener('click',e=>{
     if(e.target.tagName!=='BUTTON') return;
     const tab=e.target.dataset.tab;
@@ -273,10 +270,9 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
     if(tab==='reportes'){ drawChart(); }
   });
 
-  // ===== Leaflet (Admin)
   let map, drawnItems, drawControl;
   function initMap(){
-    if(typeof L==='undefined'){ alert('Leaflet no cargó'); return; }
+    if(typeof L==='undefined'){ return; } // si aún no cargó, el orquestador llamará de nuevo
     const cont=$('#map'); if(!cont) return;
     if(map){ setTimeout(()=>{ try{map.invalidateSize(true)}catch(_){}} ,100); return; }
     if(cont.clientHeight<100) cont.style.height='520px';
@@ -326,6 +322,7 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
     layers.forEach(l=>drawnItems.addLayer(l));
     try{ map.fitBounds(L.featureGroup(layers).getBounds().pad(.2)); }catch(_){ }
   }
+
   function renderFencesTable(){
     const tb=$('#fencesTable tbody'); tb.innerHTML='';
     const assigned=Object.fromEntries(ctx.data.fences.map(f=>[f.id,0]));
@@ -342,13 +339,13 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   window._zoomFence=id=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f||!map) return; try{ map.fitBounds(coordsToLayer(f.coords).getBounds().pad(.2)); }catch(_){ } }
   window._deleteFence=id=>{ if(!confirm('¿Eliminar geocerca?')) return; ctx.data.fences=ctx.data.fences.filter(f=>f.id!==id); saveAll(); mapRenderFences(); renderFencesTable(); }
   window._renameFence=(id,name)=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f) return; f.name=(name||'').trim()||f.name; saveAll(); renderFencesTable(); refreshFenceSelects(); }
+
   $('#btnNuevaGeocerca').onclick=()=>{ try{ new L.Draw.Polygon(map).enable(); }catch(e){ alert('Edición no disponible (Leaflet.draw)'); } };
   let editing=false;
   $('#btnEditarGeocerca').onclick=()=>{ editing=!editing; try{ new L.EditToolbar.Edit(map,{featureGroup:drawnItems})[editing?'enable':'disable'](); $('#btnEditarGeocerca').textContent= editing?'Salir de Edición':'Editar Geocercas'; }catch(e){ alert('Edición no disponible (Leaflet.draw)'); } };
   $('#btnGuardarGeocercas').onclick=()=>{ updateFencesFromLayers(); alert('Cambios guardados.'); };
   $('#btnCrearDesdeLista').onclick=()=>{ const name=$('#newFenceName').value.trim(); const txt=$('#coordsInput').value.trim(); if(!txt) return alert('Pega coordenadas'); const coords=txt.split(/\n+/).map(l=>{ const [a,b]=l.split(',').map(s=>parseFloat(s.trim())); return (Number.isFinite(a)&&Number.isFinite(b))?[a,b]:null; }).filter(Boolean); if(coords.length<3) return alert('Se requieren ≥3 puntos'); const layer=coordsToLayer(coords).bindTooltip(name||('Geocerca '+(ctx.data.fences.length+1))); drawnItems.addLayer(layer); updateFencesFromLayers(); $('#coordsInput').value=''; $('#newFenceName').value=''; };
 
-  // ===== Personal
   function refreshFenceSelects(){ $('#pGeocerca').innerHTML=['<option value=\"\">(sin asignar)</option>'].concat(ctx.data.fences.map(f=>`<option value=\"${f.id}\">${escapeHtml(f.name)}</option>`)).join(''); }
   function refreshActivePersonalSelects(){ const trackers=ctx.data.personal.filter(p=>p.rol==='TRACKER'); $('#quickUser').innerHTML=trackers.map(p=>`<option value=\"${p.id}\">${escapeHtml(p.nombre)} (${escapeHtml(p.telefono)})</option>`).join(''); }
   $('#btnAddPersonal').onclick=()=>{ const nombre=$('#pNombre').value.trim(); const telefono=$('#pTelefono').value.trim(); if(!nombre||!telefono) return alert('Completa nombre y teléfono'); const rol=$('#pRol').value; const activo=$('#pActivo').value==='true'; const geocercaId=$('#pGeocerca').value||''; ctx.data.personal.push({id:'p'+Date.now(),nombre,telefono,rol,activo,geocercaId}); saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); $('#pNombre').value=''; $('#pTelefono').value=''; };
@@ -376,10 +373,8 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   }
   window._pf=(id,field,value)=>{ const p=ctx.data.personal.find(x=>x.id===id); if(!p) return; if(field==='activo') value=(value==='true'); p[field]=value; saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); };
 
-  // Copiar enlace rápido
   $('#btnCopiarEnlace').onclick=async()=>{ const id=$('#quickUser').value; const p=ctx.data.personal.find(x=>x.id===id); if(!p) return; const link=trackerLinkFor(p); try{ await navigator.clipboard.writeText(link); $('#copiedMsg').textContent='¡Copiado!'; setTimeout(()=>$('#copiedMsg').textContent='',1500);}catch(_){ alert(link); } };
 
-  // ===== Reportes
   function renderLogs(){ const tb=$('#logsTable tbody'); if(!tb) return; tb.innerHTML=''; for(const Lg of ctx.data.logs.slice().reverse()){ const f=ctx.data.fences.find(x=>x.id===Lg.geocercaId)?.name||Lg.geocercaId||''; const tr=document.createElement('tr'); tr.innerHTML=`<td>${escapeHtml(Lg.ts)}</td><td>${escapeHtml(Lg.telefono)}</td><td>${escapeHtml(f)}</td><td>${fmt(Lg.lat)}</td><td>${fmt(Lg.lng)}</td><td>${Lg.acc??''}</td>`; tb.appendChild(tr);} }
   $('#btnExportCSV').onclick=()=>{ const rows=[['ts','telefono','geocerca','lat','lng','accuracy']].concat(ctx.data.logs.map(l=>[l.ts,l.telefono,l.geocercaId,l.lat,l.lng,l.acc])); const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'\"')}"`).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`logs_${ctx.farmId||'finca'}.csv`; a.click(); };
   $('#btnBorrarLogs').onclick=()=>{ if(!confirm('¿Borrar todos los registros?')) return; ctx.data.logs=[]; saveAll(); renderLogs(); drawChart(); };
@@ -410,11 +405,38 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
   let chart;
   function drawChart(){ const data={}; for(const l of ctx.data.logs){ const d=l.ts.slice(0,10); data[d]=(data[d]||0)+1; } const labels=Object.keys(data).sort(); const values=labels.map(k=>data[k]); const el=document.getElementById('chartPos'); if(!el) return; if(chart) chart.destroy(); chart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Posiciones/día',data:values}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}}); }
 
-  // ===== Utilidades multi-finca
+  // --- Arranque seguro: espera a Leaflet sin carreras ---
+  function startApp(){
+    const mode=(param('mode')||'').toLowerCase();
+    const hasSnapshot=!!param('state');
+
+    // TRACKER
+    if(mode==='tracker' || hasSnapshot){
+      document.body.classList.add('is-tracker');
+      $('#adminShell').classList.add('hidden');
+      $('#trackerShell').classList.remove('hidden');
+      initTracker(hasSnapshot);
+      return;
+    }
+
+    // ADMIN
+    document.body.classList.remove('is-tracker');
+    renderFarms();
+    if(!ctx.farmId){
+      const id='f'+Date.now();
+      const arr=farmsState.get(); arr.push({id,nombre:'Mi Finca'}); farmsState.set(arr);
+      ctx.farmId=id; renderFarms();
+    }
+    chooseFarm(ctx.farmId);
+    $('#trackerShell').classList.add('hidden');
+    $('#adminShell').classList.remove('hidden');
+    initMap(); mapRenderFences();
+  }
+
+  // TRACKER helpers
   function loadSectionForFarm(farmId, section){ try{ return JSON.parse(localStorage.getItem(`${LS_PREFIX}_${farmId}_${section}`)||'[]'); }catch(_){ return []; } }
   function resolveFarmByPhone(phone){ if(!phone) return null; const farms=ensureFarmList().get(); for(const f of farms){ const people=loadSectionForFarm(f.id,'personal'); const hit=people.find(p=>p.telefono===phone && p.activo); if(hit) return f.id; } return null; }
 
-  // ===== TRACKER
   let miniMap, miniFenceLayer, watchId=null, sendTimer=null, trackerUser=null, trackerFence=null, lastPos=null, lastInside=false;
   function initTracker(hasSnapshot){
     const phone=param('phone'); let farm=param('farm');
@@ -483,46 +505,14 @@ input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radi
     $('#lastSend').textContent=nowISO();
   }
 
-  // ===== Binding general
   function refreshBindings(){ renderConfig(); refreshFenceSelects(); refreshActivePersonalSelects(); renderFencesTable(); renderPersonalTable(); renderLogs(); }
-
-  // ===== Inicio
-  function start(){
-    const mode=(param('mode')||'').toLowerCase();
-    const hasSnapshot=!!param('state');
-
-    if(mode==='tracker' || hasSnapshot){
-      document.body.classList.add('is-tracker');
-      $('#adminShell').classList.add('hidden');
-      $('#trackerShell').classList.remove('hidden');
-      initTracker(hasSnapshot);  // <- no tocamos datos locales si hay snapshot
-      return;
-    }
-
-    // ADMIN
-    document.body.classList.remove('is-tracker');
-    renderFarms();
-    if(!ctx.farmId){
-      const id='f'+Date.now();
-      const arr=farmsState.get(); arr.push({id,nombre:'Mi Finca'}); farmsState.set(arr);
-      ctx.farmId=id; renderFarms();
-    }
-    chooseFarm(ctx.farmId);
-    $('#trackerShell').classList.add('hidden');
-    $('#adminShell').classList.remove('hidden');
-    initMap(); mapRenderFences();
-  }
-
-  // Botones de Reportes y Config
-  $('#btnSyncServer').onclick=syncFromServer;
-  $('#btnGuardarCfg').onclick=()=>{ ctx.data.config.webhook=$('#cfgWebhook').value.trim(); const f=parseInt($('#cfgFreq').value,10); ctx.data.config.freqSec=Number.isFinite(f)&&f>0?f:15; saveAll(); alert('Configuración guardada.'); };
   function renderConfig(){ $('#cfgWebhook').value=ctx.data.config.webhook||''; $('#cfgFreq').value=ctx.data.config.freqSec||15; $('#freqSec').textContent=ctx.data.config.freqSec||15; }
+  $('#btnGuardarCfg').onclick=()=>{ ctx.data.config.webhook=$('#cfgWebhook').value.trim(); const f=parseInt($('#cfgFreq').value,10); ctx.data.config.freqSec=Number.isFinite(f)&&f>0?f:15; saveAll(); alert('Configuración guardada.'); };
 
-  // Gráfico
-  let chart;
-  function drawChart(){ const data={}; for(const l of ctx.data.logs){ const d=l.ts.slice(0,10); data[d]=(data[d]||0)+1; } const labels=Object.keys(data).sort(); const values=labels.map(k=>data[k]); const el=document.getElementById('chartPos'); if(!el) return; if(chart) chart.destroy(); chart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Posiciones/día',data:values}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}}); }
+  let chart; function drawChart(){ const data={}; for(const l of ctx.data.logs){ const d=l.ts.slice(0,10); data[d]=(data[d]||0)+1; } const labels=Object.keys(data).sort(); const values=labels.map(k=>data[k]); const el=document.getElementById('chartPos'); if(!el) return; if(chart) chart.destroy(); chart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Posiciones/día',data:values}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}}); }
 
-  if(typeof window.L==='undefined'){ window.__leafletReady=start; } else { start(); }
+  // Arranque: cuando Leaflet esté listo
+  window.__whenLeafletReady(startApp);
 })();
 </script>
 </body>
