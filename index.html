@@ -3,14 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>App Fincas · Geocercas + Trackers</title>
-
-<!-- Leaflet: carga directa y determinista -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-o9N1j7kGv3rCwUo8I9o1tA0NfA1nQX9Wf2R8i2SYdEY=" crossorigin="anonymous">
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20n0x9wgh0uYoqQqRk8F1h9w8g6nA4l3v0s6bV7Z2bQ=" crossorigin="anonymous" defer></script>
-
-<!-- (Opcional) Chart.js para reportes -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+<title>App Fincas · Geocercas + Trackers (sin CDNs)</title>
 
 <style>
 :root{--c1:#0b5;--c2:#095;--danger:#d33}
@@ -22,7 +15,7 @@ header h1{font-size:1rem;margin:0 0 0 .25rem;font-weight:700}
 .btn{border:1px solid #ccc;background:#fff;padding:.5rem .75rem;border-radius:.5rem;cursor:pointer}
 .btn.primary{background:var(--c1);border-color:var(--c2);color:#fff}
 .btn.danger{background:var(--danger);border-color:#b12;color:#fff}
-.badge{width:.75rem;height:.75rem;border-radius:50%;display:inline-block}.ok{background:#2ecc71}.idle{background:#bdc3c7}.no{background:#e74c3c}
+.badge{width:.75rem;height:.75rem;border-radius:50%;display:inline-block;vertical-align:middle}.ok{background:#2ecc71}.idle{background:#bdc3c7}.no{background:#e74c3c}
 .small{font-size:.86rem}.muted{color:#666}.hidden{display:none}
 input,select,textarea{width:100%;padding:.5rem;border:1px solid #ddd;border-radius:.5rem}
 
@@ -34,18 +27,15 @@ section.panel.show{display:block}
 .grid{display:grid;gap:1rem}.grid-2{grid-template-columns:1fr 1fr}
 .card{background:#fff;border:1px solid #e6e6e6;border-radius:.75rem;padding:1rem}
 
-.map{height:520px;border-radius:.75rem;border:1px solid #e5e5e5;background:#f2f2f2}
-.mini-map{height:360px;border-radius:.75rem;border:1px solid #e5e5e5}
-.coords{position:absolute;right:.75rem;bottom:.75rem;background:rgba(255,255,255,.92);border:1px solid #ddd;border-radius:.5rem;padding:.25rem .5rem;font-size:.85rem}
+.map{height:520px;border-radius:.75rem;border:1px solid #e5e5e5;background:#f2f2f2;position:relative;overflow:hidden;touch-action:none}
+.mini-map{height:360px;border-radius:.75rem;border:1px solid #e5e5e5;position:relative;overflow:hidden;touch-action:none}
+.coords{position:absolute;right:.75rem;bottom:.75rem;background:rgba(255,255,255,.92);border:1px solid #ddd;border-radius:.5rem;padding:.25rem .5rem;font-size:.85rem;z-index:5}
 .is-tracker #adminHeaderControls{display:none}
 
-/* Fallback esencial Leaflet (por si el CSS no cargara) */
-.leaflet-container{position:relative;overflow:hidden;outline:0}
-.leaflet-pane,.leaflet-map-pane,.leaflet-tile-pane,.leaflet-overlay-pane,.leaflet-shadow-pane,.leaflet-marker-pane,.leaflet-tooltip-pane,.leaflet-popup-pane{position:absolute;left:0;top:0}
-.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}.leaflet-top{top:10px}.leaflet-bottom{bottom:10px}
-.leaflet-left{left:10px}.leaflet-right{right:10px}
-.leaflet-bar{box-shadow:0 1px 5px rgba(0,0,0,.4);border-radius:4px}
-.leaflet-bar a{background:#fff;border-bottom:1px solid #ccc;width:28px;height:28px;line-height:28px;text-align:center;display:block;color:#000;text-decoration:none;pointer-events:auto}
+.tile{position:absolute;image-rendering:auto}
+.svg-overlay{position:absolute;left:0;top:0;pointer-events:none}
+.poly{fill:rgba(0,187,85,.15);stroke:#0b5;stroke-width:2}
+.marker{fill:#e74c3c;stroke:#fff;stroke-width:2}
 </style>
 </head>
 <body>
@@ -98,7 +88,6 @@ section.panel.show{display:block}
       <div>
         <div class="card">
           <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-            <button class="btn" id="btnNuevaGeocerca" title="Dibujo avanzado desactivado en esta versión">Nueva Geocerca</button>
             <button class="btn" id="btnGuardarGeocercas">Guardar Cambios</button>
           </div>
           <div style="margin-top:.75rem">
@@ -199,17 +188,172 @@ section.panel.show{display:block}
   </section>
 </div>
 
-<script defer>
-/* ========= LÓGICA ========= */
+<script>
+/* ------------- Slippy Map sin librerías (OSM tiles) ------------- */
+class TinyMap {
+  constructor(container, opts={}) {
+    this.c = typeof container==='string'?document.getElementById(container):container;
+    this.w = this.c.clientWidth; this.h = this.c.clientHeight;
+    this.z = opts.zoom ?? 5;
+    this.center = opts.center ?? {lat:0, lng:0};
+    this.tiles = document.createElement('div'); this.tiles.style.position='absolute'; this.tiles.style.left='0'; this.tiles.style.top='0';
+    this.c.appendChild(this.tiles);
+    this.svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    this.svg.classList.add('svg-overlay'); this.svg.setAttribute('width',this.w); this.svg.setAttribute('height',this.h);
+    this.c.appendChild(this.svg);
+    this.markerEl = null;
+    this._bind();
+    this.render();
+  }
+  _bind(){
+    window.addEventListener('resize',()=>{ this.w=this.c.clientWidth; this.h=this.c.clientHeight; this.svg.setAttribute('width',this.w); this.svg.setAttribute('height',this.h); this.render(); });
+    let dragging=false, sx=0, sy=0, startPx=null;
+    const onMove=(x,y)=>{ if(!dragging) return; const dx=x-sx, dy=y-sy; const cp=this._project(this.center.lat,this.center.lng,this.z); const np={x:cp.x-dx,y:cp.y-dy}; const ll=this._unproject(np.x,np.y,this.z); this.center=ll; sx=x; sy=y; this.render();};
+    this.c.addEventListener('mousedown',e=>{ dragging=true; sx=e.clientX; sy=e.clientY; e.preventDefault();});
+    window.addEventListener('mousemove',e=>onMove(e.clientX,e.clientY));
+    window.addEventListener('mouseup',()=>dragging=false);
+    // touch
+    this.c.addEventListener('touchstart',e=>{ if(e.touches.length===1){ dragging=true; sx=e.touches[0].clientX; sy=e.touches[0].clientY; } },{passive:false});
+    this.c.addEventListener('touchmove',e=>{ if(e.touches.length===1){ onMove(e.touches[0].clientX,e.touches[0].clientY); } },{passive:false});
+    this.c.addEventListener('touchend',()=>dragging=false);
+    // wheel zoom
+    this.c.addEventListener('wheel',e=>{
+      e.preventDefault();
+      const delta = e.deltaY>0?-1:1; // invertido a propósito (suave)
+      const z2 = Math.min(19, Math.max(2, this.z + delta));
+      if(z2===this.z) return;
+      // zoom hacia el puntero
+      const pt = {x:e.offsetX, y:e.offsetY};
+      const before = this._unproject(this._project(this.center.lat,this.center.lng,this.z).x - (this.w/2 - pt.x), this._project(this.center.lat,this.center.lng,this.z).y - (this.h/2 - pt.y), this.z);
+      const p2 = this._project(before.lat, before.lng, z2);
+      const centerPx = {x:p2.x + (this.w/2 - pt.x), y:p2.y + (this.h/2 - pt.y)};
+      this.center = this._unproject(centerPx.x, centerPx.y, z2);
+      this.z = z2;
+      this.render();
+    }, {passive:false});
+    // coords bajo mouse
+    this.c.addEventListener('mousemove',e=>{
+      const cp=this._project(this.center.lat,this.center.lng,this.z);
+      const ll=this._unproject(cp.x - (this.w/2 - e.offsetX), cp.y - (this.h/2 - e.offsetY), this.z);
+      if(this.onPointer) this.onPointer(ll);
+    });
+  }
+  setView(lat,lng,zoom){ this.center={lat,lng}; if(zoom!=null) this.z=zoom; this.render(); }
+  addMarker(lat,lng){
+    if(!this.markerEl){
+      this.markerEl=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      this.markerEl.setAttribute('r','6'); this.markerEl.classList.add('marker');
+      this.svg.appendChild(this.markerEl);
+    }
+    const p=this._toScreen(lat,lng);
+    this.markerEl.setAttribute('cx',p.x); this.markerEl.setAttribute('cy',p.y);
+  }
+  clearMarker(){ if(this.markerEl){ this.markerEl.remove(); this.markerEl=null; } }
+  addPolygon(coords, cls='poly'){
+    const pl=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    pl.setAttribute('points', coords.map(c=>{const p=this._toScreen(c[0],c[1]); return `${p.x},${p.y}`;}).join(' '));
+    pl.setAttribute('class',cls);
+    this.svg.appendChild(pl);
+    return pl;
+  }
+  updatePolygon(pl, coords){
+    pl.setAttribute('points', coords.map(c=>{const p=this._toScreen(c[0],c[1]); return `${p.x},${p.y}`;}).join(' '));
+  }
+  fitBounds(bounds){ // bounds = [[latMin,lngMin],[latMax,lngMax]]
+    const [[sLat,sLng],[nLat,nLng]] = bounds;
+    let z=19;
+    for(; z>=2; z--){
+      const p1=this._toScreenAt(sLat,sLng,z,true);
+      const p2=this._toScreenAt(nLat,nLng,z,true);
+      const minx=Math.min(p1.x,p2.x), maxx=Math.max(p1.x,p2.x);
+      const miny=Math.min(p1.y,p2.y), maxy=Math.max(p1.y,p2.y);
+      if((maxx-minx)<=this.w*0.85 && (maxy-miny)<=this.h*0.85) break;
+    }
+    this.z=z;
+    const cLat=(sLat+nLat)/2, cLng=(sLng+nLng)/2;
+    this.center={lat:cLat,lng:cLng};
+    this.render();
+  }
+  render(){
+    // Tiles
+    const world = 256*Math.pow(2,this.z);
+    const cp = this._project(this.center.lat,this.center.lng,this.z); // px
+    const topLeft = {x: cp.x - this.w/2, y: cp.y - this.h/2};
+    const startX = Math.floor(topLeft.x/256), startY = Math.floor(topLeft.y/256);
+    const endX = Math.floor((topLeft.x+this.w)/256), endY = Math.floor((topLeft.y+this.h)/256);
+    // cleanup
+    while(this.tiles.firstChild) this.tiles.removeChild(this.tiles.firstChild);
+    const srcs = [
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      'https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+      'https://b.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'
+    ];
+    const src = srcs[0]; // puedes cambiar si algún host te bloquea
+    for(let x=startX; x<=endX; x++){
+      for(let y=startY; y<=endY; y++){
+        const tx = ((x%Math.pow(2,this.z))+Math.pow(2,this.z))%Math.pow(2,this.z); // wrap
+        const ty = Math.max(0, Math.min(Math.pow(2,this.z)-1, y));
+        const img = document.createElement('img');
+        img.className='tile';
+        img.draggable=false;
+        img.referrerPolicy='no-referrer';
+        img.loading='lazy';
+        img.src = src.replace('{z}',this.z).replace('{x}',tx).replace('{y}',ty);
+        img.style.left = (x*256 - topLeft.x)+'px';
+        img.style.top  = (y*256 - topLeft.y)+'px';
+        this.tiles.appendChild(img);
+      }
+    }
+    // Redibujar overlays al nuevo frame
+    this._redrawOverlays();
+  }
+  _redrawOverlays(){
+    // Reproyectar todos los polígonos/marker al nuevo estado
+    this.svg.querySelectorAll('polygon.poly').forEach(pl=>{
+      const data = pl.__coords || [];
+      this.updatePolygon(pl, data);
+    });
+    if(this.markerEl && this.markerEl.__ll){
+      const p=this._toScreen(this.markerEl.__ll.lat, this.markerEl.__ll.lng);
+      this.markerEl.setAttribute('cx',p.x); this.markerEl.setAttribute('cy',p.y);
+    }
+  }
+  _toScreen(lat,lng){
+    const p=this._project(this.center.lat,this.center.lng,this.z);
+    const q=this._project(lat,lng,this.z);
+    return {x:this.w/2 + (q.x-p.x), y:this.h/2 + (q.y-p.y)};
+  }
+  _toScreenAt(lat,lng,z,abs){
+    const cp=this._project(this.center.lat,this.center.lng,z);
+    const q=this._project(lat,lng,z);
+    return abs? q : {x:this.w/2 + (q.x-cp.x), y:this.h/2 + (q.y-cp.y)};
+  }
+  _project(lat,lng,z){
+    const sin=Math.sin(lat*Math.PI/180);
+    const n = Math.pow(2,z);
+    const x = ((lng+180)/360) * 256 * n;
+    const y = (0.5 - Math.log((1+sin)/(1-sin))/(4*Math.PI)) * 256 * n;
+    return {x,y};
+  }
+  _unproject(x,y,z){
+    const n = Math.PI - 2*Math.PI*y/(256*Math.pow(2,z));
+    return {
+      lng: x/(256*Math.pow(2,z))*360 - 180,
+      lat: (180/Math.PI)*Math.atan(0.5*(Math.exp(n)-Math.exp(-n)))
+    };
+  }
+}
+
+/* ---------------- Utils app ---------------- */
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const fmt=n=>(typeof n==='number')?Math.round(n*1e6)/1e6:n;
 const nowISO=()=>new Date().toISOString();
 const param=k=>new URL(location.href).searchParams.get(k);
-const escapeHtml=s=>String(s||'').replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
-function encodeStateForShare(obj){const json=JSON.stringify(obj);return btoa(unescape(encodeURIComponent(json))); }
-function decodeStateFromShare(b64){ try{const json=decodeURIComponent(escape(atob(b64)));return JSON.parse(json);}catch(_){return null;} }
+const escapeHtml=s=>String(s||'').replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;","&gt;":">","\"":"&quot;","'":"&#39;"}[m]));
+function encodeStateForShare(obj){ const json=JSON.stringify(obj); return btoa(unescape(encodeURIComponent(json))); }
+function decodeStateFromShare(b64){ try{ const json=decodeURIComponent(escape(atob(b64))); return JSON.parse(json); }catch(_){ return null; } }
 
-const LS_PREFIX='app_geo_v2';
+const LS_PREFIX='app_geo_v3nocdn';
 const ctx={ farmId:null, data:{ fences:[], personal:[], logs:[], config:{webhook:'',freqSec:15} } };
 function storageKey(section){ return `${LS_PREFIX}_${ctx.farmId||'default'}_${section}`; }
 function loadAll(){ for(const k of Object.keys(ctx.data)){ try{ const raw=localStorage.getItem(storageKey(k)); if(raw) ctx.data[k]=JSON.parse(raw);}catch(_){ } } }
@@ -218,7 +362,7 @@ function saveAll(){ for(const k of Object.keys(ctx.data)){ localStorage.setItem(
 function ensureFarmList(){ const key=`${LS_PREFIX}_farms`; let arr=JSON.parse(localStorage.getItem(key)||'[]'); return {get:()=>arr,set:a=>{arr=a;localStorage.setItem(key,JSON.stringify(a));}} }
 const farmsState=ensureFarmList();
 
-/* ========== ADMIN ========== */
+/* ---------------- ADMIN ---------------- */
 function renderFarms(){ const arr=farmsState.get(); if(!ctx.farmId&&arr[0]) ctx.farmId=arr[0].id; $('#farmSelect').innerHTML=arr.map(f=>`<option value="${f.id}">${escapeHtml(f.nombre)}</option>`).join(''); if(ctx.farmId) $('#farmSelect').value=ctx.farmId; }
 function chooseFarm(id){ ctx.farmId=id; loadAll(); refreshBindings(); mapRenderFences(); renderLogs(); drawChart(); }
 $('#btnNuevaFinca').onclick=()=>{ const nombre=prompt('Nombre de la finca:'); if(!nombre) return; const id='f'+Date.now(); const arr=farmsState.get(); arr.push({id,nombre}); farmsState.set(arr); renderFarms(); chooseFarm(id); };
@@ -231,39 +375,33 @@ $('#tabs').addEventListener('click',e=>{
   $$('#tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
   $$('section.panel').forEach(p=>p.classList.remove('show'));
   $(`#tab-${tab}`).classList.add('show');
-  if(tab==='geocercas'){ try{ initMap(); map.invalidateSize(true); mapRenderFences(); }catch(_){ } }
+  if(tab==='geocercas'){ mapResize(); mapRenderFences(); }
   if(tab==='reportes'){ drawChart(); }
 });
 
-/* ===== Mapa (sin leaflet-draw, simple y robusto) ===== */
-let map;
-function initMap(){
-  if(!window.L){ alert('Leaflet no cargó (bloqueado por red/CDN).'); return; }
-  const cont=$('#map'); if(!cont) return;
-  if(map){ setTimeout(()=>{ try{map.invalidateSize(true)}catch(_){}} ,100); return; }
-  if(cont.clientHeight<100) cont.style.height='520px';
-
-  map=L.map('map');
-  function addTiles(url){ const t=L.tileLayer(url,{maxZoom:19,attribution:'&copy; OpenStreetMap/Esri'}); t.on('load',()=>setTimeout(()=>{try{map.invalidateSize(true)}catch(_){}} ,120)); t.addTo(map); return t; }
-  let base=addTiles('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-  base.on('tileerror',()=>{ try{map.removeLayer(base)}catch(_){ } base=addTiles('https://tile.openstreetmap.org/{z}/{x}/{y}.png'); base.on('tileerror',()=>{ try{map.removeLayer(base)}catch(_){ } addTiles('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'); }); });
-  map.on('mousemove',ev=> $('#mapCoords').textContent=`Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`);
-  try{ L.control.zoom({position:'topleft'}).addTo(map); }catch(_){}
-  map.setView([-1.8312,-78.1834],6);
-  setTimeout(()=>{ try{map.invalidateSize(true)}catch(_){}} ,250);
-  window.addEventListener('resize',()=>{ try{map.invalidateSize(true)}catch(_){}} );
+/* ---------------- MAPA ADMIN ---------------- */
+let adminMap, adminPolys=[];
+function initAdminMap(){
+  if(adminMap) return;
+  adminMap = new TinyMap('map', {center:{lat:-1.8312,lng:-78.1834}, zoom:6});
+  adminMap.onPointer = ll => { $('#mapCoords').textContent=`Lat: ${fmt(ll.lat)} Lng: ${fmt(ll.lng)}`; };
 }
-
-/* Geocercas: manejo básico (crear desde lista y mostrar en mapa) */
-function coordsToLayer(coords){ return L.polygon(coords,{color:'#0b5',weight:2,fillOpacity:.1}); }
+function mapResize(){ initAdminMap(); adminMap.render(); }
 function mapRenderFences(){
-  if(!map) return;
-  // limpiar todo lo que no sea tile layer
-  map.eachLayer(ly=>{ if(!(ly instanceof L.TileLayer)) map.removeLayer(ly); });
-  if(ctx.data.fences.length===0){ try{ map.setView([-1.8312,-78.1834],6);}catch(_){ } return; }
-  const layers=ctx.data.fences.map(f=>coordsToLayer(f.coords).bindTooltip(f.name).addTo(map));
-  try{ map.fitBounds(L.featureGroup(layers).getBounds().pad(.2)); }catch(_){ }
+  initAdminMap();
+  // limpia polígonos
+  adminPolys.forEach(p=>p.remove()); adminPolys=[];
+  if(ctx.data.fences.length===0){ adminMap.setView(-1.8312,-78.1834,6); return; }
+  let minLat= 90, minLng= 180, maxLat=-90, maxLng=-180;
+  for(const f of ctx.data.fences){
+    const pl = adminMap.addPolygon(f.coords);
+    pl.__coords = f.coords.slice();
+    adminPolys.push(pl);
+    f.coords.forEach(([la,ln])=>{ minLat=Math.min(minLat,la); maxLat=Math.max(maxLat,la); minLng=Math.min(minLng,ln); maxLng=Math.max(maxLng,ln); });
+  }
+  adminMap.fitBounds([[minLat,minLng],[maxLat,maxLng]]);
 }
+
 function renderFencesTable(){
   const tb=$('#fencesTable tbody'); tb.innerHTML='';
   const assigned=Object.fromEntries(ctx.data.fences.map(f=>[f.id,0]));
@@ -277,7 +415,12 @@ function renderFencesTable(){
     tb.appendChild(tr);
   }
 }
-window._zoomFence=id=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f||!map) return; try{ map.fitBounds(coordsToLayer(f.coords).getBounds().pad(.2)); }catch(_){ } }
+window._zoomFence=id=>{
+  const f=ctx.data.fences.find(x=>x.id===id); if(!f) return;
+  let minLat= 90, minLng= 180, maxLat=-90, maxLng=-180;
+  f.coords.forEach(([la,ln])=>{ minLat=Math.min(minLat,la); maxLat=Math.max(maxLat,la); minLng=Math.min(minLng,ln); maxLng=Math.max(maxLng,ln); });
+  adminMap.fitBounds([[minLat,minLng],[maxLat,maxLng]]);
+};
 window._deleteFence=id=>{ if(!confirm('¿Eliminar geocerca?')) return; ctx.data.fences=ctx.data.fences.filter(f=>f.id!==id); saveAll(); mapRenderFences(); renderFencesTable(); }
 window._renameFence=(id,name)=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f) return; f.name=(name||'').trim()||f.name; saveAll(); renderFencesTable(); refreshFenceSelects(); }
 
@@ -288,20 +431,19 @@ $('#btnCrearDesdeLista').onclick=()=>{
   if(!txt) return alert('Pega coordenadas');
   const coords=txt.split(/\n+/).map(l=>{ const [a,b]=l.split(',').map(s=>parseFloat(s.trim())); return (Number.isFinite(a)&&Number.isFinite(b))?[a,b]:null; }).filter(Boolean);
   if(coords.length<3) return alert('Se requieren ≥3 puntos');
-  const f={id:'g'+Date.now(),name:name||('Geocerca '+(ctx.data.fences.length+1)),coords,color:'#0b5'};
+  const f={id:'g'+Date.now(),name:name||('Geocerca '+(ctx.data.fences.length+1)),coords};
   ctx.data.fences.push(f); saveAll();
   $('#coordsInput').value=''; $('#newFenceName').value='';
   renderFencesTable(); refreshFenceSelects(); mapRenderFences();
 };
-$('#btnNuevaGeocerca').onclick=()=>{ alert('Edición por dibujo desactivada en esta versión para garantizar estabilidad del mapa. Usa "Crear desde Lat/Lng".'); };
 
-/* ===== Personal y enlaces tracker ===== */
+/* ---------------- Personal / enlaces ---------------- */
 function refreshFenceSelects(){ $('#pGeocerca').innerHTML=['<option value=\"\">(sin asignar)</option>'].concat(ctx.data.fences.map(f=>`<option value=\"${f.id}\">${escapeHtml(f.name)}</option>`)).join(''); }
 function refreshActivePersonalSelects(){ const trackers=ctx.data.personal.filter(p=>p.rol==='TRACKER'); $('#quickUser').innerHTML=trackers.map(p=>`<option value=\"${p.id}\">${escapeHtml(p.nombre)} (${escapeHtml(p.telefono)})</option>`).join(''); }
 $('#btnAddPersonal').onclick=()=>{ const nombre=$('#pNombre').value.trim(); const telefono=$('#pTelefono').value.trim(); if(!nombre||!telefono) return alert('Completa nombre y teléfono'); const rol=$('#pRol').value; const activo=$('#pActivo').value==='true'; const geocercaId=$('#pGeocerca').value||''; ctx.data.personal.push({id:'p'+Date.now(),nombre,telefono,rol,activo,geocercaId}); saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); $('#pNombre').value=''; $('#pTelefono').value=''; };
 function trackerLinkFor(p){
   const fence=ctx.data.fences.find(f=>f.id===p.geocercaId)||null;
-  const snapshot={ farmId:ctx.farmId, personal:{id:p.id,nombre:p.nombre,telefono:p.telefono,activo:p.activo,rol:p.rol,geocercaId:p.geocercaId}, fences: fence?[{id:fence.id,name:fence.name,coords:fence.coords,color:'#0b5'}]:[], config:{freqSec:ctx.data.config.freqSec||15} };
+  const snapshot={ farmId:ctx.farmId, personal:{id:p.id,nombre:p.nombre,telefono:p.telefono,activo:p.activo,rol:p.rol,geocercaId:p.geocercaId}, fences: fence?[{id:fence.id,name:fence.name,coords:fence.coords}]:[], config:{freqSec:ctx.data.config.freqSec||15} };
   const u=new URL(location.href); u.search=''; u.hash='';
   u.searchParams.set('mode','tracker'); u.searchParams.set('phone',p.telefono); if(ctx.farmId) u.searchParams.set('farm',ctx.farmId);
   u.searchParams.set('state', encodeStateForShare(snapshot));
@@ -325,7 +467,7 @@ window._pf=(id,field,value)=>{ const p=ctx.data.personal.find(x=>x.id===id); if(
 
 $('#btnCopiarEnlace').onclick=async()=>{ const id=$('#quickUser').value; const p=ctx.data.personal.find(x=>x.id===id); if(!p) return; const link=trackerLinkFor(p); try{ await navigator.clipboard.writeText(link); $('#copiedMsg').textContent='¡Copiado!'; setTimeout(()=>$('#copiedMsg').textContent='',1500);}catch(_){ alert(link); } };
 
-/* ===== Reportes ===== */
+/* ---------------- Reportes ---------------- */
 function renderLogs(){ const tb=$('#logsTable tbody'); if(!tb) return; tb.innerHTML=''; for(const Lg of ctx.data.logs.slice().reverse()){ const f=ctx.data.fences.find(x=>x.id===Lg.geocercaId)?.name||Lg.geocercaId||''; const tr=document.createElement('tr'); tr.innerHTML=`<td>${escapeHtml(Lg.ts)}</td><td>${escapeHtml(Lg.telefono)}</td><td>${escapeHtml(f)}</td><td>${fmt(Lg.lat)}</td><td>${fmt(Lg.lng)}</td><td>${Lg.acc??''}</td>`; tb.appendChild(tr);} }
 $('#btnExportCSV').onclick=()=>{ const rows=[['ts','telefono','geocerca','lat','lng','accuracy']].concat(ctx.data.logs.map(l=>[l.ts,l.telefono,l.geocercaId,l.lat,l.lng,l.acc])); const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'\"')}"`).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`logs_${ctx.farmId||'finca'}.csv`; a.click(); };
 $('#btnBorrarLogs').onclick=()=>{ if(!confirm('¿Borrar todos los registros?')) return; ctx.data.logs=[]; saveAll(); renderLogs(); drawChart(); };
@@ -356,14 +498,17 @@ $('#btnSyncServer').onclick=syncFromServer;
 let chart;
 function drawChart(){ if(!window.Chart) return; const data={}; for(const l of ctx.data.logs){ const d=l.ts.slice(0,10); data[d]=(data[d]||0)+1; } const labels=Object.keys(data).sort(); const values=labels.map(k=>data[k]); const el=document.getElementById('chartPos'); if(!el) return; if(chart) chart.destroy(); chart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Posiciones/día',data:values}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}}); }
 
-/* ===== TRACKER ===== */
+/* ---------------- TRACKER ---------------- */
 function loadSectionForFarm(farmId, section){ try{ return JSON.parse(localStorage.getItem(`${LS_PREFIX}_${farmId}_${section}`)||'[]'); }catch(_){ return []; } }
 function resolveFarmByPhone(phone){ if(!phone) return null; const farms=ensureFarmList().get(); for(const f of farms){ const people=loadSectionForFarm(f.id,'personal'); const hit=people.find(p=>p.telefono===phone && p.activo); if(hit) return f.id; } return null; }
 
-let miniMap, miniFenceLayer, watchId=null, sendTimer=null, trackerUser=null, trackerFence=null, lastPos=null, lastInside=false;
-function coordsToLayer(coords){ return L.polygon(coords,{color:'#0b5',weight:2,fillOpacity:.1}); }
+let mini, miniFence=null, miniFenceEl=null, watchId=null, sendTimer=null, trackerUser=null, trackerFence=null, lastPos=null, lastInside=false;
+function pointInPolygon(point, vs){ const x=point[1], y=point[0]; let inside=false; for(let i=0,j=vs.length-1;i<vs.length;j=i++){ const xi=vs[i][1], yi=vs[i][0], xj=vs[j][1], yj=vs[j][0]; const intersect=((yi>y)!=(yj>y))&&(x< (xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi); if(intersect) inside=!inside; } return inside; }
+function setState(kind,text){ const dot=$('#trackerStateDot'); const tx=$('#trackerStateText'); dot.classList.remove('ok','no','idle'); dot.classList.add(kind); tx.textContent=text; }
+
 function initTracker(hasSnapshot){
   const phone=param('phone'); let farm=param('farm');
+
   if(hasSnapshot){
     const snap=decodeStateFromShare(param('state'));
     if(snap && snap.farmId){
@@ -383,15 +528,19 @@ function initTracker(hasSnapshot){
   trackerFence=ctx.data.fences.find(f=>f.id===trackerUser?.geocercaId);
   $('#trackerFenceName').textContent = trackerFence? trackerFence.name : '(sin asignar)';
 
-  miniMap=L.map('miniMap'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(miniMap);
-  if(trackerFence){ miniFenceLayer=coordsToLayer(trackerFence.coords).addTo(miniMap); miniMap.fitBounds(miniFenceLayer.getBounds().pad(.3)); }
-  else { miniMap.setView([-1.8312,-78.1834],6); }
-  miniMap.on('mousemove',ev=> $('#miniCoords').textContent=`Lat: ${fmt(ev.latlng.lat)} Lng: ${fmt(ev.latlng.lng)}`);
+  mini = new TinyMap('miniMap', {center:{lat:-1.8312,lng:-78.1834}, zoom:6});
+  mini.onPointer = ll => { $('#miniCoords').textContent=`Lat: ${fmt(ll.lat)} Lng: ${fmt(ll.lng)}`; };
+  if(trackerFence){
+    miniFence = trackerFence.coords;
+    miniFenceEl = mini.addPolygon(miniFence);
+    miniFenceEl.__coords = miniFence.slice();
+    let minLat= 90, minLng= 180, maxLat=-90, maxLng=-180;
+    trackerFence.coords.forEach(([la,ln])=>{ minLat=Math.min(minLat,la); maxLat=Math.max(maxLat,la); minLng=Math.min(minLng,ln); maxLng=Math.max(maxLng,ln); });
+    mini.fitBounds([[minLat,minLng],[maxLat,maxLng]]);
+  }
 
   $('#toggleSend').onchange=e=>toggleSending(e.target.checked);
 }
-function pointInPolygon(point, vs){ const x=point[1], y=point[0]; let inside=false; for(let i=0,j=vs.length-1;i<vs.length;j=i++){ const xi=vs[i][1], yi=vs[i][0], xj=vs[j][1], yj=vs[j][0]; const intersect=((yi>y)!=(yj>y))&&(x< (xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi); if(intersect) inside=!inside; } return inside; }
-function setState(kind,text){ const dot=$('#trackerStateDot'); const tx=$('#trackerStateText'); dot.classList.remove('ok','no','idle'); dot.classList.add(kind); tx.textContent=text; }
 function toggleSending(on){
   setState(on?'ok':'idle', on?'Envío activo':'Inactivo');
   if(on){
@@ -408,8 +557,8 @@ function onPos(pos){
   const {latitude,longitude,accuracy}=pos.coords;
   lastPos={lat:latitude,lng:longitude,acc:accuracy,ts:nowISO()};
   $('#miniCoords').textContent=`Lat: ${fmt(latitude)} Lng: ${fmt(longitude)} (±${Math.round(accuracy)}m)`;
-  if(window._myM) _myM.setLatLng([latitude,longitude]); else window._myM=L.marker([latitude,longitude]).addTo(miniMap);
-  if(trackerFence&&miniFenceLayer){ const b=miniFenceLayer.getBounds(); if(!b.contains([latitude,longitude])) miniMap.fitBounds(b.pad(.3)); }
+  mini.addMarker(latitude,longitude); mini.markerEl.__ll={lat:latitude,lng:longitude};
+  if(trackerFence&&miniFenceEl){ let minLat= 90, minLng= 180, maxLat=-90, maxLng=-180; trackerFence.coords.forEach(([la,ln])=>{ minLat=Math.min(minLat,la); maxLat=Math.max(maxLat,la); minLng=Math.min(minLng,ln); maxLng=Math.max(maxLng,ln); }); }
   lastInside= trackerFence? pointInPolygon([latitude,longitude], trackerFence.coords) : false;
   setState(lastInside?'ok':'no', lastInside?'Dentro de geocerca':'Fuera de geocerca');
   $('#lastEvent').textContent=`${lastPos.ts} · ${lastInside?'Dentro':'Fuera'} (${Math.round(accuracy)}m)`;
@@ -428,7 +577,7 @@ function trySend(){
   $('#lastSend').textContent=nowISO();
 }
 
-/* ===== Binding y arranque ===== */
+/* ---------------- Binding / inicio ---------------- */
 function refreshBindings(){ renderConfig(); refreshFenceSelects(); refreshActivePersonalSelects(); renderFencesTable(); renderPersonalTable(); renderLogs(); }
 function renderConfig(){ $('#cfgWebhook').value=ctx.data.config.webhook||''; $('#cfgFreq').value=ctx.data.config.freqSec||15; $('#freqSec').textContent=ctx.data.config.freqSec||15; }
 $('#btnGuardarCfg').onclick=()=>{ ctx.data.config.webhook=$('#cfgWebhook').value.trim(); const f=parseInt($('#cfgFreq').value,10); ctx.data.config.freqSec=Number.isFinite(f)&&f>0?f:15; saveAll(); alert('Configuración guardada.'); };
@@ -455,10 +604,8 @@ function start(){
   chooseFarm(ctx.farmId);
   $('#trackerShell').classList.add('hidden');
   $('#adminShell').classList.remove('hidden');
-  initMap(); mapRenderFences();
+  initAdminMap(); mapRenderFences();
 }
-
-/* Ejecutar cuando todo (incluido Leaflet) haya cargado */
 window.addEventListener('load', start);
 </script>
 </body>
