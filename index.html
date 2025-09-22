@@ -57,7 +57,7 @@ section.panel.show{display:block}
   </span>
 </header>
 
-<!-- TRACKER (sin botones de finca) -->
+<!-- TRACKER -->
 <div id="trackerShell" class="wrap hidden">
   <div class="grid grid-2">
     <div class="card">
@@ -187,7 +187,7 @@ section.panel.show{display:block}
       <div class="card">
         <h3 style="margin:0 0 .5rem">Parámetros</h3>
         <label>Webhook (POST/GET JSON)</label>
-        <input id="cfgWebhook" placeholder="https://script.google.com/macros/s/TU_ID/exec">
+        <input id="cfgWebhook" placeholder="https://script.google.com/macros/s/AKfy.../exec">
         <div class="small muted" style="margin:.25rem 0 .5rem">
           El tracker enviará a esta URL por <b>POST</b>. Los reportes se descargan por <b>GET</b> (btn o auto-sync).
         </div>
@@ -229,6 +229,16 @@ const fmt=n=>(typeof n==='number')?Math.round(n*1e6)/1e6:n;
 const nowISO=()=>new Date().toISOString();
 const param=k=>new URL(location.href).searchParams.get(k);
 const escapeHtml=s=>String(s||'').replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;","&gt;":">","\"":"&quot;","'":"&#39;"}[m]));
+
+/* Normaliza la URL del webhook (acepta ID AKfy..., añade /exec si falta) */
+function normalizeWebhook(u){
+  if(!u) return '';
+  let s = String(u).trim();
+  if(/^AKfy/i.test(s)) s = `https://script.google.com/macros/s/${s}/exec`;
+  if(/^https:\/\/script\.google\.com\/macros\/s\/[^/]+$/i.test(s)) s += '/exec';
+  return s;
+}
+
 function encodeStateForShare(o){const j=JSON.stringify(o);return btoa(unescape(encodeURIComponent(j)))}function decodeStateFromShare(b){try{const j=decodeURIComponent(escape(atob(b)));return JSON.parse(j)}catch(_){return null}}
 
 const LS_PREFIX='app_geo_v3nocdn';
@@ -306,7 +316,7 @@ function loadAutoSync(){ const on=localStorage.getItem(`${LS_PREFIX}_autoSync`)=
 function markLastSync(){ $('#lastSyncTxt').textContent='Última sync: '+new Date().toLocaleString(); }
 
 async function syncFromServer(){
-  const urlBase=(ctx.data.config.webhook||'').trim();
+  const urlBase = normalizeWebhook(ctx.data.config.webhook||'');
   if(!urlBase){ alert('Configura el Webhook en la pestaña Config.'); return; }
   const params=new URLSearchParams({ farmId: ctx.farmId });
   try{
@@ -399,7 +409,8 @@ function trySend(){
   if(!$('#toggleSend').checked||!lastPos||!lastInside) return;
   const payload={ ts:lastPos.ts, telefono:trackerUser?.telefono||param('phone')||'desconocido', geocercaId:trackerUser?.geocercaId||(trackerFence?.id||''), lat:lastPos.lat, lng:lastPos.lng, acc:lastPos.acc, farmId:ctx.farmId };
   ctx.data.logs.push(payload); saveAll();
-  const url=(ctx.data.config.webhook||'').trim();
+
+  const url = normalizeWebhook(ctx.data.config.webhook||'');
   if(url){
     const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
     const ok=(navigator.sendBeacon && navigator.sendBeacon(url,blob));
@@ -436,10 +447,9 @@ function start(){
   $('#trackerShell').classList.add('hidden');
   $('#adminShell').classList.remove('hidden');
   initAdminMap(); mapRenderFences();
-  loadAutoSync();     // <-- inicia auto-sync si estaba activado
+  loadAutoSync();     // inicia auto-sync si estaba activado
 }
 window.addEventListener('load', start);
 </script>
 </body>
 </html>
-
