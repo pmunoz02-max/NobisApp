@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>App Fincas · Geocercas + Trackers (fallback tiles)</title>
+<title>App Fincas · Geocercas + Trackers</title>
 
 <style>
 :root{--c1:#0b5;--c2:#095;--danger:#d33}
@@ -49,7 +49,6 @@ section.panel.show{display:block}
   <div class="badge ok" title="App OK"></div>
   <h1>App Fincas · Geocercas + Trackers</h1>
   <div style="flex:1"></div>
-  <!-- Controles solo para ADMIN (ocultos en tracker) -->
   <span id="adminHeaderControls">
     <label class="small muted" style="margin-right:.25rem">Finca:</label>
     <select id="farmSelect"></select>
@@ -58,7 +57,7 @@ section.panel.show{display:block}
   </span>
 </header>
 
-<!-- TRACKER -->
+<!-- TRACKER (sin botones de finca) -->
 <div id="trackerShell" class="wrap hidden">
   <div class="grid grid-2">
     <div class="card">
@@ -157,18 +156,25 @@ section.panel.show{display:block}
       <div class="card">
         <h3 style="margin:0 0 .5rem">Registros de posiciones</h3>
         <div class="small muted">Solo se guardan cuando el TRACKER está dentro de su geocerca.</div>
-        <div style="max-height:360px;overflow:auto;margin-top:.5rem">
+
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0">
+          <button class="btn" id="btnSyncServer">Sincronizar del servidor</button>
+          <button class="btn" id="btnExportCSV">Exportar CSV</button>
+          <button class="btn" id="btnBorrarLogs">Borrar registros</button>
+          <label class="small" style="display:flex;align-items:center;gap:.35rem">
+            <input type="checkbox" id="autoSyncChk"> Auto-sincronizar cada 10 s
+          </label>
+          <span class="small muted" id="lastSyncTxt"></span>
+        </div>
+
+        <div style="max-height:360px;overflow:auto;margin-top:.25rem">
           <table id="logsTable" style="width:100%;border-collapse:collapse">
             <thead><tr><th>Fecha/Hora</th><th>Teléfono</th><th>Geocerca</th><th>Lat</th><th>Lng</th><th>Accuracy</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
-        <div style="margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap">
-          <button class="btn" id="btnSyncServer">Sincronizar del servidor</button>
-          <button class="btn" id="btnExportCSV">Exportar CSV</button>
-          <button class="btn" id="btnBorrarLogs">Borrar registros</button>
-        </div>
       </div>
+
       <div class="card">
         <h3 style="margin:0 0 .5rem">Gráfico: posiciones por día</h3>
         <canvas id="chartPos"></canvas>
@@ -181,12 +187,15 @@ section.panel.show{display:block}
       <div class="card">
         <h3 style="margin:0 0 .5rem">Parámetros</h3>
         <label>Webhook (POST/GET JSON)</label>
-        <input id="cfgWebhook" placeholder="https://script.google.com/macros/s/XXXXX/exec">
-        <div class="small muted" style="margin:.25rem 0 .5rem">Si lo defines, el tracker enviará al servidor (POST) y desde Reportes puedes sincronizar (GET).</div>
+        <input id="cfgWebhook" placeholder="https://script.google.com/macros/s/TU_ID/exec">
+        <div class="small muted" style="margin:.25rem 0 .5rem">
+          El tracker enviará a esta URL por <b>POST</b>. Los reportes se descargan por <b>GET</b> (btn o auto-sync).
+        </div>
         <label>Frecuencia (segundos)</label>
         <input id="cfgFreq" type="number" min="5" value="15">
         <div style="margin-top:.5rem"><button class="btn primary" id="btnGuardarCfg">Guardar Config</button></div>
       </div>
+
       <div class="card">
         <h3 style="margin:0 0 .5rem">Acceso rápido (TRACKER)</h3>
         <div style="display:flex;gap:.5rem;align-items:flex-end">
@@ -208,174 +217,11 @@ const TILE_PROVIDERS = [
   { name:'Carto',     url:'https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png' },
   { name:'Carto-b',   url:'https://cartodb-basemaps-b.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png' }
 ];
-function getSavedTileProviderIndex(){
-  const k='geo_tile_provider_idx';
-  const idx = parseInt(localStorage.getItem(k)||'0',10);
-  return Number.isFinite(idx)?Math.max(0, Math.min(TILE_PROVIDERS.length-1, idx)) : 0;
-}
+function getSavedTileProviderIndex(){ const k='geo_tile_provider_idx'; const idx=parseInt(localStorage.getItem(k)||'0',10); return Number.isFinite(idx)?Math.max(0,Math.min(TILE_PROVIDERS.length-1,idx)):0; }
 function saveTileProviderIndex(i){ localStorage.setItem('geo_tile_provider_idx', String(i)); }
 
-/* ---------- TinyMap (slippy sin librerías) ---------- */
-class TinyMap {
-  constructor(container, opts={}) {
-    this.c = typeof container==='string'?document.getElementById(container):container;
-    this.w = this.c.clientWidth; this.h = this.c.clientHeight;
-    this.z = opts.zoom ?? 5;
-    this.center = opts.center ?? {lat:0, lng:0};
-    this.enablePan = true;
-
-    this.providerIndex = getSavedTileProviderIndex();
-    this.srcTemplate = TILE_PROVIDERS[this.providerIndex].url;
-
-    this.tiles = document.createElement('div'); this.tiles.style.position='absolute'; this.tiles.style.left='0'; this.tiles.style.top='0';
-    this.c.appendChild(this.tiles);
-    this.svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-    this.svg.classList.add('svg-overlay'); this.svg.setAttribute('width',this.w); this.svg.setAttribute('height',this.h);
-    this.c.appendChild(this.svg);
-    this.markerEl = null;
-
-    this._bind();
-    this.render();
-  }
-  _bind(){
-    window.addEventListener('resize',()=>{ this.w=this.c.clientWidth; this.h=this.c.clientHeight; this.svg.setAttribute('width',this.w); this.svg.setAttribute('height',this.h); this.render(); });
-    let dragging=false, sx=0, sy=0;
-    const onMove=(x,y)=>{ if(!dragging||!this.enablePan) return; const dx=x-sx, dy=y-sy; const cp=this._project(this.center.lat,this.center.lng,this.z); const np={x:cp.x-dx,y:cp.y-dy}; const ll=this._unproject(np.x,np.y,this.z); this.center=ll; sx=x; sy=y; this.render();};
-    this.c.addEventListener('mousedown',e=>{ if(!this.enablePan) return; dragging=true; sx=e.clientX; sy=e.clientY; e.preventDefault();});
-    window.addEventListener('mousemove',e=>onMove(e.clientX,e.clientY));
-    window.addEventListener('mouseup',()=>dragging=false);
-    this.c.addEventListener('touchstart',e=>{ if(!this.enablePan) return; if(e.touches.length===1){ dragging=true; sx=e.touches[0].clientX; sy=e.touches[0].clientY; } },{passive:false});
-    this.c.addEventListener('touchmove',e=>{ if(!this.enablePan) return; if(e.touches.length===1){ onMove(e.touches[0].clientX,e.touches[0].clientY); } },{passive:false});
-    this.c.addEventListener('touchend',()=>dragging=false);
-    this.c.addEventListener('wheel',e=>{
-      e.preventDefault();
-      const delta = e.deltaY>0?-1:1;
-      const z2 = Math.min(19, Math.max(2, this.z + delta));
-      if(z2===this.z) return;
-      const pt = {x:e.offsetX, y:e.offsetY};
-      const before = this._unproject(this._project(this.center.lat,this.center.lng,this.z).x - (this.w/2 - pt.x), this._project(this.center.lat,this.center.lng,this.z).y - (this.h/2 - pt.y), this.z);
-      const p2 = this._project(before.lat, before.lng, z2);
-      const centerPx = {x:p2.x + (this.w/2 - pt.x), y:p2.y + (this.h/2 - pt.y)};
-      this.center = this._unproject(centerPx.x, centerPx.y, z2);
-      this.z = z2;
-      this.render();
-    }, {passive:false});
-    this.c.addEventListener('mousemove',e=>{
-      const cp=this._project(this.center.lat,this.center.lng,this.z);
-      const ll=this._unproject(cp.x - (this.w/2 - e.offsetX), cp.y - (this.h/2 - e.offsetY), this.z);
-      if(this.onPointer) this.onPointer(ll, e);
-    });
-  }
-  setView(lat,lng,zoom){ this.center={lat,lng}; if(zoom!=null) this.z=zoom; this.render(); }
-  screenToLatLng(x,y){ const cp=this._project(this.center.lat,this.center.lng,this.z); return this._unproject(cp.x - (this.w/2 - x), cp.y - (this.h/2 - y), this.z); }
-  addMarker(lat,lng){
-    if(!this.markerEl){
-      this.markerEl=document.createElementNS('http://www.w3.org/2000/svg','circle');
-      this.markerEl.setAttribute('r','6'); this.markerEl.classList.add('marker');
-      this.svg.appendChild(this.markerEl);
-    }
-    const p=this._toScreen(lat,lng);
-    this.markerEl.setAttribute('cx',p.x); this.markerEl.setAttribute('cy',p.y);
-    this.markerEl.__ll={lat,lng};
-  }
-  clearMarker(){ if(this.markerEl){ this.markerEl.remove(); this.markerEl=null; } }
-  addPolygon(coords, cls='poly'){
-    const pl=document.createElementNS('http://www.w3.org/2000/svg','polygon');
-    pl.setAttribute('points', coords.map(c=>{const p=this._toScreen(c[0],c[1]); return `${p.x},${p.y}`;}).join(' '));
-    pl.setAttribute('class',cls);
-    pl.__coords = coords.slice();
-    this.svg.appendChild(pl);
-    return pl;
-  }
-  updatePolygon(pl, coords){
-    pl.__coords = coords.slice();
-    pl.setAttribute('points', coords.map(c=>{const p=this._toScreen(c[0],c[1]); return `${p.x},${p.y}`;}).join(' '));
-  }
-  fitBounds(bounds){
-    const [[sLat,sLng],[nLat,nLng]] = bounds;
-    let z=19;
-    for(; z>=2; z--){
-      const p1=this._toScreenAt(sLat,sLng,z,true);
-      const p2=this._toScreenAt(nLat,nLng,z,true);
-      const minx=Math.min(p1.x,p2.x), maxx=Math.max(p1.x,p2.x);
-      const miny=Math.min(p1.y,p2.y), maxy=Math.max(p1.y,p2.y);
-      if((maxx-minx)<=this.w*0.85 && (maxy-miny)<=this.h*0.85) break;
-    }
-    this.z=z;
-    const cLat=(sLat+nLat)/2, cLng=(sLng+nLng)/2;
-    this.center={lat:cLat,lng:cLng};
-    this.render();
-  }
-  render(){
-    const cp = this._project(this.center.lat,this.center.lng,this.z);
-    const topLeft = {x: cp.x - this.w/2, y: cp.y - this.h/2};
-    const startX = Math.floor(topLeft.x/256), startY = Math.floor(topLeft.y/256);
-    const endX = Math.floor((topLeft.x+this.w)/256), endY = Math.floor((topLeft.y+this.h)/256);
-
-    while(this.tiles.firstChild) this.tiles.removeChild(this.tiles.firstChild);
-
-    const src = this.srcTemplate;
-    let loaded=0, failed=0, total=(endX-startX+1)*(endY-startY+1);
-    const onAllDone=()=>{ if(loaded===0){ this._tryNextProvider(); } };
-
-    for(let x=startX; x<=endX; x++){
-      for(let y=startY; y<=endY; y++){
-        const tx = ((x%Math.pow(2,this.z))+Math.pow(2,this.z))%Math.pow(2,this.z);
-        const ty = Math.max(0, Math.min(Math.pow(2,this.z)-1, y));
-        const img = document.createElement('img');
-        img.className='tile'; img.draggable=false; img.crossOrigin='anonymous'; img.referrerPolicy='no-referrer';
-        img.src = src.replace('{z}',this.z).replace('{x}',tx).replace('{y}',ty);
-        img.style.left = (x*256 - topLeft.x)+'px';
-        img.style.top  = (y*256 - topLeft.y)+'px';
-        img.onload = ()=>{ loaded++; if(loaded+failed===total) onAllDone(); };
-        img.onerror= ()=>{ failed++; if(loaded+failed===total) onAllDone(); };
-        this.tiles.appendChild(img);
-      }
-    }
-    this._redrawOverlays();
-  }
-  _tryNextProvider(){
-    this.providerIndex = (this.providerIndex+1) % TILE_PROVIDERS.length;
-    this.srcTemplate = TILE_PROVIDERS[this.providerIndex].url;
-    saveTileProviderIndex(this.providerIndex);
-    this.render();
-  }
-  forceReloadProviderCycle(){ this._tryNextProvider(); }
-  _redrawOverlays(){
-    this.svg.querySelectorAll('polygon.poly,polygon.temp').forEach(pl=>{
-      const data = pl.__coords || [];
-      this.updatePolygon(pl, data);
-    });
-    if(this.markerEl && this.markerEl.__ll){
-      const p=this._toScreen(this.markerEl.__ll.lat, this.markerEl.__ll.lng);
-      this.markerEl.setAttribute('cx',p.x); this.markerEl.setAttribute('cy',p.y);
-    }
-  }
-  _toScreen(lat,lng){
-    const p=this._project(this.center.lat,this.center.lng,this.z);
-    const q=this._project(lat,lng,this.z);
-    return {x:this.w/2 + (q.x-p.x), y:this.h/2 + (q.y-p.y)};
-  }
-  _toScreenAt(lat,lng,z,abs){
-    const cp=this._project(this.center.lat,this.center.lng,z);
-    const q=this._project(lat,lng,z);
-    return abs? q : {x:this.w/2 + (q.x-cp.x), y:this.h/2 + (q.y-cp.y)};
-  }
-  _project(lat,lng,z){
-    const sin=Math.sin(lat*Math.PI/180);
-    const n = Math.pow(2,z);
-    const x = ((lng+180)/360) * 256 * n;
-    const y = (0.5 - Math.log((1+sin)/(1-sin))/(4*Math.PI)) * 256 * n;
-    return {x,y};
-  }
-  _unproject(x,y,z){
-    const n = Math.PI - 2*Math.PI*y/(256*Math.pow(2,z));
-    return {
-      lng: x/(256*Math.pow(2,z))*360 - 180,
-      lat: (180/Math.PI)*Math.atan(0.5*(Math.exp(n)-Math.exp(-n)))
-    };
-  }
-}
+/* ---------- TinyMap ---------- */
+class TinyMap{constructor(c,o={}){this.c=typeof c==='string'?document.getElementById(c):c;this.w=this.c.clientWidth;this.h=this.c.clientHeight;this.z=o.zoom??5;this.center=o.center??{lat:0,lng:0};this.enablePan=true;this.providerIndex=getSavedTileProviderIndex();this.srcTemplate=TILE_PROVIDERS[this.providerIndex].url;this.tiles=document.createElement('div');this.tiles.style.position='absolute';this.tiles.style.left='0';this.tiles.style.top='0';this.c.appendChild(this.tiles);this.svg=document.createElementNS('http://www.w3.org/2000/svg','svg');this.svg.classList.add('svg-overlay');this.svg.setAttribute('width',this.w);this.svg.setAttribute('height',this.h);this.c.appendChild(this.svg);this.markerEl=null;this._bind();this.render()}_bind(){window.addEventListener('resize',()=>{this.w=this.c.clientWidth;this.h=this.c.clientHeight;this.svg.setAttribute('width',this.w);this.svg.setAttribute('height',this.h);this.render()});let d=false,sx=0,sy=0;const mv=(x,y)=>{if(!d||!this.enablePan)return;const dx=x-sx,dy=y-sy;const cp=this._project(this.center.lat,this.center.lng,this.z);const np={x:cp.x-dx,y:cp.y-dy};this.center=this._unproject(np.x,np.y,this.z);sx=x;sy=y;this.render()};this.c.addEventListener('mousedown',e=>{if(!this.enablePan)return;d=true;sx=e.clientX;sy=e.clientY;e.preventDefault()});window.addEventListener('mousemove',e=>mv(e.clientX,e.clientY));window.addEventListener('mouseup',()=>d=false);this.c.addEventListener('touchstart',e=>{if(!this.enablePan)return;if(e.touches.length===1){d=true;sx=e.touches[0].clientX;sy=e.touches[0].clientY}},{passive:false});this.c.addEventListener('touchmove',e=>{if(!this.enablePan)return;if(e.touches.length===1){mv(e.touches[0].clientX,e.touches[0].clientY)}},{passive:false});this.c.addEventListener('touchend',()=>d=false);this.c.addEventListener('wheel',e=>{e.preventDefault();const delta=e.deltaY>0?-1:1;const z2=Math.min(19,Math.max(2,this.z+delta));if(z2===this.z)return;const pt={x:e.offsetX,y:e.offsetY};const before=this._unproject(this._project(this.center.lat,this.center.lng,this.z).x-(this.w/2-pt.x),this._project(this.center.lat,this.center.lng,this.z).y-(this.h/2-pt.y),this.z);const p2=this._project(before.lat,before.lng,z2);const centerPx={x:p2.x+(this.w/2-pt.x),y:p2.y+(this.h/2-pt.y)};this.center=this._unproject(centerPx.x,centerPx.y,z2);this.z=z2;this.render()},{passive:false});this.c.addEventListener('mousemove',e=>{const cp=this._project(this.center.lat,this.center.lng,this.z);const ll=this._unproject(cp.x-(this.w/2-e.offsetX),cp.y-(this.h/2-e.offsetY),this.z);if(this.onPointer)this.onPointer(ll,e)})}setView(lat,lng,zoom){this.center={lat,lng};if(zoom!=null)this.z=zoom;this.render()}screenToLatLng(x,y){const cp=this._project(this.center.lat,this.center.lng,this.z);return this._unproject(cp.x-(this.w/2-x),cp.y-(this.h/2-y),this.z)}addMarker(lat,lng){if(!this.markerEl){this.markerEl=document.createElementNS('http://www.w3.org/2000/svg','circle');this.markerEl.setAttribute('r','6');this.markerEl.classList.add('marker');this.svg.appendChild(this.markerEl)}const p=this._toScreen(lat,lng);this.markerEl.setAttribute('cx',p.x);this.markerEl.setAttribute('cy',p.y);this.markerEl.__ll={lat,lng}}clearMarker(){if(this.markerEl){this.markerEl.remove();this.markerEl=null}}addPolygon(coords,cls='poly'){const pl=document.createElementNS('http://www.w3.org/2000/svg','polygon');pl.setAttribute('points',coords.map(c=>{const p=this._toScreen(c[0],c[1]);return `${p.x},${p.y}`}).join(' '));pl.setAttribute('class',cls);pl.__coords=coords.slice();this.svg.appendChild(pl);return pl}updatePolygon(pl,coords){pl.__coords=coords.slice();pl.setAttribute('points',coords.map(c=>{const p=this._toScreen(c[0],c[1]);return `${p.x},${p.y}`}).join(' '))}fitBounds(b){const [[sLat,sLng],[nLat,nLng]]=b;let z=19;for(;z>=2;z--){const p1=this._toScreenAt(sLat,sLng,z,true);const p2=this._toScreenAt(nLat,nLng,z,true);const minx=Math.min(p1.x,p2.x),maxx=Math.max(p1.x,p2.x);const miny=Math.min(p1.y,p2.y),maxy=Math.max(p1.y,p2.y);if((maxx-minx)<=this.w*0.85&&(maxy-miny)<=this.h*0.85)break}this.z=z;const cLat=(sLat+nLat)/2,cLng=(sLng+nLng)/2;this.center={lat:cLat,lng:cLng};this.render()}render(){const cp=this._project(this.center.lat,this.center.lng,this.z);const topLeft={x:cp.x-this.w/2,y:cp.y-this.h/2};const startX=Math.floor(topLeft.x/256),startY=Math.floor(topLeft.y/256);const endX=Math.floor((topLeft.x+this.w)/256),endY=Math.floor((topLeft.y+this.h)/256);while(this.tiles.firstChild)this.tiles.removeChild(this.tiles.firstChild);const src=this.srcTemplate;let loaded=0,failed=0,total=(endX-startX+1)*(endY-startY+1);const onAllDone=()=>{if(loaded===0){this._tryNextProvider()}};for(let x=startX;x<=endX;x++){for(let y=startY;y<=endY;y++){const tx=((x%Math.pow(2,this.z))+Math.pow(2,this.z))%Math.pow(2,this.z);const ty=Math.max(0,Math.min(Math.pow(2,this.z)-1,y));const img=document.createElement('img');img.className='tile';img.draggable=false;img.crossOrigin='anonymous';img.referrerPolicy='no-referrer';img.src=src.replace('{z}',this.z).replace('{x}',tx).replace('{y}',ty);img.style.left=(x*256-topLeft.x)+'px';img.style.top=(y*256-topLeft.y)+'px';img.onload=()=>{loaded++;if(loaded+failed===total)onAllDone()};img.onerror=()=>{failed++;if(loaded+failed===total)onAllDone()};this.tiles.appendChild(img)}}this._redrawOverlays()}_tryNextProvider(){this.providerIndex=(this.providerIndex+1)%TILE_PROVIDERS.length;this.srcTemplate=TILE_PROVIDERS[this.providerIndex].url;saveTileProviderIndex(this.providerIndex);this.render()}forceReloadProviderCycle(){this._tryNextProvider()}_redrawOverlays(){this.svg.querySelectorAll('polygon.poly,polygon.temp').forEach(pl=>{const data=pl.__coords||[];this.updatePolygon(pl,data)});if(this.markerEl&&this.markerEl.__ll){const p=this._toScreen(this.markerEl.__ll.lat,this.markerEl.__ll.lng);this.markerEl.setAttribute('cx',p.x);this.markerEl.setAttribute('cy',p.y)}}_toScreen(lat,lng){const p=this._project(this.center.lat,this.center.lng,this.z);const q=this._project(lat,lng,this.z);return {x:this.w/2+(q.x-p.x),y:this.h/2+(q.y-p.y)}}_toScreenAt(lat,lng,z,abs){const cp=this._project(this.center.lat,this.center.lng,z);const q=this._project(lat,lng,z);return abs?q:{x:this.w/2+(q.x-cp.x),y:this.h/2+(q.y-cp.y)}}_project(lat,lng,z){const sin=Math.sin(lat*Math.PI/180);const n=Math.pow(2,z);const x=((lng+180)/360)*256*n;const y=(0.5-Math.log((1+sin)/(1-sin))/(4*Math.PI))*256*n;return {x,y}}_unproject(x,y,z){const n=Math.PI-2*Math.PI*y/(256*Math.pow(2,z));return {lng:x/(256*Math.pow(2,z))*360-180,lat:(180/Math.PI)*Math.atan(0.5*(Math.exp(n)-Math.exp(-n)))}}}
 
 /* ---------- Utils ---------- */
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
@@ -383,8 +229,7 @@ const fmt=n=>(typeof n==='number')?Math.round(n*1e6)/1e6:n;
 const nowISO=()=>new Date().toISOString();
 const param=k=>new URL(location.href).searchParams.get(k);
 const escapeHtml=s=>String(s||'').replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;","&gt;":">","\"":"&quot;","'":"&#39;"}[m]));
-function encodeStateForShare(obj){ const json=JSON.stringify(obj); return btoa(unescape(encodeURIComponent(json))); }
-function decodeStateFromShare(b64){ try{ const json=decodeURIComponent(escape(atob(b64))); return JSON.parse(json); }catch(_){ return null; } }
+function encodeStateForShare(o){const j=JSON.stringify(o);return btoa(unescape(encodeURIComponent(j)))}function decodeStateFromShare(b){try{const j=decodeURIComponent(escape(atob(b)));return JSON.parse(j)}catch(_){return null}}
 
 const LS_PREFIX='app_geo_v3nocdn';
 const ctx={ farmId:null, data:{ fences:[], personal:[], logs:[], config:{webhook:'',freqSec:15} } };
@@ -415,145 +260,50 @@ $('#tabs').addEventListener('click',e=>{
 
 /* ---------- Mapa Admin + dibujo ---------- */
 let adminMap, adminPolys=[];
-function initAdminMap(){
-  if(adminMap) return;
-  adminMap = new TinyMap('map', {center:{lat:-1.8312,lng:-78.1834}, zoom:6});
-  adminMap.onPointer = ll => { $('#mapCoords').textContent=`Lat: ${fmt(ll.lat)} Lng: ${fmt(ll.lng)}`; };
-  $('#btnReloadTiles').onclick = ()=>{ adminMap.forceReloadProviderCycle(); };
-}
+function initAdminMap(){ if(adminMap) return; adminMap=new TinyMap('map',{center:{lat:-1.8312,lng:-78.1834},zoom:6}); adminMap.onPointer=ll=>{$('#mapCoords').textContent=`Lat: ${fmt(ll.lat)} Lng: ${fmt(ll.lng)}`}; $('#btnReloadTiles').onclick=()=>adminMap.forceReloadProviderCycle(); }
 function mapResize(){ initAdminMap(); adminMap.render(); }
-function mapRenderFences(){
-  initAdminMap();
-  adminPolys.forEach(p=>p.remove()); adminPolys=[];
-  if(ctx.data.fences.length===0){ adminMap.setView(-1.8312,-78.1834,6); return; }
-  let minLat= 90, minLng= 180, maxLat=-90, maxLng=-180;
-  for(const f of ctx.data.fences){
-    const pl = adminMap.addPolygon(f.coords);
-    adminPolys.push(pl);
-    f.coords.forEach(([la,ln])=>{ minLat=Math.min(minLat,la); maxLat=Math.max(maxLat,la); minLng=Math.min(minLng,ln); maxLng=Math.max(maxLng,ln); });
-  }
-  adminMap.fitBounds([[minLat,minLng],[maxLat,maxLng]]);
-}
+function mapRenderFences(){ initAdminMap(); adminPolys.forEach(p=>p.remove()); adminPolys=[]; if(ctx.data.fences.length===0){ adminMap.setView(-1.8312,-78.1834,6); return; } let minLat=90,minLng=180,maxLat=-90,maxLng=-180; for(const f of ctx.data.fences){ const pl=adminMap.addPolygon(f.coords); adminPolys.push(pl); f.coords.forEach(([la,ln])=>{minLat=Math.min(minLat,la);maxLat=Math.max(maxLat,la);minLng=Math.min(minLng,ln);maxLng=Math.max(maxLng,ln);}); } adminMap.fitBounds([[minLat,minLng],[maxLat,maxLng]]); }
 
-function renderFencesTable(){
-  const tb=$('#fencesTable tbody'); tb.innerHTML='';
-  const assigned=Object.fromEntries(ctx.data.fences.map(f=>[f.id,0]));
-  ctx.data.personal.forEach(p=>{ if(p.geocercaId) assigned[p.geocercaId]=(assigned[p.geocercaId]||0)+1; });
-  for(const f of ctx.data.fences){
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td contenteditable onblur="window._renameFence('${f.id}',this.textContent)">${escapeHtml(f.name)}</td>
-    <td>${f.coords.length}</td><td>${assigned[f.id]||0}</td>
-    <td><button class="btn" onclick="window._zoomFence('${f.id}')">Zoom</button>
-        <button class="btn danger" onclick="window._deleteFence('${f.id}')">Borrar</button></td>`;
-    tb.appendChild(tr);
-  }
-}
-window._zoomFence=id=>{
-  const f=ctx.data.fences.find(x=>x.id===id); if(!f) return;
-  let minLat= 90, minLng= 180, maxLat=-90, maxLng=-180;
-  f.coords.forEach(([la,ln])=>{ minLat=Math.min(minLat,la); maxLat=Math.max(maxLat,la); minLng=Math.min(minLng,ln); maxLng=Math.max(maxLng,ln); });
-  adminMap.fitBounds([[minLat,minLng],[maxLat,maxLng]]);
-};
+function renderFencesTable(){ const tb=$('#fencesTable tbody'); tb.innerHTML=''; const assigned=Object.fromEntries(ctx.data.fences.map(f=>[f.id,0])); ctx.data.personal.forEach(p=>{ if(p.geocercaId) assigned[p.geocercaId]=(assigned[p.geocercaId]||0)+1; }); for(const f of ctx.data.fences){ const tr=document.createElement('tr'); tr.innerHTML=`<td contenteditable onblur="window._renameFence('${f.id}',this.textContent)">${escapeHtml(f.name)}</td><td>${f.coords.length}</td><td>${assigned[f.id]||0}</td><td><button class="btn" onclick="window._zoomFence('${f.id}')">Zoom</button><button class="btn danger" onclick="window._deleteFence('${f.id}')">Borrar</button></td>`; tb.appendChild(tr);} }
+window._zoomFence=id=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f) return; let minLat=90,minLng=180,maxLat=-90,maxLng=-180; f.coords.forEach(([la,ln])=>{minLat=Math.min(minLat,la);maxLat=Math.max(maxLat,la);minLng=Math.min(minLng,ln);maxLng=Math.max(maxLng,ln);}); adminMap.fitBounds([[minLat,minLng],[maxLat,maxLng]]); };
 window._deleteFence=id=>{ if(!confirm('¿Eliminar geocerca?')) return; ctx.data.fences=ctx.data.fences.filter(f=>f.id!==id); saveAll(); mapRenderFences(); renderFencesTable(); }
 window._renameFence=(id,name)=>{ const f=ctx.data.fences.find(x=>x.id===id); if(!f) return; f.name=(name||'').trim()||f.name; saveAll(); renderFencesTable(); refreshFenceSelects(); }
 
 $('#btnGuardarGeocercas').onclick=()=>{ saveAll(); alert('Cambios guardados.'); };
-$('#btnCrearDesdeLista').onclick=()=>{
-  const name=$('#newFenceName').value.trim();
-  const txt=$('#coordsInput').value.trim();
-  if(!txt) return alert('Pega coordenadas');
-  const coords=txt.split(/\n+/).map(l=>{ const [a,b]=l.split(',').map(s=>parseFloat(s.trim())); return (Number.isFinite(a)&&Number.isFinite(b))?[a,b]:null; }).filter(Boolean);
-  if(coords.length<3) return alert('Se requieren ≥3 puntos');
-  const f={id:'g'+Date.now(),name:name||('Geocerca '+(ctx.data.fences.length+1)),coords};
-  ctx.data.fences.push(f); saveAll();
-  $('#coordsInput').value=''; $('#newFenceName').value='';
-  renderFencesTable(); refreshFenceSelects(); mapRenderFences();
-};
+$('#btnCrearDesdeLista').onclick=()=>{ const name=$('#newFenceName').value.trim(); const txt=$('#coordsInput').value.trim(); if(!txt) return alert('Pega coordenadas'); const coords=txt.split(/\n+/).map(l=>{ const [a,b]=l.split(',').map(s=>parseFloat(s.trim())); return (Number.isFinite(a)&&Number.isFinite(b))?[a,b]:null; }).filter(Boolean); if(coords.length<3) return alert('Se requieren ≥3 puntos'); const f={id:'g'+Date.now(),name:name||('Geocerca '+(ctx.data.fences.length+1)),coords}; ctx.data.fences.push(f); saveAll(); $('#coordsInput').value=''; $('#newFenceName').value=''; renderFencesTable(); refreshFenceSelects(); mapRenderFences(); };
 
 /* ---- Dibujo manual ---- */
 let drawing=false, drawPts=[], drawPoly=null, drawDots=[];
-function setDrawing(on){
-  drawing=on;
-  adminMap.enablePan = !on;
-  document.getElementById('drawToolbox').classList.toggle('hidden', !on);
-  if(!on){
-    drawPts=[]; if(drawPoly){ drawPoly.remove(); drawPoly=null; }
-    drawDots.forEach(d=>d.remove()); drawDots=[];
-  }
-}
-function addVertexAt(x,y){
-  const ll=adminMap.screenToLatLng(x,y);
-  drawPts.push([ll.lat,ll.lng]);
-  if(!drawPoly){
-    drawPoly = adminMap.addPolygon(drawPts,'poly temp');
-  }else{
-    adminMap.updatePolygon(drawPoly, drawPts);
-  }
-  const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
-  dot.setAttribute('r','4'); dot.setAttribute('class','vertex');
-  const p=adminMap._toScreen(ll.lat,ll.lng); dot.setAttribute('cx',p.x); dot.setAttribute('cy',p.y);
-  adminMap.svg.appendChild(dot); drawDots.push(dot);
-}
-function finishDrawing(){
-  if(drawPts.length<3){ alert('La geocerca necesita al menos 3 vértices.'); return; }
-  const name=prompt('Nombre de la geocerca:', 'Geocerca '+(ctx.data.fences.length+1));
-  if(!name){ return; }
-  ctx.data.fences.push({id:'g'+Date.now(), name, coords:drawPts.slice()});
-  saveAll(); renderFencesTable(); refreshFenceSelects(); mapRenderFences();
-  setDrawing(false);
-}
-document.getElementById('btnDrawFence').onclick=()=>{ setDrawing(!drawing); };
+function setDrawing(on){ drawing=on; adminMap.enablePan=!on; document.getElementById('drawToolbox').classList.toggle('hidden',!on); if(!on){ drawPts=[]; if(drawPoly){drawPoly.remove();drawPoly=null;} drawDots.forEach(d=>d.remove()); drawDots=[]; } }
+function addVertexAt(x,y){ const ll=adminMap.screenToLatLng(x,y); drawPts.push([ll.lat,ll.lng]); if(!drawPoly){ drawPoly=adminMap.addPolygon(drawPts,'poly temp'); } else { adminMap.updatePolygon(drawPoly,drawPts); } const dot=document.createElementNS('http://www.w3.org/2000/svg','circle'); dot.setAttribute('r','4'); dot.setAttribute('class','vertex'); const p=adminMap._toScreen(ll.lat,ll.lng); dot.setAttribute('cx',p.x); dot.setAttribute('cy',p.y); adminMap.svg.appendChild(dot); drawDots.push(dot); }
+function finishDrawing(){ if(drawPts.length<3){ alert('La geocerca necesita al menos 3 vértices.'); return; } const name=prompt('Nombre de la geocerca:','Geocerca '+(ctx.data.fences.length+1)); if(!name) return; ctx.data.fences.push({id:'g'+Date.now(),name,coords:drawPts.slice()}); saveAll(); renderFencesTable(); refreshFenceSelects(); mapRenderFences(); setDrawing(false); }
+document.getElementById('btnDrawFence').onclick=()=>setDrawing(!drawing);
 document.getElementById('btnFinishDraw').onclick=finishDrawing;
-
-document.getElementById('map').addEventListener('click',e=>{
-  if(!drawing) return;
-  const rect=e.currentTarget.getBoundingClientRect();
-  addVertexAt(e.clientX-rect.left, e.clientY-rect.top);
-});
-document.getElementById('map').addEventListener('dblclick',e=>{
-  if(!drawing) return;
-  e.preventDefault();
-  finishDrawing();
-});
-window.addEventListener('keydown',e=>{
-  if(!drawing) return;
-  if(e.key==='Escape'){ setDrawing(false); }
-});
+document.getElementById('map').addEventListener('click',e=>{ if(!drawing) return; const r=e.currentTarget.getBoundingClientRect(); addVertexAt(e.clientX-r.left,e.clientY-r.top); });
+document.getElementById('map').addEventListener('dblclick',e=>{ if(!drawing) return; e.preventDefault(); finishDrawing(); });
+window.addEventListener('keydown',e=>{ if(!drawing) return; if(e.key==='Escape') setDrawing(false); });
 
 /* ---------- Personal / enlaces ---------- */
-function refreshFenceSelects(){ $('#pGeocerca').innerHTML=['<option value=\"\">(sin asignar)</option>'].concat(ctx.data.fences.map(f=>`<option value=\"${f.id}\">${escapeHtml(f.name)}</option>`)).join(''); }
-function refreshActivePersonalSelects(){ const trackers=ctx.data.personal.filter(p=>p.rol==='TRACKER'); $('#quickUser').innerHTML=trackers.map(p=>`<option value=\"${p.id}\">${escapeHtml(p.nombre)} (${escapeHtml(p.telefono)})</option>`).join(''); }
+function refreshFenceSelects(){ $('#pGeocerca').innerHTML=['<option value="">(sin asignar)</option>'].concat(ctx.data.fences.map(f=>`<option value="${f.id}">${escapeHtml(f.name)}</option>`)).join(''); }
+function refreshActivePersonalSelects(){ const trackers=ctx.data.personal.filter(p=>p.rol==='TRACKER'); $('#quickUser').innerHTML=trackers.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre)} (${escapeHtml(p.telefono)})</option>`).join(''); }
 $('#btnAddPersonal').onclick=()=>{ const nombre=$('#pNombre').value.trim(); const telefono=$('#pTelefono').value.trim(); if(!nombre||!telefono) return alert('Completa nombre y teléfono'); const rol=$('#pRol').value; const activo=$('#pActivo').value==='true'; const geocercaId=$('#pGeocerca').value||''; ctx.data.personal.push({id:'p'+Date.now(),nombre,telefono,rol,activo,geocercaId}); saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); $('#pNombre').value=''; $('#pTelefono').value=''; };
-function trackerLinkFor(p){
-  const fence=ctx.data.fences.find(f=>f.id===p.geocercaId)||null;
-  const snapshot={ farmId:ctx.farmId, personal:{id:p.id,nombre:p.nombre,telefono:p.telefono,activo:p.activo,rol:p.rol,geocercaId:p.geocercaId}, fences: fence?[{id:fence.id,name:fence.name,coords:fence.coords}]:[], config:{freqSec:ctx.data.config.freqSec||15} };
-  const u=new URL(location.href); u.search=''; u.hash='';
-  u.searchParams.set('mode','tracker'); u.searchParams.set('phone',p.telefono); if(ctx.farmId) u.searchParams.set('farm',ctx.farmId);
-  u.searchParams.set('state', encodeStateForShare(snapshot));
-  return u.toString();
-}
-function renderPersonalTable(){
-  const tb=$('#personalTable tbody'); if(!tb) return; tb.innerHTML='';
-  for(const p of ctx.data.personal){
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td contenteditable onblur="window._pf('${p.id}','nombre',this.textContent)">${escapeHtml(p.nombre)}</td>
-    <td contenteditable onblur="window._pf('${p.id}','telefono',this.textContent)">${escapeHtml(p.telefono)}</td>
-    <td><select onchange="window._pf('${p.id}','rol',this.value)"><option ${p.rol==='TRACKER'?'selected':''}>TRACKER</option><option ${p.rol==='ADMIN'?'selected':''}>ADMIN</option></select></td>
-    <td><select onchange="window._pf('${p.id}','activo',this.value)"><option value="true" ${p.activo?'selected':''}>Sí</option><option value="false" ${!p.activo?'selected':''}>No</option></select></td>
-    <td><select onchange="window._pf('${p.id}','geocercaId',this.value)"><option value="">(sin)</option>${ctx.data.fences.map(f=>`<option value="${f.id}" ${p.geocercaId===f.id?'selected':''}>${escapeHtml(f.name)}</option>`).join('')}</select></td>
-    <td><input readonly value="${trackerLinkFor(p)}" style="width:260px"/></td>
-    <td><button class="btn" onclick="window.open('${trackerLinkFor(p)}','_blank')">Abrir</button></td>`;
-    tb.appendChild(tr);
-  }
-}
+function trackerLinkFor(p){ const fence=ctx.data.fences.find(f=>f.id===p.geocercaId)||null; const snapshot={ farmId:ctx.farmId, personal:{id:p.id,nombre:p.nombre,telefono:p.telefono,activo:p.activo,rol:p.rol,geocercaId:p.geocercaId}, fences: fence?[{id:fence.id,name:fence.name,coords:fence.coords}]:[], config:{freqSec:ctx.data.config.freqSec||15} }; const u=new URL(location.href); u.search=''; u.hash=''; u.searchParams.set('mode','tracker'); u.searchParams.set('phone',p.telefono); if(ctx.farmId) u.searchParams.set('farm',ctx.farmId); u.searchParams.set('state', encodeStateForShare(snapshot)); return u.toString(); }
+function renderPersonalTable(){ const tb=$('#personalTable tbody'); if(!tb) return; tb.innerHTML=''; for(const p of ctx.data.personal){ const tr=document.createElement('tr'); tr.innerHTML=`<td contenteditable onblur="window._pf('${p.id}','nombre',this.textContent)">${escapeHtml(p.nombre)}</td><td contenteditable onblur="window._pf('${p.id}','telefono',this.textContent)">${escapeHtml(p.telefono)}</td><td><select onchange="window._pf('${p.id}','rol',this.value)"><option ${p.rol==='TRACKER'?'selected':''}>TRACKER</option><option ${p.rol==='ADMIN'?'selected':''}>ADMIN</option></select></td><td><select onchange="window._pf('${p.id}','activo',this.value)"><option value="true" ${p.activo?'selected':''}>Sí</option><option value="false" ${!p.activo?'selected':''}>No</option></select></td><td><select onchange="window._pf('${p.id}','geocercaId',this.value)"><option value="">(sin)</option>${ctx.data.fences.map(f=>`<option value="${f.id}" ${p.geocercaId===f.id?'selected':''}>${escapeHtml(f.name)}</option>`).join('')}</select></td><td><input readonly value="${trackerLinkFor(p)}" style="width:260px"/></td><td><button class="btn" onclick="window.open('${trackerLinkFor(p)}','_blank')">Abrir</button></td>`; tb.appendChild(tr);} }
 window._pf=(id,field,value)=>{ const p=ctx.data.personal.find(x=>x.id===id); if(!p) return; if(field==='activo') value=(value==='true'); p[field]=value; saveAll(); renderPersonalTable(); refreshActivePersonalSelects(); };
 
 $('#btnCopiarEnlace').onclick=async()=>{ const id=$('#quickUser').value; const p=ctx.data.personal.find(x=>x.id===id); if(!p) return; const link=trackerLinkFor(p); try{ await navigator.clipboard.writeText(link); $('#copiedMsg').textContent='¡Copiado!'; setTimeout(()=>$('#copiedMsg').textContent='',1500);}catch(_){ alert(link); } };
 
 /* ---------- Reportes ---------- */
-function renderLogs(){ const tb=$('#logsTable tbody'); if(!tb) return; tb.innerHTML=''; for(const Lg of ctx.data.logs.slice().reverse()){ const f=ctx.data.fences.find(x=>x.id===Lg.geocercaId)?.name||Lg.geocercaId||''; const tr=document.createElement('tr'); tr.innerHTML=`<td>${escapeHtml(Lg.ts)}</td><td>${escapeHtml(Lg.telefono)}</td><td>${escapeHtml(f)}</td><td>${fmt(Lg.lat)}</td><td>${fmt(Lg.lng)}</td><td>${Lg.acc??''}</td>`; tb.appendChild(tr);} }
+function renderLogs(){ const tb=$('#logsTable tbody'); if(!tb) return; tb.innerHTML=''; for(const l of ctx.data.logs.slice().reverse()){ const fname=ctx.data.fences.find(x=>x.id===l.geocercaId)?.name||l.geocercaId||''; const tr=document.createElement('tr'); tr.innerHTML=`<td>${escapeHtml(l.ts)}</td><td>${escapeHtml(l.telefono)}</td><td>${escapeHtml(fname)}</td><td>${fmt(l.lat)}</td><td>${fmt(l.lng)}</td><td>${l.acc??''}</td>`; tb.appendChild(tr);} }
 $('#btnExportCSV').onclick=()=>{ const rows=[['ts','telefono','geocerca','lat','lng','accuracy']].concat(ctx.data.logs.map(l=>[l.ts,l.telefono,l.geocercaId,l.lat,l.lng,l.acc])); const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'\"')}"`).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`logs_${ctx.farmId||'finca'}.csv`; a.click(); };
 $('#btnBorrarLogs').onclick=()=>{ if(!confirm('¿Borrar todos los registros?')) return; ctx.data.logs=[]; saveAll(); renderLogs(); drawChart(); };
+
+/* --- Sincronización remota (GET) + Auto-sync --- */
+let autoSyncTimer=null;
+function setAutoSync(on){ if(autoSyncTimer){ clearInterval(autoSyncTimer); autoSyncTimer=null; } if(on){ autoSyncTimer=setInterval(syncFromServer, 10000); } }
+$('#autoSyncChk').onchange=e=>{ const on=e.target.checked; localStorage.setItem(`${LS_PREFIX}_autoSync`, on?'1':'0'); setAutoSync(on); };
+function loadAutoSync(){ const on=localStorage.getItem(`${LS_PREFIX}_autoSync`)==='1'; $('#autoSyncChk').checked=on; setAutoSync(on); }
+function markLastSync(){ $('#lastSyncTxt').textContent='Última sync: '+new Date().toLocaleString(); }
 
 async function syncFromServer(){
   const urlBase=(ctx.data.config.webhook||'').trim();
@@ -570,8 +320,8 @@ async function syncFromServer(){
       if(!seen.has(key)){ ctx.data.logs.push(r); seen.add(key); added++; }
     }
     ctx.data.logs.sort((a,b)=> String(a.ts).localeCompare(String(b.ts)));
-    saveAll(); renderLogs(); drawChart();
-    alert(`Sincronización completa. Registros nuevos: ${added}`);
+    saveAll(); renderLogs(); drawChart(); markLastSync();
+    if(added>0 && !$('#autoSyncChk').checked) alert(`Registros nuevos: ${added}`);
   }catch(err){
     console.error(err); alert('Error al sincronizar: '+err);
   }
@@ -613,8 +363,6 @@ function initTracker(hasSnapshot){
 
   mini = new TinyMap('miniMap', {center:{lat:-1.8312,lng:-78.1834}, zoom:6});
   mini.onPointer = ll => { $('#miniCoords').textContent=`Lat: ${fmt(ll.lat)} Lng: ${fmt(ll.lng)}`; };
-
-  // Dibuja y ENCUADRA la geocerca asignada
   if(trackerFence){
     miniFence = trackerFence.coords;
     mini.addPolygon(miniFence);
@@ -688,8 +436,10 @@ function start(){
   $('#trackerShell').classList.add('hidden');
   $('#adminShell').classList.remove('hidden');
   initAdminMap(); mapRenderFences();
+  loadAutoSync();     // <-- inicia auto-sync si estaba activado
 }
 window.addEventListener('load', start);
 </script>
 </body>
 </html>
+
