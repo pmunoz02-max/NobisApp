@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>App Fincas · Geocercas + Trackers (sin CDNs, con fallback de tiles)</title>
+<title>App Fincas · Geocercas + Trackers (fallback tiles)</title>
 
 <style>
 :root{--c1:#0b5;--c2:#095;--danger:#d33}
@@ -11,6 +11,9 @@
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#fafafa;color:#222}
 header{position:sticky;top:0;z-index:10;display:flex;gap:.5rem;align-items:center;padding:.75rem 1rem;background:#fff;border-bottom:1px solid #ddd}
 header h1{font-size:1rem;margin:0 0 0 .25rem;font-weight:700}
+#adminHeaderControls{display:flex;gap:.5rem;align-items:center}
+.is-tracker #adminHeaderControls{display:none !important}
+
 .wrap{max-width:1200px;margin:0 auto;padding:1rem}
 .btn{border:1px solid #ccc;background:#fff;padding:.5rem .75rem;border-radius:.5rem;cursor:pointer}
 .btn.primary{background:var(--c1);border-color:var(--c2);color:#fff}
@@ -30,7 +33,6 @@ section.panel.show{display:block}
 .map{height:520px;border-radius:.75rem;border:1px solid #e5e5e5;background:#f2f2f2;position:relative;overflow:hidden;touch-action:none}
 .mini-map{height:360px;border-radius:.75rem;border:1px solid #e5e5e5;position:relative;overflow:hidden;touch-action:none}
 .coords{position:absolute;right:.75rem;bottom:.75rem;background:rgba(255,255,255,.92);border:1px solid #ddd;border-radius:.5rem;padding:.25rem .5rem;font-size:.85rem;z-index:5}
-.is-tracker #adminHeaderControls{display:none}
 
 .tile{position:absolute;image-rendering:auto}
 .svg-overlay{position:absolute;left:0;top:0;pointer-events:none}
@@ -47,7 +49,8 @@ section.panel.show{display:block}
   <div class="badge ok" title="App OK"></div>
   <h1>App Fincas · Geocercas + Trackers</h1>
   <div style="flex:1"></div>
-  <span id="adminHeaderControls" style="display:flex;gap:.5rem;align-items:center">
+  <!-- Controles solo para ADMIN (ocultos en tracker) -->
+  <span id="adminHeaderControls">
     <label class="small muted" style="margin-right:.25rem">Finca:</label>
     <select id="farmSelect"></select>
     <button class="btn" id="btnNuevaFinca">Crear</button>
@@ -94,7 +97,7 @@ section.panel.show{display:block}
             <button class="btn" id="btnDrawFence">Nueva Geocerca (dibujar)</button>
             <button class="btn" id="btnFinishDraw" title="Finaliza y guarda la geocerca">Finalizar dibujo</button>
             <button class="btn" id="btnGuardarGeocercas">Guardar Cambios</button>
-            <button class="btn" id="btnReloadTiles" title="Forzar recarga y cambio de proveedor de tiles">Recargar mapa</button>
+            <button class="btn" id="btnReloadTiles" title="Cambiar proveedor de tiles">Recargar mapa</button>
           </div>
           <div style="margin-top:.75rem">
             <label class="small">Crear desde Lat,Lng (una por línea)</label>
@@ -335,12 +338,9 @@ class TinyMap {
     this.providerIndex = (this.providerIndex+1) % TILE_PROVIDERS.length;
     this.srcTemplate = TILE_PROVIDERS[this.providerIndex].url;
     saveTileProviderIndex(this.providerIndex);
-    // forzar una re-renderización rápida
     this.render();
   }
-  forceReloadProviderCycle(){
-    this._tryNextProvider();
-  }
+  forceReloadProviderCycle(){ this._tryNextProvider(); }
   _redrawOverlays(){
     this.svg.querySelectorAll('polygon.poly,polygon.temp').forEach(pl=>{
       const data = pl.__coords || [];
@@ -585,7 +585,7 @@ function drawChart(){ if(!window.Chart) return; const data={}; for(const l of ct
 function loadSectionForFarm(farmId, section){ try{ return JSON.parse(localStorage.getItem(`${LS_PREFIX}_${farmId}_${section}`)||'[]'); }catch(_){ return []; } }
 function resolveFarmByPhone(phone){ if(!phone) return null; const farms=ensureFarmList().get(); for(const f of farms){ const people=loadSectionForFarm(f.id,'personal'); const hit=people.find(p=>p.telefono===phone && p.activo); if(hit) return f.id; } return null; }
 
-let mini, miniFence=null, miniFenceEl=null, watchId=null, sendTimer=null, trackerUser=null, trackerFence=null, lastPos=null, lastInside=false;
+let mini, miniFence=null, watchId=null, sendTimer=null, trackerUser=null, trackerFence=null, lastPos=null, lastInside=false;
 function pointInPolygon(point, vs){ const x=point[1], y=point[0]; let inside=false; for(let i=0,j=vs.length-1;i<vs.length;j=i++){ const xi=vs[i][1], yi=vs[i][0], xj=vs[j][1], yj=vs[j][0]; const intersect=((yi>y)!=(yj>y))&&(x< (xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi); if(intersect) inside=!inside; } return inside; }
 function setState(kind,text){ const dot=$('#trackerStateDot'); const tx=$('#trackerStateText'); dot.classList.remove('ok','no','idle'); dot.classList.add(kind); tx.textContent=text; }
 
@@ -613,9 +613,14 @@ function initTracker(hasSnapshot){
 
   mini = new TinyMap('miniMap', {center:{lat:-1.8312,lng:-78.1834}, zoom:6});
   mini.onPointer = ll => { $('#miniCoords').textContent=`Lat: ${fmt(ll.lat)} Lng: ${fmt(ll.lng)}`; };
+
+  // Dibuja y ENCUADRA la geocerca asignada
   if(trackerFence){
     miniFence = trackerFence.coords;
-    miniFenceEl = mini.addPolygon(miniFence);
+    mini.addPolygon(miniFence);
+    let minLat=90,minLng=180,maxLat=-90,maxLng=-180;
+    miniFence.forEach(([la,ln])=>{minLat=Math.min(minLat,la);maxLat=Math.max(maxLat,la);minLng=Math.min(minLng,ln);maxLng=Math.max(maxLng,ln);});
+    mini.fitBounds([[minLat,minLng],[maxLat,maxLng]]);
   }
 
   $('#toggleSend').onchange=e=>toggleSending(e.target.checked);
