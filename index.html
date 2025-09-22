@@ -57,7 +57,7 @@ section.panel.show{display:block}
   </span>
 </header>
 
-<!-- TRACKER -->
+<!-- TRACKER (sin botones de finca/crear/eliminar) -->
 <div id="trackerShell" class="wrap hidden">
   <div class="grid grid-2">
     <div class="card">
@@ -210,6 +210,9 @@ section.panel.show{display:block}
 </div>
 
 <script>
+/* ====== Parámetro por defecto de tu finca ====== */
+const DEFAULT_FARM_ID = 'f1758496281347';
+
 /* ---------- Proveedores de tiles con fallback ---------- */
 const TILE_PROVIDERS = [
   { name:'OSM',       url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png' },
@@ -220,7 +223,7 @@ const TILE_PROVIDERS = [
 function getSavedTileProviderIndex(){ const k='geo_tile_provider_idx'; const idx=parseInt(localStorage.getItem(k)||'0',10); return Number.isFinite(idx)?Math.max(0,Math.min(TILE_PROVIDERS.length-1,idx)):0; }
 function saveTileProviderIndex(i){ localStorage.setItem('geo_tile_provider_idx', String(i)); }
 
-/* ---------- TinyMap ---------- */
+/* ---------- TinyMap minimal ---------- */
 class TinyMap{constructor(c,o={}){this.c=typeof c==='string'?document.getElementById(c):c;this.w=this.c.clientWidth;this.h=this.c.clientHeight;this.z=o.zoom??5;this.center=o.center??{lat:0,lng:0};this.enablePan=true;this.providerIndex=getSavedTileProviderIndex();this.srcTemplate=TILE_PROVIDERS[this.providerIndex].url;this.tiles=document.createElement('div');this.tiles.style.position='absolute';this.tiles.style.left='0';this.tiles.style.top='0';this.c.appendChild(this.tiles);this.svg=document.createElementNS('http://www.w3.org/2000/svg','svg');this.svg.classList.add('svg-overlay');this.svg.setAttribute('width',this.w);this.svg.setAttribute('height',this.h);this.c.appendChild(this.svg);this.markerEl=null;this._bind();this.render()}_bind(){window.addEventListener('resize',()=>{this.w=this.c.clientWidth;this.h=this.c.clientHeight;this.svg.setAttribute('width',this.w);this.svg.setAttribute('height',this.h);this.render()});let d=false,sx=0,sy=0;const mv=(x,y)=>{if(!d||!this.enablePan)return;const dx=x-sx,dy=y-sy;const cp=this._project(this.center.lat,this.center.lng,this.z);const np={x:cp.x-dx,y:cp.y-dy};this.center=this._unproject(np.x,np.y,this.z);sx=x;sy=y;this.render()};this.c.addEventListener('mousedown',e=>{if(!this.enablePan)return;d=true;sx=e.clientX;sy=e.clientY;e.preventDefault()});window.addEventListener('mousemove',e=>mv(e.clientX,e.clientY));window.addEventListener('mouseup',()=>d=false);this.c.addEventListener('touchstart',e=>{if(!this.enablePan)return;if(e.touches.length===1){d=true;sx=e.touches[0].clientX;sy=e.touches[0].clientY}},{passive:false});this.c.addEventListener('touchmove',e=>{if(!this.enablePan)return;if(e.touches.length===1){mv(e.touches[0].clientX,e.touches[0].clientY)}},{passive:false});this.c.addEventListener('touchend',()=>d=false);this.c.addEventListener('wheel',e=>{e.preventDefault();const delta=e.deltaY>0?-1:1;const z2=Math.min(19,Math.max(2,this.z+delta));if(z2===this.z)return;const pt={x:e.offsetX,y:e.offsetY};const before=this._unproject(this._project(this.center.lat,this.center.lng,this.z).x-(this.w/2-pt.x),this._project(this.center.lat,this.center.lng,this.z).y-(this.h/2-pt.y),this.z);const p2=this._project(before.lat,before.lng,z2);const centerPx={x:p2.x+(this.w/2-pt.x),y:p2.y+(this.h/2-pt.y)};this.center=this._unproject(centerPx.x,centerPx.y,z2);this.z=z2;this.render()},{passive:false});this.c.addEventListener('mousemove',e=>{const cp=this._project(this.center.lat,this.center.lng,this.z);const ll=this._unproject(cp.x-(this.w/2-e.offsetX),cp.y-(this.h/2-e.offsetY),this.z);if(this.onPointer)this.onPointer(ll,e)})}setView(lat,lng,zoom){this.center={lat,lng};if(zoom!=null)this.z=zoom;this.render()}screenToLatLng(x,y){const cp=this._project(this.center.lat,this.center.lng,this.z);return this._unproject(cp.x-(this.w/2-x),cp.y-(this.h/2-y),this.z)}addMarker(lat,lng){if(!this.markerEl){this.markerEl=document.createElementNS('http://www.w3.org/2000/svg','circle');this.markerEl.setAttribute('r','6');this.markerEl.classList.add('marker');this.svg.appendChild(this.markerEl)}const p=this._toScreen(lat,lng);this.markerEl.setAttribute('cx',p.x);this.markerEl.setAttribute('cy',p.y);this.markerEl.__ll={lat,lng}}clearMarker(){if(this.markerEl){this.markerEl.remove();this.markerEl=null}}addPolygon(coords,cls='poly'){const pl=document.createElementNS('http://www.w3.org/2000/svg','polygon');pl.setAttribute('points',coords.map(c=>{const p=this._toScreen(c[0],c[1]);return `${p.x},${p.y}`}).join(' '));pl.setAttribute('class',cls);pl.__coords=coords.slice();this.svg.appendChild(pl);return pl}updatePolygon(pl,coords){pl.__coords=coords.slice();pl.setAttribute('points',coords.map(c=>{const p=this._toScreen(c[0],c[1]);return `${p.x},${p.y}`}).join(' '))}fitBounds(b){const [[sLat,sLng],[nLat,nLng]]=b;let z=19;for(;z>=2;z--){const p1=this._toScreenAt(sLat,sLng,z,true);const p2=this._toScreenAt(nLat,nLng,z,true);const minx=Math.min(p1.x,p2.x),maxx=Math.max(p1.x,p2.x);const miny=Math.min(p1.y,p2.y),maxy=Math.max(p1.y,p2.y);if((maxx-minx)<=this.w*0.85&&(maxy-miny)<=this.h*0.85)break}this.z=z;const cLat=(sLat+nLat)/2,cLng=(sLng+nLng)/2;this.center={lat:cLat,lng:cLng};this.render()}render(){const cp=this._project(this.center.lat,this.center.lng,this.z);const topLeft={x:cp.x-this.w/2,y:cp.y-this.h/2};const startX=Math.floor(topLeft.x/256),startY=Math.floor(topLeft.y/256);const endX=Math.floor((topLeft.x+this.w)/256),endY=Math.floor((topLeft.y+this.h)/256);while(this.tiles.firstChild)this.tiles.removeChild(this.tiles.firstChild);const src=this.srcTemplate;let loaded=0,failed=0,total=(endX-startX+1)*(endY-startY+1);const onAllDone=()=>{if(loaded===0){this._tryNextProvider()}};for(let x=startX;x<=endX;x++){for(let y=startY;y<=endY;y++){const tx=((x%Math.pow(2,this.z))+Math.pow(2,this.z))%Math.pow(2,this.z);const ty=Math.max(0,Math.min(Math.pow(2,this.z)-1,y));const img=document.createElement('img');img.className='tile';img.draggable=false;img.crossOrigin='anonymous';img.referrerPolicy='no-referrer';img.src=src.replace('{z}',this.z).replace('{x}',tx).replace('{y}',ty);img.style.left=(x*256-topLeft.x)+'px';img.style.top=(y*256-topLeft.y)+'px';img.onload=()=>{loaded++;if(loaded+failed===total)onAllDone()};img.onerror=()=>{failed++;if(loaded+failed===total)onAllDone()};this.tiles.appendChild(img)}}this._redrawOverlays()}_tryNextProvider(){this.providerIndex=(this.providerIndex+1)%TILE_PROVIDERS.length;this.srcTemplate=TILE_PROVIDERS[this.providerIndex].url;saveTileProviderIndex(this.providerIndex);this.render()}forceReloadProviderCycle(){this._tryNextProvider()}_redrawOverlays(){this.svg.querySelectorAll('polygon.poly,polygon.temp').forEach(pl=>{const data=pl.__coords||[];this.updatePolygon(pl,data)});if(this.markerEl&&this.markerEl.__ll){const p=this._toScreen(this.markerEl.__ll.lat,this.markerEl.__ll.lng);this.markerEl.setAttribute('cx',p.x);this.markerEl.setAttribute('cy',p.y)}}_toScreen(lat,lng){const p=this._project(this.center.lat,this.center.lng,this.z);const q=this._project(lat,lng,this.z);return {x:this.w/2+(q.x-p.x),y:this.h/2+(q.y-p.y)}}_toScreenAt(lat,lng,z,abs){const cp=this._project(this.center.lat,this.center.lng,z);const q=this._project(lat,lng,z);return abs?q:{x:this.w/2+(q.x-cp.x),y:this.h/2+(q.y-cp.y)}}_project(lat,lng,z){const sin=Math.sin(lat*Math.PI/180);const n=Math.pow(2,z);const x=((lng+180)/360)*256*n;const y=(0.5-Math.log((1+sin)/(1-sin))/(4*Math.PI))*256*n;return {x,y}}_unproject(x,y,z){const n=Math.PI-2*Math.PI*y/(256*Math.pow(2,z));return {lng:x/(256*Math.pow(2,z))*360-180,lat:(180/Math.PI)*Math.atan(0.5*(Math.exp(n)-Math.exp(-n)))}}}
 
 /* ---------- Utils ---------- */
@@ -241,6 +244,7 @@ function normalizeWebhook(u){
 
 function encodeStateForShare(o){const j=JSON.stringify(o);return btoa(unescape(encodeURIComponent(j)))}function decodeStateFromShare(b){try{const j=decodeURIComponent(escape(atob(b)));return JSON.parse(j)}catch(_){return null}}
 
+/* ---------- Storage + contexto ---------- */
 const LS_PREFIX='app_geo_v3nocdn';
 const ctx={ farmId:null, data:{ fences:[], personal:[], logs:[], config:{webhook:'',freqSec:15} } };
 function storageKey(section){ return `${LS_PREFIX}_${ctx.farmId||'default'}_${section}`; }
@@ -338,8 +342,21 @@ async function syncFromServer(){
 }
 $('#btnSyncServer').onclick=syncFromServer;
 
+/* --- Gráfico simple con Canvas (sin CDN, opcional) --- */
 let chart;
-function drawChart(){ if(!window.Chart) return; const data={}; for(const l of ctx.data.logs){ const d=l.ts.slice(0,10); data[d]=(data[d]||0)+1; } const labels=Object.keys(data).sort(); const values=labels.map(k=>data[k]); const el=document.getElementById('chartPos'); if(!el) return; if(chart) chart.destroy(); chart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Posiciones/día',data:values}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}}); }
+function drawChart(){
+  const el=document.getElementById('chartPos'); if(!el) return;
+  const ctx2=el.getContext('2d'); el.width=el.clientWidth; el.height=280;
+  const data={}; for(const l of ctx.data.logs){ const d=l.ts.slice(0,10); data[d]=(data[d]||0)+1; }
+  const keys=Object.keys(data).sort(); const vals=keys.map(k=>data[k]);
+  ctx2.clearRect(0,0,el.width,el.height);
+  if(keys.length===0) return;
+  const max=Math.max(...vals,5), pad=30, barW=(el.width-pad*2)/keys.length*0.7, gap=(el.width-pad*2)/keys.length*0.3;
+  ctx2.strokeStyle='#ddd'; ctx2.beginPath(); ctx2.moveTo(pad, pad); ctx2.lineTo(pad, el.height-pad); ctx2.lineTo(el.width-pad, el.height-pad); ctx2.stroke();
+  ctx2.fillStyle='#1e88e5';
+  keys.forEach((k,i)=>{ const x=pad+i*(barW+gap)+gap/2; const y=el.height-pad-(vals[i]/max)*(el.height-pad*2); const h=el.height-pad-y; ctx2.fillRect(x,y,barW,h); });
+  ctx2.fillStyle='#555'; ctx2.font='12px system-ui'; keys.forEach((k,i)=>{ const x=pad+i*(barW+gap)+gap/2; ctx2.save(); ctx2.translate(x+barW/2, el.height-pad+12); ctx2.rotate(-Math.PI/4); ctx2.fillText(k,0,0); ctx2.restore(); });
+}
 
 /* ---------- Tracker ---------- */
 function loadSectionForFarm(farmId, section){ try{ return JSON.parse(localStorage.getItem(`${LS_PREFIX}_${farmId}_${section}`)||'[]'); }catch(_){ return []; } }
@@ -437,13 +454,19 @@ function start(){
   }
 
   document.body.classList.remove('is-tracker');
+  // Fincas: si no hay, crea una por defecto con tu ID
+  let farms = ensureFarmList().get();
+  if(farms.length===0){
+    farms = [{ id: DEFAULT_FARM_ID, nombre: 'Mi Finca' }];
+    farmsState.set(farms);
+  }
   renderFarms();
   if(!ctx.farmId){
-    const id='f'+Date.now();
-    const arr=farmsState.get(); arr.push({id,nombre:'Mi Finca'}); farmsState.set(arr);
-    ctx.farmId=id; renderFarms();
+    ctx.farmId = farms[0].id || DEFAULT_FARM_ID;
+    renderFarms();
   }
   chooseFarm(ctx.farmId);
+
   $('#trackerShell').classList.add('hidden');
   $('#adminShell').classList.remove('hidden');
   initAdminMap(); mapRenderFences();
